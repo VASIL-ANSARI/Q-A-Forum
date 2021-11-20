@@ -1,0 +1,76 @@
+<p>Lots of questions here. I'll answer the questions with a focus on FluentMigrator.</p>
+
+<blockquote>
+  <p>Is it a way to initially create then maintain updates for a database
+  by way of versioning.</p>
+</blockquote>
+
+<p>FluentMigrator is a way to version control your database schema. Everyone does it in some way. Either manually, with sql scripts, with a tool like SqlCompare or a Visual Studio Database project. All these methods are easy to mess up. It is so easy to make a mistake when releasing a new version and cause the system to crash. Migrations is a better way to handle this.</p>
+
+<p>FluentMigrator allows you to define a change to the schema as code and this is usually checked in to your source control with the other code changes. Meaning that you can say version 1.XX of your system should have version 123 of the database. It means if you roll back your code to the previous version you also know what version of the database to rollback to as well.</p>
+
+<p>It can be used both to create the database schema from the beginning or to start with version control of the schema for an existing database. </p>
+
+<p>A Migration is a way to describe a change to your database schema. FluentMigrator creates a VersionInfo table and stores the unique id (version number) of the Migration after is has been applied. </p>
+
+<p>For example, if I have two Migrations one with Id 1 and one with Id 2. If then I execute the first Migration then Id 1 will be stored in the VersionInfo table and I can look there and know that the version of the database is 1 and that version 2 has not been applied yet.</p>
+
+<p>Being able to know which version the database schema is very useful when pushing changes from Test to Production or if you have multiple copies of the database in Production. For example, I have a customer with offices all around the world and each office has their own copy of the database and all of them are on different versions. Without knowing the database version it would be very difficult to update them safely.</p>
+
+<p>Most of the time I do not need to actually look in the VersionInfo table, FluentMigrator handles this automatically. It compares the assembly with Migrations to the VersionInfo table and figures out which changes have not been applied yet and then executes those.</p>
+
+<blockquote>
+  <p>The first migration (or initial version of the database) would contain
+  all the tables, relationships and properties required (done either
+  fluently or using a chunk of sql in a script).</p>
+</blockquote>
+
+<p>The starting point is up to you. You can have a first migration that is an sql script that you have generated from the current database. You could could also use one of the contrib projects like <a href="https://github.com/schambers/fluentmigrator/tree/master/src/FluentMigrator.T4">FluentMigrator.T4</a> to generate a Fluent Migration. Or you could just decide that the existing database is the starting point and save a copy of it to be able to restore it as version 1.</p>
+
+<p>I have introduced FluentMigrator to a lot of legacy databases without any major problems.</p>
+
+<blockquote>
+  <p>When you want to push a change to a database, you would create a new
+  migration method (Up and Down), something like add a new table or
+  modify a field.</p>
+</blockquote>
+
+<p>Yes, Up is used to apply the change specified in the Migration and Down rolls it back. So Up could be to create a table and Down could be to drop the table.</p>
+
+<blockquote>
+  <p>To deploy one of these migrations, you would use a command line
+  specifying the dll containing the migration, the connection string and
+  the required version.</p>
+</blockquote>
+
+<p>There are three <a href="https://github.com/schambers/fluentmigrator/wiki/Migration-Runners">runners</a> available to execute migrations. The command line runner, the Nant task and the MSBuild task. There are usually executed as part of a build script.</p>
+
+<p>The MigrationRunner class can also be used in code. You might do this if you wanted to build your own runner or if you have other needs (like building databases dynamically or automatically updating the database if a new migration is added.)</p>
+
+<blockquote>
+  <p>If you had a rather complex set of data models, wouldn't it be rather
+  difficult and time consuming to create a migration definition for all
+  of that?</p>
+</blockquote>
+
+<p>I have mostly answered this already. It is usually quite easy to generate an sql script for a database. For Sql Server it takes less than a minute to generate the script even for large databases. This script can be saved in a .sql file and executed as the first migration using the Execute.EmbeddedSqlScript expression. It works a treat.</p>
+
+<blockquote>
+  <p>I know with nHibernate/fluent you can easily generate tables for a
+  database without having to define anything other than the models and
+  map files. Is there a way to make this configuration compatible with
+  the Migrator/Versioning?</p>
+</blockquote>
+
+<p>At the moment, there is no such integration and in practise I, at least, don't miss it. There was some discussion about connecting Fluent NHibernate and FluentMigrator but it would be a lot of work. It would enable scaffolding to generate changes to the model like EF Code First migrations do. It's not on the roadmap at the moment however.</p>
+
+<blockquote>
+  <p>When nhibernate/fluent is in charge of generating a database, I do not
+  necessarily need to define every thing aspect of the tables. Its done
+  either via convention or via the mapping files. With the migrators I
+  would need to define this level of detail?</p>
+</blockquote>
+
+<p>Yes, you would need to define at that level of detail. FluentMigrators' migrations are a DSL (own little language) for defining schema changes that are translated to sql. You can write sql directly as well using the Execute.Sql expression. Entity Frameworks migrations have that sort of integration which has both advantages and disadvantages.</p>
+
+<p>Check out the <a href="https://github.com/schambers/fluentmigrator/wiki/Migration">wiki</a> or one of the tutorials <a href="http://lostechies.com/seanchambers/2011/04/02/fluentmigrator-getting-started/">here</a>, <a href="http://nexussharp.wordpress.com/2011/12/09/fluentmigrator-database-migrations-done-right/">here</a> (part 1) or <a href="http://nexussharp.wordpress.com/2011/12/18/fluentmigrator-part-ii/">here</a> (part 2) for more help getting started.</p>

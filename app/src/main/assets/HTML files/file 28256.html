@@ -1,0 +1,72 @@
+<p><strong>There is no way to perform conditional registration at the container level based on container contents.</strong> The trouble is that you would need to resolve something in the container in order to determine what gets registered in the container, which then could technically affect whether you wanted to register the thing in the first place. Chicken/egg circular dependency problem.</p>
+
+<p><strong>You can, however, register things conditionally into nested lifetime scopes.</strong> Most integration points (like ASP.NET) resolve out of nested lifetime scopes (like an HTTP-request-length lifetime scope). You can register things on the fly into nested lifetime scopes and that might solve your problem.</p>
+
+<pre><code>var builder = new ContainerBuilder();
+builder.Register(ctx =&gt; LoadSettings()).As&lt;ISettings&gt;().SingleInstance();
+builder.RegisterType&lt;DefaultFoo&gt;().As&lt;IFoo&gt;();
+var container = builder.Build();
+
+var settings = container.Resolve&lt;ISettings&gt;();
+using(var scope =
+  container.BeginLifetimeScope(b =&gt; {
+    if(settings.ReallyUseSpecificFoo)
+    {
+      b.RegisterType&lt;SpecificFoo&gt;().As&lt;IFoo&gt;();
+    }
+  })
+{
+  // Resolve things from the nested lifetime scope - it will
+  // use the overrides. This will get the SpecificFoo if the
+  // configuration setting is true.
+  var foo = scope.Resolve&lt;IFoo&gt;();
+}
+</code></pre>
+
+<p><strong>Another option you have is to make the registration a lambda.</strong> It might make the registration itself more complex but it's an option you could consider.</p>
+
+<pre><code>var builder = new ContainerBuilder();
+builder.Register(ctx =&gt; {
+    var settings = ctx.Resolve&lt;ISettings&gt;();
+    if(settings.ReallyUseSpecificFoo)
+    {
+      return new SpecificFoo();
+    }
+    return new DefaultFoo();
+  }).As&lt;IFoo&gt;();
+</code></pre>
+
+<p>If manual construction there isn't appealing, you could pass it through Autofac, too.</p>
+
+<pre><code>var builder = new ContainerBuilder();
+// Register the IFoo types - but NOT "As&lt;IFoo&gt;"
+builder.RegisterType&lt;DefaultFoo&gt;();
+builder.RegisterType&lt;SpecificFoo&gt;();
+// In the lambda use Resolve&lt;T&gt; to get the instances.
+builder.Register(ctx =&gt; {
+    var settings = ctx.Resolve&lt;ISettings&gt;();
+    if(settings.ReallyUseSpecificFoo)
+    {
+      return ctx.Resolve&lt;SpecificFoo&gt;();
+    }
+    return ctx.Resolve&lt;DefaultFoo&gt;();
+  }).As&lt;IFoo&gt;();
+</code></pre>
+
+<p><strong>Yet another option is to update an existing container after being built.</strong> In this case, you avoid the chicken/egg scenario by actually building the container, using it, and changing registrations after the fact.</p>
+
+<pre><code>var builder = new ContainerBuilder();
+builder.Register(ctx =&gt; LoadSettings()).As&lt;ISettings&gt;().SingleInstance();
+builder.RegisterType&lt;DefaultFoo&gt;().As&lt;IFoo&gt;();
+var container = builder.Build();
+
+var settings = container.Resolve&lt;ISettings&gt;();
+if(settings.ReallyUseSpecificFoo)
+{
+  var updater = new ContainerBuilder();
+  updater.RegisterType&lt;SpecificFoo&gt;().As&lt;IFoo&gt;();
+  updater.Update(container);
+}
+</code></pre>
+
+<p><strong>Finally, you might consider XML configuration.</strong> Given the registration is dependent on some sort of configuration setting, you might consider using <a href="https://code.google.com/p/autofac/wiki/XmlConfiguration">Autofac's XML configuration support</a>. That way, instead of trying to resolve something out of an un-built container to conditionally register something else, you could just specify the right thing to register using the XML configuration and register the correct thing the first time.</p>

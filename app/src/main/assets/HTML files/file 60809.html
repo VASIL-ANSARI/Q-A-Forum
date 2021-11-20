@@ -1,0 +1,54 @@
+<p>So Mr. Poole's statement: "<em>that query looks like it's getting fake metadata</em>" set off a bell in my head.  </p>
+
+<p>I started to wonder if it was some unknown remnant of the validation query being run on the <code>testOnBorrow</code> attribute of the pool's datasource (even though the validation query is defined as <code>select 1 from dual</code>). I removed this from the configuration, but it had no effect.</p>
+
+<p>I then tried removing the code that sets the client info in <code>V$SESSION</code> (Method 3 above); Oracle continued to show that unusual query and after only a few minutes, the session would hit the maximum open cursors limit.</p>
+
+<p>I then found that there was a "logging" method in our DAO class that logged some metadata from the connection object (values for settings like current auto commit, current transaction isolation level, JDBC driver version, etc.).  Within this logging was the use of the <code>getClientInfoProperties()</code> method on the <code>DatabaseMetaData</code> object. When I looked at the JavaDocs for this method, it became crystal clear where that unusual query was coming from; check it out...</p>
+
+<pre><code>ResultSet java.sql.DatabaseMetaData.getClientInfoProperties() throws SQLException
+
+Retrieves a list of the client info properties that the driver supports. The result set contains the following columns 
+
+1. NAME String=&gt; The name of the client info property
+2. MAX_LEN int=&gt; The maximum length of the value for the property
+3. DEFAULT_VALUE String=&gt; The default value of the property
+4. DESCRIPTION String=&gt; A description of the property. This will typically contain information as to where this property is stored in the database. 
+
+The ResultSet is sorted by the NAME column 
+
+Returns:
+
+A ResultSet object; each row is a supported client info property
+</code></pre>
+
+<p>You can clearly see that unusual query (<code>select NULL NAME, -1 MAX_LEN, NULL DEFAULT_VALUE, NULL DESCR</code>) matches what the JavaDocs say about the <code>DatabaseMetaData.getClientInfoProperties()</code> method.  Wow, right!?</p>
+
+<p>This is the code that was performing the function. As best as I can tell, it looks correct from a "closing of the <code>ResultSet</code>" standpoint - not sure what was happening that would keep the <code>ResultSet</code> open - it clearly being closed in the <code>finally</code> block.</p>
+
+<pre><code>log.debug("&gt;&gt;&gt;&gt;&gt;&gt; DatabaseMetaData Client Info Properties (jdbc driver)...");
+ResultSet rsDmd = null;
+try {
+    boolean hasResults = false;
+    rsDmd = dmd.getClientInfoProperties();
+    while (rsDmd.next()) {
+        hasResults = true;
+        log.debug("&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; NAME = '" + rsDmd.getString("NAME") + "'; DEFAULT_VALUE = '" + rsDmd.getString("DEFAULT_VALUE") + "'; DESCRIPTION = '" + rsDmd.getString("DESCRIPTION") + "'");
+    }
+    if (!hasResults) {
+        log.debug("&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; DatabaseMetaData Client Info Properties was empty (nothing returned by jdbc driver)");
+    }
+} catch (SQLException sqleDmd) {
+    log.warn("DatabaseMetaData Client Info Properties (jdbc driver) not supported or no access to system tables under current id");
+} finally {
+    if (rsDmd != null) {
+        rsDmd.close();
+    }
+}
+</code></pre>
+
+<p>Looking at the logs, when an Oracle connection was used, the <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; DatabaseMetaData Client Info Properties was empty (nothing returned by jdbc driver)</code> line was logged, so an exception wasn't being thrown, but no record was being returned either. I can only assume that the ojdbc6 (11.2.0.x.x) driver doesn't properly support the <code>getClientInfoProperties()</code> method - it is weird (I think) that an exception wasn't being thrown, as the query itself is missing the <code>FROM</code> keyword (it won't run when executed in TOAD for example).  And no matter what, the <code>ResultSet</code> should have at least been getting closed (the connection itself would still be in use though - maybe this causes Oracle to not release the cursors even though the <code>ResultSet</code> was closed).</p>
+
+<p>So all of the work I was doing was in a branch (I mentioned in a comment to my original question that I was working in trunk - my mistake - I was in a branch that was already created thinking it was based on trunk code and not modified - I failed to do my due diligence here), so I checked the SVN commit history and found that this additional logging functionality was added by a fellow teammate a couple of weeks ago (fortunately it hasn't been promoted to trunk or to higher environments - note this code works fine against our Sybase database).  My update from the SVN branch brought in his code, but I never really paid attention to what got updated (my bad).  I spoke with him about what this code was doing against Oracle, and we agreed to remove the code from the logging method.  We also put in place a check to only log the connection metadata when in our development environment (he said he added this code to help troubleshoot some driver version and auto commit questions he had).  Once this was done, I was able to run my load tests without any open cursor issues (success!!!).</p>
+
+<p>Anyway, I wanted to answer this question because when I searched for <code>select NULL NAME, -1 MAX_LEN, NULL DEFAULT_VALUE, NULL DESCR</code> and <code>ORA-01000 open cursors</code> no credible hits were returned (the majority of the hits returned were to make sure you are closing your connection resources, i.e., <code>ResultSet</code>s, <code>Statement</code>s, etc.).  I think this shows it was the database metadata query through JDBC against Oracle was the culprit of the <code>ORA-01000</code> error.  I hope this is useful to others.  Thanks.</p>

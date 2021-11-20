@@ -1,0 +1,148 @@
+<p>I think your best bet would be to use an instance of <code>WP_Query</code> for each quarter by using <a href="http://codex.wordpress.org/Class_Reference/WP_Query#Date_Parameters" rel="nofollow">date parameters</a>.</p>
+
+<p>Here is an example:</p>
+
+<pre><code>&lt;!-- Timeline begin here --&gt;
+&lt;div id="timeline"&gt;
+    &lt;?php
+    //Define your custom post type name in the arguments
+    $args = array('post_type' =&gt; 'timeline', 'order' =&gt; 'asc');
+
+    $current_year = get_the_time('Y');
+
+    $quarters = array(
+        // Q1, January - March
+        __( 'January - March' ) =&gt; array(
+            'after' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 1,
+                'day' =&gt; 1,
+            ),
+            'before' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 3,
+                'day' =&gt; 31,
+            ),
+            /* Set inclusive to true so we capture
+            ** posts on the before/after days
+             */
+            'inclusive' =&gt; true,
+        ),
+        // Q2, April - June
+        __( 'April - June' ) =&gt; array(
+            'after' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 4,
+                'day' =&gt; 1,
+            ),
+            'before' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 6,
+                'day' =&gt; 30,
+            ),
+            'inclusive' =&gt; true,
+        ),
+        // Q3, July - September
+        __( 'July - September' ) =&gt; array(
+            'after' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 7,
+                'day' =&gt; 1,
+            ),
+            'before' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 9,
+                'day' =&gt; 30,
+            ),
+            'inclusive' =&gt; true,
+        ),
+        // Q4, October - December
+        __( 'October - December' ) =&gt; array(
+            'after' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 10,
+                'day' =&gt; 1,
+            ),
+            'before' =&gt; array(
+                'year' =&gt; $current_year,
+                'month' =&gt; 12,
+                'day' =&gt; 31,
+            ),
+            'inclusive' =&gt; true,
+        ),
+    );
+
+    foreach ( $quarters as $quarter_heading =&gt; $quarter_date_query ):
+
+        // set current quarter args to our default args
+        $quarter_args = $args;
+
+        // add the date query for this quarter
+        $quarter_args['date_query'] = $quarter_date_query;
+
+        // display the heading for the current quarter
+        ?&gt;
+
+        &lt;div class="quarterlyheading"&gt;
+            &lt;?php echo  $quarter_heading; ?&gt;
+            &lt;div class="quarterlinebreak"&gt;&lt;hr&gt;&lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;?php    
+        // loop through the posts for the current quarter
+
+        //Define the loop based on arguments
+        $loop = new WP_Query( $quarter_args );
+
+        //Display the contents
+        while ( $loop-&gt;have_posts() ) : $loop-&gt;the_post();
+            $thumb = wp_get_attachment_url( get_post_thumbnail_id($post-&gt;ID,'large') );
+            ?&gt;
+            &lt;section id="&lt;?php the_time( 'M' );?&gt;"&gt;
+                &lt;div class="timeline-item"&gt;
+                    &lt;?php
+                    if( $loop-&gt;current_post === 0 ) {
+                        ?&gt;
+                        &lt;div class="timeline-icon"&gt;
+                            &lt;div class="timeline-month"&gt;
+                                &lt;?php the_time( 'M' );?&gt;
+                            &lt;/div&gt;
+                        &lt;/div&gt;
+                        &lt;?php $current_month = get_the_time('M'); ?&gt;
+                    &lt;?php } else {
+                        $post_month = get_the_time('M');
+                        if($current_month != $post_month) {
+                            ?&gt;
+                            &lt;div class="timeline-icon"&gt;
+                                &lt;div class="timeline-month"&gt;
+                                    &lt;?php the_time( 'M' );?&gt;
+                                &lt;/div&gt;
+                            &lt;/div&gt;
+                        &lt;?php }
+                    }
+                    $current_month = get_the_time('M');
+                    ?&gt;
+                    &lt;div class="timeline-content right"&gt;
+                        &lt;h2&gt;
+                            &lt;?php the_title(); ?&gt;
+                        &lt;/h2&gt;
+                        &lt;p&gt;
+                            &lt;?php echo the_content(); ?&gt;
+                        &lt;/p&gt;
+                        &lt;div class="timeline_img"&gt;
+                            &lt;img src="&lt;?php echo $thumb; ?&gt;" class="img-responsive"&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/section&gt;
+        &lt;?php
+        endwhile;
+
+        // reset post data
+        wp_reset_postdata();
+
+    endforeach;
+
+?&gt;
+&lt;/div&gt;
+</code></pre>

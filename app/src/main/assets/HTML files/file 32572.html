@@ -1,0 +1,34 @@
+<p>I ran into the same issue with Carrierwave and S3.</p>
+
+<p>Here is my scenario, I have an API responsible of uploading avatars into S3, by default a user has an avatar that is stored in the assets folder of my API. If 10 users have a default avatar they all use the same image in order to avoir to uploads a bunch of default avatar to S3.</p>
+
+<p>I have created a custom method that essentially checks if an avatar has been uploaded or not. If an avatar has been uploaded we build manually the S3 path to the avatar depending on the size. Otherwise we just return the default avatar path which is stored locally in our assets folder.</p>
+
+<p>This works for a public amazon s3 bucket, I'm not sure what would happen with a private bucket or how to generate the expire parameters, but since you're using the file storage system it shouldn't be a problem.</p>
+
+<pre><code>module Illustrable
+  extend ActiveSupport::Concern
+
+  included do
+    mount_uploader :avatar, AvatarUploader
+  end
+
+  def avatar_img(size)
+    if self.avatar?
+      "http://s3.amazonaws.com/#{ ENV['S3_BUCKET_NAME'] }/uploads/user/avatar/#{ self.id.to_s }/#{ size }_#{ self.avatar_identifier }"
+    else
+      ENV['DOMAIN_NAME'] + ActionController::Base.helpers.asset_path(["#{ size }_default_avatar.png"].compact.join('_'))
+    end
+  end
+
+end
+</code></pre>
+
+<p>This instruction was the key for generating the name of the file and not hitting S3 to get the img path back.</p>
+
+<pre><code>self.avatar_identifier
+</code></pre>
+
+<p>I had a time response of 2seconds before, now I'm at 300-500ms</p>
+
+<p>Hope this helps!</p>

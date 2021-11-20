@@ -1,0 +1,53 @@
+<p>Answering your question directly; there is a <a href="http://danielwestheide.com/blog/2013/01/16/the-neophytes-guide-to-scala-part-9-promises-and-futures-in-practice.html" rel="nofollow">good article</a> on this very topic:</p>
+
+<blockquote>
+  <p>Again, if you have long-running computations, having them run in a
+  separate ExecutionContext for CPU-bound tasks is a good idea.</p>
+</blockquote>
+
+<p>The article has the following example:</p>
+
+<pre><code>import java.util.concurrent.Executors
+import concurrent.ExecutionContext
+
+//I added 'private' for the rest of the example
+private val executorService = Executors.newFixedThreadPool(4)
+private val executionContext = ExecutionContext.fromExecutorService(executorService)
+</code></pre>
+
+<p>Answering indirectly,</p>
+
+<p><strong>Futures First</strong></p>
+
+<p>I completely agree that Akka Actors are a very useful tool for particular types of work.  When it comes to caching, <code>Actors</code> &amp; <code>Agents</code> are the best game in town.  </p>
+
+<p>However, in this instance I would suggest leveraging a <code>Future</code> instead of an Actor.  You could make veryLongProcess a <code>private</code> function.  The privacy would allow complete control over the number of threads calling the method at once:</p>
+
+<pre><code>def longProcessFut(start : Int, noOfElements : Int) : Future[Result] = Future {
+  veryLongProcess(start, noOfElements)
+}(executionContext)//controls the executing pool of veryLongProcess
+</code></pre>
+
+<p>Simple, concise, and asynchronous.  </p>
+
+<p>No killing of letters, no overloaded receive method that accepts anything under the sun, nor Props, not even an ActorRef was necessary for the Future.  Bloat, beer belly I say!</p>
+
+<p>Besides, your user is going to create a Future no matter what because of <code>?</code>:</p>
+
+<pre><code>//Actor user code, too verbose
+
+val longProcessRef = actorSystem actorOf Props[Worker]
+
+val fut : Future[Result] = (longProcessRef ? Work(0,42)).mapTo[Result]
+</code></pre>
+
+<p>Compared to using Futures directly</p>
+
+<pre><code>//happy user code
+
+val fut : Future[Result] = longProcessFut(0, 42)
+</code></pre>
+
+<p>Same great Future, but half the calories!</p>
+
+<p>You can control the dispatcher of the Future in the same manner(s) as suggested in the comments, which are quite good.  You can even use <code>actorSystem.dispatcher</code> as your Future dispatcher to control the dispatcher behavior.</p>

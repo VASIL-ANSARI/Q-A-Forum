@@ -1,0 +1,58 @@
+<p>Here is a (very trimmed) method I wrote a while ago - gets the name and also gets the windows version as a string using Environment.OSVersion - I'm just assuming you want the OS version name here rather than the sku?</p>
+
+<pre><code>/// &lt;summary&gt;
+/// Class for getting environment information
+/// &lt;/summary&gt;
+public static class EnvironmentInfo
+{
+    /// &lt;summary&gt;
+    /// Gets environment information by querying the system
+    /// &lt;/summary&gt;
+    public static IEnumerable&lt;string&gt; GetEnvironmentInfo()
+    {
+        List&lt;string&gt; results = new List&lt;string&gt;();
+
+        SafeUpdateListOfResultsFromInstrumentation("OS Product: {0}", results, "select * from win32_OperatingSystem", "name");
+        SafeUpdateListofResults("OS Version: {0}", results, (() =&gt; Environment.OSVersion.ToString()));
+
+        return results;
+    }
+
+    private static void SafeUpdateListofResults(string format, List&lt;string&gt; results, Func&lt;string&gt; del)
+    {
+        try
+        {
+            string str = del.Invoke();
+            results.Add(string.Format(format, str));
+        }
+        catch (Exception)
+        {
+            //Swallow exception - can't get diagnostic info!
+        }
+    }
+
+    private static void SafeUpdateListOfResultsFromInstrumentation(string format, List&lt;string&gt; results, string query, string index)
+    {
+        try
+        {
+            WqlObjectQuery objectQuery = new WqlObjectQuery(query);
+            ManagementObjectSearcher searcher = new ManagementObjectSearcher(objectQuery);
+
+            string name, value;
+
+            foreach (ManagementObject managementObject in searcher.Get())
+            {
+                name = managementObject[index].ToString();
+                string[] split1 = name.Split('|');
+                value = split1[0];
+                results.Add(string.Format(format, value));
+            }
+        }
+        catch (Exception)
+        {
+            //Swallow exception - can't get diagnostic info!
+        }
+
+    }
+}
+</code></pre>

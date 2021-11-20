@@ -1,0 +1,48 @@
+<p>For Cross Domain JSONP, the quickest is to use handler</p>
+
+<p><strong>Handler.ashx</strong></p>
+
+<pre><code>&lt;%@ WebHandler Language="C#" Class="Handler" %&gt;
+
+using System;
+using System.Web;
+
+public class Handler : IHttpHandler {
+
+    public void ProcessRequest (HttpContext context) {
+
+        var name = context.Request.QueryString["name"];
+        var callback = context.Request.QueryString["callback"];
+
+        var data = new { response = "name is " + name  };
+        var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+
+        context.Response.ContentType = "application/json; charset=utf-8";
+        context.Response.Write( callback + "("+ js.Serialize(data) + ")" );
+        context.Response.End();        
+    }
+
+    public bool IsReusable {
+        get {
+            return false;
+        }
+    }
+
+}
+</code></pre>
+
+<p>and Call from <strong>JS</strong></p>
+
+<pre><code>$.ajax({
+    type: "GET",
+    url: "Handler.ashx",
+    data: { name: "test" },
+    dataType: "jsonp",
+    success: function (json) {
+        alert(json.response);
+    },
+    error: function (response) {
+        alert('error:' + response);
+    }
+});
+</code></pre>

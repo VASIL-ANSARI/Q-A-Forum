@@ -1,0 +1,99 @@
+<p>Simple, don't sleep/pause/block or otherwise impede the Event Dispatching Thread.</p>
+
+<p>The EDT, is amongst other things, responsible for process paint requests, anything to stops it from running (like <code>Thread.sleep</code>) will stop it from updating the screen.</p>
+
+<p>Remember, just because you paint something to the <code>Graphics</code> context, doesn't mean it gets rendered to the output.</p>
+
+<p>Instead, use a <code>javax.swing.Timer</code></p>
+
+<p>Take a look at <a href="http://docs.oracle.com/javase/tutorial/uiswing/concurrency/" rel="nofollow">Concurrency in Swing</a>, <a href="http://docs.oracle.com/javase/tutorial/uiswing/painting/" rel="nofollow">Performing Custom Painting</a> and <a href="http://www.oracle.com/technetwork/java/painting-140037.html" rel="nofollow">Painting in AWT and Swing</a> for more details.</p>
+
+<p>I would also, strongly, encourage you against overriding any <code>paint</code> method of a top level container like <code>JApplet</code>.  Instead, use something like <code>JPanel</code> and override it's <code>paintComponent</code> method instead.</p>
+
+<p>Apart from potability, you gain the benefit of double buffering which top level containers don't have...</p>
+
+<p>For example...</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/13779392/blinking-in-jframe-java/13781606#13781606">Blinking in JFrame Java</a></li>
+</ul>
+
+<p><strong>With simple example</strong></p>
+
+<p><img src="http://i.stack.imgur.com/a9sYc.gif" alt="enter image description here"></p>
+
+<pre><code>import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.Timer;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class Blinky {
+
+    public static void main(String[] args) {
+        new Blinky();
+    }
+
+    public Blinky() {
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                }
+
+                JFrame frame = new JFrame("Testing");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setLayout(new BorderLayout());
+                frame.add(new BlinkPane());
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+        });
+    }
+
+    public class BlinkPane extends JPanel {
+
+        private boolean wink;
+
+        public BlinkPane() {
+            Timer timer = new Timer(1000, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    wink = !wink;
+                    repaint();
+                }
+            });
+            timer.start();
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension(200, 200);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2d = (Graphics2D) g.create();
+            int x = (getWidth() - 10) / 2;
+            int eyeHeight = 20;
+            if (wink) {
+                eyeHeight = 5;
+            }
+            int y = (getWidth() - eyeHeight) / 2;
+            g.fillOval(x, y, 10, eyeHeight);
+            g2d.dispose();
+        }
+    }
+}
+</code></pre>

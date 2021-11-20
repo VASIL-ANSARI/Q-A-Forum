@@ -1,0 +1,49 @@
+<blockquote>
+  <p>Why am I unable to see the stack trace in Eclipse's console when an unchecked Exception is thrown from a thread different from the main thread?</p>
+</blockquote>
+
+<p>Because it is unchecked.  By default there is nothing that prints the exceptions thrown by thread-pool threads.</p>
+
+<p>If you want to see the exception then you need to do something like:</p>
+
+<pre><code>Future future = scheduledExecutor.submit(...);
+...
+try {
+   // wait for the run() method to finish normally or with a throw
+   future.get();
+} catch (ExecutionException e) {
+   // the cause of this exception is the one that is thrown by the run()
+   Throwable cause = e.getCause();
+   cause.printStackTrace();
+}
+</code></pre>
+
+<blockquote>
+  <p>EDIT: Follow-up question: What would be the easiest way to print the exceptions thrown by thread-pool threads? Adding try-catch to every single Runnable is of course really ugly.</p>
+</blockquote>
+
+<p>You don't need to add the try/catch to the <code>Runnable</code>, you add it to the guy who starts the pool.</p>
+
+<p>Another solution would be to write a little <code>RunnableWrapper</code> which prints out exceptions:</p>
+
+<pre><code>public void RunnableWrapper implements Runnable {
+     private Runnable delegate;
+     public RunnableWrapper(Runnable delegate) {
+       this.delegate = delegate;
+     }
+     public void run() {
+         try {
+            delegate.run();
+         } catch (Throwable t) {
+             t.printStackTrace();
+         }
+     }
+ }
+</code></pre>
+
+<p>Then you can do:</p>
+
+<pre><code> scheduledExecutor.submit(new RunnableWrapper(myTask));
+</code></pre>
+
+<p>But the <code>future.get();</code> is the typical way of solving this.</p>

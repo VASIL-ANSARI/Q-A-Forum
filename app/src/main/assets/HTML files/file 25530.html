@@ -1,0 +1,104 @@
+<p>Use the "<a href="http://stackoverflow.com/questions/419163/what-does-if-name-main-do"><code>if __name__ == "__main__":</code></a>" idiom in your scripts and encapsulate <em>all of</em> the <em>function</em>-ality in <em>function</em>-s.</p>
+
+<p>Then you can <code>import</code> your scripts into another script (such as a unit test script) without the body of it being executed. This will allow you to write unit-tests for the functionality and run them through <code>nose</code>.</p>
+
+<p>I recommend keeping the "main" block to a line or two.</p>
+
+<h2>For example:</h2>
+
+<h3>plus_one.py</h3>
+
+<pre><code>#!/usr/bin/env python
+
+import sys
+
+
+def main(args):
+    try:
+        output(plus_one(get_number(args)))
+    except (IndexError, ValueError), e:
+        print e
+        return 1
+    return 0
+
+
+def get_number(args):
+    return int(args[1])
+
+
+def plus_one(number):
+    return number + 1
+
+
+def output(some_text):
+    print some_text
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
+</code></pre>
+
+<p>You can test command-line parameters, output, exceptions and return codes in your unittests...</p>
+
+<h3>t_plus_one.py</h3>
+
+<pre><code>#!/usr/bin/env python
+
+from StringIO import StringIO
+import plus_one
+import unittest
+
+
+class TestPlusOne(unittest.TestCase):
+
+    def test_main_returns_zero_on_success(self):
+        self.assertEquals(plus_one.main(['test', '1']), 0)
+
+    def test_main_returns_nonzero_on_error(self):
+        self.assertNotEqual(plus_one.main(['test']), 0)
+
+    def test_get_number_returns_second_list_element_as_integer(self):
+        self.assertEquals(plus_one.get_number(['anything', 42]), 42)
+
+    def test_get_number_raises_value_error_with_string(self):
+        self.assertRaises(ValueError, plus_one.get_number, ['something',
+                                                            'forty-two'])
+
+    def test_get_number_raises_index_error_with_too_few_arguments(self):
+        self.assertRaises(IndexError, plus_one.get_number, ['nothing'])
+
+    def test_plus_one_adds_one_to_number(self):
+        self.assertEquals(plus_one.plus_one(1), 2)
+
+    def test_output_prints_input(self):
+        saved_stdout, plus_one.sys.stdout = plus_one.sys.stdout, StringIO('_')
+        plus_one.output('some_text')
+        self.assertEquals(plus_one.sys.stdout.getvalue(), 'some_text\n')
+        plus_one.sys.stdout = saved_stdout
+
+if __name__ == '__main__':
+    unittest.main()
+</code></pre>
+
+<h2>Output</h2>
+
+<h3><code>python plus_one.py 41</code></h3>
+
+<pre><code>42
+</code></pre>
+
+<h3><code>nosetests -v t_plus_one.py</code></h3>
+
+<pre><code>test_get_number_raises_index_error_with_too_few_arguments (t_plus_one.TestPlusOne) ... ok
+test_get_number_raises_value_error_with_string (t_plus_one.TestPlusOne) ... ok
+test_get_number_returns_second_list_element_as_integer (t_plus_one.TestPlusOne) ... ok
+test_main_returns_nonzero_on_error (t_plus_one.TestPlusOne) ... ok
+test_main_returns_zero_on_success (t_plus_one.TestPlusOne) ... ok
+test_output_prints_input (t_plus_one.TestPlusOne) ... ok
+test_plus_one_adds_one_to_number (t_plus_one.TestPlusOne) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.002s
+
+OK
+</code></pre>

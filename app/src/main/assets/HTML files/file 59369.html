@@ -1,0 +1,32 @@
+<p>Well with a little refactoring and changes, it'll be very short and straightforward:</p>
+
+<pre><code>Post.details = function(id) {
+  var app = require('../../server/server'); 
+  var Rating = app.models.Rating;
+
+  return Promise.all([
+    Post.findById(id, {include: 'author', where: {deleted: false}}),
+    Rating.count({ where: {postId: id, stars: 0}}),
+    Rating.count({ where: {postId: id, stars: 1}}),
+    Rating.count({ where: {postId: id, stars: 2}}),
+  ]).then([post, ratings_0, ratings_1, ratings_2]) =&gt; {
+    return {
+      post,
+      author: post.author,
+      ratings_0,
+      ratings_1,
+      ratings_2,
+    };
+  });
+};
+</code></pre>
+
+<p>There's a couple of things going on here: </p>
+
+<ul>
+<li>You don't need <code>Author.findById</code>, assuming <code>include: 'author'</code> covers it.</li>
+<li>As for the ratings count, you just used the <code>Rating.count</code> method. It'll be faster since there's less bandwidth used and database can serve data faster if there's an index for it since it'll be served directly from the index.</li>
+<li>I've used ES6 destructing, object literal shorthand and arrow function.</li>
+<li>If you return a promise in a loopback remote method, it'll use the method return value for the request response instead of the callback.</li>
+<li>Promise.all will run the queries in parallel and finishes when all given queries are completed.</li>
+</ul>

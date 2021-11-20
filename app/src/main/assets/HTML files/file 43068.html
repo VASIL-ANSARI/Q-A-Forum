@@ -1,0 +1,67 @@
+<p>It may be helpful if you study the thrust documentation for <a href="https://thrust.github.io/doc/group__reductions.html#ga5e9cef4919927834bec50fc4829f6e6b" rel="nofollow">reduce</a>.</p>
+
+<p>Note the following:</p>
+
+<blockquote>
+  <p>Template Parameters</p>
+  
+  <p>InputIterator is a model of Input Iterator and InputIterator's value_type is convertible to T. </p>
+  
+  <p>T is a model of Assignable, and is convertible to BinaryFunction's first_argument_type and second_argument_type. </p>
+</blockquote>
+
+<p>This means that your choice of the <code>init</code> parameter as well as <em>the return type</em> of <code>reduce</code> are not arbitrary.  They must be the same type (effectively) as the type of the input iterator (i.e. <code>point</code> in this case).</p>
+
+<p><code>thrust::reduce</code> (in this case) does <em>not</em> return the index of the minimum element.  It returns the actual contents of the minimum element, i.e. if your elements are <code>point</code>, it returns a <code>point</code>, and the init value must be of type <code>point</code>.</p>
+
+<p>To find the index of the minimum point (appears to be your objective) there are various possibilities.  One possibility would be to zip together (using <code>zip_iterator</code>) the data along with an index array (e.g. <code>counting_iterator</code>), do the min-reduction based on that, and then extract the index from the value returned by <code>thrust::reduce</code>.</p>
+
+<p>However, I think a better approach would be what is suggested <a href="http://stackoverflow.com/questions/7709181/finding-the-maximum-element-value-and-its-position-using-cuda-thrust">here</a>, i.e. use <a href="https://thrust.github.io/doc/group__extrema.html#ga90f5158cab04adeb3f1b8b5e4acdbbcc" rel="nofollow"><code>thrust::min_element</code></a> which <em>will</em> return an interator to the minimum element, which can then be used to compute the index easily.</p>
+
+<p>Here's a worked example:</p>
+
+<pre><code>$ cat t683.cu
+#include &lt;thrust/device_ptr.h&gt;
+#include &lt;thrust/extrema.h&gt;
+#include &lt;thrust/host_vector.h&gt;
+#include &lt;thrust/device_vector.h&gt;
+
+#include &lt;iostream&gt;
+
+struct point{
+
+  int value;
+  int data;
+};
+
+
+struct minPointOperator
+{
+    __device__ __host__ bool operator()(const point&amp; x, const point&amp; y) const
+    {
+        return (x.value &lt; y.value);
+    }
+};
+
+int findBestPointIndx(point* dev_points, int pointCount)
+{
+    thrust::device_ptr&lt;point&gt; points(dev_points);
+    int id = thrust::min_element(points, points+pointCount, minPointOperator()) - points;
+    return id;
+}
+
+int main(){
+
+  point data[4] = { {4,5}, {0,7}, {2,3}, {6,1} };
+  thrust::host_vector&lt;point&gt; h_data(data, data + 4);
+  thrust::device_vector&lt;point&gt; d_data = h_data;
+  int min_point = findBestPointIndx(thrust::raw_pointer_cast(d_data.data()), 4);
+  std::cout &lt;&lt; "min index: " &lt;&lt; min_point &lt;&lt; std::endl;
+  return 0;
+}
+
+$ nvcc t683.cu -o t683
+$ ./t683
+min index: 1
+$
+</code></pre>

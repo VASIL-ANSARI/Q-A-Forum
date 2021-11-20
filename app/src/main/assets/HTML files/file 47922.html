@@ -1,0 +1,23 @@
+<p>Not sure why it didn't occur to me sooner, but I finally took a look at <code>twig_escape_filter</code>. It won't escape the string if it's an instance of <code>Twig_Markup</code>. Thus all we have to do is wrap our output in that:</p>
+
+<pre><code>class SpreadAttributes extends Twig_Node_Expression_Unary {
+    public function compile(Twig_Compiler $compiler) {
+        $compiler
+            -&gt;raw(__CLASS__ . '::attrs(')
+            -&gt;subcompile($this-&gt;getNode('node'))
+            -&gt;raw(', $this-&gt;env-&gt;getCharset())'); // not sure if this is the best way to pass the charset along, but it seems to work
+    }
+
+    public function operator(Twig_Compiler $compiler) {
+        throw new \Exception("Unused");
+    }
+
+    public static function attrs($attrs, $charset) {
+        return new Twig_Markup(WXU::html_attrs($attrs), $charset);
+    }
+}
+</code></pre>
+
+<p>Bam! No more escaping.</p>
+
+<p>See <a href="https://bitbucket.org/mnpenner/ptilz/src/86356a339f1b/src/Static/Html.php#Html.php-5" rel="nofollow">Ptilz</a> for an example implementation of <code>html_attrs</code>.</p>

@@ -1,0 +1,14 @@
+<p>You can speed it up by using instr and substr (rather than regexp versions), or speed it up A LOT if the input is CLOB and you use the dbms_lob versions of instr and substr. </p>
+
+<p>You can create a materialized view with <code>on commit refresh fast</code> (at the cost of making transactions on the base table a bit slower).</p>
+
+<p>The best choice is to replace the base table with one that is in first normal form - essentially with the RESULT of your current view. But perhaps that is not an option.</p>
+
+<p><strong>EDIT</strong>: I just looked at the query again and see what you are doing.... not good! The way you wrote the hierarchical query, it generates an inordinate number of rows, which you then reduce with DISTINCT. Try this first, perhaps it's all you need:</p>
+
+<pre><code>select username, trim(regexp_substr(str, '[^,]+', 1, level)) authority
+from   user
+connect by instr(str, ',', 1, level - 1) &gt; 0
+       and prior username = username
+       and prior sys_guid() is not null;
+</code></pre>

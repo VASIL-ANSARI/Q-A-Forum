@@ -1,0 +1,65 @@
+<p><strong>Client:</strong> All Callbacks extend a Abstract Callback where you implement the onFailur()</p>
+
+<pre><code>public abstract class AbstrCallback&lt;T&gt; implements AsyncCallback&lt;T&gt; {
+
+  @Override
+  public void onFailure(Throwable caught) {
+    //SessionData Expired Redirect
+    if (caught.getMessage().equals("500 " + YourConfig.ERROR_MESSAGE_NOT_LOGGED_IN)) {
+      Window.Location.assign(ConfigStatic.LOGIN_PAGE);
+    }
+    // else{}: Other Error, if you want you could log it on the client
+  }
+}
+</code></pre>
+
+<p><strong>Server:</strong> All your ServiceImplementations extend AbstractServicesImpl where you have access to your SessionData. Override onBeforeRequestDeserialized(String serializedRequest) and check the SessionData there. If the SessionData has expire then write a spacific error message to the client. This error message is getting checkt in your AbstrCallback and redirect to the Login Page.</p>
+
+<pre><code>public abstract class AbstractServicesImpl extends RemoteServiceServlet {
+
+  protected ServerSessionData sessionData;
+
+  @Override
+  protected void onBeforeRequestDeserialized(String serializedRequest) {
+
+    sessionData = getYourSessionDataHere()
+
+    if (this.sessionData == null){ 
+      // Write error to the client, just copy paste
+      this.getThreadLocalResponse().reset();
+      ServletContext servletContext = this.getServletContext();
+      HttpServletResponse response = this.getThreadLocalResponse();
+      try {
+        response.setContentType("text/plain");
+        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        try {
+          response.getOutputStream().write(
+            ConfigStatic.ERROR_MESSAGE_NOT_LOGGED_IN.getBytes("UTF-8"));
+          response.flushBuffer();
+        } catch (IllegalStateException e) {
+          // Handle the (unexpected) case where getWriter() was previously used
+          response.getWriter().write(YourConfig.ERROR_MESSAGE_NOT_LOGGED_IN);
+          response.flushBuffer();
+        }
+      } catch (IOException ex) {
+        servletContext.log(
+          "respondWithUnexpectedFailure failed while sending the previous failure to the client",
+          ex);
+      }
+      //Throw Exception to stop the execution of the Servlet
+      throw new NullPointerException();
+    }
+  }
+
+}
+</code></pre>
+
+<p>In Addition you can also Override doUnexpectedFailure(Throwable t) to avoid logging the thrown NullPointerException.</p>
+
+<pre><code>@Override
+protected void doUnexpectedFailure(Throwable t) {
+  if (this.sessionData != null) {
+    super.doUnexpectedFailure(t);
+  }
+}
+</code></pre>

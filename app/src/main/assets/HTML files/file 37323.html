@@ -1,0 +1,31 @@
+<p>The basic idea is to use a loop for the update.  The problem is that the function call takes a while and queries can time out.  In addition, updating almost 10 million rows puts a certain burden on the logging mechanisms for maintaining data integrity.  Assuming the <code>id</code> is the populated incrementally, you might do this in groups of 10,000 or maybe 100,000.  Unfortunately, you can't really use @Stewarts idea, but almost half of all the rows are likely to start with <code>1</code>.</p>
+
+<p>The basic loop is:</p>
+
+<pre><code>set @len := 10000, @i := 1;
+
+while @i * @len &lt; 10000000 do
+     update geo_location_info
+        set start_ip = INET_ATON(start_ip)
+        where id between @len*@i and @len*(@i + 1) - 1;
+     set @i := @i + 1;
+end while;
+</code></pre>
+
+<p>Unfortunately, in MySQL, you need to put this into a stored procedure -- because control flow mechanisms (such as <code>while</code>) are only allowed in stored programs.  So, something more like:</p>
+
+<pre><code>delimiter $$
+create procedure do_update ()
+begin
+    set @len := 10000, @i := 1;
+    select @max := max(id) from geo_location_info;
+
+    while @i * @len &lt;= @max do
+         update geo_location_info
+            set start_ip = INET_ATON(start_ip)
+            where id between @len*@i and @len*(@i + 1) - 1;
+         set @i := @i + 1;
+    end while;
+end $$
+delimiter ;
+</code></pre>

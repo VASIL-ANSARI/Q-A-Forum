@@ -1,0 +1,45 @@
+<p>You can use <a href="http://docs.magentocommerce.com/Mage_Customer/Mage_Customer_Model_Customer.html#getAttributes" rel="nofollow" title="Mage_Customer_Model_Customer#getAttributes()"><code>getAttributes()</code></a> which returns an array of <a href="http://docs.magentocommerce.com/Mage_Eav/Mage_Eav_Model_Entity_Attribute.html" rel="nofollow"><code>Mage_Eav_Model_Entity_Attribute</code></a>.</p>
+
+<pre><code>&lt;?php
+$attributes = Mage::getModel('customer/customer')-&gt;getAttributes();
+foreach ($attributes as $attr) :
+?&gt;
+    &lt;input type="checkbox" name="attributes[]" value="&lt;?php echo $attr-&gt;getId() ?&gt;" id="attribute-&lt;?php echo $attr-&gt;getId() ?&gt;" /&gt;
+    &lt;label for="attribute-&lt;?php echo $attr-&gt;getId() ?&gt;"&gt;&lt;?php echo $attr-&gt;getStoreLabel() ?&gt;&lt;/label&gt;
+&lt;?php endforeach; ?&gt;
+</code></pre>
+
+<hr>
+
+<h3>Much improved technique for config:</h3>
+
+<p>First we need to create a source model in your module, in the following you obviously have to rename it to match your <em>actual</em> module.</p>
+
+<pre><code>class Your_Module_Model_Source_Customer_Attribute
+{
+    public function toOptionArray()
+    {
+        $attributes = Mage::getModel('customer/entity_attribute_collection')
+            // remove filter to allow default address ID, etc.
+            -&gt;addVisibleFilter();
+        $result = array();
+        foreach ($attributes as $attribute) {
+            if (($label = $attribute-&gt;getFrontendLabel()))
+                $result[$attribute-&gt;getId()] = $label;
+        }
+        return $result;
+    }
+}
+</code></pre>
+
+<p>Then we need a single new field in your module's <strong>system.xml</strong>.</p>
+
+<pre><code>&lt;fieldname translate="label"&gt;
+    &lt;label&gt;Customer Attributes&lt;/label&gt;
+    &lt;frontend_type&gt;checkboxes&lt;/frontend_type&gt;
+    &lt;source_model&gt;yourmodule/source_customer_attribute&lt;/source_model&gt;
+    &lt;show_in_default&gt;1&lt;/show_in_default&gt;
+&lt;/fieldname&gt;
+</code></pre>
+
+<p>This works surprisingly well, surprising because these classes are not used in the core. Instead of <code>checkboxes</code> the type can also be <code>radios</code>, that works too.</p>

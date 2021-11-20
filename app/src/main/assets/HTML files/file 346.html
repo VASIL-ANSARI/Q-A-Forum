@@ -1,0 +1,175 @@
+<p>CakePHP's built-in ACL system is really powerful, but poorly documented in terms of actual implementation details. A system that we've used with some success in a number of CakePHP-based projects is as follows.</p>
+
+<p>It's a modification of some group-level access systems that have been <a href="http://realm3.com/articles/setting_up_user_groups_with_acl_and_auth_in_cakephp_1.2">documented elsewhere</a>. Our system's aims are to have a simple system where users are authorised on a group-level, but they can have specific additional rights on items that were created by them, or on a per-user basis. We wanted to avoid having to create a specific entry for each user (or, more specifically for each ARO) in the <code>aros_acos</code> table.</p>
+
+<p>We have a Users table, and a Roles table.</p>
+
+<p><strong>Users</strong></p>
+
+<p><code>user_id, user_name, role_id</code></p>
+
+<p><strong>Roles</strong></p>
+
+<p><code>id, role_name</code></p>
+
+<p>Create the ARO tree for each role (we usually have 4 roles - Unauthorised Guest (id 1), Authorised User (id 2), Site Moderator (id 3) and Administrator (id 4)) :</p>
+
+<p><code>cake acl create aro / Role.1</code></p>
+
+<p><code>cake acl create aro 1 Role.2  ... etc ...</code></p>
+
+<p>After this, you have to use SQL or phpMyAdmin or similar to add aliases for all of these, as the cake command line tool doesn't do it. We use 'Role-{id}' and 'User-{id}' for all of ours.</p>
+
+<p>We then create a ROOT ACO - </p>
+
+<p><code>cake acl create aco / 'ROOT'</code></p>
+
+<p>and then create ACOs for all the controllers under this ROOT one:</p>
+
+<p><code>cake acl create aco 'ROOT' 'MyController' ... etc ...</code></p>
+
+<p>So far so normal. We add an additional field in the aros_acos table called <code>_editown</code>  which we can use as an additional action in the ACL component's actionMap.</p>
+
+<pre><code>CREATE TABLE IF NOT EXISTS `aros_acos` (
+`id` int(11) NOT NULL auto_increment,
+`aro_id` int(11) default NULL,
+`aco_id` int(11) default NULL,
+`_create` int(11) NOT NULL default '0',
+`_read` int(11) NOT NULL default '0',
+`_update` int(11) NOT NULL default '0',
+`_delete` int(11) NOT NULL default '0',
+`_editown` int(11) NOT NULL default '0',
+PRIMARY KEY  (`id`),
+KEY `acl` (`aro_id`,`aco_id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
+</code></pre>
+
+<p>We can then setup the Auth component to use the 'crud' method, which validates the requested controller/action against an AclComponent::check(). In the app_controller we have something along the lines of:</p>
+
+<pre><code>private function setupAuth() {
+    if(isset($this-&gt;Auth)) {
+        ....
+        $this-&gt;Auth-&gt;authorize = 'crud';
+        $this-&gt;Auth-&gt;actionMap = array( 'index'     =&gt; 'read',
+                        'add'       =&gt; 'create',
+                        'edit'      =&gt; 'update'
+                        'editMine'  =&gt; 'editown',
+                        'view'      =&gt; 'read'
+                        ... etc ...
+                        );
+        ... etc ...
+    }
+}
+</code></pre>
+
+<p>Again, this is fairly standard CakePHP stuff. We then have a checkAccess method in the AppController that adds in the group-level stuff to check whether to check a group ARO or a user ARO for access:</p>
+
+<pre><code>private function checkAccess() {
+    if(!$user = $this-&gt;Auth-&gt;user()) {
+        $role_alias = 'Role-1';
+        $user_alias = null;
+    } else {
+        $role_alias = 'Role-' . $user['User']['role_id'];
+        $user_alias = 'User-' . $user['User']['id'];
+    }
+
+    // do we have an aro for this user?
+    if($user_alias &amp;&amp; ($user_aro = $this-&gt;User-&gt;Aro-&gt;findByAlias($user_alias))) {
+        $aro_alias = $user_alias;
+    } else {
+        $aro_alias = $role_alias;
+    }
+
+    if ('editown' == $this-&gt;Auth-&gt;actionMap[$this-&gt;action]) {
+        if($this-&gt;Acl-&gt;check($aro_alias, $this-&gt;name, 'editown') and $this-&gt;isMine()) {
+            $this-&gt;Auth-&gt;allow();
+        } else {
+            $this-&gt;Auth-&gt;authorize = 'controller';
+            $this-&gt;Auth-&gt;deny('*');
+        }
+    } else {
+        // check this user-level aro for access
+        if($this-&gt;Acl-&gt;check($aro_alias, $this-&gt;name, $this-&gt;Auth-&gt;actionMap[$this-&gt;action])) {
+            $this-&gt;Auth-&gt;allow();
+        } else {
+            $this-&gt;Auth-&gt;authorize = 'controller';
+            $this-&gt;Auth-&gt;deny('*');
+        }
+    }
+}
+</code></pre>
+
+<p>The <code>setupAuth()</code> and <code>checkAccess()</code> methods are called in the <code>AppController</code>'s <code>beforeFilter(</code>) callback. There's an <code>isMine</code> method in the AppControler too (see below) that just checks that the user_id of the requested item is the same as the currently authenticated user. I've left this out for clarity.</p>
+
+<p>That's really all there is to it. You can then allow / deny particular groups access to specific acos - </p>
+
+<p><code>cake acl grant 'Role-2' 'MyController' 'read'</code></p>
+
+<p><code>cake acl grant 'Role-2' 'MyController' 'editown'</code></p>
+
+<p><code>cake acl deny 'Role-2' 'MyController' 'update'</code></p>
+
+<p><code>cake acl deny 'Role-2' 'MyController' 'delete'</code></p>
+
+<p>I'm sure you get the picture.</p>
+
+<p>Anyway, this answer's way longer than I intended it to be, and it probably makes next to no sense, but I hope it's some help to you ...</p>
+
+<p>-- edit --</p>
+
+<p>As requested, here's an edited (purely for clarity - there's a lot of stuff in our boilerplate code that's meaningless here) <code>isMine()</code> method that we have in our AppController. I've removed a lot of error checking stuff too, but this is the essence of it:</p>
+
+<pre><code>function isMine($model=null, $id=null, $usermodel='User', $foreignkey='user_id') {
+    if(empty($model)) {
+        // default model is first item in $this-&gt;uses array
+        $model = $this-&gt;uses[0];
+    }
+
+    if(empty($id)) {
+        if(!empty($this-&gt;passedArgs['id'])) {
+        $id = $this-&gt;passedArgs['id'];
+        } elseif(!empty($this-&gt;passedArgs[0])) {
+            $id = $this-&gt;passedArgs[0];
+        }
+    }
+
+    if(is_array($id)) {
+        foreach($id as $i) {
+            if(!$this-&gt;_isMine($model, $i, $usermodel, $foreignkey)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return $this-&gt;_isMine($model, $id, $usermodel, $foreignkey);
+}
+
+
+function _isMine($model, $id, $usermodel='User', $foreignkey='user_id') {
+    $user = Configure::read('curr.loggedinuser'); // this is set in the UsersController on successful login
+
+    if(isset($this-&gt;$model)) {
+        $model = $this-&gt;$model;
+    } else {
+        $model = ClassRegistry::init($model);
+    }
+
+    //read model
+    if(!($record = $model-&gt;read(null, $id))) {
+        return false;
+    }
+
+    //get foreign key
+    if($usermodel == $model-&gt;alias) {
+        if($record[$model-&gt;alias][$model-&gt;primaryKey] == $user['User']['id']) {
+            return true;
+        }
+    } elseif($record[$model-&gt;alias][$foreignkey] == $user['User']['id']) {
+        return true;
+    }
+
+    return false;
+}
+</code></pre>

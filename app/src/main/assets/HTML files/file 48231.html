@@ -1,0 +1,35 @@
+<p>This should be fairly simple</p>
+
+<ol>
+<li>Assign all the statements to a string array (your foreach loop is totally appropriate here)</li>
+<li>Split the string array into multiple string arrays of 1000 or less</li>
+<li>Concatenate each group</li>
+<li>Execute query</li>
+</ol>
+
+<hr>
+
+<pre><code>$CSV = Import-Csv "records.csv"
+
+$SQLServer   = "dbserver.corp.company.tld"
+$SQLDatabase = "database"
+
+# Set up a string format template
+$InsertTemplate = "INSERT INTO database..table([id], [FirstName], [LastName]) VALUES ('{0}','{1}','{2}')"
+
+# Generate all insert statements and store in string array
+$AllInserts = foreach($Row in $CSV){
+    $InsertTemplate -f $Row.id,$Row.'First Name',$Row.'Last Name'
+}
+
+# Split array into an array of 1000 (or fewer) string arrays
+$RowArrays = for($i=0; $i -lt $AllInserts.Length; $i+=1000){
+    ,@($AllInserts[$i]..$AllInserts[$i+999])
+}
+
+# Foreach array of 1000 (or less) insert statements, concatenate them with a new line and invoke it
+foreach($RowArray in $RowArrays){
+    $Query = $RowArray -join [System.Environment]::NewLine
+    Invoke-QsSqlQuery -query $Query -SQLServer $SQLServer -database $SQLDatabase
+}
+</code></pre>

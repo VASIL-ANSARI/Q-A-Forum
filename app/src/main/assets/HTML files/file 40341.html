@@ -1,0 +1,53 @@
+<p>I think the conceptually easiest way to handle this is with recursion. Granted, because of Java's subpar tail-recursion support, an iterative solution would be more efficient; still, recursion should work for smallish values.</p>
+
+<p>Take a look at this sample code</p>
+
+<pre><code>public static void main(String[] args) {
+    int xBound = 3;
+    int yBound = 3;
+    String[][] grid = new String[][] {
+        {"A", "B", "A"},
+        {"A", "B", "B"},
+        {"A", "A", "B"} 
+    };
+
+    for(int i = 0; i &lt; yBound; i++) {
+        for(int j = 0; j &lt; xBound; j++) {
+            String state = grid[i][j];
+            List&lt;List&lt;Integer&gt;&gt; group = getGroup(state, j, i, xBound, yBound, grid);
+            if (group.size() != 0) {
+                System.out.println(state + " " + group);
+            }   
+        }
+    }
+}
+
+static List&lt;List&lt;Integer&gt;&gt; getGroup(String state, int xIndex, int yIndex, int xBound, int yBound, String[][] grid) {
+    if (xIndex &gt;= xBound || xIndex &lt; 0 || yIndex &gt;= yBound || yIndex &lt; 0 || grid[yIndex][xIndex].equals("USED")) {
+        return new ArrayList&lt;&gt;();
+    } else if (grid[yIndex][xIndex].equals(state)){
+        grid[yIndex][xIndex] = "USED";
+
+        List&lt;List&lt;Integer&gt;&gt; ourPosse = new ArrayList&lt;List&lt;Integer&gt;&gt;();
+        ourPosse.add(Arrays.asList(yIndex, xIndex));
+        ourPosse.addAll(getGroup(state, xIndex + 1, yIndex, xBound, yBound, grid));
+        ourPosse.addAll(getGroup(state, xIndex - 1, yIndex, xBound, yBound, grid));
+        ourPosse.addAll(getGroup(state, xIndex, yIndex + 1, xBound, yBound, grid));
+        ourPosse.addAll(getGroup(state, xIndex, yIndex - 1, xBound, yBound, grid));
+
+        return ourPosse;
+    } else {
+        return new ArrayList&lt;&gt;();
+    }
+}
+</code></pre>
+
+<p>We step through the grid, trying to use each entry as the "root" of a new group. If a distinct group is in fact rooted at that entry (i.e. grpCt != 0), then we print it.</p>
+
+<p>In the getGroupMethod, we first check whether we've gone out of our grid bounds or whether we've already used entry in a previous group. Note that this checking is done by mutating the grid, but we could keep a memo instead.</p>
+
+<p>Otherwise, if the present entry matches the state we're looking to group on, then we add this entry to the group and then expand in all directions, looking for other entries to add to the group.</p>
+
+<p>Otherwise, we know the present entry can't be part of the group.</p>
+
+<p>Edit: In terms of asymptotic running time, because we're effectively memoizing by setting the flag in the grid and thus only considering each entry at most 4 times, we've got O(n^2).</p>

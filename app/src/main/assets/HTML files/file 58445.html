@@ -1,0 +1,105 @@
+
+
+<h3>Authentication</h3>
+
+<p>If you're connecting to SQL Server, you should prefer Windows Authentication if that's available: you create a <em>Login</em> at server level for a group of Active Directory users, and then you create a Windows-Authenticated <em>User</em> in your database using that login.</p>
+
+<p>That way you are keeping passwords and usernames out of hard-coded strings, and let the network deal with authentication.</p>
+
+<p>Assuming you don't want to be maintaining passwords in dozens of copies of macro-enabled workbooks across your network, you'll want to use Windows Authentication.</p>
+
+<pre class="lang-xml prettyprint-override"><code>Integrated Security=SSPI; Persist Security Info=True;
+</code></pre>
+
+<hr>
+
+<h3>Server</h3>
+
+<p>Connection strings <em>are</em> annoying - seems there's a different format/wording for every single different thing that's able to parse them!</p>
+
+<p>Since you're using ADODB, you'll want to specify a <em>Provider</em>, a <em>Data Source</em> and, optionally, an <em>Initial Catalog</em>:</p>
+
+<pre class="lang-xml prettyprint-override"><code>Provider=SQLOLEDB.1; Data Source=SQL Server instance name; Initial Catalog=Database name;
+</code></pre>
+
+<hr>
+
+<h3>Who?</h3>
+
+<p>Each connection can be monitored on the server; when building your connection string you can optionally specify a <em>Workstation ID</em> to identify the machine the connection is for.</p>
+
+<pre class="lang-xml prettyprint-override"><code>Workstation ID=computer name;
+</code></pre>
+
+<p>You can get the computer name by fetching the environment variable value, using <code>Environ$</code>:</p>
+
+<pre class="lang-vb prettyprint-override"><code>Private Function GetWorkstationId() As String
+    GetWorkstationId = Environ$("ComputerName")
+End Function
+</code></pre>
+
+<hr>
+
+<p>Given a SQL Server instance named <code>SomeSqlServer</code>, a database named <code>SomeDatabase</code>, and using Windows Authentication, the ADODB connection string would look like this:</p>
+
+<pre class="lang-vb prettyprint-override"><code>Dim connString As String
+connString = "Provider=SQLOLEDB.1; Data Source=SomeSqlServer; Initial Catalog=SomeDatabase; Integrated Security=SSPI; Persist Security Info=True;"
+</code></pre>
+
+<p>Given SQL Authentication (with a hard-coded user name and password) for <code>SomeUser</code> with <code>SomePassword</code>:</p>
+
+<pre class="lang-vb prettyprint-override"><code>connString = "Provider=SQLOLEDB.1; Data Source=SomeSqlServer; Initial Catalog=SomeDatabase; UID=SomeUser; PWD=SomePassword;"
+</code></pre>
+
+<hr>
+
+<h3>Commands</h3>
+
+<p>You don't want to be concatenating arbitrary user input into a WHERE clause; avoid executing an SQL string directly from the <code>ADODB.Connection</code> object.</p>
+
+<p>Instead, create an <code>ADODB.Command</code>, and <em>parameterize</em> your query.</p>
+
+<pre class="lang-vb prettyprint-override"><code>Dim sql As String
+sql = "SELECT Foo, Bar FROM dbo.FooBars WHERE Foo = ? AND DateInserted &gt; ?"
+</code></pre>
+
+<p>Here we have 2 parameters.</p>
+
+<p>First we create the <em>command</em>:</p>
+
+<pre class="lang-vb prettyprint-override"><code>Dim cmd As ADODB.Command
+Set cmd = New ADODB.Command
+cmd.ActiveConnection = conn
+cmd.CommandType = adCmdText
+cmd.CommandText = sql
+</code></pre>
+
+<p>Then its parameters, assuming we have their respective values in <code>param1Value</code> and <code>param2Value</code> local variables:</p>
+
+<pre class="lang-vb prettyprint-override"><code>Dim param1 As ADODB.Parameter ' a string parameter
+Set param1 = New ADODB.Parameter
+param1.Type = adVarWChar
+param1.Direction = adParamInput
+param1.Size = Len(param1Value)
+param1.Value = param1Value
+cmd.Parameters.Append param1
+
+Dim param2 As ADODB.Parameter ' a date parameter
+Set param2 = New ADODB.Parameter
+param2.Type = adDate
+param2.Direction = adParamInput
+param2.Value = param2Value
+cmd.Parameters.Append param2
+</code></pre>
+
+<p>Then we retrieve the recordset by executing the command:</p>
+
+<pre class="lang-vb prettyprint-override"><code>Dim results As ADODB.Recordset
+Set results = cmd.Execute
+</code></pre>
+
+<p>Of course this looks very verbose, but it can easily be refactored into functions dedicated to creating a parameter given a value of a certain type.</p>
+
+<p>As a result, you avoid this situation, because you're no longer executing arbitrary user input concatenated into a query:</p>
+
+<p><a href="https://xkcd.com/327/" rel="nofollow"><img src="http://i.stack.imgur.com/Bbeuy.png" alt="XKCD: Exploits of a Mom"></a></p>

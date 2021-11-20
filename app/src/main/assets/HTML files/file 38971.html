@@ -1,0 +1,40 @@
+<p>This is the way I will do it:</p>
+
+<pre><code>#!/usr/bin/python
+import re
+
+pat = re.compile(r'''
+    (?P&lt;open&gt; \b [^\W_]+ ) ,, |
+    ,, (?P&lt;close&gt; [^\W_]+ ) \b |
+    (?P&lt;attrName&gt; \S+ ) [ ] (?P&lt;attrValue&gt; [^,\n]+ ) [ ] ,, |
+    (?P&lt;textContent&gt; [^,\s] (?: [^,] | , (?!,) )*? ) \s* (?=[^\W_]*,,)''',
+      re.X)
+
+txt = '''html,, 
+    head,,        profile http://gmpg.org/xfn/11 ,,
+                  lang en-US ,,
+
+        title,,   Some markright page.
+        ,,title
+    ,,head'''
+
+result = ''
+opened = False
+for m in pat.finditer(txt):
+    if m.group('attrName'):
+        result += ' ' + m.group('attrName') + '="' + m.group('attrValue') + '"'
+    else:
+        if opened:
+            opened = False
+            result += '&gt;'
+        if m.group('open'):
+            result += '&lt;' + m.group('open')
+            opened = True
+        elif m.group('close'):
+            result += '&lt;/' + m.group('close') + '&gt;'
+        else:
+            result += m.group('textContent')
+print result
+</code></pre>
+
+<p>Note: I assume that the text content is always enclosed between tags.</p>

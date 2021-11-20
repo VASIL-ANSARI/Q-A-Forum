@@ -1,0 +1,52 @@
+<p>You are calling <code>res.end()</code> before any of your <code>res.write()</code> statements have executed.  The callback to <code>content.walk()</code> is asynchronous which  means it happens some indeterminate time in the future.</p>
+
+<p>You need to call <code>res.end()</code> AFTER all the <code>res.write()</code> statements are done.  The way <code>exports.walk()</code> is structured, there is no way for the caller to know when it is done listing the files and calling the callback so it will have to be restructured to indicate when it is done.</p>
+
+<hr>
+
+<p>There are many possible ways to structure that.  One fairly simple way is by just adding an argument to the callback that signals when the list is done.</p>
+
+<pre><code>// ---- listFiles.js -----------------------------------------------------------
+exports.walk = function(currentDirPath, extension,  callback) {
+
+    var fs = require('fs');
+    var regex = new RegExp( extension + '$', 'g' );
+    fs.readdir( currentDirPath, function (err, files) {
+        if (err) callback(err);
+        files.filter(function(fname){
+            if(fname.match(regex)) {
+                // call the callback with this filename, not done yet
+                callback(null, false, fname);
+            }
+        })
+        // signal that we are done listing the files
+        callback(null, true);
+        console.log("Done listing files.");
+    });
+}
+// walk('.', 'js', function(err, done, file){ console.log(file); }); runs OK
+
+// ---- listfilesTest.js --------------------------------------------------------
+var http = require('http');
+var content = require('./listFiles');
+var args = process.argv.slice(2);
+console.log(args); // command line arguments (dir &amp; extension)
+
+http.createServer(function (req, res) {
+    var files = [];
+    res.writeHead(200, {'Content-Type': 'text/plain'});
+    res.write('-- list of files --\n');
+    content.walk(args[0], args[1], function(err, done, data){
+        if(err) {
+            console.error(err);
+            return;
+        }
+        if (done) {
+            res.end();
+        } else {
+            //console.log(data);
+            res.write(data); // not printing the dir Listings
+        }
+    });
+}).listen(9000);
+</code></pre>

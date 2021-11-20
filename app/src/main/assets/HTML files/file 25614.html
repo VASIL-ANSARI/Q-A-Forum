@@ -1,0 +1,43 @@
+<p><a href="https://chrome.google.com/webstore/detail/empty-title/cfhdojbkjhnklbpkdaibdccddilifddb" rel="nofollow">Adblock Plus</a> is perfect for this kind of thing.  Rather than trying a userscript or extension to block an external file, just install Adblock Plus and then add a filter for <code>http://website.com/e3/2013/css/styles.css</code>.</p>
+
+<hr>
+
+<p>If you insist on a userscript approach, then it appears that your existing code is fighting a <strong>race condition</strong>.  That <code>&lt;link&gt;</code> node is part of a document that is stored in a div and is apparently manipulated by javascript (AJAX).  Sometimes your script fires in time to catch a copy and sometimes it doesn't.  This is exacerbated by the fact that <a href="http://developer.chrome.com/extensions/content_scripts.html#run_at" rel="nofollow">Chrome scripts fire at unpredictable times, by default</a>.</p>
+
+<p>It <em>might</em> be sufficient just to add <a href="http://developer.chrome.com/extensions/content_scripts.html#run_at" rel="nofollow"><code>"run_at": "document_end"</code></a> to your manifest.json. (Which ironically, fires <em>before</em> the default script execution time.)</p>
+
+<p>However, to be sure, use an interval and also delete all copies of that link.  Like so:</p>
+
+<pre><code>var cssChkInterval = setInterval (killBadCSS, 222);
+
+function killBadCSS (x) {
+    var cssE3 = document.querySelectorAll (
+        'link[href="http://website.com/e3/2013/css/styles.css"]'
+    );
+    if (cssE3.length) {
+        for (var J = cssE3.length - 1;  J &gt;= 0;  --J) {
+            cssE3[J].remove ();
+        }
+
+        clearInterval (cssChkInterval);
+    }
+}
+</code></pre>
+
+<hr>
+
+<hr>
+
+<p>Or, since you are loading jQuery, Use it! :</p>
+
+<pre><code>var cssChkInterval = setInterval (killBadCSS, 222);
+
+function killBadCSS (x) {
+    var cssE3 = $('link[href="http://website.com/e3/2013/css/styles.css"]');
+    if (cssE3.length) {
+        cssE3.remove ();
+
+        clearInterval (cssChkInterval);
+    }
+}
+</code></pre>

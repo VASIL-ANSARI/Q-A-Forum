@@ -1,0 +1,99 @@
+<h2>Aside</h2>
+
+<p>I hope I'm not telling you something you already know, but it looks like you are maybe questioning where to start? That is the hardest part of testing...</p>
+
+<p>Just to make sure we are on the same page, the key to knowing what to test is describing the scenario, and the key to unit testing that scenario is Isolation.</p>
+
+<p>What this means is you want to isolate in regard to the class <em>"under test"</em>.</p>
+
+<p>Also, code is much easier to test if you write the test first and then the code to make that pass. You're not in that situation, so that means that the code you have <em>MAY NOT</em> be testable without changing it.</p>
+
+<p>And finally, given any external / 3rd party system, unless you are doing an <em>"exploratory test"</em> then you do not want to test 3rd party stuff, namely, http posting / getting. Instead, you want to test your code and how it performs.</p>
+
+<p>Assuming you knew that or that all makes sense, then, this part will be be obvious too.</p>
+
+<p>Moq, or any other mocking framework, is designed to stand in for objects / services that your class under test collaborates with, in order to aid in isolation. Given two classes, ClassA and ClassB, where ClassA acts on ClassB, you want to fake/mock Class B when giving it to ClassA so you can assert / verify that ClassA behaves as you would expect for the given scenario. This seems naive at first, but consider that you will also do the same for ClassB, you then have a suite of tests that isolate in respect to what they are testing, and that gives you great coverage.</p>
+
+<p>And the key to isolation is injection, make sure that if ClassA acts on ClassB, you pass ClassB in to ClassA's constructor, that way you can give it a fake class B. Class B shouldn't do anything, other than respond how you say it should respond so you can prove that ClassA behaves appropriately in that situation.</p>
+
+<p>Some people frown on changing code to make it testable, but my argument is if you wrote the code to be testable in the first place, you wouldn't have to change it, so try to refactor but not reengineer. </p>
+
+<h2>What to Test</h2>
+
+<p>So, what that means is you will want a few different scenarios, each with each tests that isolate in respect to what you care about. </p>
+
+<p>The key to good tests is figuring out what it is you want to test, and then arranging your tests so that it is clear what you are doing.</p>
+
+<ul>
+<li><p><strong>Test Class Name</strong> DOES NOT need to have "Test" in it; that's redundant. Explain what the scenario is instead; who is involved, etc.</p></li>
+<li><p><strong>The Test Method</strong> should say what the action is that you care about testing; what states are you in, etc.</p></li>
+<li><p>** Inside the method** for now follow the <em>"Arrange, Act, Assert"</em>  <em>(aka Given, When, Then)</em> approach:</p></li>
+<li><p><strong>Arrange:</strong> set up all of your mocks or any variables you need here, including the one class you are testing, such as your real Controller but fake myRepository and fake <code>value</code></p></li>
+<li><p><strong>Act:</strong> do the actual action, such as <code>Post()</code></p></li>
+<li><p><strong>Assert:</strong> Prove that the behaviors you expected happened, such as when you give it a <code>value</code> with four days, then you expect that:</p>
+
+<ul>
+<li>myRepository was told to add the value</li>
+<li>myRepository was told to add a day four times</li>
+</ul></li>
+</ul>
+
+<h2>An Example</h2>
+
+<p>As I'm not entirely sure what the intent of the test is there, and I don't know all of the code, I'm going to give an example that I think will relate well and will hopefully also show how to set up the mocks (and ideally why you would!) </p>
+
+<p>Also if this were truly a unit test, you would usually strive for one test per assertion / verification so you do not have to debug the test, only the failing code, but I'm putting three in here for "simplicity".</p>
+
+<p>In this test, you'll see that I:</p>
+
+<ul>
+<li>Care about testing the logic in POST</li>
+<li>So I create a mocked repository that is only used for verification it was called,</li>
+<li>And a mocked Request that is setup to respond appropriately when called,</li>
+<li>And I pass the mocked repository to the Controller's constructor (isolation through injection)</li>
+<li>And then I perform the action I care about, <code>POST</code>, on the live controller with mocked collaborators (repository and request),</li>
+<li><p>And then I verify that <code>POST</code> performs / behaves as expected.</p>
+
+<pre><code>[TestClass]
+public class GivenAValidRequestAndRepository(){
+
+  [TestMethod]
+  public void WhenWeReceiveAPostRequest(){
+
+    //Arrange / Given
+    var repository = new Mock&lt;IRepository&gt;();
+    var request = new Mock&lt;IRequest&gt;();
+    request.Setup ( rq =&gt; rq.ToString() )
+           .Returns ( "This is valid json ;-)" );
+    request.Setup ( rq =&gt; rq.Days )
+           .Returns ( new List&lt;IDay&gt; {
+             "Monday",
+             "Tuesday",
+            } );
+   var controller = new RequestController( repository.Object );
+
+
+
+   //Act / When
+   int actual = controller.Post( request.Object );
+
+
+   //Assert / Verify
+   // - then we add the request to the repository
+   repository.Verify( 
+     repo =&gt; repo.AddRequest( request, Times.Once() );
+   // - then we add the two days (from above setup) in the request to the repository
+   repository.Verify( 
+     repo =&gt; repo.AddRequestDays( It.IsAny&lt;IDay&gt;(), Times.Exactly( 2 ));
+   // - then we receive a count indicating we successfully processed the request
+   Assert.NotEqual( -1, actual );
+  }
+}
+</code></pre></li>
+</ul>
+
+<h2>Closing</h2>
+
+<p>Your goal should not be to make your boss happy that you have written a test. Instead, strive for valuable and expressive tests that you will be able to maintain down the road. You won't get it perfect (nor should you try) just make sure that what you are testing adds value. Cover things that if they were to change in code, your test would then fail, indicating you have a bug.</p>
+
+<p>I hope this helps, please reply with comments / questions.</p>

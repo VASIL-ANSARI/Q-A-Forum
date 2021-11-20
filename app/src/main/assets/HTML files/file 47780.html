@@ -1,0 +1,95 @@
+<p>The most likely culprit is that the <a href="http://wiki.python.org/moin/GlobalInterpreterLock" rel="nofollow">Global Interpreter Lock</a> (GIL) is not being held by a thread when it is invoking Python code, resulting in undefined behavior.  Verify all paths that make Python calls, such as <code>GeneralDataListener</code>'s functions, acquire the GIL before invoking Python code.  If copies of <code>PyClient</code> are being made, then <code>pyListener</code> needs to be managed in a manner that allows the GIL to be held when it is copied and destroyed.</p>
+
+<p>Furthermore, consider the <a href="http://stackoverflow.com/q/4172722/1053968">rule of three</a> for <code>PyClient</code>.  Do the copy-constructor and assignment operator need to do anything with regards to the subscription?  </p>
+
+<hr>
+
+<p>The GIL is a mutex around the CPython interpreter.  This mutex prevents parallel operations to be performed on Python objects. Thus, at any point in time, a max of one thread, the one that has acquired the GIL, is allowed to perform operations on Python objects.  When multiple threads are present, invoking Python code whilst not holding the GIL results in undefined behavior.</p>
+
+<p>C or C++ threads are sometimes referred to as alien threads in the Python documentation. The Python interpreter has no ability to control the alien thread.  Therefore, alien threads are responsible for managing the GIL to permit concurrent or parallel execution with Python threads.</p>
+
+<p>In the current code:</p>
+
+<ul>
+<li><p><code>GeneralDataListener::handle_message()</code> manages the GIL in a non-exception safe manner.  For example, if the listener's <code>log_message()</code> method throws an exception, the stack will unwind and not release the GIL as <code>PyGILState_Release()</code> will not be invoked.</p>
+
+<pre class="lang-cpp prettyprint-override"><code>void handleMessage(...)
+{
+  PyGILState_STATE state = PyGILState_Ensure();
+  client-&gt;pyListener.attr("log_message")(...);
+  ...
+
+  PyGILState_Release(state); // Not called if Python throws.
+}
+</code></pre></li>
+<li><p><code>GeneralDataListener::connected()</code>, <code>GeneralDataListener:: disconnected()</code>, and <code>GeneralDataListener:: handleException()</code> are explicitly invoking Python code, but do not explicitly manage the GIL.  If the caller does not own the GIL, then undefined behavior is invoked as Python code is being executed without the GIL.</p>
+
+<pre class="lang-cpp prettyprint-override"><code>void connected(...)
+{
+  // GIL not being explicitly managed.
+  client-&gt;pyListener.attr("connected")(...);
+}
+</code></pre></li>
+<li><p><code>PyClient</code>'s implicitly created copy-constructor and assignment operator do not manage the GIL, but may indirectly invoke Python code when copying the <code>pyListener</code> data member.  If copies are being made, then the caller needs to hold the GIL when the <code>PyClient::pyListener</code> object is being copied and destroyed.  If the <code>pyListener</code> is not managed on the free space, then the caller must be Python aware and have acquired the GIL during the destruction of the entire <code>PyClient</code> object.</p></li>
+</ul>
+
+<p>To resolve these, consider:</p>
+
+<ul>
+<li><p>Using a <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization" rel="nofollow">Resource Acquisition Is Initialization</a> (RAII) guard class to help manage the GIL in an exception safe manner. For example, with the following gil_lock class, when a gil_lock object is created, the calling thread will acquire the GIL. When the gil_lock object is destructed, it releases the GIL</p>
+
+<pre class="lang-cpp prettyprint-override"><code>/// @brief RAII class used to lock and unlock the GIL.
+class gil_lock
+{
+public:
+  gil_lock()  { state_ = PyGILState_Ensure(); }
+  ~gil_lock() { PyGILState_Release(state_);   }
+private:
+  PyGILState_STATE state_;
+};
+
+...
+
+void handleMessage(...)
+{
+  gil_lock lock;
+  client-&gt;pyListener.attr("log_message")(...);
+  ...
+}
+</code></pre></li>
+<li><p>Explicitly manage the GIL in any code path that is invokes Python code from within an alien thread.</p>
+
+<pre class="lang-cpp prettyprint-override"><code>void connected(...)
+{
+  gil_lock lock;
+  client-&gt;pyListener.attr("connected")(...);
+}
+</code></pre></li>
+<li><p>Making <code>PyClient</code> non-copyable or explicitly creating the copy-constructor and assignment operator.  If copies are being made, then change <code>pyListener</code> to be held by a type that allows for explicit destruction while the GIL is being held.  One solution is to use a <code>boost::shared_ptr&lt;python::object&gt;</code> that manages a copy of the <code>python::object</code> provided to the <code>PyClient</code> during construction, and has a custom deleter that is GIL aware.  Alternatively, one could use something like <a href="http://www.boost.org/doc/libs/1_58_0/libs/optional/doc/html/index.html" rel="nofollow"><code>boost::optional</code></a>.</p>
+
+<pre class="lang-cpp prettyprint-override"><code>class PyClient
+{
+public:
+
+  PyClient(const boost::python::object&amp; object)
+    : pyListener(
+        new boost::python::object(object),  // GIL locked, so copy.
+        [](boost::python::object* object)   // Delete needs GIL.
+        {
+          gil_lock lock;
+          delete object;
+        }
+      )
+  {
+    ...
+  }
+
+private:
+  boost::shared_ptr&lt;boost::python::object&gt; pyListener;;
+};
+</code></pre>
+
+<p>Note that by managing the <code>boost::python::object</code> on the free-space, one can freely copy the <code>shared_ptr</code> without holding the GIL.  On the other hand, if one was using something like <code>boost::optional</code> to manage the Python object, then one would need to hold the GIL during copy-construction, assignment, and destruction.</p></li>
+</ul>
+
+<p>Consider reading <a href="http://stackoverflow.com/a/20828366/1053968">this</a> answer for more details on callbacks into Python and subtle details, such as GIL management during copy-construction and destruction.</p>

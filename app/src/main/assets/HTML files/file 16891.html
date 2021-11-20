@@ -1,0 +1,66 @@
+<p>An ActivePivot post-processor is a normal Java class. There is nothing special about it. So you can use any existing technique so call a C++ DLL function while inside a Java program.</p>
+
+<p>This can be achieve for instance with JNA and BridJ. I don't consider JNI as in most cases, you don't need to use such a low-level API.</p>
+
+<p>For instance, with BridJ:
+Given a C++ header looking like:</p>
+
+<pre><code>__declspec(dllexport) int multiply(double multiplier, int size, double* const vector);
+</code></pre>
+
+<p>I made the following class:</p>
+
+<pre><code>import org.bridj.BridJ;
+import org.bridj.Pointer;
+import org.bridj.ann.Library;
+import org.bridj.ann.Runtime;
+import org.bridj.cpp.CPPRuntime;
+
+// Generated with http://code.google.com/p/jnaerator/
+@Library(CPP_Collateral.JNA_LIBRARY_NAME)
+@Runtime(CPPRuntime.class)
+public class CPP_Collateral {
+public static final String JNA_LIBRARY_NAME = "dummy";
+
+static {
+    // In eclipse, the DLL will be loaded from a resource folder
+    // Else, one should add a program property: -Djava.library.path
+    BridJ.addLibraryPath("src/main/resources/DLL");
+
+    BridJ.register();
+}
+
+/**
+ * My dummy.dll has one method:
+ * int multiply(double multiplier, int size, double* const vector)
+ */
+public static native int multiply(double multiplier, int size, Pointer&lt;Double&gt; vector);
+}
+</code></pre>
+
+<p>and my IPostProcessor is simply</p>
+
+<pre><code>@Override
+protected Object doEvaluation(ILocation location, Object[] underlyingMeasures) throws QuartetException {
+    double[] asArray = (double[]) underlyingMeasures[0];
+
+    if (asArray == null) {
+        return null;
+    } else {
+        // Size of the array
+        int size = asArray.length;
+
+        // Allocate a Pointer to provide the double[] to the C++ DLL
+        Pointer&lt;Double&gt; pCount = allocateDoubles(size);
+
+        pCount.setDoubles(asArray);
+
+        CPP_Collateral.multiply(2D, size, pCount);
+
+        // Read again: the double[] is copied back in the heap
+        return pCount.getDoubles();
+    }
+}
+</code></pre>
+
+<p>In term of performance, here I worked on 2.000 double[] of size 10000 and the impact is of about 100ms</p>

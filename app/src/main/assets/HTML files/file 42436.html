@@ -1,0 +1,79 @@
+<p>From my expirience of working with PJSUA2, the correct way to exit is to ensure that destructors of all calls are called before pj::Account destructor and desturctor for pj::Account is called before pj::Endpoint destructor.</p>
+
+<p>In my applications I have integer calls counter and exit bool flag in pj::Account derived class like:</p>
+
+<pre><code>class MyAccount : public pj::Account
+{
+public:
+    ...
+    void incrementCallsCount() { ++_callsCount; }
+    void decrementCallsCount() { --_callsCount; }
+    size_t getCallsCount() const { return _callsCount; }
+    ...
+    void setWantExit(boot wantExitFlag) { _wantExitFlag = wantExitFlag; }
+    void onIncomingCall(pj::OnIncomingCallParam &amp;prm)
+    {
+       if (_wantExitFlag)
+           return;
+       MyCall *call = MyCall::create(*this, prm.callId);
+       // Do your stuff with call:
+       // - add to map id-&gt;call
+       // - answer SIP 180 Ringing / SIP 200 OK
+    }
+    ...
+private:
+    std::atomic&lt;size_t&gt; _callsCount;
+    bool _wantExitFlag;
+};
+</code></pre>
+
+<p>In constructor of pj::Call derived class I call incrementCallsCount() and in destructor I call decrementCallsCount() like:</p>
+
+<pre><code>class MyCall : public pj::Call
+{
+public:
+    typedef pj::Call base_class;
+    static MyCall *create(MyAccount &amp;account, int callId)
+    {
+        return new MyCall(account, callId);
+    }
+
+    virtual void onCallState(pj::OnCallStateParam&amp; prm)
+    {
+        pj::CallInfo ci = getInfo();
+        if (ci.state == PJSIP_INV_STATE_DISCONNECTED)
+        {
+            // You may call some onDisconnected() handler function here
+            delete this;
+            return;
+        }
+    }
+    ...
+private:
+    MyCall(MyAccount &amp;account, int callId)
+        : base_class(account, callId)
+        , _myAccount(account)
+    {
+        _myAccount.incrementCallsCount();
+    }
+
+    virtual ~MyCall()
+    {
+        _myAccount.decrementCallsCount();
+    }
+
+    MyAccount &amp;_myAccount;
+};
+</code></pre>
+
+<p>Note that constructor and destructor declared as private, to ensure that users create calls by static fuction MyCall::create() only! MyCall class takes responsibility for memory management: call deleted only when PJSUA2 tells to delete call (<code>PJSIP_INV_STATE_DISCONNECTED</code> call state).</p>
+
+<p>With this functions and classes in mind, if you just want to exit from application almost immediately, you should:</p>
+
+<ul>
+<li><p>Stop creating MyCall in MyAccount by <code>_myAccount.setWantExit(true)</code>. When <code>pj::Call::onIncomingCall()</code> function returns immediately, PJSUA2 hande this by executing hangup() for the call immediately.</p></li>
+<li><p>call <code>Endpoint::instance().hangupAllCalls()</code></p></li>
+<li><p>wait until <code>MyAccount::getCallsCount()</code> will return 0</p></li>
+<li><p>ensure MyAccount's destructor is called before Enpoint's destructor</p></li>
+<li><p>exit application</p></li>
+</ul>

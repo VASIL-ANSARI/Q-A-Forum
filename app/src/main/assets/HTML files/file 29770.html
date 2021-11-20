@@ -1,0 +1,58 @@
+<blockquote>
+  <p>Does mvvmcross natively support binding to nested properties?</p>
+</blockquote>
+
+<p>Yes</p>
+
+<blockquote>
+  <p>Should this work?</p>
+</blockquote>
+
+<p>Yes</p>
+
+<p>For example, this line in ApiExamples for Xamarin.iOS is working:</p>
+
+<pre><code>        set.Bind(errorLabel2).To(vm =&gt; vm.Errors.Count);
+</code></pre>
+
+<p><a href="https://github.com/MvvmCross/MvvmCross-Tutorials/blob/master/ApiExamples/ApiExamples.Touch/Views/FirstView.cs#L361" rel="nofollow">https://github.com/MvvmCross/MvvmCross-Tutorials/blob/master/ApiExamples/ApiExamples.Touch/Views/FirstView.cs#L361</a></p>
+
+<p>The set of supported functionality is described in <a href="https://github.com/MvvmCross/MvvmCross/wiki/Databinding#fluent" rel="nofollow">https://github.com/MvvmCross/MvvmCross/wiki/Databinding#fluent</a> - but admittedly this fluent binding is more established/used in Xamarin.iOS than it is in Wpf.</p>
+
+<hr>
+
+<p>To try to debug why your current binding might not be working try adding a simple property to your view which provides debug output</p>
+
+<pre><code>private Visibility _mockVisibility;
+public Visibility MockVisibility
+{
+   get
+   {
+      return _mockVisibility;
+   }
+   set
+   {
+       Debug.WriteLine("MockVisibility called with " + value);
+       _mockVisibility = value;
+   }
+}
+</code></pre>
+
+<p>and binding this as:</p>
+
+<pre><code>  this.CreateBinding(this)
+     .For(view=&gt; view.MockVisibility)
+     .To&lt;MainViewModel&gt;(vm =&gt; vm.SubViewModel.ShowIndeterminantProgress)
+     .WithConversion("Visibility")
+     .Apply();
+</code></pre>
+
+<p>This should give you debug/trace output and should give you somewhere to put a breakpoint to understand the call stack a little too (although expect this to contain lots of reflection which can be hard to read through).</p>
+
+<p>Beyond this:</p>
+
+<ul>
+<li>you could also try binding a label's text to see what that displays.</li>
+<li>you can also try setting the binding trace level to Diagnostic (using the static field <code>MvxBindingTrace.TraceBindingLevel</code> <a href="https://github.com/MvvmCross/MvvmCross/blob/v3.1/Cirrious/Cirrious.MvvmCross.Binding/MvxBindingTrace.cs#L14" rel="nofollow">https://github.com/MvvmCross/MvvmCross/blob/v3.1/Cirrious/Cirrious.MvvmCross.Binding/MvxBindingTrace.cs#L14</a>)</li>
+<li>try isolating the problem piece by piece (isolating the converter, isolating the nested property, etc, etc) - I guess this is what you are already doing in asking this question.</li>
+</ul>

@@ -1,0 +1,53 @@
+<p>You shouldn't really be uploading files there.</p>
+
+<p>If you are using a war, redeploying will delete them. If they are intended to be temporary then use an os assigned temporary location.</p>
+
+<p>If you intend to publish them afterwards then choose a location in which to store the files on your server, make this location known to the application and save and load files from the location.</p>
+
+<p>If you are trying to replace resources dynamically such as an image which is referenced in the html or css templates, then consider publishing the external location separately, you can use mvc:resources for this e.g:</p>
+
+<pre><code>&lt;mvc:resources mapping="/images/**" location="file:/absolute/path/to/image/dir"/&gt;
+</code></pre>
+
+<p>and you would save your files to that location. This will make it more permanent between deployments.</p>
+
+<p>To save an image to that location using your code you will need to add this into your bean definition (assuming you are using xml configuration without annotations):</p>
+
+<pre><code>&lt;property name="imagesFolder" value="/absolute/path/to/image/dir"/&gt;
+</code></pre>
+
+<p>and keeping your code as similar as possible change it to:</p>
+
+<pre><code>private String imagesFolder;
+public void setImagesFolder(String imagesFolder) {
+    this.imagesFolder = imagesFolder;
+}
+public String fileUpload(UploadedFile uploadedFile) {
+    InputStream inputStream = null;
+    OutputStream outputStream = null;
+    MultipartFile file = uploadedFile.getFile();
+    String fileName = file.getOriginalFilename();
+    File newFile = new File(imagesFolder + fileName);
+
+    try {
+        inputStream = file.getInputStream();
+
+        if (!newFile.exists()) {
+            newFile.createNewFile();
+        }
+        outputStream = new FileOutputStream(newFile);
+        int read = 0;
+        byte[] bytes = new byte[1024];
+
+        while ((read = inputStream.read(bytes)) != -1) {
+            outputStream.write(bytes, 0, read);
+        }
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+
+    return newFile.getAbsolutePath();
+}
+</code></pre>
+
+<p>Please bear in mind that you need to change /absolute/path/to/image/dir to an actual path that exists, also I would recommend to look at the <a href="http://docs.spring.io/spring/docs/4.0.0.RELEASE/spring-framework-reference/htmlsingle/#resources" rel="nofollow">Spring Resources documentation</a> for a better way to deal with files and resources.</p>

@@ -1,0 +1,45 @@
+<pre><code>&gt; s = "a=1, b=2, c=3, d=4"
+=&gt; "a=1, b=2, c=3, d=4"
+&gt; Hash[s.split(",").map(&amp;:strip).map { |p| p.split("=") }.map { |k, v| [ k.to_sym, v.to_i ] }]
+=&gt; {:a=&gt;1, :b=&gt;2, :c=&gt;3, :d=&gt;4}
+</code></pre>
+
+<p>Part of the problem is that you're trying to do it in a single line and losing track of what the intermediate values are. Break it down into each component, make sure you're using what Ruby gives you, etc.</p>
+
+<p>Your naming assumes you get an array back (not a hash). <code>Hash[...]</code>, however, will create a hash based on an array of <code>[key, value]</code> pairs. This makes manual hash stuffing go away. Also, that method should <em>return</em> a hash, not set something&ndash;keep methods small, and pure.</p>
+
+<p>Note I <code>strip</code> the first set of split values. This avoids symbols like <code>:" a"</code>, which you get if you don't trim leading/trailing spaces. My code does <em>not</em> take strings like <code>"a = 1"</code> into account&ndash;yours should.</p>
+
+<p>First, make things readable. Then, if (and <em>only</em> if) it makes sense, and remains legible, play code golf.</p>
+
+<pre><code>&gt; s = "a=1, b=2, c=3, d=4"
+=&gt; "a=1, b=2, c=3, d=4"
+&gt; a1 = s.split(",")
+=&gt; ["a=1", " b=2", " c=3", " d=4"]
+&gt; a2 = a1.map(&amp;:strip)
+=&gt; ["a=1", "b=2", "c=3", "d=4"]
+&gt; a3 = a2.map { |s| s.split("=") }
+=&gt; [["a", "1"], ["b", "2"], ["c", "3"], ["d", "4"]]
+&gt; a4 = a3.map { |k, v| [ k.to_sym, v.to_i ] }
+=&gt; [[:a, 1], [:b, 2], [:c, 3], [:d, 4]]
+&gt; Hash[a4]
+=&gt; {:a=&gt;1, :b=&gt;2, :c=&gt;3, :d=&gt;4}
+</code></pre>
+
+<hr>
+
+<p>Unrelated, but if you're doing a lot of ETL with Ruby, especially on plain text, using mixins can make code much cleaner, closer to a DSL. You can play horrible games, too, like:</p>
+
+<pre><code>&gt; def splitter(sym, s)
+    String.send(:define_method, sym) do
+      split(s).map(&amp;:strip)
+    end
+  end
+&gt; s = "a=1, b=2, c=3, d=4"
+&gt; splitter :split_comma, ","
+&gt; splitter :split_eq,    "-"
+&gt; Hash[s.split_comma.map(&amp;:split_eq).map { |k, v| [ k.to_sym, v.to_i ]}]
+=&gt; {:a=&gt;1, :b=&gt;2, :c=&gt;3, :d=&gt;4}
+</code></pre>
+
+<p>It can get significantly worse than this and become a full-fledged ETL DSL. It's great if you need it, though.</p>

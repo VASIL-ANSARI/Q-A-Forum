@@ -1,0 +1,48 @@
+<p>I will do this way that <code>MyConfigManager</code> does not depends on anything. <a href="https://developer.apple.com/library/ios/documentation/cocoa/reference/foundation/Classes/NSObject_Class/Reference/Reference.html#//apple_ref/occ/clm/NSObject/load" rel="nofollow"><code>+[load]</code></a> is used to register configs which will be called by runtime on startup.</p>
+
+<pre><code>@implementation MyConfigManager
+
+static NSMutableDictionary *defaults;
+
++ (NSMutableDictionary *)mutableDefaults
+{
+    static dispatch_once_t pred;
+    dispatch_once(&amp;pred, ^{
+        defaults = [[NSMutableDictionary alloc] init];
+    });
+    return defaults;
+}
+
++ (void)addDefaults:(NSDictionary *)dict
+{
+    [[self mutableDefautls] addEntriesFromDictionary:dict];
+}
+
++ (NSDictionary *)config
+{
+    return [self mutableDefaults];
+}
+
+@end
+
+@implementation DeveloperConfig 
+
++ (void)load
+{
+    [MyConfigManager addDefaults:@{@"key":@"value"}];
+}
+
+@end
+</code></pre>
+
+<p>you don't even need a new class because <code>load</code> is called for every categories</p>
+
+<pre><code>@interface MyConfigManager (DeveloperConfig)
+@end
+@implementation MyConfigManager (DeveloperConfig)
++ (void)load
+{
+    [self addDefaults:@{@"key":@"value"}];
+}
+@end
+</code></pre>

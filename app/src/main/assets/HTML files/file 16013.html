@@ -1,0 +1,91 @@
+<p>Operating on an entire file at once you can use:</p>
+
+<pre><code>s/(\ba(?=(?:\.|,|\s|{|#)))([^}{]*?{[^}]*?text-decoration:\s*)none(\s?!important)?;/$1$2underline;/g
+</code></pre>
+
+<p>More nicely formatted, this is:</p>
+
+<pre><code>s/                          # find and replace
+    (                       # group 1
+        \b                  # a word boundary
+        a                   # followed by 'a'
+        (?=                 # where the next character (positive lookahead)
+            (?:             # (inside a non-capturing group)
+              \.|,|\s|{|#   # is one of '.', ',', '{', '#' or whitespace
+            ) 
+        )
+    )
+    (                       # group 2
+        [^}{]*?             # then non-greedily match anything up to a '{' or '}'
+                            # if '}' is found, the next character will not match
+                            # and therefore the whole regex will not match
+        {                   # and find the '{'
+        [^}]*?              # and then non-greedily match anything until we 
+                            # find 'text-decoration', but don't keep matching
+                            # when a '}' is found
+        text-decoration:    # then find 'text-decoration'
+        \s*                 # and optional whitespace
+    )
+    none                    # and 'none'
+    (\s?!important)?        # and optional '!important'
+    ;                       # and a ';'
+/
+    $1                      # replace by group 1
+    $2                      # then group 2
+    underline;              # then 'underline;'
+/g
+</code></pre>
+
+<p>Example file:</p>
+
+<pre><code>$ cat test.css
+a { text-decoration: none; }
+b, a { text-decoration: none; }
+b, a, u { text-decoration: none; }
+b, a.cat, u { text-decoration: none; }
+b, a.cat, u { text-decoration: none !important; }
+b, a, u {
+    text-decoration: none;
+}
+b, a, u {
+    color: red;
+    text-decoration: none;
+}
+b, a, u {
+    color: red;
+    text-decoration: none;
+    padding: 10px;
+}
+</code></pre>
+
+<p>And result:</p>
+
+<pre><code>perl -0777 -p -e 's/(\ba(?=(?:\.|,|\s|{|#)))([^}{]*?{[^}]*?text-decoration:\s*)none(\s?!important)?;/$1$2underline;/g' test.css
+a { text-decoration: underline; }
+b, a { text-decoration: underline; }
+b, a, u { text-decoration: underline; }
+b, a.cat, u { text-decoration: underline; }
+b, a.cat, u { text-decoration: underline; }
+b, a, u {
+    text-decoration: underline;
+}
+b, a, u {
+    color: red;
+    text-decoration: underline;
+}
+b, a, u {
+    color: red;
+    text-decoration: underline;
+    padding: 10px;
+}
+</code></pre>
+
+<p>You can use perl's <code>-i</code> flag (don't forget to set a backup extension!) to operate on the files in-place.</p>
+
+<p>There's obviously a lot of other possible CSS rules which can include an <code>a</code>; e.g. <code>html&gt;a</code> or <code>div a b</code>; this regex will not find the first, and will find the second, but will be "wrong" in both cases. Basically, you can use regex for these types of tasks only when you can make strong assumptions about the text you're manipulating.</p>
+
+<p><strong>update</strong> added <code>}</code> to part of a rule to avoid matching, e.g.:</p>
+
+<pre><code>b { background-image: url('http://domain.com/this is a picture.jpg'); }
+u { text-decoration: none; }
+</code></pre>

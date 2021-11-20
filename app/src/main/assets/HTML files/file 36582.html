@@ -1,0 +1,16 @@
+<p>I managed to figure it out so I will leave the answer here for future reference.</p>
+
+<p>The first problem was that I tried to connect to <code>127.0.0.1</code>. As the request was proxied, the proxy would try to connect to <code>127.0.0.1</code>, so it would try to connect to itself, not to me.
+I had to configure my router to forward requests on port 443 to my laptop and then I replaced <code>127.0.0.1</code> with my routers IP.</p>
+
+<p>After that was out of the way, I found out that socksipy doesn't play very well with ssl.
+I had to call <code>connect</code> on the socket before wrapping it, otherwise I'd get a handshake failure. The code became:</p>
+
+<pre><code>import socks, ssl
+s = socks.socksocket()
+s.setproxy(socks.PROXY_TYPE_SOCKS5,"127.0.0.1", 9050)
+s.connect(('127.0.0.1', 443))
+ssl_sock = ssl.wrap_socket(s, ssl_version=ssl.PROTOCOL_TLSv1)
+</code></pre>
+
+<p>After that, everything was working fine.</p>

@@ -1,0 +1,28 @@
+<p>I suspect (but I'm not sure) that you are trying to call <code>__new__</code> on both your super classes, ie <code>A</code> and <code>B</code>. The best way to do that depends on a lot of things.</p>
+
+<p>The purpose of <code>P.__new__</code> is to return an instance of <code>P</code>. So that's what you should create. This is indeed what <code>super().__new__(cls,a)</code> will do, so that should work fine, however, you could also just call <code>str.__new__(cls, a)</code> directly. </p>
+
+<p>Usually you actually call <code>object.__new__</code>, but since you subclass from <code>str</code> you can't do that, it will tell you that it's unsafe in this case.</p>
+
+<p>If you do want to use <code>super()</code> (and there are cases when this is a good idea) you should typically use it consistently in all of the classes, so it should be used in <code>A</code> and <code>B</code> as well, and not only in <code>__new__</code> but also in <code>__init__</code></p>
+
+<pre><code>class A(str):
+    def __init__(self, s):
+        super().__init__(s)
+        self.a = s
+
+    def __new__(cls, s):
+        return super().__new__(cls, s)
+
+class B(str):
+    def __init__(self, s):
+        super().__init__(s)
+        self.b = s
+
+    def __new__(cls, s):
+        return super().__new__(cls, s)
+</code></pre>
+
+<p>However, that becomes problematic here as you don't have the same function profile, since P takes two parameters. This can be take as an indication that your solution may not be the best one. Especially since P is a string that takes two strings as parameters, that doesn't make much sense. In your previous question, you talked about polymorphism, and this is a pattern that break that polymorphism somewhat, as P doesn't have the same API as A and B, and hence can't be used interchangeably.</p>
+
+<p>The result is that I suspect that subclassing is the wrong solution here. Also, I'm guessing you are trying to cache the objects so that creating new objects with the same parameters will actually return the same object. I suggest you instead use a factory method for that, instead of overriding <code>__new__</code>.</p>

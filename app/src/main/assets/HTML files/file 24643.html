@@ -1,0 +1,536 @@
+<p>The problem you're having is far to common.</p>
+
+<p>Swing is a single threaded framework.  This means that all UI related interactions must occur within the context of this thread (AKA the Event Dispatching Thread).</p>
+
+<p>The EDT is responsible for, amongst other things, dispatching repaint requests.  If any part of your code stops this thread (block I/O, time consuming process, <code>Thread.sleep</code>), the EDT will be unable to process any new events.</p>
+
+<p>Have a read through <a href="http://docs.oracle.com/javase/tutorial/uiswing/concurrency/" rel="nofollow">Concurrency in Swing</a> for more details.</p>
+
+<p>You now face two issues...</p>
+
+<ol>
+<li>You can't block the EDT</li>
+<li>You can't update the UI from any thread other then the EDT.</li>
+</ol>
+
+<p>Luckily, there are a number of solutions.  The simplest is using a <code>javax.swing.Timer</code>.</p>
+
+<p>This timer triggers it's tick events within the EDT but waits within it's own thread...</p>
+
+<p><img src="http://i.stack.imgur.com/2IbNt.png" alt="enter image description here"></p>
+
+<pre><code>import com.sun.org.apache.bcel.internal.generic.LSTORE;
+import java.awt.AlphaComposite;
+import java.awt.BorderLayout;
+import java.awt.Composite;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.Timer;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class Droplets {
+
+    public static void main(String[] args) {
+        new Droplets();
+    }
+
+    public Droplets() {
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                }
+
+                JFrame frame = new JFrame("Test");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setLayout(new BorderLayout());
+                frame.add(new DropletPane());
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+        });
+    }
+    protected static final int MAX_RADIUS = 50;
+    protected static final int GROWTH_RATE = 1;
+
+    public class DropletPane extends JPanel {
+
+        private List&lt;Droplet&gt; droplets;
+
+        public DropletPane() {
+            droplets = new ArrayList&lt;&gt;(25);
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    droplets.add(new Droplet(e.getPoint()));
+                }
+            });
+
+            Timer timer = new Timer(40, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    for (Droplet droplet : droplets.toArray(new Droplet[droplets.size()])) {
+                        droplet.grow();
+                        if (droplet.getRadius() &gt;= MAX_RADIUS) {
+                            droplets.remove(droplet);
+                        }
+                    }
+                    repaint();
+                }
+            });
+            timer.setRepeats(true);
+            timer.setCoalesce(true);
+            timer.start();
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension(200, 200);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2d = (Graphics2D) g.create();
+            Composite comp = g2d.getComposite();
+            for (Droplet droplet : droplets) {
+
+                float alpha = 1f - ((float) droplet.getRadius() / (float) MAX_RADIUS);
+                g2d.setComposite(AlphaComposite.SrcOver.derive(alpha));
+                Point p = droplet.getLocation();
+                int radius = droplet.getRadius();
+                g2d.drawOval(p.x - (radius / 2), p.y - (radius / 2), radius, radius);
+                g2d.setComposite(comp);
+
+            }
+            g2d.dispose();
+        }
+    }
+
+    public class Droplet {
+
+        private Point p;
+        private int radius;
+
+        public Droplet(Point p) {
+            this.p = p;
+        }
+
+        public Point getLocation() {
+            return p;
+        }
+
+        public int getRadius() {
+            return radius;
+        }
+
+        public void grow() {
+            radius += GROWTH_RATE;
+            if (radius &gt; MAX_RADIUS) {
+                radius = MAX_RADIUS;
+            }
+        }
+    }
+}
+</code></pre>
+
+<h2>Extended Example</h2>
+
+<p>This example will, when you click the "Start" button, create a random number of droplets at a random interval (between each droplet).  You can press start multiple times and it will compound the output.</p>
+
+<p><img src="http://i.stack.imgur.com/oED57.png" alt="enter image description here"></p>
+
+<pre><code>import static droplets.Droplets.MAX_RADIUS;
+import java.awt.AlphaComposite;
+import java.awt.BorderLayout;
+import java.awt.Composite;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.SwingWorker;
+import javax.swing.Timer;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class Droplets02 {
+
+    public static void main(String[] args) {
+        new Droplets02();
+    }
+
+    public Droplets02() {
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                }
+
+                JFrame frame = new JFrame("Test");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setLayout(new BorderLayout());
+                frame.add(new DropletPane());
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+        });
+    }
+    protected static final int MAX_RADIUS = 50;
+    protected static final int GROWTH_RATE = 1;
+
+    public interface Pool {
+
+        public void addDroplet(Droplet droplet);
+
+        public Dimension getSize();
+    }
+
+    public class DropletPane extends JPanel implements Pool {
+
+        private List&lt;Droplet&gt; droplets;
+        private Timer timer;
+
+        public DropletPane() {
+
+            setLayout(new GridBagLayout());
+            JButton button = new JButton("Start");
+            button.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    new DropletWorker(DropletPane.this).execute();
+                }
+            });
+            add(button);
+
+            droplets = new ArrayList&lt;&gt;(25);
+            timer = new Timer(40, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (!droplets.isEmpty()) {
+                        for (Droplet droplet : droplets.toArray(new Droplet[droplets.size()])) {
+                            droplet.grow();
+                            if (droplet.getRadius() &gt;= MAX_RADIUS) {
+                                droplets.remove(droplet);
+                            }
+                        }
+                        if (droplets.isEmpty()) {
+
+                            ((Timer) e.getSource()).stop();
+
+                        }
+                        repaint();
+                    }
+                }
+            });
+            timer.setRepeats(true);
+            timer.setCoalesce(true);
+
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return new Dimension(200, 200);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2d = (Graphics2D) g.create();
+            Composite comp = g2d.getComposite();
+            for (Droplet droplet : droplets) {
+
+                float alpha = 1f - ((float) droplet.getRadius() / (float) MAX_RADIUS);
+                g2d.setComposite(AlphaComposite.SrcOver.derive(alpha));
+                Point p = droplet.getLocation();
+                int radius = droplet.getRadius();
+                g2d.drawOval(p.x - (radius / 2), p.y - (radius / 2), radius, radius);
+                g2d.setComposite(comp);
+
+            }
+            g2d.dispose();
+        }
+
+        @Override
+        public void addDroplet(Droplet droplet) {
+            if (!timer.isRunning()) {
+                timer.start();
+            }
+            droplets.add(droplet);
+        }
+    }
+
+    public class Droplet {
+
+        private Point p;
+        private int radius;
+
+        public Droplet(Point p) {
+            this.p = p;
+        }
+
+        public Point getLocation() {
+            return p;
+        }
+
+        public int getRadius() {
+            return radius;
+        }
+
+        public void grow() {
+            radius += GROWTH_RATE;
+            if (radius &gt; MAX_RADIUS) {
+                radius = MAX_RADIUS;
+            }
+        }
+    }
+
+    public class DropletWorker extends SwingWorker&lt;Void, Droplet&gt; {
+
+        private Pool pool;
+
+        public DropletWorker(Pool pool) {
+            this.pool = pool;
+        }
+
+        public Pool getPool() {
+            return pool;
+        }
+
+        protected int random(int minRange, int maxRange) {
+            return minRange + (int) (Math.round(Math.random() * (maxRange - minRange)));
+        }
+
+        @Override
+        protected Void doInBackground() throws Exception {
+
+            int dropCount = random(1, 100);
+            Pool pool = getPool();
+            Dimension size = pool.getSize();
+            for (int index = 0; index &lt; dropCount; index++) {
+                Thread.sleep(random(10, 1000));
+                int x = random(0, size.width);
+                int y = random(0, size.height);
+                Droplet droplet = new Droplet(new Point(x, y));
+                publish(droplet);
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void process(List&lt;Droplet&gt; chunks) {
+            for (Droplet droplet : chunks) {
+                getPool().addDroplet(droplet);
+            }
+        }
+    }
+}
+</code></pre>
+
+<h2>Animation Basics</h2>
+
+<p>You need three things to perform animation.</p>
+
+<ul>
+<li>A Start state</li>
+<li>A Target state</li>
+<li>A delta or time range.</li>
+</ul>
+
+<p>(You also need some way to store the current state)</p>
+
+<p>The start and target states are self explanatory, they describe where you are now and where you want to change to.</p>
+
+<p>The delta would be the amount to apply to the current state at each "time interval" (or tick) until you reach the delta.</p>
+
+<p><strong>Or</strong></p>
+
+<p>The time range would be the amount of time you want to use to move from the start state to the end state.</p>
+
+<p>The delta approach is the simpler mechanism, but isn't nearly as flexible as the time range approach...</p>
+
+<p>Once you have these basic elements set up, you need some kind of "tick" that is triggered at regular intervals which allows you to calculate the current state, which is either a linear movement from the start state to the target state (delta) or a progression of change of over time (time range)</p>
+
+<h2>A final, full working rework</h2>
+
+<p>Apart from you're attempt to block the EDT within the paint method and failing to following the <a href="http://docs.oracle.com/javase/tutorial/uiswing/concurrency/initial.html" rel="nofollow">Initial Thread</a> requirements of Swing, the only other, significant, problem I found was your reliance on the <code>radius</code> and <code>iter</code> values.</p>
+
+<p>Basically, these were never getting set UNLESS you pressed the <kbd>Enter</kbd> key...which I wasn't.</p>
+
+<p>This example uses the code that you posted and the ideas from the first example...</p>
+
+<p><img src="http://i.stack.imgur.com/LaZ3q.png" alt="enter image description here"></p>
+
+<pre><code>import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.Timer;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class ControlCircles extends JFrame {
+
+    private JButton jbtEnlarge = new JButton("Start");
+    private JButton jbtShrink = new JButton("Stop");
+    private CirclePanel canvas = new CirclePanel();
+    private JTextField f1 = new JTextField(8);
+    private JTextField f2 = new JTextField(8);
+
+    public ControlCircles() {
+        JPanel panel = new JPanel();
+        JPanel jp = new JPanel();
+        jp.setPreferredSize(new Dimension(300, 0));
+        panel.add(jbtEnlarge);
+        panel.add(jbtShrink);
+
+        this.add(jp, BorderLayout.WEST);
+        this.add(canvas, BorderLayout.CENTER);
+        this.add(panel, BorderLayout.SOUTH);
+
+
+        jp.setLayout(new FlowLayout(FlowLayout.RIGHT, 50, 30));
+        jp.add(new JLabel("Radius"));
+        jp.add(f1);
+        jp.add(new JLabel("Iteration"));
+        jp.add(f2);
+
+        jbtEnlarge.addActionListener(new EnlargeListener());
+        jbtShrink.addActionListener(new ShrinkListener());
+    }
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                }
+
+                JFrame frame = new ControlCircles();
+
+                frame.setTitle("ControlCircle");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setSize(800, 600);
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+
+        });
+    }
+
+    class EnlargeListener implements ActionListener {
+
+        public void actionPerformed(ActionEvent e) {
+            int radius = Integer.parseInt(f1.getText());
+            int iter = Integer.parseInt(f2.getText());
+            canvas.start(radius, iter);
+
+        }
+
+    }
+
+    class ShrinkListener implements ActionListener {
+
+        public void actionPerformed(ActionEvent e) {
+            //canvas.shrink();
+        }
+
+    }
+
+    class CirclePanel extends JPanel {
+
+        private int radius;
+        private int iterations;
+
+        private int iteration;
+
+        private List&lt;Integer&gt; circles;
+        private Timer timer;
+
+        public CirclePanel() {
+            circles = new ArrayList&lt;&gt;(25);
+            timer= new Timer(100, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    iteration++;
+                    if (iteration &lt; iterations) {
+                        circles.add(radius);
+                        radius += 10;
+                    } else {
+                        ((Timer)e.getSource()).stop();
+                    }
+                    repaint();
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            int width = getWidth() - 1;
+            int height = getHeight()- 1;
+            g.drawRect(0, 0, width, height);
+            for (Integer radius : circles) {
+                int x = (width - radius) / 2;
+                int y = (height - radius) / 2;
+                g.drawOval(x, y, radius, radius);
+            }
+        }
+
+        public void start(int radius, int iter) {
+            timer.stop();
+            circles.clear();
+            this.radius = radius;
+            iterations = iter;
+            iteration = 0;
+            System.out.println("radius = " + radius);
+            System.out.println("iterations = " + iterations);
+            timer.start();
+        }
+    }
+}
+</code></pre>
+
+<p>This code works based on the description of your problem by correcting the common mistakes with animation in Swing but some of your code didn't quite make sense to me (ie <code>enlarge</code> and <code>shrink</code>) so I focused on the description your provided.</p>

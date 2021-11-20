@@ -1,0 +1,40 @@
+<p>There are two issues. </p>
+
+<p>The result of a tuple sequence reduction should be a tuple but not <code>int</code>.   According to the document </p>
+
+<p><a href="https://thrust.github.io/doc/group__reductions.html#ga633d78d4cb2650624ec354c9abd0c97f" rel="nofollow">https://thrust.github.io/doc/group__reductions.html#ga633d78d4cb2650624ec354c9abd0c97f</a></p>
+
+<p>The last parameter <code>binary_op</code> should be of the type</p>
+
+<blockquote>
+  <p>BinaryFunction    is a model of Binary Function and BinaryFunction's result_type is convertible to OutputIterator2's value_type.</p>
+</blockquote>
+
+<p>It means your reduction operation should be  something like </p>
+
+<pre><code>struct GetSum
+{
+  template&lt;typename Tuple&gt;
+  __host__ __device__
+  Tuple operator()(const Tuple&amp; a, construction Tuple&amp; b)
+  {
+    ...
+  }
+}
+</code></pre>
+
+<p>On the other hand, at the reduction stage, you can only calculate the sum but not the average efficiently. It means your <code>values_output</code> should also be  a zip iterator with the same type as <code>values_first</code>. </p>
+
+<blockquote>
+  <p>OutputIterator2   is a model of Output Iterator and InputIterator2's value_type is convertible to OutputIterator2's value_type.</p>
+</blockquote>
+
+<p>So you need two result arrays, one for the sum by key  and one for the count by key. They should be zipped together and used as <code>values_output</code> .</p>
+
+<p>Then you need another <code>thrust::transform</code> to calculate the final result - average by key. </p>
+
+<hr>
+
+<p>You could also try the approach proposed by @RobertCrovella, which uses a single <code>thrust::reduce_by_key</code> to calculate the average.</p>
+
+<p><a href="http://stackoverflow.com/questions/37149344/output-from-reduce-by-key-as-a-function-of-two-reduced-vectors/37150407#37150407">Output from reduce_by_key() as a function of two reduced vectors</a></p>

@@ -1,0 +1,91 @@
+<p>It is possible, but it's not exactly pretty. You can make use of <code>Expression&lt;Func&lt;double&gt;&gt;</code> to pass in the property, then use reflection to pull the value back out.</p>
+
+<p><strong>NB:</strong> I have not coded this to accomodate for error scenarios, you may want to add additional checks.</p>
+
+<pre><code>class Program
+{
+    static void Main(string[] args)
+    {
+        MeritFunction&lt;CalculationOutput&gt; mf = new MeritFunction&lt;CalculationOutput&gt;();
+
+        //Create an instance of the object for reference.
+        var obj = new CalculationOutput();
+
+        //Use Lambda to set the Property Expression on the Line, pointing at the Property we are interested in.
+        mf.Lines.Add(new MeritFunctionLine() { PropertyExpression = () =&gt; obj.property1, value = 90, ComparisonType = ComparisonTypes.GreaterThan });
+        mf.Lines.Add(new MeritFunctionLine() { PropertyExpression = () =&gt; obj.property3, value = 50, ComparisonType = ComparisonTypes.Equals });
+
+        CalculationOutput c1 = new CalculationOutput() { property1 = 1, property2 = 20, property3 = 150, property4 = 500 };
+        CalculationOutput c2 = new CalculationOutput() { property1 = 15, property2 = 32, property3 = 15, property4 = 45 };
+
+        double value1 = mf.Calculate(c1);
+        double value2 = mf.Calculate(c2);
+
+        Console.WriteLine(value1);
+        Console.WriteLine(value2);
+    }
+}
+
+public class MeritFunctionLine
+{
+    //Capture an expression representing the property we want.
+    public Expression&lt;Func&lt;double&gt;&gt; PropertyExpression { get; set; }
+
+    public double value { get; set; }
+    public ComparisonTypes ComparisonType { get; set; }
+}
+
+public class MeritFunction&lt;T&gt;
+{
+    public List&lt;MeritFunctionLine&gt; Lines { get; set; }
+
+    public MeritFunction()
+    {
+        Lines = new List&lt;MeritFunctionLine&gt;();
+    }
+
+    public double Calculate(T values)
+    {
+        double m = 0;
+        foreach (var item in Lines)
+        {
+            //Get the Value before calculating.
+            double value = ExtractPropertyValue(item, values);
+
+            m += Math.Abs(value - item.value);
+        }
+        return m;
+    }
+
+    /// &lt;summary&gt;
+    /// Take the Provided Expression representing the property, and use it to extract the property value from the object we're interested in.
+    /// &lt;/summary&gt;
+    private double ExtractPropertyValue(MeritFunctionLine line, T values)
+    {
+        var expression = line.PropertyExpression.Body as MemberExpression;
+        var prop = expression.Member as PropertyInfo;
+
+        double value = (double)prop.GetValue(values);
+
+        return value;
+    }
+}
+
+public class CalculationOutput
+{
+    public double property1 { get; set; }
+    public double property2 { get; set; }
+    public double property3 { get; set; }
+    public double property4 { get; set; }
+}
+
+public enum ComparisonTypes
+{
+    GreaterThan,
+    Equals
+}
+</code></pre>
+
+<p>The one gotcha of this method, is that you need to create an instance of the object whilst building up the Lines property, otherwise you can't actually access the property through the lambda.</p>
+
+<p>If you only need this for a single class, then this is likely overkill, but it will work with essentially any class.</p>

@@ -1,0 +1,63 @@
+<p>For the clients, you should add two more socket listeners,</p>
+
+<p>1) One to assign player to one side</p>
+
+<p>2) To listen to moves made</p>
+
+<p>something like this</p>
+
+<pre><code>$(document).ready(function(){
+    socket.emit('ready');
+});
+
+socket.on('assign', function(side){
+    if(side==='left') {
+        $("#left").on('click', function(){
+            socket.emit('tug', 'left');
+        });
+    } else {
+        $("#right").on('click', function(){
+            socket.emit('tug', 'right');
+        });
+    }
+});
+socket.on('move', function(newPos){
+    $("#rope").css({left: newPos});
+});
+</code></pre>
+
+<p>where, <code>#rope</code> is your rope, maybe with <code>position:absolute</code> set</p>
+
+<p>And just to simplify things on the server you could use just the center and move it around, and define the limits at the end, to decide the winner</p>
+
+<pre><code>ropeCenter = 300;
+socket.on('tug', function (side) {
+    if(side == "left"){
+        console.log("left button clicked");
+        ropeCenter--;
+    }
+    else if (side == "right"){
+        console.log("right button clicked");
+        ropeCenter ++; 
+    }
+
+    //If you're planning to maintain rooms use io.sockets.in('room').emit below
+
+    if(rope &gt; 100 &amp;&amp; ropeCenter&lt;500 )     //Someone must have toppled by now, right?
+        io.sockets.emit('move',ropeCenter);     
+    else {
+        console.log('We have a winner');
+        io.sockets.emit('end');
+    }
+});
+
+assignFirst = true;
+socket.on('ready', function(){
+   if(assignFirst){
+       socket.emit('left');
+       assignFirst = false;
+   } else {
+       socket.emit('right');
+   }
+});
+</code></pre>

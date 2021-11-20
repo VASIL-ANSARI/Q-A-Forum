@@ -1,0 +1,47 @@
+<p>Like <a href="http://stackoverflow.com/users/3783478/rajesh">Rajesh</a> says, Javascript code running in your browser is scoped to the window.  And since the console runs separately from the window, your Javascript cannot directly access it.</p>
+
+<p>So no, it is not possible to log the text that the user is typing into their Javascript console.</p>
+
+<p>Having said that, if the user calls functions from the console, and you have the opportunity to override those functions, then you could learn a little bit about what the user is doing.</p>
+
+<p>As a proof of concept, add the following Javascript to the page:</p>
+
+<pre><code>var myLog = "";
+
+var realSetTimeout = window.setTimeout;
+
+window.setTimeout = function(a, b){
+    myLog += "setTimeout was called from " + (new Error).stack + "\n";
+    myLog += "with arguments: " + a + " and " + b + "\n";
+
+    return realSetTimeout.apply(this, arguments);
+};
+</code></pre>
+
+<p>Now if the user was to run <code>setTimeout(function)({ test; }, 1000);</code> from their console, your <code>myLog</code> variable would contain something like this:</p>
+
+<p><strong>Chrome</strong></p>
+
+<pre><code>setTimeout was called from Error
+    at window.setTimeout (&lt;anonymous&gt;:3:51)
+    at &lt;anonymous&gt;:2:1
+    at Object.InjectedScript._evaluateOn (&lt;anonymous&gt;:875:140)
+    at Object.InjectedScript._evaluateAndWrap (&lt;anonymous&gt;:808:34)
+    at Object.InjectedScript.evaluate (&lt;anonymous&gt;:664:21)
+with arguments: function (){ test; } and 1000
+</code></pre>
+
+<p><strong>Firefox</strong></p>
+
+<pre><code>setTimeout was called from window.setTimeout@debugger eval code:2:51
+@debugger eval code:1:1
+with arguments: function (){ test; } and 1000
+</code></pre>
+
+<p>(Of course the code above would also log every call to setTimeout made from the normal page scripts too!  So you might want to log only those with a matching stacktrace.)</p>
+
+<p>So it is in fact possible to spy on the user's console commands a little bit, if the user call functions.</p>
+
+<p>Perhaps using getters you could also spy on property accesses.</p>
+
+<p>Whether your users will appreciate you doing this, or whether you will gain any useful information from it, is another matter!</p>

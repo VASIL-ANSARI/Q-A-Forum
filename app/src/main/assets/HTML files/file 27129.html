@@ -1,0 +1,41 @@
+<p>Casting a signed integer type to an unsigned integer type of the same width can change the representation, if you can find a machine with sign-magnitude or ones-complement signed representations. But the types <code>int32_t</code> and <code>uint32_t</code> are guaranteed to be two's-complement representations, so in that particular case the representation cannot change.</p>
+
+<p>Conversion of signed integer to unsigned integers is well-defined in the standard, section 6.3.1.3. The relevant algorithm is the second paragraph:</p>
+
+<blockquote>
+  <ol>
+  <li>When a value with integer type is converted to another integer type other than _Bool, if
+  the value can be represented by the new type, it is unchanged.</li>
+  <li>Otherwise, if the new type is unsigned, the value is converted by repeatedly adding or
+  subtracting one more than the maximum value that can be represented in the new type
+  until the value is in the range of the new type.</li>
+  <li>...</li>
+  </ol>
+</blockquote>
+
+<p>So the result has to be, in effect, what a bit-for-bit copy would have resulted in had the negative number been stored in 2's-complement. A conforming implementation is allowed to use sign-magnitude or ones-complement; in both cases, the representation of negative integers will have to be modified to cast to unsigned.</p>
+
+<hr>
+
+<p>Summarizing a lengthy and interesting discussion in the comments:</p>
+
+<ul>
+<li><p>In the precise example in the OP, which uses <code>int32_t</code> and <code>uint32_t</code>, the representations must be equal <em>if the program compiles</em>, because C99 requires <code>int32_t</code> and <code>uint32_t</code> to be exactly 32 bits long with no padding, and requires <code>int32_t</code> to use 2's-complement representation. It does not, however, require those types to exist; a ones-complement implementation could simply not define <code>int32_t</code>, and still conform.</p></li>
+<li><p>My interpretation of type-punning is below the horizontal rule. @R.. pointed us to a <a href="http://www.open-std.org/jtc1/sc22/wg14/www/docs/dr_283.htm" rel="nofollow">Defect Report</a> from 2004 which seems to say that type-punning is either OK or fires a trap, which is closer to implementation-defined behaviour than undefined behaviour. On the other hand, the suggested resolution of that DR doesn't seem to be in the C11 document, which says (6.2.6.1(5)):</p></li>
+</ul>
+
+<blockquote>
+  <p>Certain object representations need not represent a value of the object type. If the stored value of an object has such a representation and is read by an lvalue expression that does not have character type, the behavior is undefined.</p>
+</blockquote>
+
+<p>That seems to me to be saying that type-punning is undefined behaviour if one of the participating types has a trap representation (and consequently is <em>not</em> undefined behaviour if the reading type does not have a trap representation). On the other hand, no type is required to have a trap representation, and only a few types are prohibited from having one:  <code>char</code> and <code>union</code> types -- but not members of union types --, as well as whichever of the <code>[u]int*K_t</code> types are implemented.</p>
+
+<p>My previous statement on type-punning follows:</p>
+
+<hr>
+
+<p>The storage-punning union has undefined behaviour. But without invoking lagartos voladores, it is somewhat expected that sign-magnitude or ones-complement machines may throw a hardware exception if a certain value is stored as unsigned and then accessed as signed.</p>
+
+<p>Both ones-complement and sign-magnitude have two possible representations of <code>0</code>, one with each popular sign bit. The one with a negative sign bit, "negative zero", is allowed to be a "trap value"; consequently, accessing the value (even just to copy it) as a signed integer could trigger the trap.</p>
+
+<p>Although the C compiler would be within its rights to suppress the trap, say by copying the value with memcpy or an unsigned opcode, it is unlikely to do so because that would be surprising to a programmer who knew that her program was running on a machine with trapping negative zeros, and was expecting the trap to trigger in the case of an illegal value.</p>

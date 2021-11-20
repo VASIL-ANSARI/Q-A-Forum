@@ -1,0 +1,62 @@
+<p>To answer my question, I found the problem. Windows Runtime doesn't support buffered encryption and will always treat data as a whole. While the .NET <code>ICryptoTransform</code> contains methods like <code>TransformBlock</code> and <code>TransformFinalBlock</code>, the RT API always uses treats data as final, which makes it impossible to encrypt large streams by chunks.
+I ended up using BouncyCastle PCL library which worked out perfectly. Similarly, <code>DesEngine</code> in BouncyCastle has method <code>ProcessBytes</code> and <code>DoFinal</code> which correspond to the above mentioned .NET methods in <code>ICryptoTransform</code>.</p>
+
+<p>Hope this helps someone.</p>
+
+<pre><code>    private Task TransformStream_DesCbcPkcs7_WithProgress(bool forEncryption, Stream inputStream, Stream outputStream, byte[] key, byte[] iv, IProgress&lt;int&gt; progress)
+    {
+        return Task.Run(async () =&gt;
+        {
+            // Initialize symmetric crypto engine
+            // Algorithm:           DES
+            // Mode of operation:   CBC
+            // Byte padding:        PKCS#7
+            var engine = new PaddedBufferedBlockCipher(new CbcBlockCipher(new DesEngine()), new Pkcs7Padding());
+            engine.Init(forEncryption, new ParametersWithIV(new DesParameters(key), iv));
+
+            // Report progress if available
+            Action&lt;int&gt; report = x =&gt;
+            {
+                if (progress != null)
+                    progress.Report(x);
+            };
+
+            var size = inputStream.Length;
+            var current = inputStream.Position;
+            var chunkSize = 1024 * 1024L;
+            var lastChunk = false;
+
+            report(0);
+            await Task.Yield();
+
+            // Initialize DataReader and DataWriter for reliable reading and writing
+            // to a stream. Writing directly to a stream is unreliable.
+            using (var reader = new BinaryReader(inputStream))
+            using (var writer = new BinaryWriter(outputStream))
+            {
+                while (current &lt; size)
+                {
+                    if (size - current &lt; chunkSize)
+                    {
+                        chunkSize = (uint)(size - current);
+                        lastChunk = true;
+                    }
+
+                    var chunk = new byte[chunkSize];
+                    reader.Read(chunk, 0, (int)chunkSize);
+
+                    // The last chunk must call DoFinal() as it appends additional bytes
+                    var processedBytes = lastChunk ? engine.DoFinal(chunk) : engine.ProcessBytes(chunk);
+
+                    writer.Write(processedBytes);
+
+                    current = inputStream.Position;
+                    report((int)(current * 100F / size));
+
+                    await Task.Yield();
+                }
+                await outputStream.FlushAsync();
+            }
+        });
+    }
+</code></pre>

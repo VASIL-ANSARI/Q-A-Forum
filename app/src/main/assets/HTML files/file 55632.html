@@ -1,0 +1,102 @@
+<p>As pointed out in the comments, the <a href="http://docs.oracle.com/javase/8/javafx/api/javafx/scene/control/TreeItem.html" rel="nofollow">documentation for <code>TreeItem</code></a> has an example of lazily-populating the child nodes of the tree item.</p>
+
+<p>Here's a very simple complete example of an infinite tree table. In this example, the child nodes are removed when the tree item is collapsed, allowing them to be garbage collected.</p>
+
+<pre><code>import java.math.BigInteger;
+import java.util.function.Function;
+
+import javafx.application.Application;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.ObservableList;
+import javafx.scene.Scene;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeTableColumn;
+import javafx.scene.control.TreeTableView;
+import javafx.stage.Stage;
+
+public class UnlimitedTreeTableView extends Application {
+
+
+    @Override
+    public void start(Stage primaryStage) {
+        TreeTableView&lt;Item&gt; treeTable = new TreeTableView&lt;&gt;();
+        treeTable.setRoot(createTreeItem(BigInteger.ZERO));
+
+        treeTable.getColumns().add(column("Item", Item::getName));
+        treeTable.getColumns().add(column("Value", Item::getValue));
+
+        primaryStage.setScene(new Scene(treeTable));
+        primaryStage.show();
+    }
+
+    private TreeItem&lt;Item&gt; createTreeItem(BigInteger value) {
+        TreeItem&lt;Item&gt; item = new TreeItem&lt;Item&gt;(new Item(String.format("Item %,d", value), value)) {
+
+            private boolean childrenComputed = false ;
+
+            {
+                expandedProperty().addListener((obs, wasExpanded, isNowExpanded) -&gt; {
+                    if (! isNowExpanded) { // remove child nodes...
+                        super.getChildren().clear();
+                        childrenComputed = false ;
+                    }
+                });
+            }
+
+            @Override
+            public ObservableList&lt;TreeItem&lt;Item&gt;&gt; getChildren() {
+                if (! childrenComputed) {
+                    Item item = getValue();
+                    BigInteger value = item.getValue() ;
+                    BigInteger valueTimes10 = value.multiply(BigInteger.TEN);
+                    for (int i = 0 ; i &lt; 10 ; i++) {
+                        BigInteger v = BigInteger.valueOf(i);
+                        super.getChildren().add(createTreeItem(valueTimes10.add(v)));
+                    }
+                    childrenComputed = true ;
+                }
+                return super.getChildren();
+            }
+
+            @Override
+            public boolean isLeaf() {
+                return false ;
+            }
+        };
+
+        return item ;
+    }
+
+    private static &lt;S,T&gt; TreeTableColumn&lt;S,T&gt; column(String title, Function&lt;S,T&gt; property) {
+        TreeTableColumn&lt;S,T&gt; column = new TreeTableColumn&lt;&gt;(title);
+        column.setCellValueFactory(cellData -&gt; 
+            new SimpleObjectProperty&lt;T&gt;(property.apply(cellData.getValue().getValue())));
+        column.setPrefWidth(200);
+        return column ;
+    }
+
+    public static class Item {
+        private final BigInteger value ;
+        private final String name ;
+
+        public Item(String name, BigInteger value) {
+            this.name = name ;
+            this.value = value ;
+        }
+
+        public BigInteger getValue() {
+            return value;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+</code></pre>

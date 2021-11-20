@@ -1,0 +1,109 @@
+<p>I have a solution here for webkit, working right. It is a lil tricky to change these values on the fly.</p>
+
+<p>Attached to 'mousemove', this script adds / removes the animation rule &amp; class continiously and alters some values so it rotates smooth enough.</p>
+
+<p>Theres bunch of stuff you wanna change if you use this. Atleast make sure the stylesheet index is good etc. in this case i use 1 since thats the jsFiddle stylesheet index.</p>
+
+<p>EDIT: works on firefox now too</p>
+
+<p><a href="http://jsfiddle.net/9nj4dgeq/" rel="nofollow">http://jsfiddle.net/9nj4dgeq/</a></p>
+
+<pre><code>//
+
+document.addEventListener('mousemove', function(event) {
+
+    Rotator.init(event, document.getElementsByClassName("img")[0]);
+
+}, false);
+
+//
+
+var Rotator = {
+
+    init: function(event, element_) {
+
+
+
+        var element = element_,
+            compatibility = {
+                prefixes: ["-webkit-", "-moz-"],
+            },
+            browserPrefix,
+            browserEvent = event.clientX,
+            stylesheet = 0;
+
+        for (var k in compatibility) {
+
+            if (k === "prefixes") {
+
+                for (var i = 0; i &lt; compatibility[k].length; i += 1) {
+
+                    if (window.getComputedStyle(element, null).getPropertyValue(compatibility[k][i] + "transform") !== null) {
+
+                        browserPrefix = compatibility.prefixes[i];
+                    }
+                }
+            }
+        }
+
+        this.rotate(element, browserPrefix, browserEvent, stylesheet);
+    },
+
+    rotate: function(element_, browserPrefix_, browserEvent_, stylesheet_) {
+
+        var element = element_,
+            className = element.className,
+            browserPrefix = browserPrefix_,
+            browserEvent = browserEvent_,
+            stylesheet = stylesheet_,
+            blanks = [
+                "@" + browserPrefix + "keyframes ",
+                " {from{" + browserPrefix + "transform:rotate( ",
+                "deg);}to{" + browserPrefix + "transform:rotate(",
+                "deg);}}",
+                ".",
+                "{" + browserPrefix + "animation-name:",
+                ";" + browserPrefix + "animation-timing-function:linear;" + browserPrefix + "animation-iteration-count:infinite;" + browserPrefix + "animation-duration:",
+                "s}"],
+            name = "rotating" + browserEvent,
+            speed = String(browserEvent / 100),
+            transform = window.getComputedStyle(element, null).getPropertyValue(browserPrefix + "transform"),
+            values, a, b, angle, toAngle;
+
+        if (transform !== "none") {
+
+            values = transform.split('(')[1];
+            values = values.split(')')[0];
+            values = values.split(',');
+            a = values[0];
+            b = values[1];
+
+            angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+        }
+
+        toAngle = 360 + angle;
+
+        document.styleSheets[stylesheet].insertRule(blanks[0] + name + blanks[1] + angle + blanks[2] +
+
+        (function () {
+
+            if (!toAngle) {
+
+                return 10;
+
+            } else {
+
+                return toAngle;
+            }
+        }()) + blanks[3], 0);
+
+        document.styleSheets[stylesheet].insertRule(blanks[4] + className + blanks[5] + name + blanks[6] + speed + blanks[7], 0);
+
+        if (document.styleSheets[stylesheet].cssRules.length &gt; 8) {
+            for (var rules = document.styleSheets[stylesheet].cssRules.length; rules &gt; 2; rules -= 1) {
+                document.styleSheets[stylesheet].deleteRule([rules] - 1);
+            }
+        }
+    }
+}
+</code></pre>

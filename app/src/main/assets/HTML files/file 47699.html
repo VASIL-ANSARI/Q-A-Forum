@@ -1,0 +1,30 @@
+<p>If you join the tables this way and use the group by in the main query, you will first join the records of the <code>map_user_question_vote</code> table (twice) with the records of the <code>questions</code> table and sum will be calculated later for the same question groups (although the column names are different, the values will be the same).</p>
+
+<p>You need to join with subqueries where you first calculate the sum of the votes. I.e.:</p>
+
+<pre><code>select
+  questions.id
+, questions.question
+, parent.id as parentId
+, parent.question as parentQuestion
+, COALESCE(qv.sum_vote, 0) as parent_question_vote_score
+, COALESCE(cv.sum_vote, 0) as comment_vote_score
+
+from `questions`
+
+join `questions` as `parent` on
+     `questions`.`parent` = `parent`.`id`
+
+left join (select `question_id`, sum(`vote`) as `sum_vote` from `map_user_question_vote` group by `question_id`) as `cv` on 
+          `cv`.`question_id` = `questions`.`id`
+
+left join (select `question_id`, sum(`vote`) as `sum_vote` from `map_user_question_vote` group by `question_id`) as `qv` on
+          `qv`.`question_id` = `parent`.`id`
+
+where questions.user_id = 1
+  and questions.parent  &gt; 0
+
+limit 5
+</code></pre>
+
+<p>See the results in SQL fiddle <a href="http://sqlfiddle.com/#!9/b5d08/4" rel="nofollow">here</a>.</p>

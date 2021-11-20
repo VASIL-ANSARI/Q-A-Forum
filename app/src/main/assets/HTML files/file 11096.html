@@ -1,0 +1,60 @@
+<p>This is usually done by routing all requests to a single entry point (a file that executes different code based on the request) with a rule like:</p>
+
+<pre><code># Redirect everything that doesn't match a directory or file to index.php
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule .* index.php [L]
+</code></pre>
+
+<p>This file then compares the request (<code>$_SERVER["REQUEST_URI"]</code>) against a list of routes - a mapping of a pattern matching the request to a controller action (in MVC applications) or another path of execution. Frameworks often include a route that can infer the controller and action from the request itself, as a backup route.</p>
+
+<p>A small, simplified example:</p>
+
+<pre><code>&lt;?php
+
+// Define a couple of simple actions
+class Home {
+    public function GET() { return 'Homepage'; }
+}
+
+class About {
+    public function GET() { return 'About page'; }
+}
+
+// Mapping of request pattern (URL) to action classes (above)
+$routes = array(
+    '/' =&gt; 'Home',
+    '/about' =&gt; 'About'
+);
+
+// Match the request to a route (find the first matching URL in routes)
+$request = '/' . trim($_SERVER['REQUEST_URI'], '/');
+$route = null;
+foreach ($routes as $pattern =&gt; $class) {
+    if ($pattern == $request) {
+        $route = $class;
+        break;
+    }
+}
+
+// If no route matched, or class for route not found (404)
+if (is_null($route) || !class_exists($route)) {
+    header('HTTP/1.1 404 Not Found');
+    echo 'Page not found';
+    exit(1);
+}
+
+// If method not found in action class, send a 405 (e.g. Home::POST())
+if (!method_exists($route, $_SERVER["REQUEST_METHOD"])) {
+    header('HTTP/1.1 405 Method not allowed');
+    echo 'Method not allowed';
+    exit(1);
+}
+
+// Otherwise, return the result of the action
+$action = new $route;
+$result = call_user_func(array($action, $_SERVER["REQUEST_METHOD"]));
+echo $result;
+</code></pre>
+
+<p>Combined with the first configuration, this is a simple script that will allow you to use URLs like <code>domain.com/about</code>. Hope this helps you make sense of what's going on here.</p>

@@ -1,0 +1,101 @@
+<p>Change your formpanel code like this: </p>
+
+<pre><code>var fp = new Ext.FormPanel({
+    renderTo: 'questionnaire_div',
+    id: 'FileuploadID',
+    fileUpload: true,
+    width: 500,
+    frame: true,
+    title: 'Upload Audit File',
+    autoHeight: true,
+    bodyStyle: 'padding: 10px 10px 10px 10px;',
+    labelWidth: 50,
+    defaults: 
+    {
+        anchor      : '95%',
+        allowBlank  : false,
+        msgTarget   : 'side'
+    },
+    items: [
+        {
+            xtype: 'fileuploadfield',
+            id: 'form-file',
+            emptyText: 'Select PDF file',
+            fieldLabel: 'PDF',
+            name: 'file'
+        }
+    ],
+    buttons: [
+        {
+            text: 'Upload',
+            handler: function () 
+            {
+                if (fp.getForm().isValid()) 
+                {
+                    fp.getForm().submit(
+                    {
+                        url: 'uploadAuditPDF',
+                        //method : 'POST',
+                        waitMsg: 'Uploading Audit PDF file...',
+                        success: function (fp, o) 
+                        {
+                            // ******************************************************
+                            var result = o.result.success;
+                            if(success)
+                            {
+                                msg('Success', 'Processed file "' + o.result.file + '" on the server');
+                            }
+                            else
+                            {
+                                alert('Uploading Audit PDF file failed...');
+                            }
+                            // ******************************************************
+                        }
+                    });
+                }
+            }
+        }
+    ]
+});
+</code></pre>
+
+<p>Change your java controller like this:</p>
+
+<pre><code>@RequestMapping(value="/uploadAuditPDF", method = RequestMethod.POST)     
+public @ResponseBody void uploadAuditPDF(WebRequest request, FileUploadBean uploadItem, BindingResult result, HttpServletResponse response)
+{
+    // I defined global return variable and initialized it
+    String successResult = false;
+
+    if (result.hasErrors())
+    {
+
+        successResult = false;
+    }    
+
+    if(uploadItem.getFile() != null)
+    {
+        String fileName = uploadItem.getFile().getOriginalFilename();
+        byte[] file = uploadItem.getFile().getBytes();
+        QuestionnaireHandler questionnaireHandler = new QuestionnaireHandler();
+        try
+        {
+            questionnaireHandler.saveFileAttachment(fileName, file);
+        }
+        catch (Exception ex) 
+        {
+            throw new VDSQRuntimeException(PropertiesReader.getValue(Constants.ERROR_GENERIC));
+        }
+
+    }
+    else
+    {
+        successResult = false;
+    }
+    successResult = true;
+
+    // TODO: here is important part
+    response.setContentType("text/html");
+    response.getWriter().write("{success:"+successResult+"}");
+}
+</code></pre>

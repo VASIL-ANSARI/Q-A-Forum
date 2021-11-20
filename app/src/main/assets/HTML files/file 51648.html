@@ -1,0 +1,45 @@
+<p>So, these lines I believe are wrong:</p>
+
+<pre><code>for t in range(n):
+    real[w] += series[t] * math.cos(a * t)
+    imag[w] += series[t] * math.sin(a * t)
+amplitude.append(math.sqrt(real[w] * real[w] + imag[w] * imag[w]) / n)
+phase.append(math.atan(imag[w] / real[w]))
+</code></pre>
+
+<p>I believe it should be dividing by m instead of n, since you are only working with computing half the points.  That will fix the amplitude problem.  Also, the computation of <code>imag[w]</code> is missing a negative sign.  Taking into account the atan2 fix, it would look like:</p>
+
+<pre><code>for t in range(n):
+    real[w] += series[t] * math.cos(a * t)
+    imag[w] += -1 * series[t] * math.sin(a * t)
+amplitude.append(math.sqrt(real[w] * real[w] + imag[w] * imag[w]) / m)
+phase.append(math.atan2(imag[w], real[w]))
+</code></pre>
+
+<p>The next one is here:</p>
+
+<pre><code>for i in range(m):
+    waves.append(Wave(amp[i], 2 * math.pi * i / m, phase[i]))
+</code></pre>
+
+<p>The divide by <code>m</code> is not right.  <code>amp</code> has only half the points it should, so using the length of amp isn't right here.  It should be:</p>
+
+<pre><code>for i in range(m):
+    waves.append(Wave(amp[i], 2 * math.pi * i / (m * 2), phase[i]))
+</code></pre>
+
+<p>Finally, your model reconstruction has a problem:</p>
+
+<pre><code>    for j in range(m): #sum by sin waves
+        summ += freq[j].amp * math.sin(freq[j].freq * i + freq[j].phase)
+</code></pre>
+
+<p>It should use cosine instead (sine introduces a phase shift):</p>
+
+<pre><code>    for j in range(m): #sum by cos waves
+        summ += freq[j].amp * math.cos(freq[j].freq * i + freq[j].phase)
+</code></pre>
+
+<p>When I fix all of that, the model and the DFT both make sense:</p>
+
+<p><a href="http://i.stack.imgur.com/xXLsG.png" rel="nofollow"><img src="http://i.stack.imgur.com/xXLsG.png" alt="Picture of spectrum and time models"></a></p>

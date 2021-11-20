@@ -1,0 +1,15 @@
+<blockquote>
+  <p>e.g. pushing "%" yields the character '5'</p>
+</blockquote>
+
+<p>By design, the WM_KEYDOWN message passes a <em>virtual key</em> code in wparam.  The virtual key code for the key that produces '%' and '5' is the same, it is the same key on your keyboard.  It doesn't get turned into an actual typing key until Windows processes the WM_KEYDOWN message and turns it into a WM_CHAR message.  Which will check the state of the Shift, Ctrl and Alt keys and change the generated character accordingly.  The actual character that is produced depends on the active keyboard layout.</p>
+
+<blockquote>
+  <p>looking at the value of the k, it appears as "LButton | MButton | ShiftKey | Space"</p>
+</blockquote>
+
+<p>That's a side-effect of the [Flags] attribute on the Keys type.  The default Enum.ToString() method checks that attribute and will combine enum values if that attribute is present.  The integer value of Keys.D5 is 0x35, a combination of 0x01 + 0x04 + 0x10 + 0x20.  Respectively Keys.LButton, MButton, ShiftKey and Space.  Clearly this is unhelpful in your case, cast to (int) in the watch expression.</p>
+
+<p>Well, that explains what is going on.  The one thing you <em>really</em> want to avoid is trying to translate the virtual key to a typing key yourself.  Have a look at the <a href="http://msdn.microsoft.com/en-us/library/ms646322.aspx" rel="nofollow">ToUnicodeEx()</a> Windows api function, the one you have to use to do it properly.  You can use the Control.ModifierKeys property to detect the difference between a plain Keys.D5 and one that's pressed with the Shift key down.</p>
+
+<p>Btw: you should also trap WM_SYSKEYDOWN, the message that's generated when the Alt key is down.  Message 0x104.</p>

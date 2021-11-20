@@ -1,0 +1,43 @@
+<p><strong>Options 1 &amp; 2</strong></p>
+
+<p><code>Context.getConfiguration().get("map.input.file")</code>
+<code>Context.getConfiguration().get("mapreduce.map.input.file")</code></p>
+
+<p>I believe both of these return <code>null</code> because they should be used with the older <code>mapred</code> API and its <code>JobConf</code> configuration object. Your <code>#3</code> option is the way to do it for the <code>mapreduce</code> API.</p>
+
+<p>Using the <code>mapred</code> API you would do the following:</p>
+
+<pre><code>public void configure(JobConf job) {
+  inputFile = job.get(JobContext.MAP_INPUT_FILE);
+}
+</code></pre>
+
+<p>This is shown here: <a href="https://hadoop.apache.org/docs/r2.7.2/api/org/apache/hadoop/mapred/Mapper.html" rel="nofollow">https://hadoop.apache.org/docs/r2.7.2/api/org/apache/hadoop/mapred/Mapper.html</a></p>
+
+<p>The <code>JobContext.MAP_INPUT_FILE</code> constant value used to be <code>map.input.file</code> and was changed to <code>mapreduce.map.input.file</code> at some point.</p>
+
+<p><a href="https://hadoop.apache.org/docs/r2.7.2/hadoop-project-dist/hadoop-common/DeprecatedProperties.html" rel="nofollow">https://hadoop.apache.org/docs/r2.7.2/hadoop-project-dist/hadoop-common/DeprecatedProperties.html</a></p>
+
+<p><strong>Option 3</strong></p>
+
+<p>You're mixing MapReduce APIs. There are two the <code>mapred</code> and <code>mapreduce</code> API.</p>
+
+<p>You can see this in the error you're getting:</p>
+
+<p><code>Caused by: java.lang.ClassCastException: org.apache.hadoop.mapreduce.lib.input.FileSplit cannot be cast to org.apache.hadoop.mapred.FileSplit</code></p>
+
+<p>You've imported:</p>
+
+<p><code>import org.apache.hadoop.mapred.FileSplit</code></p>
+
+<p>Which is from the <code>mapred</code> API, but you're using the <code>mapreduce</code> API. Change the import to:</p>
+
+<p><code>import org.apache.hadoop.mapreduce.lib.input.FileSplit;</code></p>
+
+<p>One clue in your code (aside from the import) that this has happened is you've needed to add a cast to make the code compile:</p>
+
+<p><code>filesplit = ((FileSplit)context.getInputSplit()).getPath();</code></p>
+
+<p>This should be:</p>
+
+<p><code>filesplit = context.getInputSplit().getPath();</code></p>

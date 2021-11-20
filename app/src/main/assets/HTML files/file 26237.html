@@ -1,0 +1,70 @@
+<p>This took a long time perfect. But I managed to do it after a lot of experimenting.</p>
+
+<p>I animate the margins of the drawer but because of the unexpected behavior of negative margins the button that opens the drawer can not be positioned on top.</p>
+
+<p>When the drawer is closed the XML looks like so:</p>
+
+<pre><code>&lt;RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/accordion"
+    android:orientation="vertical"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"&gt;
+
+    &lt;com.animationtest.drawer.Drawer
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/topic_drawer"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="0dp"
+        android:visibility="invisible"/&gt;
+
+    &lt;com.animationtest.drawer.Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/topic_btn"
+        android:layout_marginTop="58dp"/&gt;
+
+&lt;/RelativeLayout&gt;
+</code></pre>
+
+<p>Then when the button is pressed the top_margin of the drawer is increased until it has come to whatever position is needed (in this case drawerHeight - someOffset).</p>
+
+<p>I used android.view.animation.Animation to animate the widget my applyTransformation function looks something like this (Note that mLayoutParams are the drawer params):</p>
+
+<pre><code>@Override
+protected void applyTransformation(float interpolatedTime, Transformation t) {
+    int valueDifference = Math.abs(startValue - endValue);
+    float valueChange = interpolatedTime * valueDifference;
+
+    if(currentState.equals(State.COLLAPSED)) {
+        // is closed and I want to open it
+        mLayoutParams.topMargin = Math.round(interpolatedTime * valueDifference);
+    }
+    else {
+        // is opened and I want to close it
+        mLayoutParams.topMargin = valueDifference - Math.round(interpolatedTime * valueDifference);
+    }
+
+    drawerView.requestLayout(); //this is my drawer
+}
+</code></pre>
+
+<p>Finally, to hide the top of the drawer as it moves, I overrode my DrawerView's dispatchDraw method to looks like so:</p>
+
+<pre><code>@Override
+protected void dispatchDraw(Canvas canvas) {
+    float height = getHeight();
+    float top = height - ((LayoutParams) getLayoutParams()).topMargin;
+
+    Path path = new Path();
+    RectF rectF = new RectF(0.0f, top, getWidth(), height);
+
+    path.addRoundRect(rectF, 0.0f, 0.0f, Path.Direction.CW);
+    canvas.clipPath(path);
+    super.dispatchDraw(canvas);
+}
+</code></pre>
+
+<p><strong>One final note:</strong>
+Because of the Button's position one would need to set the widgets margin as a negative number for it to align correctly in a list or layout. In this case it would have to be -58dp.</p>

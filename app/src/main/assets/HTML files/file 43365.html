@@ -1,0 +1,53 @@
+<p>So it looks like there are a couple of factors, that might lead to this. </p>
+
+<ol>
+<li>I am no longer sure that the SRAM is running at the same clock speed as the Processor. As pointed out by @user58697, the <code>SRAM</code> is on IPB clock time even though it looks like the bus is on XLB time. On top of that there is this diagram:</li>
+</ol>
+
+<p><img src="http://i.stack.imgur.com/eUAd4.png" alt="enter image description here">
+(<em><a href="http://cache.freescale.com/files/microcontrollers/doc/user_guide/MPC5200UM.pdf#page=137" rel="nofollow">source</a></em>)</p>
+
+<p>This seems to indicate that he memory clock is on the XLB path but that the XLB path is at a lower frequency than the CORE clock. This can be confirmed here:</p>
+
+<p><img src="http://i.stack.imgur.com/VD5Tq.png" alt="enter image description here"></p>
+
+<p>(<em><a href="http://cache.freescale.com/files/microcontrollers/doc/user_guide/MPC5200UM.pdf#page=139" rel="nofollow">source</a></em>)</p>
+
+<p>Which indicates that the XLB_Bus runs at a slower rate than the processor. </p>
+
+<ol start="2">
+<li>To test that the SRAM is at least faster than the dynamic ram i conducted the following test:</li>
+</ol>
+
+<p>.</p>
+
+<pre><code>// Fill up the cache with pointless stuff
+for (int i = 0; i &lt; 4097; ++i) {
+    a = (int)TSin[i];
+}
+
+// 1. Test the dynamic RAM access with a cache miss every time. 
+ticks = timer_now();
+// += 16 to ensure a cache line miss.
+for (int y = 0; y &lt; listSize; y += 16) {
+    a = (data1[y]);
+}
+elapsedTicks = timer_now() - ticks;
+
+// Fill up the cache with pointless stuff again ...
+
+ticks = timer_now();
+// Test 2, do the same cycles but with static memory.
+for (int y = 0; y &lt; listSize; y += 16) {
+    a = (mpc5200.sram[y]);
+}
+elapsedTicks = timer_now() - ticks;
+</code></pre>
+
+<p>And with this we get the following results:</p>
+
+<pre><code>elapsed dynamic:  294.84 uS
+elapsed static:  57.78 uS
+</code></pre>
+
+<p>So what we can say here is that the static RAM is faster than the dynamic RAM (expected) but when the dynamic RAM is loaded into cache accessing the static ram is much much slower because cache access is at processor speed and the static ram speed is much less than this. </p>

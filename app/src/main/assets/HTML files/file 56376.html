@@ -1,0 +1,37 @@
+<p>Using <a href="http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html" rel="nofollow"><code>NumPy's broadcasted comparison</code></a>, we can create such a <code>2D</code> mask in a vectorized manner. Rest of the work is all about <code>sum-reduction</code> along the first axis for which we can take help from <code>np.einsum</code>. Thus, we would have an implementation like so -</p>
+
+<pre><code>N = my2darray.shape[0]
+mask = myvector &lt;= np.arange(N)[:,None]
+uout = np.true_divide(np.einsum('ij,ij-&gt;j',my2darray,~mask),myvector)
+lout = np.true_divide(np.einsum('ij,ij-&gt;j',my2darray,mask),N-myvector)
+</code></pre>
+
+<p>Sample run to verify results -</p>
+
+<pre><code>In [184]: N = my2darray.shape[0]
+     ...: mask = myvector &lt;= np.arange(N)[:,None]
+     ...: uout = np.true_divide(np.einsum('ij,ij-&gt;j',my2darray,~mask),myvector)
+     ...: lout = np.true_divide(np.einsum('ij,ij-&gt;j',my2darray,mask),N-myvector)
+     ...: 
+
+In [185]: uout
+Out[185]: array([ 6. ,  4.6,  4. ,  0. ])
+
+In [186]: [my2darray[:item,i].mean() for i,item in enumerate(myvector)]
+Out[186]: [6.0, 4.5999999999999996, 4.0, 0.0] # Loopy version results
+
+In [187]: lout
+Out[187]: array([ 5.2       ,  4.        ,  2.66666667,  2.        ])
+
+In [188]: [my2darray[item:,i].mean() for i,item in enumerate(myvector)]
+Out[188]: [5.2000000000000002, 4.0, 2.6666666666666665, 2.0] # Loopy version
+</code></pre>
+
+<hr>
+
+<p>Another potentially faster way would be to calculate the summations for the upper mask, store it and from it, subtract the sum along the first axis along the entire length of the <code>2D</code> input array. This could be then used for the calculation of the lower part average. Thus, after we store <code>N</code> and calculate <code>mask</code>, we would have -</p>
+
+<pre><code>usum = np.einsum('ij,ij-&gt;j',my2darray,~mask)
+uout = np.true_divide(usums,myvector)
+lout = np.true_divide(my2darray.sum(0) - usums,N-myvector)
+</code></pre>

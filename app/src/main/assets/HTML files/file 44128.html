@@ -1,0 +1,34 @@
+<p>You cannot stop Paypal from repeating the request.  This is part of the IPN system to make sure that the transactions clear even if the site goes down.  Therefore, you should store this transaction ID in the database and check to be sure you have not encountered it in the past.  If you have encountered it previously, you can log that you are seeing a repeat.  Otherwise, process it.</p>
+
+<p>Simple idea of this using a Transactions class:</p>
+
+<pre><code>foreach ($_POST as $key =&gt; $value) {
+  $value = urlencode(stripslashes($value));
+  $req .= "&amp;$key=$value";
+  $value = urldecode($value);
+  foreach ($pp_vars as $search) {
+    if ($key == $search)
+      $$key = $value;
+  }
+  if (preg_match("/txn_id/", $key)) {
+      $txn_id = $value;
+  }
+  if (preg_match("/item_number/", $key)) {
+    $item_number = $value;
+  }
+}
+
+$model = new Transactions();
+if ($model-&gt;exists('txid', $txn_id)) {
+    $res = "REPEAT";
+}
+$model-&gt;action[0] = $res;
+$model-&gt;txid[0] = $txn_id;
+$model-&gt;description[0] = $req;
+$model-&gt;price[0] = $payment_gross;
+$model-&gt;reviewed[0] = 0;
+$model-&gt;user_id[0] = $user-&gt;id;
+$model-&gt;created_at[0] = date("Y-m-d H:i:s");
+$model-&gt;updated_at[0] = $model-&gt;created_at;
+$model-&gt;save();    
+</code></pre>

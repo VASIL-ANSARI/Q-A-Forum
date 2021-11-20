@@ -1,0 +1,29 @@
+<blockquote>
+  <p>Can I completely safe rewrite my program to the new modern STL notation and get rid of the old C code?</p>
+</blockquote>
+
+<p>First, STL is not new; it dates back to well before C++ itself was standardized. Second, we call it the C++ standard library.</p>
+
+<p>Third, as long as your threads follow the requirements of C++ (ie: don't terminate in a way that C++ doesn't allow), and you don't leak memory, then yes, you'll be fine.</p>
+
+<blockquote>
+  <p>Is there any memory fragmentation when running for that long time in million of threads?</p>
+</blockquote>
+
+<p>You're going from objects living on the stack to dynamically allocating memory. <em>Of course</em> there is the possibility of memory fragmentation.</p>
+
+<p>That has absolutely nothing to do with C++ standard library containers. It's an outgrowth of using dynamic allocations.</p>
+
+<p>Equally importantly, you could just use <code>std::array&lt;char, ...&gt;</code> if you want to use a nicer, fixed-size stack array. Then again, <code>std::string</code> implementations with small string optimization offer a pretty good compromise in a lot of cases, forgoing allocating memory if the string is below some maximum size.</p>
+
+<blockquote>
+  <p>What about the performance? Using the old C code having the variables on stack does not have any performance impact.</p>
+</blockquote>
+
+<p>It made your stack longer, which given the 10 million threads, could have caused you to commit more pages of memory. Then again, maybe not.</p>
+
+<p>In any case, memory allocation is always an issue when it comes to a hyper-threaded application. Memory allocation, by its nature, has to be reentrant. That means mutex locking and so forth.</p>
+
+<p>You can devise atomic ways of allocating and deallocating memory, but that tends to require allocations of fixed sizes. And such things tend to have their own downsides. You could have thread-local memory pools that you allocate from. All of those require using your own memory allocators.</p>
+
+<p>But most importantly of all... these issues again have nothing to do with using C++ standard library types <em>specifically</em>. This is simply what happens when you go from static memory to dynamic allocations. Whether you're using <code>malloc/free</code> or standard library containers, the issue is with dynamic allocations.</p>

@@ -1,0 +1,92 @@
+<p>I created something simliar to what you want to achieve.. Hope this helps</p>
+
+<p><strong>image.py</strong></p>
+
+<pre><code>import os
+from google.appengine.ext import db
+from google.appengine.ext import webapp
+from google.appengine.ext.webapp import template
+from google.appengine.ext.webapp.util import run_wsgi_app
+class Profile(db.Model):
+                image=db.BlobProperty()
+class disp_image(webapp.RequestHandler):       
+                def get(self): 
+                    key = self.request.get('key')
+                    image = Profile.get(key)
+                    self.response.headers['Content-Type'] = "image/png"
+                    return self.response.out.write(image.image)
+class MainPage(webapp.RequestHandler):
+    def get(self):
+        image = self.request.get('image')
+        pro=Profile()
+        if image:   
+            pro.image = db.Blob(image)
+            import logging
+            logging.info('persisted')
+            pro.put()
+        prof=Profile().all()
+
+        return self.response.out.write(template.render('view.html',{'prof':prof}))
+    def post(self):
+        return MainPage.get(self)
+application = webapp.WSGIApplication([
+  ('/', MainPage),
+  ('/disp', disp_image)
+], debug=True)
+def main():
+  run_wsgi_app(application)
+if __name__ == '__main__':
+  main()
+</code></pre>
+
+<p><strong>view.html</strong></p>
+
+<pre><code>&lt;!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8"&gt;
+&lt;title&gt;Insert title here&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;form enctype="multipart/form-data" method="post" action="/"&gt;
+&lt;input type="file" name='image'/&gt;
+&lt;input type='submit' value="submit"/&gt;
+{% for prof in prof %}
+&lt;img src="/disp?key={{prof.key}}" /&gt;
+{% endfor %}
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p><strong>app.yaml</strong></p>
+
+<pre><code>application: sample-app
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /.*
+  script: image.py
+</code></pre>
+
+<p>url</p>
+
+<pre><code>&gt;&gt;&gt; req.host
+'localhost:80'
+&gt;&gt;&gt; req.host_url
+'http://localhost'
+&gt;&gt;&gt; req.application_url
+'http://localhost/blog'
+&gt;&gt;&gt; req.path_url
+'http://localhost/blog/article'
+&gt;&gt;&gt; req.url
+'http://localhost/blog/article?id=1'
+&gt;&gt;&gt; req.path
+'/blog/article'
+&gt;&gt;&gt; req.path_qs
+'/blog/article?id=1'
+&gt;&gt;&gt; req.query_string
+'id=1'
+</code></pre>

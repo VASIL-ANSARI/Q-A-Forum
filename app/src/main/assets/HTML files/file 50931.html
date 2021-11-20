@@ -1,0 +1,84 @@
+<p>First, you need a unique id for the table so each record can be updated individually:</p>
+
+<pre><code>create table tempqueue
+
+(
+    id int identity(1,1)
+    ,QueueT varchar(20)
+    ,Type varchar(20)
+)
+</code></pre>
+
+<p>Then you can update it using a couple sub queries, <code>min</code>, <code>count</code>, and the <code>row_number</code> windowed function:</p>
+
+<pre><code>create table tempqueue
+
+(
+    id int identity(1,1)
+    ,QueueT varchar(20)
+    ,Type varchar(20)
+)
+
+insert into tempqueue
+(
+    QueueT 
+    ,Type 
+)
+
+values
+( 'bob' , 'type1'),
+( 'bob' , 'type1'),
+( 'john' , 'type2'),
+( 'john' , 'type2'),
+( 'john' , 'type2'),
+( null , 'type1'),
+( null , 'type1'),
+( null , 'type3'),
+( null , 'type1'),
+( null , 'type2'),
+( null , 'type2'),
+( 'tim' , 'type1'),
+( 'bob' , 'type1'),
+( 'jill' , 'type2'),
+( 'jack' , 'type2'),
+( 'john' , 'type2'),
+( null , 'type1'),
+( null , 'type1'),
+( null , 'type1'),
+( null , 'type1'),
+( null , 'type2'),
+( null , 'type2'),
+( null , 'type2')
+
+-- loop through records until no records are updated
+declare @rows_updated int = 1
+while @rows_updated &gt; 0
+    begin
+        update t
+            set t.QueueT = u.QueueT
+            from tempqueue t
+                -- get min record id per type where QueueT is null
+                inner join (select Type,min(id) id
+                            from tempqueue
+                            where QueueT is null
+                            group by Type) id
+                    on id.Type = t.Type
+                    and id.id = t.id
+                -- get QueueT for each Type with the least count
+                inner join (select QueueT,Type,
+                                row_number() over(partition by Type order by cnt) lst
+                            from (select QueueT,Type,count(*) cnt
+                                  from tempqueue
+                                  where QueueT is not null
+                                  group by QueueT,Type)c)u
+                    on u.Type = id.Type
+                    and u.lst = 1
+            set @rows_updated = @@rowcount
+    end
+
+select QueueT,Type,count(*) cnt
+from tempqueue
+group by QueueT,Type
+</code></pre>
+
+<p><a href="http://sqlfiddle.com/#!3/4c0f6/1" rel="nofollow">SQL FIDDLE</a></p>

@@ -1,0 +1,38 @@
+<p>Create an array variable before the loop, and instead of resolving the "parent promise" , push a new Promise to the array for every request in the loop. Then after the loop use `Promise.all' to wait for all promises, then resolve the parent promise.</p>
+
+<p>Something like this:</p>
+
+<pre><code>// SearchClass.js
+Search.prototype.search = function(search) {
+  var self = this;
+
+  this.params['wa'] = search;
+
+  return new Promise(function(resolve, reject) {
+
+      request(SEARCH_URL + '?' + querystring.stringify(self.params), function (error, response, body) {
+            if (error || response.statusCode !== 200) {
+                return reject(error || response.statusCode);
+            }
+
+            var promises = [];
+
+            for (var i = 1; i &lt;= pages; i++) {
+                promises.push( new Promise(resolve,reject){
+                    request(SEARCH_URL + '?' + querystring.stringify(self.params), function (error, response, body) {
+                        if (!error &amp;&amp; response.statusCode == 200){
+                            resolve(body);
+                        }
+                        else {
+                            reject(error || response.statusCode);
+                        }
+                    });
+                });
+            }
+            resolve(Promise.all(promises));
+      });
+  });
+};
+</code></pre>
+
+<p>Mind you, I haven't tried it out (sorry, I know that makes it a poor answer) I might have fallen in some logic trap, but I think you'll get the logic behind it at least.</p>

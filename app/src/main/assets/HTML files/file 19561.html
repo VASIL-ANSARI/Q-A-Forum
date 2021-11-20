@@ -1,0 +1,46 @@
+<p>I think this should do it:</p>
+
+<pre><code>User.select("country, city").uniq
+</code></pre>
+
+<p>This should return an array of <code>User</code> objects where only <code>country</code> and <code>city</code> is populated.
+Then you can map it into something you need, i.e.:</p>
+
+<pre><code>User.select("country, city").uniq.map { |u| "#{u.country} - #{u.city}" }
+</code></pre>
+
+<p>for instance...</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Answering your comment:
+Yes, you can just add the lat and lng fields you need like so:</p>
+
+<pre><code># remember afterwards to only access the fields you're actively selecting here,
+# otherwise you'll get an exception
+@users = User.select("country, city, lat, lng").uniq.map { |u| { country: u.country, city: u.city, lat: u.lat, lng: u.lng } }
+</code></pre>
+
+<p>For easy use add a method to your <code>User</code> model that returns a string as you need it, i.e.:</p>
+
+<pre><code>def country_city
+  "#{country} - #{city}"
+end
+</code></pre>
+
+<p>And in your view(s) you can use the <a href="http://api.rubyonrails.org/classes/ActionView/Helpers/FormOptionsHelper.html#method-i-collection_select" rel="nofollow"><code>collection_select</code></a> helper method to only use the fields you want (by using the new method in the model) for your select but still have the <code>lat</code> and <code>lng</code> fields in the hash-array.</p>
+
+<pre><code>collection_select(:name_of_view_instance, :name_of_select_field, @users, :id, :country_city)
+</code></pre>
+
+<p>This gives you an HTML output like the following:</p>
+
+<pre><code>&lt;select name="name_of_view_instance[name_of_select_field]"&gt;
+  &lt;option value="1" selected="selected"&gt;United States - Boston&lt;/option&gt;
+  &lt;option value="2"&gt;United States - New York&lt;/option&gt;
+  &lt;option value="3"&gt;United States - San Francisco&lt;/option&gt;
+  &lt;!-- and so on --&gt;
+&lt;/select&gt;
+</code></pre>
+
+<p>See the documentation of the helper method at above link.</p>

@@ -1,0 +1,43 @@
+<p><strong>TLDR</strong>: use </p>
+
+<pre><code>kruskal_minimum_spanning_tree(g, std::back_inserter(mst), 
+                        weight_map( get(&amp;Edge::weight, g) );
+</code></pre>
+
+<p><strong>Original answer</strong>:</p>
+
+<p>The problem you are facing is that the algorithm needs to access a graph's weight map and yours doesn't have one by default. If you look at the signature of the algorithm in <a href="http://www.boost.org/libs/graph/doc/kruskal_min_spanning_tree.html" rel="nofollow">the documentation</a> you can see that it is:</p>
+
+<pre><code>template &lt;class Graph, class OutputIterator, class P, class T, class R&gt;
+OutputIterator kruskal_minimum_spanning_tree(Graph&amp; g, OutputIterator tree_edges, 
+                                   const bgl_named_params&lt;P, T, R&gt;&amp; params = all defaults);
+</code></pre>
+
+<p>It has two "normal" parameters (the ones you used) and then a strange looking <code>bgl_named_params&lt;P, T, R&gt;&amp; params</code>. This last parameter allows you to use the four parameters listed later in that page: <code>weight_map</code>, <code>rank_map</code>, <code>predecessor_map</code> and <code>vertex_index_map</code>. If you don't use any of these parameters its default value is used and in the case of <code>weight_map</code> this default is <code>get(edge_weight,g)</code>. That only works if you have an interior edge_weight property in your graph, meaning your graph is defined like this:</p>
+
+<pre><code>typedef adjacency_list&lt;vecS, vecS, undirectedS, 
+                    property&lt;vertex_name_t,char&gt;,//Could also be `Node` unless you use another algorithm with requirements on the vertices
+                    property&lt;edge_weight_t,float&gt; 
+                  &gt; InternalPropGraph;
+</code></pre>
+
+<p>But if that definition was required to use <code>kruskal_minimum_spanning_tree</code> (or any other algorithm) then <a href="http://www.boost.org/libs/graph/doc/bundles.html" rel="nofollow">bundled properties</a> wouldn't be useful at all. You just need to override the default <code>weight_map</code> using the named parameters:</p>
+
+<pre><code>//typedef adjacency_list&lt;vecS, vecS, undirectedS, Node, Edge&gt; Grafo;
+...
+kruskal_minimum_spanning_tree(g, std::back_inserter(mst), 
+                        weight_map( get(&amp;Edge::weight, g) );
+</code></pre>
+
+<p>In order to access a property map that relates a vertex/edge descriptor with a member of your structs you can simply use <code>get(&amp;Struct::member, g)</code>.</p>
+
+<p>A final note about Named Parameters, if in your invocation of the algorithm you need to use more than one of these parameters, you need to concatenate them with <code>.</code> instead of the usual <code>,</code> since in the signature <code>params</code> despite its name is a single parameter.</p>
+
+<pre><code>//the order of the named params is irrelevant
+kruskal_minimum_spanning_tree(g, std::back_inserter(mst), 
+                                 weight_map(my_weights)
+                                .vertex_index_map(my_indices)
+                                .predecessor_map(my_predecessors));
+</code></pre>
+
+<p><a href="http://melpon.org/wandbox/permlink/DGEBVM9SHBl6ovZ9" rel="nofollow">Here</a> is an example that shows something similar to what you want using both internal properties and bundled properties. It deliberately uses different ways to set/access properties to show what you can do.</p>

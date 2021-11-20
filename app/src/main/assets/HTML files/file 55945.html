@@ -1,0 +1,78 @@
+<p>No, partials don't call the controller.  You instantiate the objects you need in the controller.  So if you want to render an address partial you'd get the address in the controller.</p>
+
+<p>If you need all 3 on all pages you could create controller concerns which have a before action on them</p>
+
+<pre><code>module GetStuff
+  extend ActiveSupport::Concern
+
+  included do
+    before_action :set_user
+    before_action :set_address
+  end
+
+  def set_user
+     @user = # code for getting user
+  end
+end
+
+class UsersController
+  include GetStuff
+end
+</code></pre>
+
+<p>Or assuming you inherit from application controller you could simply set a before action for them there (but if you have other controllers inheriting from it that's probably not the best idea.</p>
+
+<p>If you use them frequently you could put methods in application controller and set helper methods to allow the methods to be accessible from views as well as controllers.</p>
+
+<pre><code>class ApplicationController
+  def current_user
+    @current_user = #code to get user
+  end
+  helper_method :current_user
+end
+
+# Some view
+&lt;% if current_user %&gt;
+  &lt;%= current_user.username %&gt;
+&lt;% end %&gt;
+</code></pre>
+
+<p>Or you could have methods in helpers</p>
+
+<pre><code>module ApplicationHelper
+  def current_user
+    @current_user = #code to get user
+  end
+end
+</code></pre>
+
+<p>Or presumably address is linked to user too you could create a facade and simply instantiate that in your controllers</p>
+
+<pre><code>class UserController
+  def show
+    @user_facade = UserFacade.new(User.find(params[:id])
+  end
+end
+
+class UserFacade
+  attr_reader :user
+
+  def initialize(user)
+    @user = user
+  end
+
+  def address
+    @address ||= user.address
+  end
+
+  def user_history
+    @user_history ||= user.history
+  end
+end
+
+# users/show.html.erb
+
+&lt;%= render @user_facade.user %&gt;
+&lt;%= render @user_facade.address %&gt;
+&lt;%= render @user_facade.user_history %&gt;
+</code></pre>

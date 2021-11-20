@@ -1,0 +1,142 @@
+<p>The problem I see here is that your lookup keys are column names which makes difficult to think how to join them.
+But you only need to have all lookup descriptions as a single row joined to each row of the <code>census data</code> table.</p>
+
+<p><strong>Steps (Bottom to Top)</strong></p>
+
+<ul>
+<li>Pivot the lookup table using <code>MAX()</code> aggregation. Pivoted lookup table has only one row. Can use crosstab function here via tablefunc extension.</li>
+<li>Cross join with <code>census data</code> table.  </li>
+<li>Using json <a href="https://www.postgresql.org/docs/current/static/functions-json.html" rel="nofollow">functions</a> assemble a json object for each row.</li>
+<li>Using json <a href="https://www.postgresql.org/docs/current/static/functions-aggregate.html" rel="nofollow">aggregation</a> assemble a json array of all rows.</li>
+<li>Add final key to json object.</li>
+</ul>
+
+<p>Here is the query.</p>
+
+<pre><code>-- add 'Census' Key to aggregated json
+SELECT jsonb_build_object('Census', agg_data) final_json FROM
+(
+  -- assemble json array
+  SELECT jsonb_agg(json_data) agg_data FROM
+  (
+    -- Assemble json object with each row
+    SELECT 
+      jsonb_build_object(
+        'geographicProfile', jsonb_build_object(
+          'district', district, 
+          'hc01_vc03', jsonb_build_array(hc01_vc03, hc01_vc03_lu), 
+          'hc02_vc03', jsonb_build_array(hc02_vc03, hc02_vc03_lu), 
+          'hc03_vc03', jsonb_build_array(hc03_vc03, hc03_vc03_lu), 
+          'hc04_vc03', jsonb_build_array(hc04_vc03, hc04_vc03_lu)
+    )
+  ) json_data
+  FROM ( 
+    -- Cross Join census data with pivoted lookup table
+    SELECT 
+      district,
+      a.hc01_vc03, b.hc01_vc03 hc01_vc03_lu,
+      a.hc02_vc03, b.hc02_vc03 hc02_vc03_lu,
+      a.hc03_vc03, b.hc03_vc03 hc03_vc03_lu,
+      a.hc04_vc03, b.hc04_vc03 hc04_vc03_lu
+    FROM
+      public.census_data a, 
+      (
+      -- Pivot lookup table. Put all values in only one row with keys as column names. Could use tablefunc extension here.
+      SELECT 
+        MAX (CASE WHEN name = 'hc01_vc03' then description END) hc01_vc03,
+        MAX (CASE WHEN name = 'hc02_vc03' then description END) hc02_vc03,
+        MAX (CASE WHEN name = 'hc03_vc03' then description END) hc03_vc03,
+        MAX (CASE WHEN name = 'hc04_vc03' then description END) hc04_vc03 
+      FROM
+        public.lookup
+      ) b
+    ) c
+  ) d
+) e
+</code></pre>
+
+<p><strong>PHP Processing</strong></p>
+
+<p>Remove all select involving json functions if you want to do the json assembling in your php code.</p>
+
+<pre><code>    -- Cross Join census data with pivoted lookup table
+    SELECT 
+      district,
+      a.hc01_vc03, b.hc01_vc03 hc01_vc03_lu,
+      a.hc02_vc03, b.hc02_vc03 hc02_vc03_lu,
+      a.hc03_vc03, b.hc03_vc03 hc03_vc03_lu,
+      a.hc04_vc03, b.hc04_vc03 hc04_vc03_lu
+    FROM
+      public.census_data a, 
+      (
+      -- Pivot lookup table. Put all values in only one row with keys as column names. Could use tablefunc extension here.
+      SELECT 
+        MAX (CASE WHEN name = 'hc01_vc03' then description END) hc01_vc03,
+        MAX (CASE WHEN name = 'hc02_vc03' then description END) hc02_vc03,
+        MAX (CASE WHEN name = 'hc03_vc03' then description END) hc03_vc03,
+        MAX (CASE WHEN name = 'hc04_vc03' then description END) hc04_vc03 
+      FROM
+        public.lookup
+      ) b
+</code></pre>
+
+<p>Now you have all the info needed in each row to create the json in PHP loop.</p>
+
+<p><strong>Crosstab function</strong></p>
+
+<p><code>Tablefunc</code> extension needs to be installed. 
+Use this query instead of the pivoting lookup select.</p>
+
+<pre><code>SELECT * 
+FROM public.crosstab( 'select ''lu1''::text, * from public.lookup' )
+AS ct(lookup_name text,
+      hc01_vc03 text, hc02_vc03 text,
+      hc03_vc03 text, hc04_vc03 text)
+</code></pre>
+
+<p><strong>CTEs</strong></p>
+
+<p>CTEs are more 'readable'.</p>
+
+<p>Here is a CTE version of the query.</p>
+
+<pre><code>WITH pivoted_lu AS ( -- put all lookup values in one row (pivot)
+      SELECT 
+        MAX (CASE WHEN name = 'hc01_vc03' then description END) hc01_vc03,
+        MAX (CASE WHEN name = 'hc02_vc03' then description END) hc02_vc03,
+        MAX (CASE WHEN name = 'hc03_vc03' then description END) hc03_vc03,
+        MAX (CASE WHEN name = 'hc04_vc03' then description END) hc04_vc03 
+      FROM
+        public.lookup
+
+) 
+,full_data AS ( -- cross join with census data to have all lookup names available in all rows
+SELECT 
+  district,
+  a.hc01_vc03, b.hc01_vc03 hc01_vc03_lu,
+  a.hc02_vc03, b.hc02_vc03 hc02_vc03_lu,
+  a.hc03_vc03, b.hc03_vc03 hc03_vc03_lu,
+  a.hc04_vc03, b.hc04_vc03 hc04_vc03_lu
+FROM public.census_data a, pivoted_lu b
+)
+-- stop here and get this recordset (select * from full_data) if you want to assemble json in php code...
+-- Why would you do this? Postgres offers terrific json manipulation functions !
+,json_data as ( -- convert each row to json
+SELECT 
+jsonb_build_object(
+    'geographicProfile', jsonb_build_object(
+        'district', district, 
+        'hc01_vc03', jsonb_build_array(hc01_vc03, hc01_vc03_lu), 
+        'hc02_vc03', jsonb_build_array(hc02_vc03, hc02_vc03_lu), 
+        'hc03_vc03', jsonb_build_array(hc03_vc03, hc03_vc03_lu), 
+        'hc04_vc03', jsonb_build_array(hc04_vc03, hc04_vc03_lu)
+    )
+) json_data
+FROM full_data
+)
+,aggregated_json_data as ( -- agreggate into one json array
+select jsonb_agg(json_data) agg_data from json_data
+)
+
+select jsonb_build_object('Census', agg_data) final_json from aggregated_json_data 
+</code></pre>

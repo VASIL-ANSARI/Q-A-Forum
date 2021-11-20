@@ -1,0 +1,105 @@
+<p>with the below code you should be able to manipulate the output to your requirements..</p>
+
+<pre><code>/* utility class to simplify working with DOMDocument &amp; XML */
+class xmldom{
+    private $xml;
+    private $parse_errs;
+    public function __construct( $data, $options=array() ){
+        try{
+
+            $opts=(object)array_merge(array(
+                'encoding'      =&gt;  'utf-8',
+                'validate'      =&gt;  false,
+                'standalone'    =&gt;  true,
+                'preserve'      =&gt;  true,
+                'strict'        =&gt;  false,
+                'substitute'    =&gt;  false,
+                'recover'       =&gt;  true,
+                'format'        =&gt;  false
+            ),$options);
+
+            libxml_use_internal_errors( TRUE );
+            $this-&gt;xml = new DOMDocument('1.0',$opts-&gt;encoding);
+            $this-&gt;xml-&gt;validateOnParse=$opts-&gt;validate;
+            $this-&gt;xml-&gt;standalone=$opts-&gt;standalone;
+            $this-&gt;xml-&gt;preserveWhiteSpace=$opts-&gt;preserve;
+            $this-&gt;xml-&gt;strictErrorChecking=$opts-&gt;strict;
+            $this-&gt;xml-&gt;substituteEntities=$opts-&gt;substitute;
+            $this-&gt;xml-&gt;recover=$opts-&gt;recover;
+            $this-&gt;xml-&gt;formatOutput=$opts-&gt;format;
+            $this-&gt;xml-&gt;loadXML( mb_convert_encoding( $data, $opts-&gt;encoding ) );
+            $this-&gt;parse_errs=serialize( libxml_get_last_error() );
+            libxml_clear_errors();
+
+        }catch( Exception $e ){
+            die( $e-&gt;getMessage() );    
+        }
+    }
+    public function getdom(){
+        return $this-&gt;xml;
+    }
+    public function geterrors(){
+        return $this-&gt;parse_errs;   
+    }
+}
+
+/* Utility class to iterate nodes in the DOM */
+class RecursiveDOMIterator implements RecursiveIterator {
+    private $index;
+    private $list;
+
+    public function __construct(DOMNode $domNode){
+        $this-&gt;index = 0;
+        $this-&gt;list = $domNode-&gt;childNodes;
+    }
+    public function current(){
+        return $this-&gt;list-&gt;item($this-&gt;index);
+    }
+    public function getChildren(){
+        return new self( $this-&gt;current() );
+    }
+    public function hasChildren(){
+        return $this-&gt;current()-&gt;hasChildNodes();
+    }
+    public function key(){
+        return $this-&gt;index;
+    }
+    public function next(){
+        $this-&gt;index++;
+    }
+    public function rewind(){
+        $this-&gt;index = 0;
+    }
+    public function valid(){
+        return $this-&gt;index &lt; $this-&gt;list-&gt;length;
+    }
+}
+
+/* Get the xml data */
+$url=file_get_contents( 'http://www.newyorkfed.org/xml/data/fx/ATSNoon.xml' );
+
+/* Construct DOMDocument object using xml data as source */
+$dom=new xmldom(  $url );
+$xml=$dom-&gt;getdom();
+
+/* Find the Root node in the DOMDocument */
+$rootnode=$xml-&gt;getElementsByTagName('UtilityData')-&gt;item(0);
+
+/* Create the Domnode iterator object */
+$nodeItr=new RecursiveDOMIterator( $rootnode );
+
+/* Create standard recursive Iterator */
+$itr=new RecursiveIteratorIterator( $nodeItr, RecursiveIteratorIterator::SELF_FIRST );
+
+/* Iterate through the DOM and echo out tagname &amp; value */
+foreach( $itr as $node ) {
+    if( $node-&gt;nodeType === XML_ELEMENT_NODE ) {
+        /*
+            Here you can add to an array or manipulate however you see fit.
+        */
+        echo $node-&gt;nodeName . ' ' . $node-&gt;nodeValue. '&lt;br /&gt;';
+    }
+}
+/* clean up */
+$dom=$rootnode=$itr=$nodeItr=null;
+</code></pre>

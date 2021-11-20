@@ -1,0 +1,43 @@
+<p>The error you're seeing occurs at query parsing time, i.e. nothing has been executed yet. At that time, the <a href="https://github.com/elastic/elasticsearch/blob/9fa69bd663206c0d7800d866acd7afe40bb6d9ce/core/src/main/java/org/elasticsearch/index/query/functionscore/fieldvaluefactor/FieldValueFactorFunctionParser.java" rel="nofollow"><code>FieldValueFactorFunctionParser</code></a> builds the <code>filter_value_factor</code> function to be executed later, but it notices that the <code>views</code> field doesn't exist in the mapping type. </p>
+
+<p>Note that the filter has not been executed yet, just like the <code>filter_value_factor</code> function, it has only been parsed by <a href="https://github.com/elastic/elasticsearch/blob/9fa69bd663206c0d7800d866acd7afe40bb6d9ce/core/src/main/java/org/elasticsearch/index/query/functionscore/FunctionScoreQueryParser.java#L217" rel="nofollow"><code>FunctionScoreQueryParser</code></a>.</p>
+
+<p>I'm wondering why you can't simply add a field in your mapping type, it's  as easy as running this</p>
+
+<pre><code>curl -XPUT 'http://localhost:9200/blog/_mapping/page' -d '{
+    "page" : {
+        "properties" : {
+            "views" : {"type" : "integer"}
+        }
+    }
+}'
+</code></pre>
+
+<p>If this is REALLY not an option, another possibility would be to use <code>script_score</code> instead, like this:</p>
+
+<pre><code>{
+  "query": {
+    "function_score": {
+      "query": {
+        "match": {
+          "author-title": "developer"
+        }
+      },
+      "functions": [
+        {
+          "filter": {
+            "range": {
+              "views": {
+                "from": 1
+              }
+            }
+          }, 
+          "script_score": {
+            "script": "_score * doc.views.value"
+          }
+        }
+      ]
+    }
+  }
+}
+</code></pre>

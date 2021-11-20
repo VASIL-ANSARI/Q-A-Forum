@@ -1,0 +1,37 @@
+<p>Their are (at least) two ways to solve this it seems...</p>
+
+<h2>Way 1</h2>
+
+<p>Instead of:</p>
+
+<pre><code>pGlobal = PyDict_New();
+</code></pre>
+
+<p>You can import the <code>__main__</code> module and get it's globals dictionary like this:</p>
+
+<pre><code>pGlobal = PyModule_GetDict(PyImport_AddModule("__main__"));
+</code></pre>
+
+<p>This way is described like so:</p>
+
+<blockquote>
+  <p>BUT PyEval_GetGlobals will return null it it is not called from within 
+  Python. This will never be the case when extending Python, but when Python 
+  is embedded, it may happen. This is because PyRun_* define the global 
+  scope, so if you're not somehow inside a PyRun_ thing (e.g. module called 
+  from python called from embedder), there are no globals. </p>
+  
+  <p>In an embedded-python situation, if you decide that all of your PyRun_* 
+  calls are going to use <code>__main__</code> as the global namespace, 
+  PyModule_GetDict(PyImport_AddModule("<code>__main__</code>")) will do it.</p>
+</blockquote>
+
+<p>Which I got from the question <a href="http://www.gossamer-threads.com/lists/python/python/8946#8946" rel="nofollow">embedding</a> I found over on this <a href="http://www.gossamer-threads.com/lists/python/python/" rel="nofollow">Python list</a>.</p>
+
+<h2>Way 2</h2>
+
+<p>Or as an alternative, which I personally prefer to importing the main module (and found <a href="http://stackoverflow.com/a/10684099/1039947">here</a>), you can do this to populate the new dictionary you created with the built-in stuff which includes <code>__build_class__</code>:</p>
+
+<pre><code>pGlobal = PyDict_New();
+PyDict_SetItemString(pGlobal, "__builtins__", PyEval_GetBuiltins());
+</code></pre>

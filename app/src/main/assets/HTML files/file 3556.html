@@ -1,0 +1,35 @@
+<p>The root cause of this problem lies in the communication line between your Java code and the DB server in question. It can be everything. A bug in your JDBC code, a bug in the JDBC driver, a bug in NIC driver, a crappy NIC, a poor network cable, a stuttering DB server, a DB server dropping connections because it runs out of them, etcetera. </p>
+
+<p>There's no straightforward cause, even not based on the stacktrace. I would start checking if the JDBC code is properly and robust written. I.e. acquiring and closing all DB resources in shortest possible scope in a try/finally block.</p>
+
+<p>E.g.</p>
+
+<pre><code>public Entity find(Long id) throws SQLException {
+    Connection connection = null;
+    PreparedStatement statement = null;
+    ResultSet resultSet = null;
+    Entity entity = null;
+
+    try {
+        connection = database.getConnection();
+        statement = connection.prepareStatement(SQL_FIND_BY_ID);
+        statement.setLong(1, id);
+        resultSet = statement.executeQuery();
+        if (resultSet.next()) {
+            entity = new Entity();
+            entity.setSomething(resultSet.getObject("something"));
+            // ...
+        }
+    } finally {
+        close(resultSet);
+        close(statement);
+        close(connection);
+    }
+
+    return entity;
+}
+</code></pre>
+
+<p>Next step would be upgrading the JDBC driver and then checking the hardware matters. </p>
+
+<p>Good luck nailing down the cause of the problem. </p>

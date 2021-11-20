@@ -1,0 +1,32 @@
+<p>The linked <a href="http://automapper.codeplex.com/workitem/3197">issue</a> more or less answers your questions:</p>
+
+<blockquote>
+  <p>Mapper.CreateMap is not threadsafe, nor will it ever be. However,
+  Mapper.Map is thread-safe. The Mapper static class is just a thin
+  wrapper on top of the MappingEngine and Configuration objects.</p>
+</blockquote>
+
+<p>So only use <code>Mapper.CreateMap</code> if you do your configuration in <strong>one central place</strong> in a threadsafe manner.</p>
+
+<p>Your comment was:</p>
+
+<blockquote>
+  <p>I'm asking this because I'd like to configure automatter in-place,
+  i.e. right before usage. I planned to configure it in non-concurrent
+  context, i.e. ~ lock (mapperConfigLock) { Mapper.CreateMap()....; },
+  and I fear this is not enough now.</p>
+</blockquote>
+
+<p>If you are doing in-place configuration just don't use the static <code>Mapper</code> class. As the comment on the github issue suggest use the mapping engine directly:</p>
+
+<pre><code>var config = 
+    new ConfigurationStore(new TypeMapFactory(), MapperRegistry.AllMappers());
+config.CreateMap&lt;Source, Destination&gt;();
+var engine = new MappingEngine(config);
+
+var source = new Source();
+var dest = engine.Map(source);
+</code></pre>
+
+<p>It's a little bit of more code but you can create your own helpers around it.
+But everything is local in a given method so no shared state no need to worry about thread safety.</p>

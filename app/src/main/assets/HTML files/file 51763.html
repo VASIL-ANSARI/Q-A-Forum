@@ -1,0 +1,86 @@
+<p>I don't think I fully understand your question. Posting your code and an example file would have been very helpful.</p>
+
+<p>This code will count all entries in all files, then it will identify unique entries per file. After that, it will count each entry's occurrence in each file. Then, it will select only entries that appeared at least in 90% of all files.</p>
+
+<p>Also, this code could have been shorter, but for readability's sake, I created many variables, with long, meaningful names. </p>
+
+<p>Please read the comments ;)</p>
+
+<pre class="lang-python prettyprint-override"><code>import os
+from collections import Counter
+from sys import argv
+
+# adjust your cut point
+PERCENT_CUT = 0.9
+
+# here we are going to save each file's entries, so we can sum them later
+files_dict = {}
+
+# total files seems to be the number you'll need to check against count
+total_files  = 0;
+
+# raw total entries, even duplicates
+total_entries = 0;
+
+unique_entries = 0;
+
+# first argument is script name, so have the second one be the folder to search
+search_dir = argv[1]
+
+# list everything under search dir - ideally only your input files
+# CHECK HOW TO READ ONLY SPECIFIC FILE types if you have something inside the same folder
+files_list = os.listdir(search_dir)
+
+total_files = len(files_list)
+
+print('Files READ:')
+
+# iterate over each file found at given folder
+for file_name in files_list:
+    print("    "+file_name)
+
+    file_object = open(search_dir+file_name, 'r')
+
+    # returns a list of entries with 'newline' stripped
+    file_entries = map(lambda it: it.strip("\r\n"), file_object.readlines())
+
+    # gotta count'em all
+    total_entries += len(file_entries)
+
+    # set doesn't allow duplicate entries
+    entries_set = set(file_entries)
+
+    #creates a dict from the set, set each key's value to 1.
+    file_entries_dict = dict.fromkeys(entries_set, 1)
+
+    # entries dict is now used differenty, each key will hold a COUNTER
+    files_dict[file_name] = Counter(file_entries_dict)
+
+    file_object.close();
+
+
+print("\n\nALL ENTRIES COUNT: "+str(total_entries))
+
+# now we create a dict that will hold each unique key's count so we can sum all dicts read from files
+entries_dict = Counter({})
+
+for file_dict_key, file_dict_value in files_dict.items():
+    print(str(file_dict_key)+" - "+str(file_dict_value))
+    entries_dict += file_dict_value
+
+print("\nUNIQUE ENTRIES COUNT: "+str(len(entries_dict.keys())))
+
+# print(entries_dict)
+
+# 90% from your question
+cut_line = total_files * PERCENT_CUT
+print("\nNeeds at least "+str(int(cut_line))+" entries to be listed below")
+#output dict is the final dict, where we put entries that were present in &gt; 90%  of the files.
+output_dict = {}
+# this is PYTHON 3 - CHECK YOUR VERSION as older versions might use iteritems() instead of items() in the line belows
+for entry, count in entries_dict.items():
+    if count &gt; cut_line:
+        output_dict[entry] = count;
+
+print(output_dict)
+</code></pre>

@@ -1,0 +1,32 @@
+<p>After doing a little digging, I found a solution. If you look in the following directory in the TensorFlow package:</p>
+
+<pre><code>tensorflow.contrib.learn.python.learn.datasets
+</code></pre>
+
+<p>You can find a file called <em>base.py</em> which has the csv file loading functions. Basically, I just modified the function called <em>load_csv</em> to take in my file. The code is shown below:</p>
+
+<pre><code>Dataset = collections.namedtuple('Dataset', ['data', 'target'])
+Datasets = collections.namedtuple('Datasets', ['train', 'validation', 'test'])
+
+def load_csv(filename, target_dtype, target_column=-1,    has_header=True):
+   """Load dataset from CSV file."""
+  with gfile.Open(filename) as csv_file:
+    data_file = csv.reader(csv_file)
+    if has_header:
+       header = next(data_file)
+       n_samples = int(header[0])
+       n_features = int(header[1])
+       data = np.empty((n_samples, n_features))
+       target = np.empty((n_samples,), dtype=np.int)
+       for i, ir in enumerate(data_file):
+            target[i] = np.asarray(ir.pop(target_column), dtype=target_dtype)
+            data[i] = np.asarray(ir, dtype=np.float64)
+    else:
+       data, target = [], []
+       for ir in data_file:
+       target.append(ir.pop(target_column))
+       data.append(ir)
+  return Dataset(data=data, target=target)
+</code></pre>
+
+<p>So if you see the code above, I think the problem I was having is the <em>target_dtype</em> attribute. Even though I changed the dtype of the target array, I didn't change the target_dtype attribute, which made it seem incompatible when TensorFlow checked the signatures. My code works now =. If you have any questions or can clarify this further please feel free to do so!</p>

@@ -1,0 +1,60 @@
+<p>You could place all the <code>.use</code> calls in a single <code>setupDependencies</code> call and all the header setting in a single <code>setHeaders</code> call.</p>
+
+<pre><code>var https_options = {
+    name: 'myapp',
+    version: '1.0.0',
+    key: fs.readFileSync('./HTTPS.key'), //on current folder
+    certificate: fs.readFileSync('./HTTPS.cert'),
+};
+
+var https_server = restify.createServer(https_options);
+
+https_server.use(restify.acceptParser(server.acceptable));
+https_server.use(restify.queryParser());
+https_server.use(restify.bodyParser());
+
+https_server.use(restify.CORS());
+https_server.opts(/.*/, function (req,res,next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", req.header("Access-Control-Request-Method"));
+    res.header("Access-Control-Allow-Headers", req.header("Access-Control-Request-Headers"));
+    res.send(200);
+    return next();
+});
+</code></pre>
+
+<p>Would reduce to:</p>
+
+<pre><code>var https_options = {
+    name: 'myapp',
+    version: '1.0.0',
+    key: fs.readFileSync('./HTTPS.key'), //on current folder
+    certificate: fs.readFileSync('./HTTPS.cert'),
+};
+
+var https_server = restify.createServer(https_options);
+
+setupDependencies(https_server);
+
+https_server.opts(/.*/, function (req,res,next) {
+    setHeaders(req, res);
+    res.send(200);
+    return next();
+});
+
+
+/* helpers */
+
+function setupDependencies(server) {
+    server.use(restify.acceptParser(server.acceptable));
+    server.use(restify.queryParser());
+    server.use(restify.bodyParser());
+    server.use(restify.CORS());
+};
+
+function setHeaders(req, res) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", req.header("Access-Control-Request-Method"));
+    res.header("Access-Control-Allow-Headers", req.header("Access-Control-Request-Headers"));
+};
+</code></pre>

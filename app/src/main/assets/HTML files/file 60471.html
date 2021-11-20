@@ -1,0 +1,54 @@
+<p>It was a timing problem. I was loading 'tab.js', appending it to the body, and assuming this process would complete immediately:</p>
+
+<pre><code>ourScript = document.createElement("script");
+ourScript.type  = "text/javascript";
+ourScript.src = sourceDir + "tab.js";
+document.body.appendChild(ourScript);
+</code></pre>
+
+<p>There appears to be no callback from jquery appends, so I added a one second time delay before checking for 'tab.js' and all seems OK. I expect the Chrome console gets confused and shows strange effects.</p>
+
+<p>Final code:</p>
+
+<pre><code>// ---------------------------------
+var eventNameSpaceLoaded = function (thisNamespace) {
+    var isLoaded = false;
+    var theseClickEvents = jQuery._data(document, "events").click; 
+
+    Object.keys(theseClickEvents).forEach(function (key) {
+        if (theseClickEvents[key].namespace &amp;&amp; (theseClickEvents[key].namespace === thisNamespace)) {
+            isLoaded = true;
+            return false;               // stop the each
+        }
+    });
+    return isLoaded;
+};
+
+// check bootstrap tab.js is loaded
+var ourScript;
+if( !eventNameSpaceLoaded("bs.data-api.tab")) {
+    ourScript = document.createElement("script");
+    ourScript.type = "text/javascript";
+    ourScript.src = sourceDir + "tab.js";
+    document.body.appendChild(ourScript);
+}
+
+// has tab.js been loaded - try checking for 10 seconds
+(function checkTabLoad( counter) {
+    if( !eventNameSpaceLoaded("bs.data-api.tab")) {
+        counter -= 1;
+        if(counter &gt; 0){
+            setTimeout(function(){  
+                checkTabLoad( counter); 
+            }, 100);
+        }
+    } else {
+        // get tabs working 
+        $('#SOME_ SELECTOR').click(function (e) {
+            e.preventDefault();
+            $(this).tab('show');
+        });
+        console.log("tabs fired up");
+    }
+}( 100));
+</code></pre>

@@ -1,0 +1,46 @@
+<p><code>@SqlResultSetMapping</code> can be placed at <strong>any</strong> entity class (don't annotate POJOs - it won't work). Mapping to POJO class with <code>@ConstructorResult</code> was added in version 2.1 of JPA. POJO used with the mapping has to have correct constructor.</p>
+
+<blockquote>
+  <p>All columns corresponding to arguments of the intended constructor must be specified using the columns element of the ConstructorResult annotation in the same order as that of the argument list of the constructor. </p>
+</blockquote>
+
+<p>Please consult following example with query usage and work out your case accordingly.</p>
+
+<pre><code>@Entity
+public class Address {
+    @Id int id;  
+    String street;
+}
+
+
+@SqlResultSetMapping(name="PersonDTOMapping",
+    classes = {
+     @ConstructorResult(targetClass = PersonDTO.class,
+       columns = {@ColumnResult(name="name"), @ColumnResult(name="street")}
+     )}
+)
+@Entity
+public class Person {
+    @Id int id;
+    String name;
+    Address address;  
+}  
+
+public class PersonDTO {
+    String name;
+    String street;
+    public PersonDTO(String name, String street) {
+        this.name = name;
+        this.street = street;
+    }
+}
+
+// usage
+Query query = em.createNativeQuery(
+    "SELECT p.name AS name, a.street AS street FROM Person p, Address a WHERE p.address_id=a.id",
+    "PersonDTOMapping");
+List&lt;PersonDTO&gt; result = query.getResultList();
+</code></pre>
+
+<p>Please note that aliases (<code>AS name</code> and <code>AS street</code>) has to match the names in <code>@ColumnResult</code>s.
+The example was tested against Ecliselink 2.5.1.</p>

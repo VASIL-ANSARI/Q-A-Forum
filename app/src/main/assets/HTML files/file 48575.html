@@ -1,0 +1,33 @@
+<p>There is probably a better way to do this, but this is what I came up with.</p>
+
+<pre><code>List&lt;OpenXmlElement&gt; elems =new List&lt;OpenXmlElement&gt;(doc.MainDocumentPart.Document.Body.Descendants());
+var crs=doc.MainDocumentPart.RootElement.Descendants&lt;CommentRangeStart&gt;();
+var cre=doc.MainDocumentPart.RootElement.Descendants&lt;CommentRangeEnd&gt;();
+var dic_cr=new Dictionary&lt;CommentRangeStart, CommentRangeEnd&gt;();
+for (int i = 0; i &lt; crs.Count(); i++)
+{
+    dic_cr.Add(crs.ElementAt(i), cre.ElementAt(i));
+}
+for (int i = 0; i &lt; elems.Count; i++)
+    if (elems.ElementAt(i).LocalName.Equals("t"))
+       if (isInsideAnyComment(dic_cr, elems.ElementAt(i)))
+           for (int j = 0; j &lt; dic_cr.Count; j++)
+               if (isInsideAComment(dic_cr.ElementAt(j), elems.ElementAt(i)))
+                    String text = ((Text)elems.ElementAt(i)).InnerText;
+
+
+public bool isInsideAnyComment(IDictionary&lt;CommentRangeStart, CommentRangeEnd&gt; dic_cr, OpenXmlElement item)
+    {
+        foreach (var i in dic_cr)
+            if (item.IsAfter(i.Key) &amp;&amp; item.IsBefore(i.Value))
+                return true;
+        return false;
+    }
+
+public bool isInsideAComment(KeyValuePair&lt;CommentRangeStart, CommentRangeEnd&gt; dic_cr_elem, OpenXmlElement item)
+    {
+        if (item.IsAfter(dic_cr_elem.Key) &amp;&amp; item.IsBefore(dic_cr_elem.Value))
+            return true;
+        return false;
+    }
+</code></pre>

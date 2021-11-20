@@ -1,0 +1,38 @@
+<p>The problem with your code is not in getting an empty list of properties, because they are genuinely not there. <code>SqlQuery&lt;T&gt;</code> will not populate a property if it's not there on type <code>T</code>; you are passing <code>dynamic</code>, which translates to <code>System.Object</code>.</p>
+
+<p>One trick to solving this is to retrieve column names dynamically, and build an <code>ExpandoObject</code> out of it. The technique is described <a href="http://lvasquez.github.io/2013/08/15/return-dynamic-result-from-database-asp-mvc/" rel="nofollow">here</a>.</p>
+
+<pre><code>static IList&lt;dynamic&gt; Read(DbDataReader reader) {
+    var res= new List&lt;Dictionary&lt;string,object&gt;&gt;();
+    foreach (var item in reader) {
+        IDictionary&lt;string,object&gt; expando = new ExpandoObject();
+        foreach (PropertyDescriptor propertyDescriptor in TypeDescriptor.GetProperties(item)) {
+            var obj = propertyDescriptor.GetValue(item);
+            expando.Add(propertyDescriptor.Name, obj);
+        }
+        res.Add(expando);
+    }
+    return res;
+}
+</code></pre>
+
+<p>With this method in place, call </p>
+
+<pre><code>using (var cmd = ctx.Database.Connection.CreateCommand()) {
+    ctx.Database.Connection.Open();
+    cmd.CommandText = ...; // Your big SQL goes here
+    using (var reader = cmd.ExecuteReader()) {
+        return Read(reader).ToList();
+    }
+}
+</code></pre>
+
+<p>Once your repository start returning <code>ExpandoObject</code>s, your code for retrieving properties can be replaced with code querying <code>IDictionary&lt;string,object&gt;</code>, an interface implemented by <code>ExpandoObject</code>:</p>
+
+<pre><code>IDictionary&lt;string,object&gt; properties = item as IDictionary&lt;string,object&gt;;
+if (properties != null) {
+    foreach (var p in properties) {
+        model.Add(p.Key, p.Value);
+    }
+}
+</code></pre>

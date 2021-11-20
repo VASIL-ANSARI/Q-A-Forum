@@ -1,0 +1,33 @@
+<p>Measure the elapsed time between sending the request and getting back the response.  Then, divide that value by 2.  That gives you a rough value of one-way latency.  If you add that to the time value from the server, you'll be closer to the true server time.</p>
+
+<p>Something like this should work:</p>
+
+<pre><code>function syncTime() {
+    // Set up our time object, synced by the HTTP DATE header
+    // Fetch the page over JS to get just the headers
+    console.log("syncing time")
+    var r = new XMLHttpRequest();
+    var start = (new Date).getTime();
+
+    r.open('HEAD', document.location, false);
+    r.onreadystatechange = function()
+    {
+        if (r.readyState != 4)
+        {
+            return;
+        }
+        var latency = (new Date).getTime() - start;
+        var timestring = r.getResponseHeader("DATE");
+
+        // Set the time to the **slightly old** date sent from the 
+        // server, then adjust it to a good estimate of what the
+        // server time is **right now**.
+        systemtime = new Date(timestring);
+        systemtime.setMilliseconds(systemtime.getMilliseconds() + (latency / 2))
+    };
+    r.send(null);
+}
+</code></pre>
+
+<p><em>Interesting aside</em>:  John Resig has a <a href="http://ejohn.org/blog/accuracy-of-javascript-time/">good article</a> on the accuracy of Javascript timing.<br>
+  It shouldn't cause a problem in this case, since you're only concerned about your time being off by ~1 second.  A 15 ms difference shouldn't have much effect.</p>

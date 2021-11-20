@@ -1,0 +1,34 @@
+<p>If you're using Moq, and ar not willing to really check that the right argument is passed to your function, i guess that <a href="http://salmontech.blogspot.fr/2009/11/moq-ignoring-arguments.html" rel="nofollow">this is what you are looking for:</a></p>
+
+<pre><code>_mock.Setup(method =&gt; method.DeleteRecordsByFilter(It.IsAny&lt;Expression&lt;Func&lt;Record,bool&gt;&gt;&gt;());
+</code></pre>
+
+<p>(which is equilvalent to <code>.IgnoreArguments()</code> using RhinoMock)</p>
+
+<p>The problem is that even if the two Expressions are the "same" (logically the same), they are not the same reference of object, and System.Linq.Expression does not implement .Equals() override. Thus, they are "different" for Moq.</p>
+
+<p>That is why you get your exception.</p>
+
+<p>If you wish to compare your expressions, you will have to setup a callback on your mock which will compare the two expressions (using an ExprssionVisitor for instance).</p>
+
+<p><em><strong>Edit</em></strong></p>
+
+<p>An an example, your test should work if implemented like this:</p>
+
+<pre><code>[Test]
+public void DeleteRecordsShouldCallDeleteRecordsByFilterOnRepo()
+{
+    const int recordId = 10;
+
+    var repo = new Mock&lt;IRepository&gt;();
+    Expression&lt;Func&lt;Record,bool&gt;&gt; exp = x =&gt; x.RecordId.Equals(recordId);
+    repo.Setup(method =&gt; method.DeleteRecordsByFilter(exp));
+
+    var sut = new MyClass(repo.Object);
+    sut.DeleteRecords(recordId);
+
+    repo.Verify(method =&gt; method.DeleteRecordsByFilter(exp));
+}
+</code></pre>
+
+<p>but its testing nothing :)</p>

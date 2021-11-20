@@ -1,0 +1,70 @@
+<p>This is a horrible idea and you should never do it.</p>
+
+<p>Here is how you do it.</p>
+
+<pre><code>#include &lt;type_traits&gt;
+
+template&lt;typename T, typename U&gt;
+struct decay_equiv
+  : std::is_same&lt;
+    typename std::decay&lt;T&gt;::type,
+    typename std::decay&lt;U&gt;::type
+  &gt;::type {};
+
+template&lt;typename T&gt;
+struct comparator {
+  bool res;
+  T passalong;
+  explicit operator bool() { return res; }
+  typename std::enable_if&lt;
+    !decay_equiv&lt;T, comparator&lt;T&gt; &gt;::value,
+    comparator&lt;T&gt;
+  &gt;::type operator==(T const&amp; rhs);
+  comparator&lt;T&gt; operator==(comparator&lt;T&gt; const&amp; rhs);
+};
+
+template&lt;typename T&gt;
+typename std::enable_if&lt;
+  !decay_equiv&lt;T, comparator&lt;T&gt;&gt;::value,
+  comparator&lt;T&gt;
+&gt;::type comparator&lt;T&gt;::operator==(T const&amp; rhs) {
+  if (!res) {
+    return {res, rhs};
+  }
+  return {(passalong == rhs).res, rhs};
+}
+
+template&lt;typename T&gt;
+comparator&lt;T&gt; comparator&lt;T&gt;::operator==(comparator&lt;T&gt; const&amp; rhs) {
+  if (!res || !rhs.res) {
+    return {res, rhs};
+  }
+  return {(passalong == rhs.passalong).res, rhs.passalong};
+}
+
+struct bla {
+  int a;
+  comparator&lt;bla&gt; operator==(bla const&amp; rhs);
+  comparator&lt;bla&gt; operator==(comparator&lt;bla&gt; const&amp; rhs);
+};
+
+comparator&lt;bla&gt; bla::operator==(bla const&amp; rhs) {
+  return {a == rhs.a, rhs};
+}
+
+comparator&lt;bla&gt; bla::operator==(comparator&lt;bla&gt; const&amp; rhs) {
+  if (!rhs.res) {
+    return rhs;
+  }
+  return {a == rhs.passalong.a, rhs.passalong};
+}
+
+int main() {
+  bla a = {0},b = {0},d = {0};
+  if (a==b==d)
+    return 0;
+  return -1;
+}
+</code></pre>
+
+<p>This code assumes C++11, but can be written in C++98 with only very minor changes.</p>

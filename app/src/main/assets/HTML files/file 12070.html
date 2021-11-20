@@ -1,0 +1,27 @@
+<blockquote>
+  <p>If I do shutdown on this manager - all the connection will be closed.
+  It would be appropriate if I use SingleClientConnectionManager, but I
+  don't. Am I right?</p>
+</blockquote>
+
+<p>You should be using just one connection manager instance per distinct HTTP service. You do not really need to shut it down, but you might want to evict connection from the pool that have been idle longer than a given period of time as described here:</p>
+
+<p><a href="http://hc.apache.org/httpcomponents-client-ga/tutorial/html/connmgmt.html#d4e659">http://hc.apache.org/httpcomponents-client-ga/tutorial/html/connmgmt.html#d4e659</a></p>
+
+<blockquote>
+  <p>Although (even after consumeContent) the socketInputStream inside
+  those getContent() stream was not closed, as well as socket. Is it
+  bad?</p>
+</blockquote>
+
+<p>No, it is not. The underlying connection may still be kept alive if it is in a consistent state. However one <strong><em>must</em></strong> close the content stream in order to ensure release of that connection back to the connection manager.</p>
+
+<blockquote>
+  <p>How normally we should work with a ThreadSafeConnectionManager -
+  should it be created only once? and if it is so, how to properly close
+  those sockets if any?</p>
+</blockquote>
+
+<p>Yes, it should be created only once. However, you must make sure that connections get properly released back to the manager by closing out response content streams. You may also want to want to pro-actively evict connections from the pool after a certain period of inactivity.</p>
+
+<p>And lastly, please note that other components of your application can be leaking file descriptors too. The culprit may not necessarily be HttpClient's connection manager.</p>

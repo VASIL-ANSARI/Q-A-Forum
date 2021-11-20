@@ -1,0 +1,43 @@
+<p>I would not use macros. </p>
+
+<p>There are situations where macros are the only possibility, but I dare to say this is not the case. Macros perform bare text-processing; what they process is not part of the C++ meta-model, but meaningless pieces of text. They are unsafe, hard to understand, and hard to maintain. So unless there is really no other way of doing something, rather avoid macros.</p>
+
+<p>Moreover, your <code>pluck&lt;&gt;</code> trait basically does what <code>std::decay&lt;&gt;</code> does. This means that with a simple template alias, you can rewrite your <code>some_fun</code> function in a way that makes it easy to read <em>and</em> to parse (I got lost trying to put together all the pieces of those macros). </p>
+
+<pre><code>#include &lt;type_traits&gt;
+
+template&lt;typename T&gt;
+using Decay = typename std::decay&lt;T&gt;::type;
+
+template&lt;typename T&gt; 
+Decay&lt;T&gt; some_fun(Decay&lt;T&gt; a, Decay&lt;T&gt; b)
+{
+    Decay&lt;T&gt; c;
+
+   // something
+
+   return c;
+}
+</code></pre>
+
+<p>Similarly, for the second use case you can write something like:</p>
+
+<pre><code>template&lt;typename T, typename U&gt;
+using CheckType = typename std::enable_if&lt;
+    std::is_same&lt;typename std::decay&lt;T&gt;::type, U&gt;::value
+    &gt;::type;
+
+struct A
+{
+    template&lt;typename... Args&gt;
+    A(Args&amp;&amp;... args) : _b(std::forward&lt;Args&gt;(args)...)
+    {}
+
+    template&lt;typename T, CheckType&lt;T, std::string&gt;* = nullptr&gt;
+    A(T&amp;&amp; str) : _str(std::forward&lt;T&gt;(str))
+    {}
+
+    B _b;
+    std::string _str;
+};
+</code></pre>

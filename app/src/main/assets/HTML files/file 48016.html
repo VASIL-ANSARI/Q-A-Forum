@@ -1,0 +1,41 @@
+<p>I just ran this code with my own basic ArrayAdapter and it displayed the toast immediately when the View was created and setSelection() was called before the listener was set(as you have it above).</p>
+
+<p>This is definitely unintuitive, since you are setting the listener AFTER the selection has been set. The only way to get to the bottom of it is to take a deep dive into the source code. After rummaging around I found out that they are posting <a href="http://grepcode.com/file/repository.grepcode.com/java/ext/com.google.android/android/5.1.0_r1/android/widget/AdapterView.java#AdapterView.SelectionNotifier" rel="nofollow">this Runnable</a> to the main thread to notify the listener of selection changes. This is the order of events:</p>
+
+<ol>
+<li>Spinner View inflated</li>
+<li>Adapter(data sources) set</li>
+<li>Selection set and SelectionNotifier Runnable posted</li>
+<li>Selection listener is set on Spinner</li>
+<li>SelectionNotifier processed on mainthread</li>
+<li>SelectionNotifier calls onItemSelected() and Toast is displayed</li>
+</ol>
+
+<p>Post a Runnable to set your selection listener, so that it gets processed after SelectionNotifier for the first pass-through:</p>
+
+<pre><code>private void InitValueOfControls()
+{
+    spinnerRanger=(Spinner)mView.findViewById(R.id.spinner);
+    PublicParFun.FillRangeSpinner(mView, spinnerRanger);
+
+    spinnerRanger.setSelection(PublicParFun.GetIndexOfRangeDeleteOld(mContext));
+    spinnerRanger.post(new Runnable() {
+    @Override
+        public void run() {
+            spinnerRanger.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {...}
+        }
+    });
+}
+</code></pre>
+
+<p>The new order of events is:</p>
+
+<ol>
+<li>Spinner View inflated</li>
+<li>Adapter(data sources) set</li>
+<li>Selection set and SelectionNotifier Runnable posted</li>
+<li>Runnable to set Selection listener on Spinner is posted</li>
+<li>SelectionNotifier processed on mainthread</li>
+<li>SelectionNotifier has no listeners to notify so it does nothing. NO TOAST displayed!</li>
+<li>Our Runnable to set Selection listener on Spinner is processed on main thread and selection listener is set</li>
+</ol>

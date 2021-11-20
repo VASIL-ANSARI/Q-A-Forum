@@ -1,0 +1,30 @@
+<p>The basic problem here is, that SQL will not allow you to precisely define a binary tree.</p>
+
+<p>In your approach it would be possible for a tree item to have multiple parents, since nothing prevents LeftId and RightId to point to the same reference or to have another tree item pointing to the same sub-tree.</p>
+
+<p>We need a defined end-point for the navigation properties on Left/Right. This is the key to a solution: define a separate inverse navigation property for left/right child items and account for the possibility to have multiple parents.</p>
+
+<p>With that in mind, lets set up the model for entity framework. Note that I replaced <code>Tree</code> by <code>TreeItem</code>, since its one entry per tree-node and used <code>Left</code>, <code>Right</code> instead of your property names out of lazyness.</p>
+
+<pre><code>public class TreeItem
+{
+    public int Id { get; set; }
+
+    public int? LeftId { get; set; }
+    public int? RightId { get; set; }
+
+    [ForeignKey("LeftId")]
+    [InverseProperty("Parent1")]
+    public virtual TreeItem Left { get; set; }
+    [ForeignKey("RightId")]
+    [InverseProperty("Parent2")]
+    public virtual TreeItem Right { get; set; }
+
+    [InverseProperty("Left")]
+    public virtual ICollection&lt;TreeItem&gt; Parent1 { get; set; }
+    [InverseProperty("Right")]
+    public virtual ICollection&lt;TreeItem&gt; Parent2 { get; set; }
+}
+</code></pre>
+
+<p>Also note: I tested only in EF6, so no guarantee to work with EF5</p>

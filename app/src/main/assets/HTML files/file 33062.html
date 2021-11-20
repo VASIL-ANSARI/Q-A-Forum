@@ -1,0 +1,26 @@
+<p>set up your redis.rb file as such :</p>
+
+<pre><code> module MyApp
+   class &lt;&lt; self
+     def redis
+       @redis ||= Redis.new(url: (ENV['REDISTOGO_URL'] || 'redis://127.0.0.1:6379'))
+     end
+   end
+ end
+</code></pre>
+
+<p>in your sidekiq.rb do  :</p>
+
+<pre><code> Sidekiq.configure_server do |config|
+
+   Rails.logger = Sidekiq::Logging.logger
+
+   config.redis = { :url =&gt; MyApp.redis[:url], :namespace =&gt; 'sidekiq', :size =&gt; 5 }
+ end
+
+ Sidekiq.configure_client do |config|
+   config.redis = { :url =&gt; MyApp.redis[:url], :namespace =&gt; 'sidekiq', :size =&gt; 1 }
+ end
+</code></pre>
+
+<p>this will ensure Sidekiq is picking up the Redis connection from your redis.rb init file.</p>

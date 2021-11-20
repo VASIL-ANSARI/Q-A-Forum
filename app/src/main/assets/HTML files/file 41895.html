@@ -1,0 +1,33 @@
+<p>Your <code>foo</code> function will mutate its argument if it's called with a <code>list</code>âbut if it's called with something different, it might raise an exception, or do something that doesn't mutate it.</p>
+
+<p>Similarly, you can write a type that mutates itself every time you call <code>len</code> on it, and then a function that just printing the length of its argument would be mutating its arguments.</p>
+
+<p>It's even worse if you use an operator like <code>+=</code>, which will call the (generally-mutating) <code>__iadd__</code> method on types that have it, like <code>list</code>, but will call the (non-mutating) <code>__add__</code> method on types that don't, like <code>tuple</code>. So, what are you going to do in those cases?</p>
+
+<p>For that matter, even a <code>for</code> loop over an argument is mutating if you pass in an iterator, but (usually) not if you pass in a sequence.</p>
+
+<p>If you just want to make a list of frequently-mutating method names and operators and search for those, that wouldn't be too hard to write as an AST visitor. But that's going to give you a lot of both false negatives and false positives.</p>
+
+<hr>
+
+<p>This is exactly the kind of problem that static typing was designed to solve. Python doesn't have static typing built it, but it's possible to build on top of Python.</p>
+
+<p>First, if you're using Python 3.x, you can use annotations to store the types of the parameters. For example:</p>
+
+<pre><code>def foo(x: MutableSequence) -&gt; NoneType:
+    x.append("x at the end")
+</code></pre>
+
+<p>Now you know, from the fact that it takes a <code>MutableSequence</code> (or a <code>list</code>) rather than a <code>Sequence</code>, that it <em>intends</em> to mutate its parameter. And, even if it doesn't do so now, some future version might well do so, so you should trust its annotations anyway.</p>
+
+<p>And now you can solve your problem the same way you would in Haskell or ML: your pure functional code takes a <code>Sequence</code> and it calls functions with that <code>Sequence</code>, and you just need to ensure that none of those functions is defined to take a <code>MutableSequence</code>, right?</p>
+
+<p>That last part is the hard part. Python doesn't stop me from writing this:</p>
+
+<pre><code>def foo(x: Sequence) -&gt; NoneType:
+    x.append("x at the end")
+</code></pre>
+
+<p>For that, you need a static type checker. Guido has been pushing to standardize annotations to allow the <a href="http://www.mypy-lang.org/" rel="nofollow">mypy</a> static checker to become a semi-official part of Python. It's not completely finished yet, and it's not as powerful a type system as typical typed functional languages, but it will handle most Python code well enough for what you're looking for. But mypy isn't the only static type checker available; there are others if you search.</p>
+
+<p>Anyway, with a type checker, that <code>foo</code> function would fail with an error explaining that <code>Sequence</code> has no such method <code>append</code>. And if, on the other hand, <code>foo</code> were properly defined as taking a <code>MutableSequence</code>, your functional code that calls it with a <code>Sequence</code> would fail with an error explaining that <code>Sequence</code> is not a subtype of <code>MutableSequence</code>.</p>

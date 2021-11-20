@@ -1,0 +1,79 @@
+<p><strong>Edit:</strong></p>
+
+<p>A pretty decent partial-LINQ lazily executed solution could be done in this way:</p>
+
+<p>Firstly, get your query up to the ordered events based on popularity:</p>
+
+<pre><code>var evArtists = Context.Events
+  .Where(x =&gt; x.Stage.Venue.AreaId == 1 &amp;&amp; x.StartDateTimeUtc &gt; DateTime.UtcNow &amp;&amp; x.IsVerified)
+  .OrderByDescending(x =&gt; x.Headliners.Max(y =&gt; y.Popularity));
+</code></pre>
+
+<p>Secondly, since a <code>ICollection&lt;Artist&gt;</code> can be unordered yet forming equal set, creates an <em>intermediate function</em> to check if two <code>ICollection&lt;Artist&gt;</code> are of identical members:</p>
+
+<pre><code>private bool areArtistsEqual(ICollection&lt;Artist&gt; arts1, ICollection&lt;Artist&gt; arts2) {
+    return arts1.Count == arts2.Count &amp;&amp; //have the same amount of artists
+        arts1.Select(x =&gt; x.ArtistId)
+        .Except(arts2.Select(y =&gt; y.ArtistId))
+        .ToList().Count == 0; //when excepted, returns 0
+}
+</code></pre>
+
+<p>Thirdly, use the above method to get the unique artists set in the query results, put the results in a <code>List</code>, and fill the <code>List</code> with the number of elements you need (say, 10 elements):</p>
+
+<pre><code>List&lt;Events&gt; topEvList = new List&lt;Events&gt;();
+foreach (var ev in evArtists) {
+    if (topEvList.Count == 0 || !topEvList.Any(te =&gt; areArtistsEqual(te.Headliners, ev.Headliners)))
+        topEvList.Add(ev);
+    if (topEvList.Count &gt;= 10) //you have had enough events
+        break;
+}
+</code></pre>
+
+<p>Your result is in the <code>topEvList</code>.</p>
+
+<p><strong>Benefits:</strong></p>
+
+<p>The solution above is <em>lazily executed</em> and is also pretty decent in the sense that you can really <em>break down</em> the logic and <em>check</em> your execution piece by piece <em>without</em> breaking the performance.</p>
+
+<p>Note that using the method above you do not need to refer to the <code>evArtists</code> (which is your large query) other than by its individual element <code>ev</code>. Using full-LINQ solution is <em>possible</em>, yet you may need to refer to <code>evArtists.Any</code> to find the duplicates set of artists (as you do have have memory of what sets has been chosen before) from the original ordered query itself (rather than by simply using its element (<code>ev</code>) one by one).</p>
+
+<p>This is possible because you create a temporary memory <code>topEvList</code> which records what sets have been chosen before and only need to check if the next element (<code>ev</code>) is not among the already selected set of artists. Thus, you do <em>not</em> impair your performance by checking you set of artists against the whole ordered query every time.</p>
+
+<hr>
+
+<p><strong>Original:</strong></p>
+
+<p>You are almost there actually. What you further need are <code>LINQ</code> <code>GroupBy</code> and <code>First</code>, and put your <code>Take(10)</code> the last:</p>
+
+<pre><code>var query = Context.Events
+  .Where(x =&gt; x.Stage.Venue.AreaId == 1 &amp;&amp; x.StartDateTimeUtc &gt; DateTime.UtcNow &amp;&amp; x.IsVerified)
+  .OrderByDescending(x =&gt; x.Headliners.Max(y =&gt; y.Popularity))
+  .GroupBy(a =&gt; a.ArtistId) 
+  .Select(e =&gt; e.First())
+  .Take(10);
+</code></pre>
+
+<p>Since in by this query  you have sorted your headliner artist:</p>
+
+<pre><code>.OrderByDescending(x =&gt; x.Headliners.Max(y =&gt; y.Popularity))
+</code></pre>
+
+<p>Then you only need to group your headliners by <code>ArtistId</code>:</p>
+
+<pre><code>.GroupBy(a =&gt; a.ArtistId) 
+</code></pre>
+
+<p>Thus each artist would be having one group. Then next, you only want the first element in the group (supposedly the most popular <em>Event per Artist</em>):</p>
+
+<pre><code>.Select(e =&gt; e.First())
+</code></pre>
+
+<p>And thus you will get all the most popular events per artist. And lastly, among these most popular events per artist, you only want to take 10 of them, thus:</p>
+
+<pre><code>.Take(10);
+</code></pre>
+
+<p>And you are done!</p>
+
+<hr>

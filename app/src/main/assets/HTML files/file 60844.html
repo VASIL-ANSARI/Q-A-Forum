@@ -1,0 +1,74 @@
+<p>I found out that I was totally misunderstanding the Java security concept. I want to build a sandbox for plugin code so that it is always running in a restricted environment where I can control the permissions it has. The application should always run alongside with full access granted. </p>
+
+<p>Here is how to build a sandbox for classes loaded by a separate classloader:</p>
+
+<ol>
+<li><strong>Use the default SecurityManager</strong> If you find yourself implementing your own <code>java.lang.SecurityManager</code> to allow or deny actions based on permissions you are probably doing wrong! You only need to install the default <code>java.lang.SecurityManager</code> by doing this <code>System.setSecurityManager(new SecurityManager());</code>. Now you get a working access control by using Java defaults.</li>
+<li><p><strong>Grant all permissions to application</strong> The application that loads the plugins should get full access. This is because we trust ourselves. I solved this by starting my application with a policy file that grants all access. I think the policy file is needed on application start because the AppClassLoader needs to create the correct protection domains for the classes. Start the main application with the JavaVM argument <code>java.security.policy=&lt;URL-TO-POLICY&gt;</code> where <code>&lt;URL-TO-POLICY</code> points to the following policy file:</p>
+
+<p><code>grant {
+permission java.security.AllPermission;
+};</code> </p></li>
+<li><p><strong>Custom policy implementation</strong> We need to install our custom policy after application startup. We want to separate the permissions for the main application (which runs with full access granted) and the plugins (which permissions we want to limit). The plugins should run in a sandbox with hand-picked permissions. To achieve this, here is the custom policy implementation:</p>
+
+<pre><code>class SandboxPolicy extends Policy {
+@Override
+
+  public PermissionCollection getPermissions(ProtectionDomain domain) {
+    // Decide if the plugin permissions are needed or full access can be granted using all permissions.
+    if (isPlugin(domain)) {
+      return pluginPermissions();
+    } else {
+      return applicationPermissions();
+    }
+  }
+
+  private boolean isPlugin(ProtectionDomain domain) {
+    // Identify the classloader of the protection domain
+    // The PluginClassLoader is assumed to be the one that loaded
+    // the plugin
+    return domain.getClassLoader() instanceof PluginClassLoader;
+  }
+
+  private PermissionCollection pluginPermissions() {
+    // Empty permissions = No permissions
+    // This is not the point to add plugin permissions
+    return new Permissions();
+  }
+
+  private PermissionCollection applicationPermissions() {
+    // Grant full access to the application
+    Permissions permissions = new Permissions();
+    permissions.add(new AllPermission());
+    return permissions;
+  }
+}
+</code></pre></li>
+<li><p><strong>ProtectionDomains per Classloader</strong> The classloaders are responsible to create a <code>ProtectionDomain</code> for every source, code is loaded from. The protection domains specify the permissions that will be granted to the code. We have to modify the set of permissions the classloader adds to the protection domains. To do this, let your PluginClassloader extend the <code>java.security.SecureClassLoader</code>. Then override the method <code>java.security.SecureClassLoader.getPermissions(CodeSource)</code> in the following way: </p>
+
+<pre><code>@Override
+protected PermissionCollection getPermissions(CodeSource codeSource)
+{
+    PermissionCollection pc;
+    // The SecureClassloader per default grants access to read resources from the source JAR.
+    // This is useful. Call super to get those permissions:
+    pc = super.getPermissions(codeSource);
+    // At this point you can extend permissions.
+    // For example grant read access to a file.
+    pc.add(new FilePermission("path\\file", "read"));
+    return (pc);
+}
+</code></pre></li>
+</ol>
+
+<p><strong>Note:</strong> See the policy implementation and have a look at my comment <code>// This is not the point to add plugin permissions</code>. The policy is asked by the <code>AccessController</code> to see if a permission can be granted. If permissions are added here, the information you can get from the caller are very limited. I woul not recommend to calculate and add any permissions here. The classloader is the point where you can add permissions based on the code source. I recommend to add permissions here. They become visible in the protection domains and you can easily observe what the AccessController is doing with those protection domains.</p>
+
+<p><strong>Privileged actions</strong></p>
+
+<p>There is another part in my question that I want to answer. </p>
+
+<blockquote>
+  <p>The interesting thing is, that I realized, that it is not the plugin itself that wants to add a shutdown hook. The plugin just triggers the AWT/Swing internals (precise: SunFontManager) by loading a font.</p>
+</blockquote>
+
+<p>There are actions that will be performed as a side effect of plugin code. A class <code>org.plugin.A</code> can trigger the Swing/AWT internals to add a shutdown hook. In this case we do not want to deny this. The Java classes are in scope of the application and should get full access. The plugin code may be restricted and adding a shutdown hook directly should fail with <code>SecurityException</code>. This is a common use-case of <code>java.security.AccessController.doPrivileged(PrivilegedAction&lt;T&gt;)</code>. A privileged action makes sure that the <code>AccessController</code> will only take the protection domain of the last stack frame into account. AWT/Swing is adding its shutdown hook inside a privileged action and therefore is allowed to do so, because the protection domain of the classes performin this action where setup with full access permission. Please refer to any documentation of <code>java.security.AccessController</code> to learn more about privileged actions.</p>

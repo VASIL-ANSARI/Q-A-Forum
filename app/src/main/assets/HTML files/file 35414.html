@@ -1,0 +1,43 @@
+<p>I'm thinking of another alternative. Setup an exchange rate table like:</p>
+
+<pre><code>create table exchange_rate(
+   cur_code_from varchar2(3)  not null
+  ,cur_code_to   varchar2(3)  not null
+  ,valid_from    date         not null
+  ,valid_to      date         not null
+  ,rate          number(20,6) not null
+);
+
+alter table exchange_rate 
+  add constraint exchange_rate_pk 
+      primary key(cur_code_from, cur_code_to, valid_from);
+</code></pre>
+
+<p>The table should hold data that looks something like: </p>
+
+<pre><code>cur_code_from   cur_code_to valid_from  valid_to   rate
+=============  =========== ==========  ========    ====
+    EUR           EUR      2014-01-01   9999-12-31  1
+    EUR           USD      2014-01-01   9999-12-31  1,311702
+    EUR           SEK      2014-01-01   2014-03-30  8,808322
+    EUR           SEK      2014-04-01   9999-12-31  8,658084
+    EUR           GBP      2014-01-01   9999-12-31  0,842865
+    EUR           PLN      2014-01-01   9999-12-31  4,211555
+</code></pre>
+
+<p>Note the special case when you convert from and to the same currency.
+From a normalization perspective, you don't need <code>valid_to</code> since it can be computed from the next <code>valid_from</code>, but from a practical point of view, it's easier to work with a valid-to-date than using a sub-query every time. </p>
+
+<p>Then, to convert into the customers currency you would join with this table:</p>
+
+<pre><code>select o.order_value * x.rate as value_in_customer_currency
+  from orders o
+  join exchange_rate_t x on(
+       x.cur_code_from = 'EUR' -- Your- default currency here
+   and x.cur_code_to   = 'SEK' -- The customers currency here
+   and o.order_close_date between x.valid_from and x.valid_to
+  )
+ where o.order_id = 1234;
+</code></pre>
+
+<p>Here I have used the rates valid as of the <code>order_close_date</code>. So if you have two orders, one with a close date of 2014-02-01, then it would pick up a different rate than an order with a close date of 2014-04-05.</p>

@@ -1,0 +1,78 @@
+<p>Remove those extra php tags. They are probably adding whitespace that us being sent before you call <code>header</code> </p>
+
+<pre><code>&lt;?php require_once('Connections/trabalhoCD.php');
+
+if (!function_exists("GetSQLValueString")) {
+function GetSQLValueString($theValue, $theType, $theDefinedValue = "", $theNotDefinedValue = "") 
+{
+  if (PHP_VERSION &lt; 6) {
+    $theValue = get_magic_quotes_gpc() ? stripslashes($theValue) : $theValue;
+  }
+  $theValue = function_exists("mysql_real_escape_string") ? mysql_real_escape_string($theValue) : mysql_escape_string($theValue);
+  switch ($theType) {
+    case "text":
+      $theValue = ($theValue != "") ? "'" . $theValue . "'" : "NULL";
+      break;    
+    case "long":
+    case "int":
+      $theValue = ($theValue != "") ? intval($theValue) : "NULL";
+      break;
+    case "double":
+      $theValue = ($theValue != "") ? doubleval($theValue) : "NULL";
+      break;
+    case "date":
+      $theValue = ($theValue != "") ? "'" . $theValue . "'" : "NULL";
+      break;
+    case "defined":
+      $theValue = ($theValue != "") ? $theDefinedValue : $theNotDefinedValue;
+      break;
+  }
+  return $theValue;
+}
+}
+
+// Validate request to login to this site.
+if (!isset($_SESSION)) {
+  session_start();
+}
+$loginFormAction = $_SERVER['PHP_SELF'];
+if (isset($_GET['accesscheck'])) {
+  $_SESSION['PrevUrl'] = $_GET['accesscheck'];
+}
+if (isset($_POST['login'])) {
+  $loginUsername=$_POST['login'];
+  $password=md5($_POST['pass']);
+  $MM_fldUserAuthorization = "";
+  $MM_redirectLoginSuccess = "tabela1.php";
+  $MM_redirectLoginFailed = "login2.php";
+  $MM_redirecttoReferrer = false;
+  mysql_select_db($database_trabalhoCD, $trabalhoCD);
+
+  $LoginRS__query=sprintf("SELECT login, pass FROM utilizador WHERE login=%s AND pass=%s",
+    GetSQLValueString($loginUsername, "text"), GetSQLValueString($password, "text")); 
+
+  $LoginRS = mysql_query($LoginRS__query, $trabalhoCD) or die(mysql_error());
+  $loginFoundUser = mysql_num_rows($LoginRS);
+  if ($loginFoundUser) {
+     $loginStrGroup = "";
+
+    if (PHP_VERSION &gt;= 5.1) {session_regenerate_id(true);} else {session_regenerate_id();}
+    //declare two session variables and assign them
+    $_SESSION['MM_Username'] = $loginUsername;
+    $_SESSION['MM_UserGroup'] = $loginStrGroup;       
+    if (isset($_SESSION['PrevUrl']) &amp;&amp; false) {
+      $MM_redirectLoginSuccess = $_SESSION['PrevUrl'];  
+    }
+    header("Location: " . $MM_redirectLoginSuccess );
+  }
+  else {
+    header("Location: ". $MM_redirectLoginFailed );
+  }
+}
+?&gt;
+...
+</code></pre>
+
+<p>Also, you should try to organize your code in such a way that you don't need to check if a function is defined before you define it (that's a performance issue and just seems, to me, like a bad idea)</p>
+
+<p>Also, the <code>mysql_</code> library is deprecated in php 5 and removed from php 7. <a href="http://stackoverflow.com/questions/12859942/why-shouldnt-i-use-mysql-functions-in-php">Consider switching to mysqli or PDO which will let you use parameterized queries.</a> (pdo is the way to go, imo)</p>

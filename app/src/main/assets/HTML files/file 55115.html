@@ -1,0 +1,77 @@
+<p>First of all 
+<code>generic &lt;class ObjectTypeInherited&gt; where ObjectTypeInherited : System::Object^</code>.
+should be
+<code>generic &lt;class ObjectTypeInherited&gt; where ObjectTypeInherited : System::Object</code>.</p>
+
+<p>No <strong><code>^</code></strong> sign here.</p>
+
+<p>And then the fun begins...</p>
+
+<p>Somehow the <code>C++\CLI</code> compiler does not wish to understand that a class does not have to be generic in order to implement the <code>IFoo&lt;ObjectType&gt;::Test</code>. So I created a workaround for this strange problem.</p>
+
+<p>You can use <code>System::Object</code> instead of <code>MyObjectType</code>. I used the <code>MyObjectType</code> just for versatility.</p>
+
+<pre><code>public ref class MyObjectType
+{
+};
+
+generic &lt;class ObjectType&gt;
+public interface class IFoo
+{
+public:
+    generic &lt;class ObjectTypeInherited&gt; where ObjectTypeInherited : ObjectType
+    ObjectTypeInherited Test();
+};
+
+//All the magic is here. Somehow the C++\CLI compiler does not wish to
+//understand that the DerivedBase class does not have to be generic in order
+//to implement the IFoo&lt;ObjectType&gt;::Test. As you can see the Whatever type
+//name is never used. Although without it the compiler gives the C3284
+//error.
+generic &lt;class Whatever&gt;
+public ref class DerivedBase : public IFoo&lt;MyObjectType^&gt;
+{
+public:
+    //Why not make use of explicit syntax just because we can.
+    generic &lt;class ObjectTypeInherited&gt; where ObjectTypeInherited : MyObjectType
+    virtual ObjectTypeInherited Test() = IFoo&lt;MyObjectType^&gt;::Test
+    {
+        return ObjectTypeInherited();
+    }
+};
+
+//In order to overcome the fake genericness of DerivedBase I provide
+//another successor.
+public ref class Derived : public DerivedBase&lt;Object^&gt;
+{
+};
+</code></pre>
+
+<p>I do not have any in-depth knowledge of either the Roslyn compiler or C++\CLI but to my mind this seems to be a bug.</p>
+
+<p>If I do the same with the C# managed code, it should look as simple as this. And this is where I would stop myself. Even without any strange compiler behavior managed declarations are easier to maintain on the C# side than C++\CLI.</p>
+
+<pre><code>public class MyObjectType
+{
+}
+
+public interface IFoo&lt;ObjectType&gt;
+{
+    ObjectTypeInherited Test&lt;ObjectTypeInherited&gt;() where ObjectTypeInherited : ObjectType;
+}
+
+public class Derived : IFoo&lt;MyObjectType&gt;
+{
+    //Explicit
+    ObjectTypeInherited IFoo&lt;MyObjectType&gt;.Test&lt;ObjectTypeInherited&gt;()
+    {
+        return null;
+    }
+
+    //Implicit
+    public ObjectTypeInherited Test&lt;ObjectTypeInherited&gt;() where ObjectTypeInherited : MyObjectType
+    {
+        return null;
+    }
+}
+</code></pre>

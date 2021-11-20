@@ -1,0 +1,57 @@
+<p>Checkstyle's understanding of Enums is sometimes incomplete. I would guess that the author of the <a href="http://checkstyle.sourceforge.net/config_design.html#VisibilityModifier" rel="nofollow">VisibilityModifier</a> check did not think of Enums. Enums are a corner case that would require some additional properties of the check.</p>
+
+<p>However, accidentally, in your case, the warning is still correct. I believe that there is no situation where you should use <code>protected</code> fields in an Enum. If you need instance specific state in your Enum constants, initialize it via the constructor or via static initialization.</p>
+
+<p>Try the following approach. This should gain you several benefits:</p>
+
+<ul>
+<li>The Checkstyle warning goes away because the <code>Map</code> is now <code>private</code>.</li>
+<li>The <code>CatanPiece</code> enum constants are now really constants because the cost map is immutable.</li>
+<li>No overhead for lazy initialization. Users of the <code>CatanPiece</code> enum constants can be sure that the costs map is initialized properly.</li>
+</ul>
+
+<p>The only downside is that whenever the Enum is extended (e.g. with <code>SHIP</code>), the developer must not forget to update <code>buildCostMap()</code>. Such a bug would show up very quickly though.</p>
+
+<pre><code>public enum CatanPiece implements Buildable
+{
+    ROAD, SETTLEMENT, CITY;
+
+    private static final Map&lt;CatanPiece, Map&lt;Resource, Integer&gt;&gt; allCosts =
+            buildCostMap();
+
+    private static Map&lt;CatanPiece, Map&lt;Resource, Integer&gt;&gt; buildCostMap()
+    {
+        Map&lt;CatanPiece, Map&lt;Resource, Integer&gt;&gt; result =
+            new HashMap&lt;CatanPiece, Map&lt;Resource, Integer&gt;&gt;();
+
+        Map&lt;Resource, Integer&gt; cost = new EnumMap&lt;Resource, Integer&gt;(Resource.class);
+        cost.put(Resource.WHEAT, 2);
+        cost.put(Resource.ORE, 3);
+        result.put(CITY, Collections.unmodifiableMap(cost));
+
+        cost = new EnumMap&lt;Resource, Integer&gt;(Resource.class);
+        cost.put(Resource.BRICK, 1);
+        cost.put(Resource.LUMBER, 1);
+        cost.put(Resource.SHEEP, 1);
+        cost.put(Resource.WHEAT, 1);
+        result.put(SETTLEMENT, Collections.unmodifiableMap(cost));
+
+        cost = new EnumMap&lt;Resource, Integer&gt;(Resource.class);
+        cost.put(Resource.BRICK, 1);
+        cost.put(Resource.LUMBER, 1);
+        result.put(ROAD, Collections.unmodifiableMap(cost));
+
+        return Collections.unmodifiableMap(result);
+    }
+
+    @Override
+    public Map&lt;Resource, Integer&gt; getCost() {
+        return allCosts.get(this);
+    }
+
+    @Override
+    public Buildable build(final PlayerHand payment) {
+        return payment.remove(cost) ? null : this;
+    }
+}
+</code></pre>

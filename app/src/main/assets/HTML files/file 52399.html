@@ -1,0 +1,42 @@
+<p>A handle in this context is basically a reference to the memory mapped library file.</p>
+
+<p>However there are existing ways to achieve what what you want with the help of OS functions.</p>
+
+<p><strong>windows:</strong>
+Windows provides an API for this purpose called <code>GetModuleFileName</code>. Some example of usage is already <a href="http://stackoverflow.com/questions/11007896/how-can-i-search-and-get-the-directory-of-a-dll-file-in-python">here</a>.</p>
+
+<p><strong>linux:</strong>
+There is existing a <code>dlinfo</code> function for this purpose, see <a href="http://man7.org/linux/man-pages/man3/dlinfo.3.html" rel="nofollow">here</a>.</p>
+
+<hr>
+
+<p>I played around with ctypes and here is my solution for linux based Systems. I have zero knowledge of ctypes so far, if there are any suggestions for improvement I appreciate them.</p>
+
+<pre><code>from ctypes import *
+from ctypes.util import find_library
+
+#linkmap structure, we only need the second entry
+class LINKMAP(Structure):
+    _fields_ = [
+        ("l_addr", c_void_p),
+        ("l_name", c_char_p)
+    ]
+
+libc = CDLL(find_library('c'))
+libdl = CDLL(find_library('dl'))
+
+dlinfo = libdl.dlinfo
+dlinfo.argtypes  = c_void_p, c_int, c_void_p
+dlinfo.restype = c_int
+
+#gets typecasted later, I dont know how to create a ctypes struct pointer instance
+lmptr = c_void_p()
+
+#2 equals RTLD_DI_LINKMAP, pass pointer by reference
+dlinfo(libc._handle, 2, byref(lmptr))
+
+#typecast to a linkmap pointer and retrieve the name.
+abspath = cast(lmptr, POINTER(LINKMAP)).contents.l_name
+
+print(abspath)
+</code></pre>

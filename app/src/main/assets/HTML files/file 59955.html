@@ -1,0 +1,28 @@
+<p>Your <code>my_cool_app</code> is an instance of <code>Blueprint</code> which doesn't have a <code>config</code> attribute. You need to use <code>current_app</code>:</p>
+
+<pre><code>import sqlite3
+from flask import Flask, g, current_app
+from .views import my_cool_app
+
+# create application
+def create_app(debug=True):
+    app = Flask(__name__, instance_relative_config=True)
+    app.debug = debug
+    app.config.from_object('config')
+    app.config.from_pyfile('config.py')
+    app.register_blueprint(my_cool_app)
+    return app
+
+def connect_db():
+    return sqlite3.connect(current_app.config['DATABASE'])
+
+@my_cool_app.before_request
+def before_request():
+    g.db = connect_db()
+
+@my_cool_app.teardown_request
+def teardown_request(exception):
+    db = getattr(g, 'db', None)
+    if db is not None:
+        db.close()
+</code></pre>

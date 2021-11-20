@@ -1,0 +1,24 @@
+<blockquote>
+  <p>...most of which determined that the mail server only supports TLSv1</p>
+</blockquote>
+
+<p>Does this mean that the server will croak on any other handshake? Typically a client will start with the best protocol it can (like TLSv12) and if the server does not support it, then it will just reply with a lower protocol (like TLSv1 in this case). But, some servers are just broken or there is a broken middlebox in between. </p>
+
+<pre><code>[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure
+....
+It seems like Python 3.4 tries to use sslv3 even though I tell it not to.
+</code></pre>
+
+<p>Not necessarily. TLS1.0 is just SSL3.1 and lots of TLS handling is actually done with SSLv3 functions. So this error message might be confusing.</p>
+
+<p>When checking the server out with <a href="https://github.com/noxxi/p5-io-socket-ssl/blob/master/util/analyze-ssl.pl" rel="nofollow">some tool</a> it looks like, that it</p>
+
+<ul>
+<li>will return "unsupported protocol" with SSL3.0, which is fine.</li>
+<li>will croak with with TLS1.1 instead of just returning with TLS1.0. This means that the server or some middlebox in between is seriously broken.</li>
+<li>will only accept RC4-MD5 as a cipher and croak on any other ciphers. This also makes it broken because it should return "no shared ciphers" on unsupported ciphers instead.</li>
+</ul>
+
+<p>RC4-MD5 also is the reason for not working with python 3.4. Contrary to python 2.7 there is a more secure default cipher set in python 3.4 which includes "..:!MD5". This means the python 3.4 client will not offer RC4-MD5 as cipher and thus the handshake will fail because of no shared ciphers.</p>
+
+<p>Fix would be to fix the broken server. Workaround might be to explicitly set the cipher for your connecion, i.e. <code>wrap_socket( ... , ciphers="RC4-MD5")</code> or similar</p>

@@ -1,0 +1,57 @@
+<p>Assuming you have some class property:</p>
+
+<pre><code>@interface ViewController ()
+@property (nonatomic, strong) NSArray *array;
+@end
+</code></pre>
+
+<p>Just use <code>NSJSONSerialization</code>:</p>
+
+<pre><code>NSError *error;
+NSData *data = [NSData dataWithContentsOfURL:url];
+self.array = [NSJSONSerialization JSONObjectWithData:data
+                                             options:0
+                                               error:&amp;error];
+</code></pre>
+
+<p>If you want to save the array in your <code>Documents</code> folder for persistent storage for retrieval upon a future invocation of the app, you can:</p>
+
+<pre><code>NSString *docsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
+NSString *filename = [docsPath stringByAppendingPathComponent:@"results.plist"];
+[self.array writeToFile:filename atomically:NO];
+</code></pre>
+
+<p>To read it from the file later at the next invocation (in case you didn't want to re-retrieve it from the server):</p>
+
+<pre><code>NSString *docsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
+NSString *filename = [docsPath stringByAppendingPathComponent:@"results.plist"];
+self.array = [NSData dataWithContentsOfFile:filename];
+</code></pre>
+
+<p>To use it for a <code>UITableView</code>, you'd store that in a class property and respond to the appropriate <code>UITableViewDataSource</code> methods:</p>
+
+<pre><code>- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return [self.array count];
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    NSString *cellIdentifier = @"Cell";
+
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
+
+    NSDictionary *rowData = self.array[indexPath.row];
+    NSDictionary *fields = rowData[@"fields"];
+
+    cell.textLabel.text = fields[@"message"];
+    cell.detailTextLabel.text = fields[@"message_detail"];
+
+    return cell;
+}
+</code></pre>

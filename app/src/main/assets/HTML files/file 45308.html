@@ -1,0 +1,56 @@
+<p>This line:</p>
+
+<pre><code>if(view.rightCalloutAccessoryView){
+</code></pre>
+
+<p>says essentially "if view.rightCalloutAccessoryView is not nil".</p>
+
+<p>Since you are setting the right-side accessory on <em><strong>all</strong></em> annotation views, that <code>if</code> condition will <em><strong>always</strong></em> be true and so tapping <em>either</em> accessory will execute the code inside that <code>if</code> which is to remove the annotation.</p>
+
+<p>Instead, you want to check what button or control was tapped in this specific case of the delegate method being called (not whether the view has a right-side accessory defined).</p>
+
+<p>Fortunately, the delegate method passes exactly what control was tapped in the <code>control</code> parameter.  </p>
+
+<p>The <code>control</code> parameter can be directly compared against the view's right/left accessory view to tell which was tapped:</p>
+
+<pre><code>if (control == view.rightCalloutAccessoryView) {
+</code></pre>
+
+<p><hr>
+<br>
+Some unrelated points:</p>
+
+<ol>
+<li><p>The <code>latitude</code> and <code>longitude</code> properties in annotations are of type <code>CLLocationDegrees</code> (aka <code>double</code>) which has higher precision than <code>float</code> so to avoid losing accuracy, use <code>CLLocationDegrees</code> or <code>double</code>:</p>
+
+<pre><code>CLLocationDegrees lat= annotation.coordinate.latitude;
+</code></pre></li>
+<li><p>The <code>MKPointAnnotation</code> allows you to change the <code>title</code> directly (it's not read-only like the default <code>id&lt;MKAnnotation&gt;</code>) so you don't need to remove and create a new annotation.  It simplifies the code a bit:</p>
+
+<pre><code>-(void)mapView:(MKMapView *)mapView annotationView:(MKAnnotationView *)view calloutAccessoryControlTapped:(UIControl *)control {
+
+    if ([view.annotation isKindOfClass:[MKPointAnnotation class]])
+    {
+        NSLog(@"Clicked");
+
+        if (control == view.rightCalloutAccessoryView) {
+            [self.mapView removeAnnotation:view.annotation];
+        }
+        else {
+            // Cast view.annotation as an MKPointAnnotation
+            // (which we know it is) so that compiler sees
+            // title is read-write instead of the
+            // default id&lt;MKAnnotation&gt; which is read-only.
+            MKPointAnnotation *pa = (MKPointAnnotation *)view.annotation;
+
+            pa.title = _titleOut.text;
+            pa.subtitle = _subtitle.text;
+
+            //If you want callout to be closed automatically after
+            //title is changed, uncomment the line below:
+            //[mapView deselectAnnotation:pa animated:YES];
+        }
+    }
+}
+</code></pre></li>
+</ol>

@@ -1,0 +1,9 @@
+<p>NCrunch will never execute tests concurrency within the same process, so unless you have multi-threaded behaviour inside your test logic, then it should be safe to say that this isn't an issue caused by the locking or threading over the singleton.</p>
+
+<p>As you've already tried disabling parallel execution and this hasn't made a difference, I'm assuming that the problem wouldn't be caused by concurrent use of resources outside the test runner process (i.e. files on disk).</p>
+
+<p>This means that the problem is almost certainly related to the sequence in which the tests are being executed.  Almost all manual test runners (including Resharper) will run tests in a defined sequence from start to finish.  This is good for consistency, but it can mask problems that may surface when the tests are run in an inconsistent/random order.  NCrunch will execute tests in order of priority and can also reuse test processes between test runs, which can make the runtime behaviour of your tests different if they haven't been designed with this in mind.</p>
+
+<p>A useful way to surface (and thus debug) sequence related issues is to try running your tests in a manually defined order by using NCrunch.  If you right-click a test inside the NCrunch Tests Window, under the 'Advanced' menu you'll find an option to run a test using an existing task runner process.  Try this action against several of your tests to see if you can reproduce the sequence that surfaces the problem.  When it happens, you should easily be able to get a debugger onto the test and find out why it is failing.</p>
+
+<p>Most sequence related problems are caused by uncleared static members, so make sure each of your tests is written in the assumption that existing state may be left behind by another test that has been run within the process.  Another option is to ensure all state is fully cleared by tests on tear down (although in my opinion, this is often a less pragmatic approach).</p>

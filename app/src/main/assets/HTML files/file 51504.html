@@ -1,0 +1,110 @@
+<p>Your code is a little messy. You've defined a generator function <code>float_range</code> but you never use it, and the rest of your code is tacked onto that function, but should be separated from it, and not indented at the same level.</p>
+
+<p>You've also messed up the definition of the core function that needs to be integrated to get the Bessel function. You left out the constant <code>m</code>, and you mixed up the <code>x</code> and the <code>t</code> (theta). When you're evaluating the integral only the parameter <code>t</code> should vary - <code>m</code> and <code>x</code> are fixed.</p>
+
+<p>Anyway, here's some working code:</p>
+
+<pre><code>from math import sin, cos, pi
+
+# The core function of the Bessel integral
+def f(m, x, t):
+    return cos(m * t - x * sin(t))
+
+#The number of steps used in the Simpson's integral approximation
+N = 1000
+
+def J(m, x):
+    ''' Approximate Bessel function Jm(x) for integer m '''
+
+    # lower &amp; upper limits of the integral
+    a = 0.0
+    b = pi
+
+    # step size
+    h = (b - a) / N
+
+    # Sum the values for Simpson's integration
+    s = f(m, x, a) + f(m, x, b)
+    for i in range(1, N):
+        t = a + i * h
+        if i % 2 == 1:
+            s += 4.0 * f(m, x, t)
+        else:
+            s += 2.0 * f(m, x, t)
+
+    # multiply by h/3 to get the integral
+    # and divide by pi to get the Bessel function.
+    return s * h / (3.0 * pi) 
+
+for x in range(21):
+    print(x, J(0, x), J(1, x), J(2, x))
+</code></pre>
+
+<p><strong>output</strong></p>
+
+<pre class="lang-none prettyprint-override"><code>0 1.0 3.59712259979e-17 5.16623780792e-17
+1 0.765197686558 0.440050585745 0.114903484932
+2 0.223890779141 0.576724807757 0.352834028616
+3 -0.260051954902 0.339058958526 0.486091260586
+4 -0.397149809864 -0.0660433280235 0.364128145852
+5 -0.177596771314 -0.327579137591 0.0465651162778
+6 0.150645257251 -0.276683858128 -0.24287320996
+7 0.30007927052 -0.00468282348235 -0.301417220086
+8 0.171650807138 0.234636346854 -0.112991720424
+9 -0.0903336111829 0.245311786573 0.144847341533
+10 -0.245935764451 0.0434727461689 0.254630313685
+11 -0.171190300407 -0.176785298957 0.139047518779
+12 0.0476893107968 -0.223447104491 -0.0849304948786
+13 0.206926102377 -0.0703180521218 -0.217744264242
+14 0.17107347611 0.133375154699 -0.152019882582
+15 -0.0142244728268 0.205104038614 0.0415716779753
+16 -0.174899073984 0.0903971756613 0.186198720941
+17 -0.169854252151 -0.0976684927578 0.158363841239
+18 -0.013355805722 -0.187994885488 -0.0075325148878
+19 0.14662943966 -0.105701431142 -0.157755906096
+20 0.167024664341 0.0668331241758 -0.160341351923
+</code></pre>
+
+<hr>
+
+<p>The accuracy of this approximation is surprisingly good. Here are some values generated using the <a href="http://mpmath.org/" rel="nofollow">mpmath</a> module, which supplies various Bessel functions.</p>
+
+<pre class="lang-none prettyprint-override"><code>0 1.0 0.0 0.0
+1 0.76519768655796655145 0.44005058574493351596 0.11490348493190048047
+2 0.22389077914123566805 0.5767248077568733872 0.35283402861563771915
+3 -0.26005195490193343762 0.33905895852593645893 0.48609126058589107691
+4 -0.39714980986384737229 -0.066043328023549136143 0.36412814585207280421
+5 -0.17759677131433830435 -0.32757913759146522204 0.046565116277752215532
+6 0.15064525725099693166 -0.27668385812756560817 -0.24287320996018546772
+7 0.30007927051955559665 -0.0046828234823458326991 -0.30141722008594012028
+8 0.17165080713755390609 0.23463634685391462438 -0.11299172042407525
+9 -0.090333611182876134336 0.24531178657332527232 0.14484734153250397263
+10 -0.2459357644513483352 0.04347274616886143667 0.25463031368512062253
+11 -0.17119030040719608835 -0.17678529895672150114 0.13904751877870126996
+12 0.047689310796833536624 -0.22344710449062761237 -0.084930494878604805352
+13 0.206926102377067811 -0.070318052121778371157 -0.21774426424195679117
+14 0.17107347611045865906 0.13337515469879325311 -0.15201988258205962291
+15 -0.014224472826780773234 0.20510403861352276115 0.04157167797525047472
+16 -0.17489907398362918483 0.090397175661304186239 0.18619872094129220811
+17 -0.16985425215118354791 -0.097668492757780650236 0.15836384123850347142
+18 -0.013355805721984110885 -0.18799488548806959401 -0.0075325148878013995603
+19 0.14662943965965120426 -0.1057014311424092668 -0.15775590609569428497
+20 0.16702466434058315473 0.066833124175850045579 -0.16034135192299815017
+</code></pre>
+
+<p><br></p>
+
+<p>I'll let you figure out the plotting part of your exercise. :)</p>
+
+<hr>
+
+<p>Here's the mpmath code I used to generate those Bessel function values above, which are accurate to 20 significant figures:</p>
+
+<pre><code>from mpmath import mp
+
+# set precision
+mp.dps = 20
+
+for x in range(21):
+    print(x, mp.besselj(0, x), mp.besselj(1, x), mp.besselj(2, x))
+</code></pre>

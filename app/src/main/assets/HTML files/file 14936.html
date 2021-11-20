@@ -1,0 +1,71 @@
+<p>You have to do it yourself with the proper predicate, you can use sample code below as a starting point but you'll have to provide context, predicate, etc.</p>
+
+<p>The delete rules are nice to ensure data integrity but if you have your special cases you have to Fetch the objects and delete them manually.</p>
+
+<blockquote>
+  <p>`// Create fetch request</p>
+</blockquote>
+
+<pre><code>NSFetchRequest *request = [[NSFetchRequest alloc] init];
+NSEntityDescription *entity = [NSEntityDescription entityForName:entityName inManagedObjectContext:managedObjectContext];
+[request setEntity:entity]; 
+
+// Ignore property values for maximum performance
+[request setIncludesPropertyValues:NO];
+
+// If a predicate was specified then use it in the request
+if (predicate != nil)
+    [request setPredicate:predicate];
+
+// Execute the count request
+NSError *error = nil;
+NSArray *fetchResults = [managedObjectContext executeFetchRequest:request error:&amp;error];
+
+// Delete the objects returned if the results weren't nil
+if (fetchResults != nil) {
+    for (NSManagedObject *manObj in fetchResults) {
+        [managedObjectContext deleteObject:manObj];
+    }
+</code></pre>
+
+<p>`</p>
+
+<p>Aside of this, in the datamodel inspector of the relationships you can specify delete rules :</p>
+
+<p><img src="http://i.stack.imgur.com/g3XB5.png" alt="enter image description here"></p>
+
+<p>But if you begin to say, i want it to be deleted only if "the employee is one legged, at work, but in the coffee room, except if the big boss is on holidays, then you have to code it. </p>
+
+<p>From the Core Data Programming guide :</p>
+
+<blockquote>
+  <p>Relationship Delete Rules</p>
+  
+  <p>A relationship's delete rule specifies what should happen if an attempt is made to delete the source object. Note the phrasing in the previous sentenceâ"if an attempt is madeâ¦". If a relationship's delete rule is set to Deny, it is possible that the source object will not be deleted. Consider again a department's employees relationship, and the effect that the different delete rules have.</p>
+  
+  <p>Deny</p>
+  
+  <p>If there is at least one object at the relationship destination, then the source object cannot be deleted.
+  For example, if you want to remove a department, you must ensure that all the employees in that department are first transferred elsewhere (or fired!) otherwise the department cannot be deleted.</p>
+  
+  <p>Nullify</p>
+  
+  <p>Set the inverse relationship for objects at the destination to null.
+  For example, if you delete a department, set the department for all the current members to null. This only makes sense if the department relationship for an employee is optional, or if you ensure that you set a new department for each of the employees before the next save operation.</p>
+  
+  <p>Cascade</p>
+  
+  <p>Delete the objects at the destination of the relationship.
+  For example, if you delete a department, fire all the employees in that department at the same time.</p>
+  
+  <p>No Action</p>
+  
+  <p>Do nothing to the object at the destination of the relationship.
+  For example, if you delete a department, leave all the employees as they are, even if they still believe they belong to that department.</p>
+  
+  <p>It should be clear that the first three of these rules are useful in different circumstances. For any given relationship it is up to you to choose which is most appropriate, depending on the business logic. It is less obvious why the No Action rule might be of use, since if you use it you have the possibility of leaving the object graph in an inconsistent state (employees having a relationship to a deleted department).</p>
+  
+  <p>If you use the No Action rule, it is up to you to ensure that the consistency of the object graph is maintained. You are responsible for setting any inverse relationship to a meaningful value. This may be of benefit in a situation where you have a to-many relationship and there may be a large number of objects at the destination.`</p>
+</blockquote>
+
+<p>source : <a href="https://developer.apple.com/library/mac/#documentation/Cocoa/Conceptual/CoreData/Articles/cdRelationships.html" rel="nofollow">Core Data Programming Guide</a></p>

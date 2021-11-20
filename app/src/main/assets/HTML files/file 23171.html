@@ -1,0 +1,55 @@
+<p>Note this is using numpy >= 1.7, for numpy &lt; 1.7, see the conversion here: <a href="http://pandas.pydata.org/pandas-docs/dev/timeseries.html#time-deltas">http://pandas.pydata.org/pandas-docs/dev/timeseries.html#time-deltas</a></p>
+
+<p>Your original frame, with a datetime index</p>
+
+<pre><code>In [196]: df
+Out[196]: 
+                     value
+2012-03-16 23:50:00      1
+2012-03-16 23:56:00      2
+2012-03-17 00:08:00      3
+2012-03-17 00:10:00      4
+2012-03-17 00:12:00      5
+2012-03-17 00:20:00      6
+2012-03-20 00:43:00      7
+
+In [199]: df.index
+Out[199]: 
+&lt;class 'pandas.tseries.index.DatetimeIndex'&gt;
+[2012-03-16 23:50:00, ..., 2012-03-20 00:43:00]
+Length: 7, Freq: None, Timezone: None
+</code></pre>
+
+<p>Here is the timedelta64 of what you want</p>
+
+<pre><code>In [200]: df['tvalue'] = df.index
+
+In [201]: df['delta'] = (df['tvalue']-df['tvalue'].shift()).fillna(0)
+
+In [202]: df
+Out[202]: 
+                     value              tvalue            delta
+2012-03-16 23:50:00      1 2012-03-16 23:50:00         00:00:00
+2012-03-16 23:56:00      2 2012-03-16 23:56:00         00:06:00
+2012-03-17 00:08:00      3 2012-03-17 00:08:00         00:12:00
+2012-03-17 00:10:00      4 2012-03-17 00:10:00         00:02:00
+2012-03-17 00:12:00      5 2012-03-17 00:12:00         00:02:00
+2012-03-17 00:20:00      6 2012-03-17 00:20:00         00:08:00
+2012-03-20 00:43:00      7 2012-03-20 00:43:00 3 days, 00:23:00
+</code></pre>
+
+<p>Getting out the answer while disregarding the day difference (your last day is 3/20, prior is 3/17), actually is tricky</p>
+
+<pre><code>In [204]: df['ans'] = df['delta'].apply(lambda x: x  / np.timedelta64(1,'m')).astype('int64') % (24*60)
+
+In [205]: df
+Out[205]: 
+                     value              tvalue            delta  ans
+2012-03-16 23:50:00      1 2012-03-16 23:50:00         00:00:00    0
+2012-03-16 23:56:00      2 2012-03-16 23:56:00         00:06:00    6
+2012-03-17 00:08:00      3 2012-03-17 00:08:00         00:12:00   12
+2012-03-17 00:10:00      4 2012-03-17 00:10:00         00:02:00    2
+2012-03-17 00:12:00      5 2012-03-17 00:12:00         00:02:00    2
+2012-03-17 00:20:00      6 2012-03-17 00:20:00         00:08:00    8
+2012-03-20 00:43:00      7 2012-03-20 00:43:00 3 days, 00:23:00   23
+</code></pre>

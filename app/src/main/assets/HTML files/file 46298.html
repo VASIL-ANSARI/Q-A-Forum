@@ -1,0 +1,18 @@
+<p>The problem appears to be is not within pipe/dup2 related code but with <code>os._exit</code>. It is brutal way to kill python interpreter (but OK for forked processes so it won't touch "shared" objects), but it causes <code>stdout</code> and <code>stderr</code> not to be flushed, and data is lost. </p>
+
+<p>I came to the following code in child:</p>
+
+<pre><code>try:
+    os.close(rpipe)
+    os.dup2(wpipe, sys.stdout.fileno())
+    os.dup2(wpipe, sys.stderr.fileno())
+    os.close(wpipe)
+
+    print 'aaaaaaaaa'
+except:
+    traceback.print_exc(20, sys.stderr)
+finally:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(1)
+</code></pre>

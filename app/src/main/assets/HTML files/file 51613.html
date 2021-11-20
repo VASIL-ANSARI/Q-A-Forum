@@ -1,0 +1,38 @@
+<p>Because of the iterative nature of this problem it's not possible to replace the loop with array operations. </p>
+
+<p>As an alternative I think Numba is indeed a good choice. Numba doesn't work with Python lists (hence the exception you received), so then you're restricted to Numpy arrays. To handle the a priori unknown array size, the <code>ndarray.resize</code> instance method is nice to use, because it frees the unused memory (as opposed to taking a slice, which keeps a reference to the whole array). The code would look something like this:</p>
+
+<pre><code>from numba import jit
+
+@jit(nopython=True)
+def EM_helper(T, x1, x2, x3, x5, y, p):
+    dt = (T[-1] - T[0]) / T.shape[0]
+    for i in range(1, T.shape[0]):
+
+        # ...big calculation
+
+        y[i] = pos
+        p[i] = mom
+
+        #Boundary condition            
+        if(pos &lt; 0):
+            break
+
+    return i+1
+
+def EM(T, x1, x2, x3, x4, x5):
+    y = np.empty_like(T, dtype=float)  # Table for the path
+    p = np.empty_like(T, dtype=float)  # Table for the momentum
+
+    y[0] = x3*T[0] - 0.01
+    p[0] = x3*x2*x4
+    count = EM_helper(T, x1, x2, x3, x5, y, p)
+
+    y.resize(count)
+    p.resize(count)
+    return T[:count], y, p
+</code></pre>
+
+<p>Instead of the <code>EM_helper</code> function you could also try to rely on automatic "loop lifting" but this is less robust in my experience.</p>
+
+<p>The creation of the time array <code>T = np.linspace(tstart, tend, steps)</code> I moved outside of the function, because in a quick test I found it would become a performance bottleneck.</p>

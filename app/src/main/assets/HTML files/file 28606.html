@@ -1,0 +1,97 @@
+<p>set Button's background Drawable to a custom Drawable like this one:</p>
+
+<p><img src="http://i.stack.imgur.com/EZ6jx.png" alt="enter image description here"></p>
+
+<pre><code>public class DecoratedTextViewDrawable extends LayerDrawable {
+    private int mCnt = 0;
+    private Paint mPaint;
+    private TextView mParent;
+    private ColorStateList mColors;
+    private Rect mBounds;
+
+    public DecoratedTextViewDrawable(TextView tv, Drawable[] layers, int cnt) {
+        super(layers);
+        mParent = tv;
+        mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mPaint.setTextAlign(Align.CENTER);
+        mPaint.setTextSize(tv.getTextSize());
+        mPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        int[][] states = {
+                {android.R.attr.state_pressed}, {android.R.attr.state_focused}, {}
+        };
+        int[] colors = {
+                0xff0000aa, 0xff880000, 0xff00aa00
+        };
+        mColors = new ColorStateList(states, colors);
+        mBounds = new Rect();
+        setCnt(cnt);
+    }
+
+    public void setCnt(int cnt) {
+        mCnt = cnt;
+        String s = Integer.toString(cnt);
+        mPaint.getTextBounds(s, 0, s.length(), mBounds);
+        invalidateSelf();
+    }
+
+    @Override
+    protected boolean onStateChange(int[] state) {
+        invalidateSelf();
+        return super.onStateChange(state);
+    }
+
+    @Override
+    public boolean isStateful() {
+        return true;
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        super.draw(canvas);
+
+        float x = mPaint.getTextSize() * 1.5f;
+        float r = mPaint.getTextSize() * 0.9f;
+        int base = mParent.getBaseline();
+        int[] stateSet = getState();
+//        Log.d(TAG, "draw " + StateSet.dump(stateSet));
+        int color = mColors.getColorForState(stateSet, 0xff000000);
+        mPaint.setColor(color);
+        canvas.drawCircle(x, base + mBounds.top + mBounds.height() / 2, r, mPaint);
+        mPaint.setColor(0xffeeeeee);
+        canvas.drawText(Integer.toString(mCnt), x, base, mPaint);
+    }
+}
+</code></pre>
+
+<p>you can use it like this:</p>
+
+<pre><code>// Activity.onCreate method
+LinearLayout ll = new LinearLayout(this);
+ll.setOrientation(LinearLayout.VERTICAL);
+
+int NUM = 5;
+final int[] cnt = new int[NUM];
+Random r = new Random();
+for (int i = 0; i &lt; NUM; i++) {
+    cnt[i] = r.nextInt(20);
+    Button b = new Button(this);
+    b.setText("Click me");
+    b.setTextSize(18);
+    b.setTag(i);
+
+    Drawable[] layers = {b.getBackground()};
+    Drawable d = new DecoratedTextViewDrawable(b, layers, cnt[i]);
+    b.setBackgroundDrawable(d);
+    OnClickListener l = new OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            DecoratedTextViewDrawable  d = (DecoratedTextViewDrawable) v.getBackground();
+            int idx = (Integer) v.getTag();
+            d.setCnt(++cnt[idx]);
+        }
+    };
+    b.setOnClickListener(l);
+    ll.addView(b);
+}
+setContentView(ll);
+</code></pre>

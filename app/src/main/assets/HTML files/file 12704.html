@@ -1,0 +1,29 @@
+<pre><code>// Step 1.
+var record = context.MyTable.First();
+
+// Step 2.
+var foreignKey = ForeignKeyTable.Where(x =&gt; x.Id == record.ForeignKeyId).Single();
+
+// Step 3.
+var entry = context.Entry(record);
+
+// Step 4.
+trace(entry.Reference(x =&gt; x.ForeignKey).IsLoaded);
+
+// Step 5.
+trace(record.ForeignKey.SomeProperty);
+</code></pre>
+
+<ol>
+<li>Retrieve some record (DB is queried). <strong>yes, and the resulting record is attached to the DbContext.</strong></li>
+<li>Retrieve a record that happens to be a foreign key property of record without using lazy loading like record.ForeignKey to retrieve it (DB is queried). <strong>yes. If you had wanted to eager load the foreign key in #1, you would have used context.MyTable.Include(m => m.ForeignKey).First(); That would have retrieved the record along with the fk in 1 query.</strong></li>
+<li>Get the details of the record entity. <strong>Kind of... it is the details of the entity in relation to the DbContext (what is attached / deleted / loaded / etc)</strong></li>
+<li>This is the part I'm unsure about. In my testing it outputs true. I'm guessing that IsLoaded doesn't know whether or not record.ForeignKey currently has a value, but knows that record.ForeignKey is already being tracked in the context based on it's knowledge of record.ForeignKeyId and the relationships that have been established. <strong>This means that the DbContext does not need to run another query to load the data for the foreign key. If you execute record.ForeignKey, the data is already there, and no additional trip to the db is required</strong>.</li>
+<li>The db doesn't seem to be hit here, and I assume it's for the same reason IsLoaded returns true in 4. It knows that it's tracking the foreignKey object already, so it knows it doesn't have to do the lazy loading. <strong>The entitiy has already been loaded in step #2, so there was no additional trip needed to get it from the db.</strong> </li>
+</ol>
+
+<p><strong>Update after question edit</strong></p>
+
+<p>According to EF, the .Attach method on IDbSet:</p>
+
+<p>Attaches the given entity to the context underlying the set. That is, the entity is placed into the context in the Unchanged state, just as if it had been read from the database.</p>

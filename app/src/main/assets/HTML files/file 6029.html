@@ -1,0 +1,47 @@
+<p>I implemented this to convert a <code>IList&lt;T&gt;</code> to a <code>DataTable</code> and documented it on my blog:</p>
+
+<pre><code>public static class ListExtensions
+{
+    public static DataTable ToDataTable&lt;T&gt;(this IList&lt;T&gt; list)
+    {
+        IList&lt;PropertyInfo&gt; properties = list.GetPropertiesOfObjectInList();
+        DataTable resultTable = CreateTable(properties);
+
+        foreach(var item in list)
+        {
+            var row = CreateRowFromItem&lt;T&gt;(resultTable, item);
+            resultTable.Rows.Add(row);
+        }
+
+        return resultTable;
+    }
+
+    private static DataTable CreateTable(IList&lt;PropertyInfo&gt; properties)
+    {
+        DataTable resultTable = new DataTable();
+        foreach (var property in properties)
+        {
+            resultTable.Columns.Add(property.Name, property.PropertyType);
+        }
+        return resultTable;
+    }
+
+    public static IList&lt;PropertyInfo&gt; GetPropertiesOfObjectInList&lt;T&gt;(this IList&lt;T&gt; list)
+    {
+        return typeof(T).GetProperties().ToList();
+    }
+
+    private static DataRow CreateRowFromItem&lt;T&gt;(DataTable resultTable, T item)
+    {
+        var row = resultTable.NewRow();
+        var properties = item.GetType().GetProperties().ToList();
+        foreach (var property in properties)
+        {
+            row[property.Name] = property.GetValue(item, null);
+        }
+        return row;
+    }
+}
+</code></pre>
+
+<p>This allows you to write code like <code>DataTable yourTable = yourList.ToDataTable()</code>. You can read about it here: <a href="http://blog.tomasjansson.com/2010/10/generic-list-to-datatable/" rel="nofollow">Generic list to DataTable</a></p>

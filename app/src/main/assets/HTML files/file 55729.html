@@ -1,0 +1,58 @@
+<p>Just because it is a base class doesn't eliminate the issue with class level variables in CRM plugins (and workflows.)</p>
+
+<p>From <a href="https://msdn.microsoft.com/en-us/library/gg328263.aspx#bkmk_writingbasic">https://msdn.microsoft.com/en-us/library/gg328263.aspx#bkmk_writingbasic</a>:</p>
+
+<blockquote>
+  <p>For improved performance, Microsoft Dynamics CRM caches plug-in
+  instances. The plug-in's Execute method should be written to be
+  stateless because the constructor is not called for every invocation
+  of the plug-in. Also, multiple system threads could execute the
+  plug-in at the same time. All per invocation state information is
+  stored in the context, so you should not use global variables or
+  attempt to store any data in member variables for use during the next
+  plug-in invocation unless that data was obtained from the
+  configuration parameter provided to the constructor. Changes to a
+  plug-ins registration will cause the plug-in to be re-initialized.</p>
+</blockquote>
+
+<p>Having class level variables violates this stateless requirement.</p>
+
+<p>My recommendation is to rewrite the plugin (and then do the same for the workflow) to have an object that holds the references for each call to <code>Execute</code>, thus allowing the code to meet the stateless requirement.</p>
+
+<pre><code>public class CrmObjects
+{
+    public IServiceProvider ServiceProvider { get; set; }
+    public ITracingService TracingService { get; set; }
+    public IPluginExecutionContext PluginContext { get; set; }
+    public IOrganizationService Service { get; set; }
+}
+
+public abstract class BasePlugin : IPlugin
+{
+
+    public void Execute(IServiceProvider serviceProvider)
+    {
+
+        var crmObjects = new CrmObjects();
+
+        crmObjects.ServiceProvider = serviceProvider;
+        crmObjects.TracingService =
+            (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+
+        crmObjects.PluginContext = (IPluginExecutionContext)
+            serviceProvider.GetService(typeof(IPluginExecutionContext));
+
+        IOrganizationServiceFactory serviceFactory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+        crmObjects.Service = serviceFactory.CreateOrganizationService(crmObjects.PluginContext.UserId);
+
+        ExecutePluginLogic(crmObjects);
+    }
+
+    public virtual void ExecutePluginLogic(CrmObjects crmObjects)
+    {
+        throw new NotImplementedException();
+    }
+}
+</code></pre>
+
+<p>I wrote a blog article about doing something similar, <a href="http://nicknow.net/dynamics-crm-2011-abstracting-plugin-setup/">http://nicknow.net/dynamics-crm-2011-abstracting-plugin-setup/</a>, a few years back. In the model I described it didn't rely on a base class but used a class that was instantiated on the first line of the <code>Execute</code> method to accomplish the same concept. I've since moved to a base class model - similar to this design. When I get a chance I'll put it out on GitHub.</p>

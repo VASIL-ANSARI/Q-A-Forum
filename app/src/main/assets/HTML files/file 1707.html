@@ -1,0 +1,30 @@
+<p>Best I could come up with, untested:</p>
+
+<pre><code>DECLARE @username VARCHAR(40)
+DECLARE @date DATETIME
+DECLARE @counter INT
+    SET @counter = 1
+
+WITH occur AS (
+     SELECT DISTINCT
+            CONVERT(VARCHAR(10), o.date, 101) AS dt,
+            o.username
+       FROM OCCURRENCES o
+   ORDER BY o.username, dt),
+     occur_rank AS (
+     SELECT x.dt,
+            @username = x.username,
+            @date = CAST(x.dt AS DATETIME),
+            CASE WHEN @username = x.username AND @date + 1 = x.date THEN @counter = @counter + 1 ELSE @counter = 1 END AS rank
+       FROM occur x
+   ORDER BY x.username, x.dt)
+  SELECT or.dt,
+         SUM(CASE WHEN or.rank BETWEEN 2 AND 5 THEN 1 ELSE 0 END) AS 2_to_5,
+         SUM(CASE WHEN or.rank BETWEEN 6 AND 10 THEN 1 ELSE 0 END) AS 6_to_10
+    FROM occur_rank or
+GROUP BY or.dt
+</code></pre>
+
+<p>If you can get the numbering to reset on a date gap, the rest is easy.  But <a href="http://msdn.microsoft.com/en-us/library/ms189798.aspx" rel="nofollow">none of the SQL Server ranking functions support that</a>.  So that leaves manually incrementing a variable.</p>
+
+<p>The first CTE, <code>occur</code> just returns a list of usernames associated with dates.  The second CTE builds on it, adding the ranking for the final output to pivot on.</p>

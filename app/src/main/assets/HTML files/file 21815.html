@@ -1,0 +1,86 @@
+<p>javascript never stop</p>
+
+<p>toGetQuestionNumber(); will return directly, it not wait your tx.executeSql</p>
+
+<p>so, alert('Second' + QnNumber); is called first</p>
+
+<p>second, on page ready callback you do the ajax request, but it's not the place to put this ready callback</p>
+
+<p>instead of doing</p>
+
+<pre><code>.live
+  .ready
+</code></pre>
+
+<p>do</p>
+
+<pre><code>.ready
+  .live
+</code></pre>
+
+<p>just take in mind that javascript is asynchron, there are some callback after action, like $.ajax and tx.executeSql</p>
+
+<p>if you want a second action called after a first one, launch second action on end callback of the first one</p>
+
+<p>try a thing like this :</p>
+
+<pre><code>$(document).ready(function(){
+$('#alpha').live('pageshow', function(event) {
+    var day         = getUrlVars()["day"];
+    var module      = getUrlVars()["module"];
+
+    var QnNumber=1;
+
+    var db = openDatabase("Exam", "1.0", "The Exam", 200`enter code here`000);
+    var dataset;
+    var selectAllStatement = "SELECT  TotQn, TotAnswd FROM QuizScore where DayID=" + day + " and ModuleID=" + module ;
+    var xml;
+
+    //loading XML file and parsing to .main div.
+    function xmlParser(data) 
+    {   // if here ajax request is end
+        xml = data;
+        $('#list').empty();
+        alert('Third' + QnNumber); ////// Third Alert
+
+        $('#list').trigger('create');
+    }
+
+    function toGetQuestionNumber() {
+        db.transaction(function(tx) 
+        {
+            tx.executeSql(selectAllStatement, [], function(tx, result) 
+            {
+                dataset = result.rows;
+                for (var i = 0, item = null; i &lt; dataset.length; i++) 
+                {
+                  item = dataset.item(i);
+                  //if(item['TotAnswd']&gt;0)
+                  //{
+                      QnNumber = item['TotAnswd'];
+                      alert('First=' +QnNumber); ////// First Alert
+
+                      // if here, db request is end !
+
+                      alert('Second' + QnNumber);  ////// Second Alert
+
+                      // call ajax request
+
+                      $.ajax({
+                      type: "GET",
+                      url: "data/quiz.xml",
+                      dataType: "xml",
+                      success: xmlParser
+                      });
+                  //}
+                }
+            });
+        });
+    }
+
+    // start all
+    toGetQuestionNumber();
+
+});
+});
+</code></pre>

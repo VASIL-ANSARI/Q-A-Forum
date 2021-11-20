@@ -1,0 +1,63 @@
+<p>using NAudio.dll library , we can dealing with microphone and speakers using C#  the following code:
+1- This code will give us the microphone devices.</p>
+
+<pre><code>        List&lt;NAudio.Wave.WaveInCapabilities&gt; sources = new List&lt;NAudio.Wave.WaveInCapabilities&gt;();
+        for (int i = 0; i &lt; NAudio.Wave.WaveIn.DeviceCount; i++)
+        {
+            sources.Add(NAudio.Wave.WaveIn.GetCapabilities(i));
+        }
+        sourceListView.Items.Clear();
+
+        foreach (var source in sources)
+        {
+            ListViewItem item = new ListViewItem(source.ProductName);
+            item.SubItems.Add(new ListViewItem.ListViewSubItem(item, source.Channels.ToString()));
+            sourceListView.Items.Add(item);
+        }
+</code></pre>
+
+<p>2- This code will start capturing audio from the microphone and bring it out  to speakers.</p>
+
+<pre><code>    private NAudio.Wave.WaveIn sourceStream = null;
+    private NAudio.Wave.DirectSoundOut waveOut = null;
+
+    private void btnStart_Click(object sender, EventArgs e)
+    {
+        if (sourceListView.SelectedItems.Count == 0) return;
+        //NAudio.Wave.MixingWaveProvider32 mixer=sourceStream.GetMixerLine();
+        int deviceNumber = sourceListView.SelectedItems[0].Index;
+        sourceStream = new NAudio.Wave.WaveIn();
+        sourceStream.DeviceNumber = deviceNumber;
+        sourceStream.WaveFormat = new NAudio.Wave.WaveFormat(9600,8, NAudio.Wave.WaveIn.GetCapabilities(deviceNumber).Channels);
+        NAudio.Wave.WaveInProvider waveIn = new NAudio.Wave.WaveInProvider(sourceStream);
+        waveOut = new NAudio.Wave.DirectSoundOut();
+        waveOut.Init(waveIn);
+        sourceStream.StartRecording();
+        sourceStream.DataAvailable += new EventHandler&lt;NAudio.Wave.WaveInEventArgs&gt;(sourceStream_DataAvailable);
+        waveOut.Play();
+    }
+
+    void sourceStream_DataAvailable(object sender, NAudio.Wave.WaveInEventArgs e)
+    {
+
+    }
+
+    private void btnStop_Click(object sender, EventArgs e)
+    {
+        if (waveOut != null)
+        {
+            waveOut.Stop();
+            waveOut.Dispose();
+            waveOut = null;
+        }
+        if (sourceStream != null)
+        {
+            sourceStream.StopRecording();
+            sourceStream.Dispose();
+            sourceStream = null;
+        }
+    }
+</code></pre>
+
+<p>It is a very simple example to to do this issue, and You can download the NAudio.dll library from this website:
+<a href="http://naudio.codeplex.com/releases/view/79035" rel="nofollow">http://naudio.codeplex.com/releases/view/79035</a></p>

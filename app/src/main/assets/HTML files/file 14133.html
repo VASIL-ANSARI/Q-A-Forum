@@ -1,0 +1,191 @@
+<p>I think you problem is that your BroadcastReceiver mReceiver does not survive after the onCreate method of your service. Furthermore you are not declare it right. If I was you I would do something like this:</p>
+
+<pre><code>public class UpdateService extends Service {
+
+private ScreenReceiver mReceiver = null;
+
+@Override
+public void onCreate() {
+    super.onCreate();
+    // register receiver that handles screen on and screen off logic
+    IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+    filter.addAction(Intent.ACTION_SCREEN_OFF);
+    if(mReceiver != null)mReceiver = new ScreenReceiver();
+    registerReceiver(mReceiver, filter);
+}
+
+@Override
+public int onStartCommand(Intent intent, int flags, int startId) {
+    *** NOTE HERE THAT I AM OVERRIDING THE ONSTART AS AN INT NOT VOID***
+
+    .... do your stuff here....
+
+    return Service.START_STICKY;
+}
+</code></pre>
+
+<p>Now there is another problem with your approach. You are declaring and instantiating your receiver in the service's onCreate method and then you are starting the service AGAIN from within onReceive method of your receiver. This is not the way android services work.
+The correct approach is to instantiate and register your receiver from the onCreate method of your service and start the service from another point of your application, for example if it is an app-widget you can do this from the onUpdate method of the WidgetProvider or from some Activity's onCreate method.</p>
+
+<p>So your code should be as follow:</p>
+
+<ol>
+<li><p>Your receviver:</p>
+
+<pre><code>public class ScreenReceiver extends BroadcastReceiver {
+
+    private boolean screenOff;
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+            screenOff = true;
+        } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+            screenOff = false;
+        }
+
+        ... Do your stuff here for screen on or off ....
+        ... AND DO NOT START A SERVICE FROM HERE ....
+    }
+}
+</code></pre></li>
+<li><p>Your service:</p>
+
+<pre><code>public class UpdateService extends Service {
+
+    private ScreenReceiver mReceiver = null;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        // register receiver that handles screen on and screen off logic
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        if(mReceiver != null)mReceiver = new ScreenReceiver();
+        registerReceiver(mReceiver, filter);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        NOTE HERE THAT I AM OVERRIDING THE ONSTART AS AN INT NOT VOID
+
+        .... YOU DON'T HAVE TO DO SOMETHING HERE EXCEPT FROM SOME ....
+        .... INITIALIZATION CODE ...
+
+        return Service.START_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        UnregisterReceiver(mReceiver);
+        super.onDestroy();
+    }
+}
+</code></pre></li>
+<li><p>Your Activity or other code point:</p>
+
+<p>startService(new Intent(context, UpdateService.class));</p></li>
+</ol>
+
+<p>What happens here is this:</p>
+
+<p>When the startService executes your service is instantiated and the onCreate method executes in which the receiver is registered and starts monitoring for Intents. Then the onStart method of the service is called and it returns START_STICKY which means that the service will be restarted if terminated from the system and thus the receiver will be registered again and so on. BTW whenever your service terminating the onDestroy method will be called and the receiver will be unregistered (which is a very goog thing to do).</p>
+
+<p>Now you have a service run all the time ready to receive notifications from the system.</p>
+
+<p>If you wish to terminate the service at some point, simply call the</p>
+
+<pre><code>context.stopService(new Intent(context, UpdateService.class));
+</code></pre>
+
+<p>I don't really know Android services in depth but this technique works very well with my service which hosts a BroadcastReceiver and a ContentObserver at the same time.</p>
+
+<p><em><strong>EDIT BASED ON YOUR NEW PROGRESS</em></strong></p>
+
+<p>Ok now it seems that we are getting somewhere. I can see in your onReceive method</p>
+
+<pre><code>@Override
+public void onReceive(Context context, Intent intent) {
+    if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+        Intent led = new Intent(IlluminationIntent.ACTION_STOP_LED);
+        led.putExtra(IlluminationIntent.EXTRA_PACKAGE_NAME, "com.test.xl");
+        led.putExtra(IlluminationIntent.EXTRA_LED_ID, IlluminationIntent.VALUE_BUTTON_2);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, 0xFFFFFFFF);
+        context.startService(led);
+        screenOff = true;
+    } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+
+        int ledC = TestXLActivity.getledC();
+
+        Intent led = new Intent(IlluminationIntent.ACTION_START_LED);
+        led.putExtra(IlluminationIntent.EXTRA_PACKAGE_NAME, "com.test.xl");
+        led.putExtra(IlluminationIntent.EXTRA_LED_ID, IlluminationIntent.VALUE_BUTTON_2);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, ledC);
+        context.startService(led);
+        screenOff = false;
+    }
+}
+</code></pre>
+
+<p>You are declaring an intent led and you are using it to start a service, but you are not specifying which service to start. I think you are missing something like led.setClass. But in order to clear things a little bit let's modify the onReceive like this:</p>
+
+<pre><code>@Override
+public void onReceive(Context context, Intent intent) {
+    Intent led = new Intent(context, your_led_service_name.class);
+    led.putExtra(IlluminationIntent.EXTRA_PACKAGE_NAME, "com.test.xl");
+
+    if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+        led.addAction(IlluminationIntent.ACTION_STOP_LED);
+        led.putExtra(IlluminationIntent.EXTRA_LED_ID, IlluminationIntent.VALUE_BUTTON_2);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, 0xFFFFFFFF);
+        context.startService(led);
+        screenOff = true;
+    } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+        int ledC = TestXLActivity.getledC();
+        led.addAction(IlluminationIntent.ACTION_START_LED);
+        led.putExtra(IlluminationIntent.EXTRA_LED_ID, IlluminationIntent.VALUE_BUTTON_2);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, ledC);
+        context.startService(led);
+        screenOff = false;
+    }
+}
+</code></pre>
+
+<p>and see how it goes now...</p>
+
+<p>SECOND EDIT</p>
+
+<p>Ok I don't know anything about Sony Ericsson Illumination API but based on your code you may need to change the onReceive as follows:</p>
+
+<pre><code>@Override
+public void onReceive(Context context, Intent intent) {
+    IlluminationIntent led = new IlluminationIntent(??);
+    //Note: In place of ?? you may need your context on nothing at all
+    //it depends on sony's API.
+
+    led.putExtra(IlluminationIntent.EXTRA_PACKAGE_NAME, "com.test.xl");
+
+    led.putExtra(IlluminationIntent.EXTRA_LED_ID, IlluminationIntent.VALUE_BUTTON_2);
+    //This is only needed once...
+
+    if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+        led.addAction(IlluminationIntent.ACTION_STOP_LED);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, 0xFFFFFFFF);
+        screenOff = true;
+    } else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+        int ledC = TestXLActivity.getledC();
+        led.addAction(IlluminationIntent.ACTION_START_LED);
+        led.putExtra(IlluminationIntent.EXTRA_LED_COLOR, ledC);
+        screenOff = false;
+    }
+
+    context.startService(led);
+}
+</code></pre>
+
+<p>Hope this helps...</p>

@@ -1,0 +1,75 @@
+<p>Oracle selects the <code>root row(s)</code> of the hierarchy (those rows that satisfy the START WITH condition.)
+Oracle selects the child rows of each root row. 
+Each child row must satisfy the condition of the <code>CONNECT BY</code> condition with respect to one of the root rows.</p>
+
+<p>To find the children of a parent row, Oracle evaluates the PRIOR expression of the CONNECT BY condition for the parent row and the other expression for each row in the table. 
+Rows for which the condition is true are the children of the parent. 
+The <code>CONNECT BY</code> condition can contain other conditions to further filter the rows selected by the query.</p>
+
+<pre><code>A root row is the highest row within an inverted tree. 
+</code></pre>
+
+<p>If you try with same parent as child (22 or 33 or 44) it will work since they are not root rows and just parents
+Since 1 is the root and also a child with 1, the LEVEL is set to be cycle due to CONNECT_BY_ROOT clause</p>
+
+<p>The duplication in output occurs since the <code>connect by works on root which is duplicated</code> as well.</p>
+
+<pre><code>Oracle is not able to restrict the uniqueness since Oracle can't give preference to one of the other
+</code></pre>
+
+<p>Either make your data set unique or code them such that oracle can work on preference in hierarchy</p>
+
+<p><strong>FOLLOW UP:
+SOLUTION FOR OP's problem</strong></p>
+
+<pre><code>SELECT
+      VENDOR,
+      CUSTOMER,
+      LEVEL,
+      CONNECT_BY_ISLEAF AS ISLEAF,
+      CONNECT_BY_ISCYCLE AS ISCYCLE,
+      CONNECT_BY_ROOT VENDOR
+      || SYS_CONNECT_BY_PATH ( CUSTOMER,
+                          ' ~ ' )
+          AS PATH
+FROM
+      (SELECT
+            VENDOR,
+            CUSTOMER
+       FROM
+            T
+       WHERE
+            CUSTOMER &lt;&gt; '1')
+CONNECT BY
+      NOCYCLE VENDOR = PRIOR CUSTOMER
+START WITH
+      VENDOR = '1';
+</code></pre>
+
+<p><strong>Results:</strong></p>
+
+<pre><code>VENDOR CUSTOMER      LEVEL     ISLEAF    ISCYCLE PATH                                                                            
+------ -------- ---------- ---------- ------------------------------------------------------------------------------------------
+1      2                 1          0          0 1 ~ 2                                                                           
+2      3                 2          1          0 1 ~ 2 ~ 3                                                                       
+2      4                 2          0          1 1 ~ 2 ~ 4                                                                       
+4      5                 3          1          0 1 ~ 2 ~ 4 ~ 5                                                                   
+4      6                 3          0          1 1 ~ 2 ~ 4 ~ 6                                                                   
+6      9                 4          0          0 1 ~ 2 ~ 4 ~ 6 ~ 9                                                               
+9      10                5          0          0 1 ~ 2 ~ 4 ~ 6 ~ 9 ~ 10                                                          
+10     11                6          1          1 1 ~ 2 ~ 4 ~ 6 ~ 9 ~ 10 ~ 11                                                     
+9      12                5          1          0 1 ~ 2 ~ 4 ~ 6 ~ 9 ~ 12                                                          
+1      7                 1          0          0 1 ~ 7                                                                           
+7      8                 2          1          0 1 ~ 7 ~ 8                                                                       
+1      9                 1          0          0 1 ~ 9                                                                           
+9      10                2          0          0 1 ~ 9 ~ 10                                                                      
+10     11                3          0          0 1 ~ 9 ~ 10 ~ 11                                                                 
+11     2                 4          0          0 1 ~ 9 ~ 10 ~ 11 ~ 2                                                             
+2      3                 5          1          0 1 ~ 9 ~ 10 ~ 11 ~ 2 ~ 3                                                         
+2      4                 5          0          1 1 ~ 9 ~ 10 ~ 11 ~ 2 ~ 4                                                         
+4      5                 6          1          0 1 ~ 9 ~ 10 ~ 11 ~ 2 ~ 4 ~ 5                                                     
+4      6                 6          1          1 1 ~ 9 ~ 10 ~ 11 ~ 2 ~ 4 ~ 6                                                     
+9      12                2          1          0 1 ~ 9 ~ 12                                                                      
+
+20 rows selected
+</code></pre>

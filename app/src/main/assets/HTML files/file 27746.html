@@ -1,0 +1,13 @@
+<blockquote>
+  <p>I can see that the interrupt flag is set in the code of MyTask. But unfortunately, the Interrupted exception is not catch and I cant find why. Any idea?</p>
+</blockquote>
+
+<p>The only time that an <code>InterruptedException</code> is thrown is when the method is doing some sort of sleep or wait (<code>Thread.sleep(...)</code>, <code>Object.wait(...)</code>, etc.).  In this case, the <code>InterruptedException</code> will only be thrown if the thread that is <em>calling</em> <code>futureTask.get()</code> has been interrupted -- not the task itself.  The thread that has called <code>get()</code> is waiting for the task to finish and so it could be interrupted.</p>
+
+<p>If you want to check to see if the task has been interrupted then you should use <code>Thread.currentThread().isInterrupted()</code> inside of the task code.  You interrupt a <em>task</em>  typically by calling <code>futureTask.cancel(true)</code>.  This will stop the task from running if it has not been executed yet.  If it is currently running then you will need to test for the interrupt bit in your code.  Something like:</p>
+
+<pre><code>// your task should do something like this if you have a while loop
+while (!Thread.currentThread().isInterrupted()) {
+    ...
+}
+</code></pre>

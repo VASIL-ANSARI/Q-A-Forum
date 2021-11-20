@@ -1,0 +1,35 @@
+<p>I believe your problem here could be in the format specifiers you are using when calling printf.</p>
+
+<p>The OpenCL C built-ins get_global_size(), get_local_size(), get_num_groups(), get_global_id(), get_local_id() and get_group_id() all return a size_t value. The size_t type is different depending on the architecture's address width; it's size is equal to the size of a pointer (i.e. sizeof(size_t) == sizeof(void *)), therefore on x86 size_t is 4bytes and on x86_64 size_t is 8bytes. Because of this printf has the "%zu" format specifier for size_t values. This might explain why you were seeing different outputs on x86 and x86_64 kernel builds.</p>
+
+<p>Additionally the OpenCL C built-in get_work_dim() returns an unsigned int value, and for this you should use the "%u" format specifier.</p>
+
+<p>Maybe try this for your kernel instead:</p>
+
+<pre><code>__kernel void k_Test()
+{
+    if ( (get_group_id(0) + get_group_id(1) + get_group_id(2)) == 0 &amp;&amp;
+         (get_local_id(0) + get_local_id(1) + get_local_id(2)) == 0)
+    {
+        printf( "get_global_size = %zu x %zu x %zu | " \
+                "get_local_size = %zu x %zu x %zu | " \
+                "get_work_dim = %u \n" \
+                "////////////////////////////////////\n", \
+                get_global_size(0), get_global_size(1), get_global_size(2), \
+                get_local_size(0), get_local_size(1), get_local_size(2), \
+                get_work_dim()
+                );
+    }
+
+    printf( "get_group_id = %zu x %zu x %zu \n" \
+            "get_global_id = %zu x %zu x %zu \n" \
+            "get_local_id = %zu x %zu x %zu \n" \
+            "get_num_groups = %zu x %zu x %zu \n" \
+            "////////////////////////////////////\n", \
+            get_group_id(0), get_group_id(1), get_group_id(2), \
+            get_global_id(0), get_global_id(1), get_global_id(2), \
+            get_local_id(0), get_local_id(1), get_local_id(2), \
+            get_num_groups(0), get_num_groups(1), get_num_groups(2)
+            );
+}
+</code></pre>

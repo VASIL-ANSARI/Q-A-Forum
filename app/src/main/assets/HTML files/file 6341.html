@@ -1,0 +1,54 @@
+<ol>
+<li><p>Yes. It will slow it down by an imperceivable amount. Frankly, it would be absolutely ridiculous to be worried about this.</p></li>
+<li><p>On every tick, decrement a property. Bind your UI to that property. Alternatively, simply invalidate a property on every tick, and have the property getter calculate the time remaining.</p></li>
+</ol>
+
+<p><strong>Option 1</strong></p>
+
+<pre><code>myTimer.Interval = TimeSpan.FromSeconds(1);
+myTimer.Tick += delegate
+{
+    this.SecondsRemaining = this.SecondsRemaining - 1;
+
+    if (this.SecondsRemaining == 0)
+    {
+        myTimer.Dispose();
+    }
+};
+this.SecondsRemaining = 60;
+myTimer.Start();
+
+...
+
+// assumes your class implements INotifyPropertyChanged and you have a helper method to raise OnPropertyChanged
+public int SecondsRemaining
+{
+    get { return this.secondsRemaining; }
+    private set
+    {
+        this.secondsRemaining = value;
+        this.OnPropertyChanged(() =&gt; this.SecondsRemaining);
+    }
+}
+</code></pre>
+
+<p><strong>Option 2</strong></p>
+
+<pre><code>myTimer.Interval = TimeSpan.FromSeconds(1);
+myTimer.Tick += delegate
+{
+    this.OnPropertyChanged("TimeRemaining");
+
+    if (this.TimeRemaining &lt;= 0)
+    {
+        myTimer.Dispose();
+    }
+};
+this.endTime = DateTime.UtcNow.AddMinutes(1);
+myTimer.Start();
+
+public int TimeRemaining
+{
+    get { return (endTime - DateTime.UtcNow).TotalSeconds; }
+}
+</code></pre>

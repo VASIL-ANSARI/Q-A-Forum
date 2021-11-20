@@ -1,0 +1,16 @@
+<p>Here's one way, using a temporary table with 3 fields: a <code>MIN(id)</code> field where <code>id</code> is a unique or primary key in <code>Table</code>, and the <code>FieldA</code> and <code>FieldB</code>:</p>
+
+<pre><code>CREATE TEMPORARY TABLE tmp_fix AS
+SELECT MIN(id) AS id, FieldA, FieldB 
+FROM Table GROUP BY FieldA, FieldB having Count(*)&gt;1;
+</code></pre>
+
+<p>We can then update the original <code>Table</code> to set all duplicate <code>FieldA, FieldB</code> to <code>NULL</code> except for the one with the lowest id (which we saved in the <code>tmp_fix</code> table):</p>
+
+<pre><code>UPDATE Table t 
+LEFT JOIN tmp_fix f ON t.FieldA = f.FieldA AND t.fieldB = f.FieldB
+SET t.FieldA = NULL, t.fieldB = NULL
+WHERE t.id &lt;&gt; f.id;
+</code></pre>
+
+<p>You might want to make a copy of the <code>Table</code> before trying this!</p>

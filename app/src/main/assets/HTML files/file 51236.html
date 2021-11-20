@@ -1,0 +1,22 @@
+<p>There's a couple of issues there.</p>
+
+<p>The easier one is that <code>A::x</code> is malformed: You want a pointer to a member, and that requires the address-of operator. <code>doSomething(&amp;myA, &amp;A::x)</code> will work fine.</p>
+
+<p>The second one is trickier, since there's no way in C++ to form a pointer to a member of a member. Unless you want to do hacky, non-type-safe stuff with <code>offsetof</code>, you'll need something more powerful than a pointer. For instance, you could pass in a lambda which returns a reference to the member:</p>
+
+<pre><code>template &lt;typename TAccessor&gt;
+void doSomething(A *a, TAccessor accessor){
+
+    accessor(a) = 5;
+}
+
+int main()
+{
+    A myA;
+    doSomething(&amp;myA, [](A* a)-&gt;int&amp;{ return a-&gt;b.y; });
+}
+</code></pre>
+
+<p>Obviously that leaves something to be desired, readability-wise.</p>
+
+<p>EDIT: Oh, and if your eventual solution is based on member pointers, take 101010's advice and make the template parameter specifically a member pointer template parameter. Not only is it possibly more efficient, it's more self-documenting, and compiler errors if you mess up will be ten times clearer.</p>

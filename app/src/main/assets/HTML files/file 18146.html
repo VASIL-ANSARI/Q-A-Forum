@@ -1,0 +1,18 @@
+<p>I dunno why I didn't think of this sooner, but if I wrap my entire captureOutput:didOutput... method in an async call to the main thread, even though it seems kind of non-ideal, turning off sampleBuffer processing works as expected. I guess it makes sense; my touch event always comes from the main thread, and since I don't have a handle on which thread was used in my buffer output queue, the only way (that I can see) to reliably check isRecording is to do so from the main thread too.</p>
+
+<pre><code>- (void)captureOutput:(AVCaptureOutput *)captureOutput did... {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!isRecording) {
+            return;
+        }
+
+        NSLog(@"processing!");
+
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+            // do actual processing
+        });
+    });
+}
+</code></pre>
+
+<p>If anyone has any other suggestions though I'd love to hear 'em. Thanks!</p>

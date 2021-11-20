@@ -1,0 +1,51 @@
+<p>You might be better to use the <a href="http://www.opennetcf.com/Products/SmartDeviceFramework/tabid/65/Default.aspx" rel="nofollow">Smart Device Framework</a> which has a battery control in place..see here for the download link for the community edition.</p>
+
+<p><strong>Edit:</strong> If you still want the pinvoke equivalent of the structure look here:</p>
+
+<pre>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct BATT_ID
+{
+    [System.Runtime.InteropServices.MarshalAsAttribute(System.Runtime.InteropServices.UnmanagedType.ByValArray, SizeConst = 8, ArraySubType = System.Runtime.InteropServices.UnmanagedType.I8)]
+      public int[] nBattId;
+};
+</pre>
+
+<p>Then prior to p/invoking, you need the signature for the '<a href="http://pinvoke.net/default.aspx/coredll/DeviceIOControl.html" rel="nofollow">DeviceIoControl</a>' as shown:</p>
+
+<pre>
+[DllImport("coredll.dll", EntryPoint="DeviceIoControl", SetLastError=true)]
+        internal static extern int DeviceIoControlCE(
+            int hDevice, 
+            int dwIoControlCode, 
+            byte[] lpInBuffer, 
+            int nInBufferSize, 
+            byte[] lpOutBuffer, 
+            int nOutBufferSize, 
+            ref int lpBytesReturned, 
+            IntPtr lpOverlapped);
+</pre>
+
+<p>The call would look like this:</p>
+
+<pre>
+IntPtr ptr = IntPtr.Zero;
+BATT_ID battId;
+int sz = Marshal.SizeOf(battId.GetType());
+ptr = Marshal.AllocHGlobal(sz);
+Marshal.StructureToPtr((BATT_ID)battId, ptr, false);
+byte[] pBattId = ptr.ToPointer();
+out int bytesReturned = 0;
+DeviceIoControl(handle, IOCONTROL_ID, null, 0, pBattId, sz, ref bytesReturned, IntPtr.Zero);
+battId = Marshal.PtrToStructure(ptr, battId.GetType());
+Marshal.FreeHGlobal(ptr);
+</pre>
+
+<p>I hope I have this right...</p>
+
+<p><strong>Edit#2:</strong> As <strong><em>ctacke</em></strong> (thanks!) pointed out my code sample is wrong...</p>
+
+<pre>
+unsigned byte[8] battId;
+DeviceIoControl(g_hDevice, SOMO650_PWR_GET_BATT_ID, null, 0, battId, Marshal.SizeOf(battId), ref bytesReturned, IntPtr.Zero);
+</pre>

@@ -1,0 +1,52 @@
+<p>At last problem solved! AsyncTask was not running because of it's behavior changed through Android version.
+I have add the following code </p>
+
+<pre><code>if (android.os.Build.VERSION.SDK_INT &gt;= 9)
+            myTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        else
+            myTask.execute(); 
+</code></pre>
+
+<p>I found the solution here <a href="http://www.jayway.com/2012/11/28/is-androids-asynctask-executing-tasks-serially-or-concurrently/" rel="nofollow">Android's AsyncTask executing tasks</a>.
+Another discussion <a href="http://stackoverflow.com/questions/9119627/android-sdk-asynctask-doinbackground-not-running-subclass">Android SDK AsyncTask doInBackground not running (subclass)</a></p>
+
+<p>Here is the changes I made...</p>
+
+<pre><code>private void registerInBackground() {
+        context = this.cordova.getActivity();
+         AsyncTask&lt;Void,Void,String&gt; myTask = new AsyncTask&lt;Void, Void, String&gt;() {
+             @Override
+             protected String doInBackground(Void... params) {
+                // if (android.os.Build.VERSION.SDK_INT &gt; 9) {  
+                //     StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();  
+                //     StrictMode.setThreadPolicy(policy);  
+                // }
+                Log.d(TAG,"Running AsyncTask");
+                String msg = "";
+                try {
+                    if (gcm == null) {
+                        gcm = GoogleCloudMessaging.getInstance(context);
+                    }
+                    regid = gcm.register(SENDER_ID);
+                    msg = "Device registered, registration ID=" + regid;
+                    Log.d(TAG, "Registration Id : " + regid);
+                    //sendRegistrationIdToBackend();
+                    storeRegistrationId(context, regid);
+                } catch (IOException ex) {
+                    msg = "Error :" + ex.getMessage();
+                    Log.d(TAG, "registerInBackground catch : " + msg);
+                    // If there is an error, don't just keep trying to register.
+                    // Require the user to click a button again, or perform
+                    // exponential back-off.
+                }
+                 return msg;
+            }
+        };
+        if (android.os.Build.VERSION.SDK_INT &gt;= 9)
+            myTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        else
+            myTask.execute();
+    }
+</code></pre>
+
+<p>It will help someone.</p>

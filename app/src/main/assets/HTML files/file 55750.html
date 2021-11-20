@@ -1,0 +1,33 @@
+<p>For Performance improvement you can have the Filter Conditions in the Join Clause, instead of where clause. In this case each join will restrict the results to even lesser number of rows.</p>
+
+<pre><code>        SELECT PA.PERSON_ID,
+           PA.PERSON_ACCOUNT_ID,
+           DR.DISBURSEMENT_REQUEST_ID,
+           SUM
+           (  
+                ISNULL(CD.EE_PRE_TAX_AMT,0) + 
+                ISNULL(CD.EE_ADDL_PRE_TAX_AMT,0)
+           ) AS EE_PRE_TAX_CONTRIB,
+           DD.PRE_TAX_AMOUNT AS DISB_DTL_PRE_TAX_AMOUNT,
+           SUM
+           (     ISNULL(CD.EE_POST_TAX_AMT,0) + 
+                 ISNULL(CD.EE_ADDL_POST_TAX_AMT,0)
+           ) AS EE_POST_TAX_CONTRIB,
+           DD.POST_TAX_AMOUNT AS DISB_DTL_POST_TAX_AMOUNT
+           FROM SGT_DISBURSEMENT_REQUEST DR
+           INNER JOIN SGT_DISBURSEMENT_DETAIL DD ON     DR.DISBURSEMENT_REQUEST_ID = DD.DISBURSEMENT_REQUEST_ID AND DR.REQUEST_CATEGORY_VALUE = 'REFD' AND
+                 DD.DETAIL_CATEGORY_VALUE = 'REFD' AND DR.DISBURSEMENT_STATUS_VALUE &lt;&gt; 'CANL'
+           INNER JOIN SGT_PERSON_ACCOUNT PA ON PA.PERSON_ACCOUNT_ID = DR.PERSON_ACCOUNT_ID
+           INNER JOIN SGT_CONTRIB_DTL CD ON CD.PERSON_ACCOUNT_ID = PA.PERSON_ACCOUNT_ID AND CD.STATUS_VALUE = 'VALD' AND
+                 CD.POSTED_DATE &lt;= DR.ACCEPTED_TO_PAYROLL_DATE
+           WHERE EXISTS
+                (
+                    SELECT 1 FROM SGT_DISBURSEMENT_REQUEST SDR1 
+                    INNER JOIN SGT_DISBURSEMENT_DETAIL SDD1 ON SDD1.DISBURSEMENT_REQUEST_ID = SDR1.DISBURSEMENT_REQUEST_ID
+                    WHERE SDR1.PERSON_ACCOUNT_ID = DR.PERSON_ACCOUNT_ID and SDD1.DETAIL_CATEGORY_VALUE = DD.DETAIL_CATEGORY_VALUE
+                    GROUP BY SDR1.PERSON_ACCOUNT_ID 
+                    HAVING COUNT(*) = 1
+                )
+           GROUP BY 
+                PA.PERSON_ID, PA.PERSON_ACCOUNT_ID, DR.DISBURSEMENT_REQUEST_ID, DD.PRE_TAX_AMOUNT, DD.POST_TAX_AMOUNT
+</code></pre>

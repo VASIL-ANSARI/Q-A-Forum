@@ -1,0 +1,66 @@
+<p>This link gives you the full reference to all RESTConf Api's for ODL: <a href="https://wiki.opendaylight.org/view/OpenDaylight_Controller%3aMD-SAL%3aModel_Reference" rel="nofollow">OpenDaylight_Controller:MD-SAL:Model_Reference</a></p>
+
+<p>Another good place to start is here: <a href="https://wiki.opendaylight.org/view/OpenDaylight_OpenFlow_Plugin%3aUser_Guide" rel="nofollow">OpenDaylight OpenFlow Plugin:User Guide</a></p>
+
+<p>For instance, if you want to find the topology you have to send a GET request to:
+http://:8080/restconf/operational/network-topology:network-topology/topology/flow:1/</p>
+
+<p>So, the URN name space tells you what module/bundle in the ODL controller you want to talk to..
+Another example is http://:8080/restconf/operational/opendaylight-inventory:nodes/node/openflow:1, which will give you information about the openflow node 'openflow:1'..</p>
+
+<p>If you want to push something, such as openflow rules, just attach the XML body to the PUT together with headers Content-Type' : 'application/xml' and 'Accept':'application/xml.
+This is the 'lib' I have created in python for my application. You might find some inspiration.</p>
+
+<pre><code>import sys
+import json
+import httplib2
+
+#Base URLs for Config and operational
+baseUrl = 'http://192.168.231.246:8080'
+confUrl = baseUrl + '/restconf/config/'
+operUrl = baseUrl + '/restconf/operational/'
+
+#"Old" REST APIs that still are used
+sdSalUrl = baseUrl + '/controller/nb/v2/'
+
+#Specific REST URLs
+findNodes = operUrl + '/opendaylight-inventory:nodes/'
+findTopo = operUrl + '/network-topology:network-topology/'
+findNodeConnector = operUrl + '/opendaylight-inventory:nodes/node/node-connector/'
+findTopology = operUrl + '/network-topology:network-topology/topology/flow:1/'
+findFlow = confUrl +'/opendaylight-inventory:nodes/node/openflow:1/table/0/'
+
+h = httplib2.Http(".cache")
+h.add_credentials('admin', 'admin')
+
+#Functions for  
+def get(url):
+    resp, xml = h.request(
+        url,
+        method = "GET",
+        headers = {'Content-Type' : 'application/xml'}
+        )
+    return xml
+def put(url, body):
+    resp, content = h.request(
+        url, 
+        method = "PUT",
+        body = body,
+        headers = {'Content-Type' : 'application/xml', 'Accept':'application/xml'}
+        )
+    return resp, content
+def delete(url):
+    resp, content = h.request(
+        url,
+        method = "DELETE"
+        )
+    return resp
+
+def get_active_hosts():
+    resp, content = h.request(sdSalUrl + 'hosttracker/default/hosts/active/', "GET")
+    hostConfig = json.loads(content)
+    hosts = hostConfig['hostConfig']
+    return hosts
+</code></pre>
+
+<p>Oh, and by the way. One of the OVSDB devs from ODL answered something similar here earlier: <a href="http://stackoverflow.com/questions/22018227/add-a-flow-in-opendaylight-using-java-api/22628225#22628225">networkstatic's answer</a></p>

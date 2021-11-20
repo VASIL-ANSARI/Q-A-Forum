@@ -1,0 +1,41 @@
+<p><em><strong><code>foreach</code></em></strong></p>
+
+<p>I would say it's both about performance and compatibility</p>
+
+<ul>
+<li>If you had chosen <code>foreach</code> to use <code>IEnumerable</code> it would have made all generic
+collections iteration very slow for value-types <code>T</code> (because of
+boxing/unboxing).</li>
+<li>If you had chosen to use <code>IEnumerable&lt;T&gt;</code> iterating over <code>ArrayList</code> and
+all non-generic collections from early .NET version would have not been
+possible.</li>
+</ul>
+
+<p>I think the design decision was good. When <code>foreach</code> was introduced (.NET 1.1) there was nothing about generics in .NET (they were introduced in .NET 2.0). Choosing <code>IEnumerable</code> as a source of <code>foreach</code> enumeration would make using it with generic collections poor or would require a radical change. I guess designers already knew that they were going to introduce generics not that long time later.</p>
+
+<p>Additionaly, declaring it as <em>use <code>IEnumerable&lt;T&gt;</code> when it's available or <code>IEnumerable</code> when it's not</em> is not much different then <em>use available <code>GetEnumerator</code> method or do not compile when it's not available</em>, is it?</p>
+
+<p><em>update</em></p>
+
+<p>As @mikez mentioned in comments, there is one more advantage. When you don't expect <code>GetEnumerator</code> to return <code>IEnumerator</code>/<code>IEnumerator&lt;T&gt;</code> you can return <code>struct</code> and don't worry about boxing when the enumerator is used by loop.</p>
+
+<p><em><strong>LINQ</em></strong></p>
+
+<p>The same <em>magic methods</em> situation occurs when you use LINQ and syntax based queries. When you write</p>
+
+<pre><code>var results = from item in source
+              where item != "test"
+              select item.ToLower();
+</code></pre>
+
+<p>it's transformed by compiler into</p>
+
+<pre><code>var results = source.Where(x =&gt; x != "test")
+                    .Select(x =&gt; x.ToLower());
+</code></pre>
+
+<p>And because that code would work no matter what interface <code>source</code> implement the same applies to syntax-based query. As long as after transforming it to method-based query every method call can be properly assigned by compiler everything is OK.</p>
+
+<p><em><strong>async/await</em></strong></p>
+
+<p>I'm not that sure but think the same thing applies to <code>async</code>/<code>await</code>. When you use these keywords compiler generates a bunch of code for yourself, which is then compiled as if you'd written the code by yourself. And as long as code made by that transformation can be compiled everything is OK.</p>

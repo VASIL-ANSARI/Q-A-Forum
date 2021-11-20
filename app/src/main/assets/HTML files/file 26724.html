@@ -1,0 +1,67 @@
+<p>Unfortunately,</p>
+
+<pre><code>sprintf( str, "%d,%d,%d,%d,%d,%d,%d,%d", sample[i++],sample[i++],sample[i++],
+           sample[i++],sample[i++],sample[i++],sample[i++],sample[i++]);
+</code></pre>
+
+<p>won't work; since the order in which function arguments are evaluated is unspecified, it's not guaranteed that each <code>sample[i++]</code> will be evaluated from left to right, nor is it guaranteed that the side effect of <code>++</code> is applied immediately after each <code>i++</code> is evaluated.  The behavior of this code is <em>undefined</em>, meaning the result is not predictable.  </p>
+
+<p><strike>Unfortunately, there's no good way to do what you're asking within a single <code>sprintf</code> call.  You will either have to specify each index explicitly, as you do in</p>
+
+<pre><code>sprintf( str, "%d,%d,%d,%d,%d,%d,%d,%d", sample[0],sample[1],sample[2],sample[3],
+           sample[4],sample[5],sample[6],sample[7]);
+</code></pre>
+
+<p>or you'll have to write something different, like</p>
+
+<pre><code>strcpy( str, "" );
+for ( size_t i = 0; i &lt; 8; i++ )
+{
+  char tmp[4] = {0};
+  char *empty = "";
+  char *comma = ",";
+  char *sep = empty;
+
+  sprintf( tmp, "%s%d", sep, samples[i] );
+  strcat( str, tmp );
+  sep = comma;
+}
+</code></pre>
+
+<p>Yuck, I know.  Frankly, you're better off just specifying each index manually in a single <code>sprintf</code> call.  </strike></p>
+
+<p>Serves me right for not paying better attention.  If you just need to print a row of 8 samples to standard output at a time, this will be <em>much</em> simpler:</p>
+
+<pre><code>for ( j = 0; j &lt; 64; j++ )
+{
+  printf( "%d", samples[ j * 8 ] );
+
+  for ( k = 1; k &lt; 8; k ++ )
+  {
+    printf( ",%d", sep, samples[ j * 8 + k ] );
+  }
+  putchar( '\n' );
+}        
+</code></pre>
+
+<p><strong>Edit</strong></p>
+
+<pre><code>for ( j = 0; j &lt; 63; j++ )
+{
+    sprintf( str, "%d,%d,%d,%d,%d,%d,%d,%d,", 
+      samples[ j * 8 ],     samples[ j * 8 + 1 ], samples[ j * 8 + 2 ],
+      samples[ j * 8 + 3 ], samples[ j * 8 + 4 ], samples[ j * 8 + 5 ],
+      samples[ j * 8 + 6 ], samples[ j * 8 + 7 ] );
+
+    // send str
+}        
+
+sprintf( str, "%d,%d,%d,%d,%d,%d,%d,%d", 
+  samples[ j * 8 ],     samples[ j * 8 + 1 ], samples[ j * 8 + 2 ],
+  samples[ j * 8 + 3 ], samples[ j * 8 + 4 ], samples[ j * 8 + 5 ],
+  samples[ j * 8 + 6 ], samples[ j * 8 + 7 ] );
+
+// send str
+</code></pre>
+
+<p>Special case for the last row, since I'm assuming you don't want a trailing comma after the last sample.  </p>

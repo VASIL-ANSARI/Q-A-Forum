@@ -1,0 +1,43 @@
+<p>Besides the fact that your problem description is very terse, the problem seems to be your assumptions about what is returning what.</p>
+
+<p>The function d3.json() is an asynchronous function that directly returns (with an undefined value I assume). Only when the data is received from the backend, the callback function you passed to it will be called. Obviously the context is different here and the return value of your callback will not automatically become the return value of d3.json (as this one has returned "long" before already).</p>
+
+<p>What you want to do is probably something like:</p>
+
+<pre><code>    var jsondata;
+    d3.json(dataPath, function(dataFromServer) {
+      jsondata = dataFromServer;
+    }
+    console.log(jsondata);
+</code></pre>
+
+<p><strong>Update 1:</strong>
+Obviously, the above example is still not fully correct. The call to console.log() is made directly after the d3.json() returned. Thus, the server might not have sent the reply fully yet. Therefore, you can only access data when the callback is returned. Fixed example:</p>
+
+<pre><code>    var jsondata;
+
+    function doSomethingWithData() {
+      console.log(jsondata);
+    }
+
+    d3.json(dataPath, function(dataFromServer) {
+      jsondata = dataFromServer;
+      doSomethingWithData();
+    }
+</code></pre>
+
+<p>For a (somewhat stupid, but) working example see: <a href="http://jsfiddle.net/GhpBt/10/">http://jsfiddle.net/GhpBt/10/</a></p>
+
+<p><strong>Update 2:</strong>
+The above example demonstrates in which order the code is executed but does not really deserve a price for most beautiful code. I myself would not use this "global" variable and simplify the above example to:</p>
+
+<pre><code>    function doSomethingWithData(jsondata) {
+      console.log(jsondata);
+    }
+
+    d3.json(dataPath, doSomethingWithData);
+</code></pre>
+
+<p>Note how doSomethingWithData is directly passed to d3.json in stead of calling it separately in an anonymous inner function. </p>
+
+<p><strong>Note:</strong> This is not a particular problem of d3.js. Basically, all javascript functions that are asynchronous are likely to behave in a similar way. If they return something, it will not be the return value of the passed callback.</p>

@@ -1,0 +1,91 @@
+<p>It cannot be done in this example. Enum family is the index in vertex container in the graph. So by removing Rick would John become be Rick.</p>
+
+<p>However if the definition of the graph is changed to use values of enum a solution would be following.</p>
+
+<pre><code>enum family { Jeanie, Debbie, Rick, John, Amanda, Margaret, Benjamin, N };
+const char *name[] = { "Jeanie", "Debbie", "Rick", "John", "Amanda",
+                       "Margaret", "Benjamin"
+                     };
+typedef boost::adjacency_list &lt;boost::vecS
+                             , boost::vecS
+                             , boost::bidirectionalS
+                             , family&gt; Graph;
+
+struct VisitorBFS : public boost::default_bfs_visitor {
+    VisitorBFS(
+        std::vector&lt;boost::graph_traits&lt;Graph&gt;::vertex_descriptor&gt;&amp; container
+    )
+    : container(container) {}
+
+    template &lt;class Vertex, class Graph&gt;
+    void discover_vertex(const Vertex&amp; v, const Graph&amp; g) const
+    {
+        container.push_back(v);
+    }
+
+    std::vector&lt;boost::graph_traits&lt;Graph&gt;::vertex_descriptor&gt;&amp; container;
+};
+
+void printFamily(const Graph&amp; g)
+{
+    using namespace boost;
+    graph_traits &lt;Graph&gt;::vertex_iterator i, end;
+    graph_traits &lt;Graph&gt;::adjacency_iterator ai, a_end;
+
+    for (boost::tie(i, end) = vertices(g); i != end; ++i) {
+        std::cout &lt;&lt; name[g[*i]];
+        boost::tie(ai, a_end) = adjacent_vertices(*i, g);
+        if (ai == a_end)
+            std::cout &lt;&lt; " has no children";
+        else
+            std::cout &lt;&lt; " is the parent of ";
+        for (; ai != a_end; ++ai) {
+            std::cout &lt;&lt; name[g[*ai]];
+            if (boost::next(ai) != a_end)
+                std::cout &lt;&lt; ", ";
+        }
+        std::cout &lt;&lt; std::endl;
+    }
+}
+
+int main()
+{
+    using namespace boost;
+
+    Graph g;
+    add_vertex(Jeanie, g);
+    add_vertex(Debbie, g);
+    add_vertex(Rick, g);
+    add_vertex(John, g);
+    add_vertex(Amanda, g);
+    add_vertex(Margaret, g);
+    add_vertex(Benjamin, g);
+
+    add_edge(Jeanie, Debbie, g);
+    add_edge(Jeanie, Rick, g);
+    add_edge(Jeanie, John, g);
+    add_edge(Debbie, Amanda, g);
+    add_edge(Rick, Margaret, g);
+    add_edge(John, Benjamin, g);
+
+    printFamily(g);
+
+    // Rick and his family left - I want to remove them from the chart
+
+    // First, find a subgraph from vertex Rick. Algorithm breadth_first_search
+    // also goes through the start vertex, so Rick is included in result.
+    std::vector&lt;graph_traits&lt;Graph&gt;::vertex_descriptor&gt; vertexes;
+    breadth_first_search(g, Rick, visitor(VisitorBFS(vertexes)));
+
+    // Then remove incoming edges because they are not removed automatically
+    // along with vertexes, then remove vertexes. 
+    for (std::vector&lt;graph_traits&lt;Graph&gt;::vertex_descriptor&gt;::iterator it = vertexes.begin(); it != vertexes.end();  ++it) {
+        clear_in_edges(*it, g);
+        remove_vertex(*it, g);
+    }
+
+    printFamily(g); 
+
+    return 0;
+}
+</code></pre>

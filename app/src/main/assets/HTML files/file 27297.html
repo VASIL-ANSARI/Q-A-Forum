@@ -1,0 +1,43 @@
+<p>Here's one way of doing it: Assuming you have a signal of NSNumbers representing the current value of each wheel on the lock and a <code>successIndicator</code> indicating whether or not the combination is correct:</p>
+
+<pre><code>NSArray *correctCombination = @[@1, @2, @3, @4)];
+RACSignal *currentCombination = [RACSignal combineLatest:@[digit1, digit2, digit3, digit4];
+
+RACSignal *(^hasCorrectValue)(NSUInteger idx) ^(NSUInteger idx){
+    return [currentCombination map:^(RACTuple *currentCombination) {
+        return [currentCombination[idx] isEqual:correctCombination[idx]];
+    }];
+};
+
+__block RACSignal *(^hasUnlockedStage)(NSUInteger idx) = ^(NSUInteger idx){
+    if (idx == 0) return hasCorrectValue(idx);
+    else return [hasCorrectValue(idx) and:hasUnlockedStage(idx - 1)];
+};
+
+[hasUnlockedStage(0) setKeypath:@keypath(wheel2, enabled) onObject:wheel2];
+[hasUnlockedStage(1) setKeypath:@keypath(wheel3, enabled) onObject:wheel3];
+[hasUnlockedStage(2) setKeypath:@keypath(wheel4, enabled) onObject:wheel4];
+[hasUnlockedStage(3) setKeypath:@keypath(successIndicator, active) onObject:successIndicator];
+
+hasUnlockedStage = nil; // nil out recursive block
+</code></pre>
+
+<p>The middle part, where the logic happens, is very similar to the non-reactive:</p>
+
+<pre><code>BOOL(^hasCorrectValue)(NSUInteger idx) ^(NSUInteger idx){
+   return [[views[idx] currentValue] isEqual:[correctCombination[idx] currentValue]];
+};
+
+__block BOOL(^hasUnlockedStage)(NSUInteger idx) = ^(NSUInteger idx){
+    if (idx == 0) return hasCorrectValue(idx);
+    else return hasCorrectValue(idx) &amp;&amp; hasUnlockedStage(idx - 1);
+};
+</code></pre>
+
+<p>Once all the inputs are represented as signals, we can proceed roughly as we would in standard Objective-C, substituting the RAC operations (which operate on streams of values) for normal operations (which operate on values).</p>
+
+<p>Each operation represents a step transforming a stream of values into another stream of values. Each step results in a new signal which represents a further step converting our initial stream of values into the stream of values we want.</p>
+
+<p>Relatedly, the last operation has no output signal, and is only place where we cause any side-effects. It's good practice to separate the logic that transforms and combines values and the logic that performs side-effects. This way, we can add additional observers to the locked signal, or refactor the code affecting locked without worrying about unintended consequences.</p>
+
+<p>A nice next exercise would be to handle changes to the correct combination, or the number of wheels on the lock.</p>

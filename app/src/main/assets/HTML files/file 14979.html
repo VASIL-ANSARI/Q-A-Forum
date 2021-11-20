@@ -1,0 +1,46 @@
+<p>From my understanding, you're looking for the way to "save" the generator state at some point and then "restore" it. Using <code>tee</code> is the correct idea, <a href="http://www.python.org/dev/peps/pep-0323/" rel="nofollow">PEP 0323</a> has more info on this.</p>
+
+<pre><code>import itertools
+
+lst = range(10)
+it = iter(lst)
+
+while True:
+    print it.next(), '&gt;&gt;',
+    it, saved = itertools.tee(it)
+    for subitem in it:
+        print subitem,
+    it = saved
+    print
+</code></pre>
+
+<p>Update:</p>
+
+<pre><code>import itertools
+
+class fancy_it(object):
+    stack = []
+
+    def __init__(self, iterable=None):
+        if not iterable:
+            prev = fancy_it.stack[-1]
+            prev.it, iterable = itertools.tee(prev.it)
+        self.it = iter(iterable)
+
+    def __iter__(self):
+        fancy_it.stack.append(self)
+        try:
+            while True:
+                yield self.it.next()
+        except StopIteration:
+            fancy_it.stack.pop()
+            raise StopIteration
+
+
+for x in fancy_it(range(10)):
+    print x
+    for y in fancy_it():
+        print '**', y
+        for z in fancy_it():
+            print '****', z
+</code></pre>

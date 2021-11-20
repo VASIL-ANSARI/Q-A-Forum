@@ -1,0 +1,91 @@
+<p><strong>EDIT:</strong> Rewritting my answer to make it clearer</p>
+
+<p>The problem is that the options in the select dropdown don't contain any texts, when the select dropdown is closed. You only get to see which option is selected:</p>
+
+<pre><code>&lt;select class="para_small" name="" size="20" data-index="75"&gt;
+&lt;option value="/aa/en/gen/df.aspx?refid=df&amp;s=gen&amp;~ck=cr"&gt;&lt;/option&gt;
+&lt;option value="/al/en/gen/df.aspx?refid=df&amp;s=gen&amp;~ck=cr"&gt;&lt;/option&gt;
+&lt;option value="/dz/fr/gen/df.aspx?refid=df&amp;s=gen&amp;~ck=cr"&gt;&lt;/option&gt;
+...
+&lt;option value="/in/en/gen/df.aspx?refid=df&amp;s=gen" selected="selected"&gt;&lt;/option&gt;
+...
+&lt;/select&gt;
+</code></pre>
+
+<p>What you need to do is to click and open that dropdown again, after you select "India" and the page gets reloaded.</p>
+
+<p>This is how you can do it:</p>
+
+<pre><code>// the fix
+driver.findElement(By.xpath("//a[@class='ctryName']")).click();
+// end of fix
+</code></pre>
+
+<p>And here is your full code with my fix to show you where it is done:</p>
+
+<pre><code>import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+public class DellDropdown {
+
+    public static void main(String[] args)
+    {
+        WebDriver driver=new FirefoxDriver();
+        driver.manage().timeouts().implicitlyWait(20, TimeUnit.SECONDS);
+        WebDriverWait wait = new WebDriverWait(driver, 30);
+        driver.get("http://www.dell.com/");
+        driver.findElement(By.xpath("//a[@class='ctryName']")).click();
+        WebElement countryDropdown=driver.findElement(By.xpath("//select[@class='para_small']"));
+        Select selectElement = new Select(countryDropdown);
+        selectElement.selectByVisibleText("India");
+        if(driver.findElement(By.xpath("//a[@class='ctryName' and text()='India']")).getText().equals("India")){
+            System.out.println("The dropdown is changed to india");
+        }
+
+        // the fix
+        driver.findElement(By.xpath("//a[@class='ctryName']")).click();
+        // end of fix
+
+        WebElement selectedCountryDropdown=driver.findElement(By.xpath("//select[@class='para_small']"));
+        selectElement = new Select(selectedCountryDropdown);
+        List&lt;WebElement&gt; options=selectElement.getOptions();
+        for(int i=0;i&lt;options.size();i++){
+            WebElement option=options.get(i);
+            String countryName=option.getText();
+            boolean selectedValue=option.isSelected();
+            System.out.print(countryName);
+            System.out.println(selectedValue);
+        }
+        driver.close();
+    }
+}
+</code></pre>
+
+<p><strong>NOTE: Make sure you don't interfere with the brower while the test is running, otherwise your mouse movement will generate an <code>onmouseout</code> event and the dropdown will close and the text values will disappear!</strong></p>
+
+<p><strong>EDIT:</strong> To make sure the select dropdown stays open, you can move the mouse to that dropdown in each iteration of the options loop. However that solution slows down the code, so you have to choose what suits you best.</p>
+
+<p>Moving the mouse in the "for" loop:</p>
+
+<pre><code>    for(int i=0;i&lt;options.size();i++){
+        //fix
+        Actions mouseAction = new Actions(driver);
+        mouseAction.moveToElement(selectedCountryDropdown).build().perform();
+        //end of fix
+
+        WebElement option=options.get(i);
+        String countryName=option.getText();
+        boolean selectedValue=option.isSelected();
+        System.out.print(countryName);
+        System.out.println(selectedValue);
+    }
+</code></pre>

@@ -1,0 +1,45 @@
+<p>How do you instantiate and use your callback?  A callback must remain in scope for the lifetime it may be called.  See <a href="http://stackoverflow.com/questions/4505839/python-ctypes-weird-behavior/4506098#4506098">this answer</a>.  These </p>
+
+<hr>
+
+<p><strong>Edit</strong></p>
+
+<p>Clarifying what I think the issue is...</p>
+
+<p>I see you have to implement a <code>DOKAN_OPERATIONS</code> structure that implements callbacks like <code>FindFilesWithPattern</code>, then call <code>DokanMain</code> with that structure to mount the filesystem.  When you fill out the structure you should be creating a type for the callback, then instantiating the callback with a Python function. Something like (pseudocode):</p>
+
+<pre><code>#Create the callback pointer type
+PFINDFILESWITHPATTERN = ctypes.WINFUNCTYPE(ctypes.c_int,
+                                          ctypes.c_wchar_p,
+                                          ctypes.c_wchar_p,
+                                          PFillFindData,
+                                          PDOKAN_FILE_INFO) 
+
+# Implement in Python
+def FindFilesWithPatternImpl(...):
+    # implementation
+
+# Create a callback pointer object
+FindFilesWithPattern = PFINDFILESIWTHPATTERN(FindFilesWithPatternImpl)
+
+# Create the required structure listing the callback
+dokan_op = DOKAN_OPERATIONS(...,FindFilesWithPattern,...)
+
+# Register the callbacks
+DokanMain(byref(dokan_op))
+</code></pre>
+
+<p>You must keep a reference to object <code>dokan_op</code> for the lifetime the callback could be used.  If you implement mounting Dokan similar to below:</p>
+
+<pre><code>def mount():
+    # Create structure locally
+    dokan_op = DOKAN_OPERATIONS(...)
+    # Spin off thread to mount Dokan
+    threading.Thread(DokanMain,args=(byref(dokan_op),))
+
+mount()
+</code></pre>
+
+<p>Once <code>mount()</code> returns <code>dokan_op</code> will be destructed.  This is the scenario described by my original answer and would cause the error you are seeing.  I'm theorizing your problem since I don't know what the rest of the code looks like, but I think the way you've implemented <code>FindFilesWithPattern</code> in Python is correct, esp. since you say it works intermittently.  I've had the failure you're seeing before and the above scenario or something like it <em>will</em> cause the error you're seeing.</p>
+
+<p>Hope this helps...</p>

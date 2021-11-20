@@ -1,0 +1,34 @@
+<p>Assuming that your original list is sorted (if it is not, make it so it is), you could loop through your original list and check whether adjacent items are consecutive (i.e. whether the start times have a distance of exactly 30 minutes). Always keep track of the first item in the current series of consecutive timeslots - once you reach four of them (with 4 consecutive 30 minutes timeslots adding up to a possible two-hour timeslot; other timeslot sizes obviously require different factors), save a new two-hour timeslot into your resulting list and update your reference to the beginning of the current series of consecutive items.</p>
+
+<p>Untested, so please consider this as pseudocode:</p>
+
+<pre><code>var twoHourSlots = new List&lt;DateTime&gt;();
+int consecutiveSlotsCount = 0;
+DateTime? previousSlot;
+foreach (DateTime smallSlotStart in slots) {
+    if (previousSlot.HasValue) {
+        if (smallSlotStart - previousSlot.Value == new TimeSpan(0, 30, 0)) {
+            consecutiveSlotsCount++;
+        } else {
+            consecutiveSlotsCount = 0;
+        }
+    }
+    if (consecutiveSlotsCount == 4) {
+        twoHourSlots.Add(smallSlotStart - new TimeSpan(1, 30, 0));
+        consecutiveSlots = 0;
+        previousSlot = null;
+    } else {
+        previousSlot = smallSlotStart;
+    }
+}
+</code></pre>
+
+<p>Some things to note:</p>
+
+<ul>
+<li>I am using arithmetic operators on <code>DateTime</code> values. Check the <a href="http://msdn.microsoft.com/en-us/library/ff986512%28v=vs.110%29.aspx" rel="nofollow">docs</a> to find out more; they do handy things and often let you work with <a href="http://msdn.microsoft.com/en-us/library/system.timespan%28v=vs.110%29.aspx" rel="nofollow"><code>TimeSpan</code></a> values automatically.</li>
+<li>I am using a <a href="http://msdn.microsoft.com/en-us/library/bk8a3558%28v=vs.110%29.aspx" rel="nofollow"><code>TimeSpan</code> constructor that takes hours, minutes and seconds</a> several times. So that's what the three numbers mean.</li>
+<li>I have declared <code>previousSlot</code>, a variable that keeps track of the last slot looked at (to compare to the current one), as <code>DateTime?</code> (again, check the <a href="http://msdn.microsoft.com/en-us/library/b3h38hb0%28v=vs.110%29.aspx" rel="nofollow">docs</a> if you are not sure what a nullable type is). That is because in the first iteration of the <code>foreach</code> loop, there is no previous slot to look at and the loop has to behave differently.</li>
+<li>Likewise, <code>previousSlot</code> is set to <code>null</code> when we have found a 2-hour slot, as the last 30-minute slot of the found 2-hour slot should not be counted to the next possible 2-hour slot.</li>
+<li>Once four consecutive 30-minute slots have been found, one hour and thirty minutes are subtracted from the beginning of the last one. That is because the thirty minutes after the beginning of the last 30-minute slot will be part of the resulting 2-hour slot.</li>
+</ul>

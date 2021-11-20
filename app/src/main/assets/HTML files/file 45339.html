@@ -1,0 +1,50 @@
+<p>It is not a supported key because the SDK's player does not take into account the alternatives yet, I guess it will soon do. You can go around this limitation by a little method swizzling.</p>
+
+<p>So you need to create a category on DZRTrack and swizzle <code>-[DZRObject supportedInfoKeys]</code> to add the key <code>alternative</code> at the end of the array. This alone will give you a "property" <code>alternative</code> on <code>DZRTrack</code>'s instances which will be a <code>NSDictionary</code> with the content of the JSON.</p>
+
+<p>You can go a little further though and get back full fledge <code>DZRTrack</code> object for the alternative. The SDK when it parse the response from the API seems to, at some point, look for a <code>parseFoo:error:</code> method on the instance. So by putting a method <code>parseAlternative:error:</code> method in your category, you can parse the JSON and get, the DZRTrack object. For this you will need to use a private API of the SDK : <code>+[DZROject objectFromJSON:error:]</code>.</p>
+
+<p>Included is the implementation of the category.</p>
+
+<pre><code>@interface DZRObject (AlternativeTrack)
++ (id)objectFromJSON:(id)JSON error:(NSError **)error;
+@end
+
+@implementation DZRTrack (AlternativeTrack)
++ (void)load
+{
+    static dispatch_once_t once;
+    dispatch_once(&amp;once, ^{
+        Class aClass = [self class];
+
+        SEL original = @selector(supportedInfoKeys);
+        SEL swizzled = @selector(alternativeTrack_supportedInfoKeys);
+
+        Method originalMethod = class_getInstanceMethod(aClass, original);
+        Method swizzledMethod = class_getInstanceMethod(aClass, swizzled);
+
+        BOOL didAddMethod = class_addMethod(aClass, original,
+            method_getImplementation(swizzledMethod),
+            method_getTypeEncoding(swizzledMethod));
+        if (didAddMethod) {
+            class_replaceMethod(aClass, swizzled,
+                method_getImplementation(originalMethod),
+                method_getTypeEncoding(originalMethod));
+        }
+        else {
+            method_exchangeImplementations(originalMethod, swizzledMethod);
+        }
+    });
+}
+
+- (NSArray *)alternativeTrack_supportedInfoKeys
+{
+    return [[self alternativeTrack_supportedInfoKeys] arrayByAddingObject:@"alternative"];
+}
+
+- (id)parseAlternative:(id)JSON error:(NSError **)error
+{
+    return [DZRObject objectFromJSON:JSON error:error];
+}
+@end
+</code></pre>

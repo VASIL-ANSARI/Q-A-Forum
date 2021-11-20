@@ -1,0 +1,25 @@
+<blockquote>
+  <p>If -static-libstdc++ is not used when building for either the shared lib or the app, it works.</p>
+</blockquote>
+
+<p>In general, you should <em>either</em> avoid using <code>-static-libstdc++</code>, <em>or</em> hide all of its symbols to avoid such problems.</p>
+
+<blockquote>
+  <p>So I suspect the problem is related to symbol confusion/duplication between the app &amp; .so.</p>
+</blockquote>
+
+<p>Correct. In particular, the problem is that some symbols are duplicated, while others are not. We've had to <a href="https://cygwin.com/ml/libc-alpha/2011-10/msg00073.html" rel="nofollow">disable</a> <code>STB_GNU_UNIQUE</code> symbols for that reason.</p>
+
+<blockquote>
+  <p>if I have the code load the .so first with (RTLD_LAZY | RTLD_DEEPBIND), and then close it and re-load with only RTLD_LAZY, it also works.</p>
+</blockquote>
+
+<p>That's because <code>dlclose</code> doesn't actually unload the library if you used it. From <code>man dlclose</code>:</p>
+
+<pre><code>The function dlclose() decrements the reference count on the dynamic
+library handle handle.  If the reference count drops to zero and no
+other loaded libraries use symbols in it, then the dynamic library
+is unloaded.
+</code></pre>
+
+<p>You should be able to verify that this is the case by stopping the program in GDB after <code>dlclose</code> and looking at its <code>/proc/$PID/maps</code> -- it's very likely that you'll find that <code>libfunctions.so</code> is still present in memory.</p>

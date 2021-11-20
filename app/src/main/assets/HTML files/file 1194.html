@@ -1,0 +1,100 @@
+<p>Your example could be implemented. But it violates the MVC pattern quite a bit. And if you are doing that anyway you might just as well go with the exact same solution you had in webforms.</p>
+
+<p>When I create html mails I usually create a normal mvc view (with a action on some controller and a view). Then I render that view into a string and send it away. This way you are following the mvc pattern and you get the ability to see the mail in the browser automatically (you can just visit the url to that action. This can of course be restricted in any way you want).</p>
+
+<p>To render a view to a string I use this class:</p>
+
+<pre><code>public class ViewRenderer
+{
+    protected RouteCollection RouteCollection { get; private set; }
+
+    public DefaultViewRenderer()
+        : this(RouteTable.Routes)
+    {
+
+    }
+
+    public DefaultViewRenderer(RouteCollection routeCollection)
+    {
+        RouteCollection = routeCollection;
+    }
+
+    public virtual string RenderViewAsString&lt;TController&gt;(Expression&lt;Action&lt;TController&gt;&gt; action)
+        where TController : Controller
+    {
+        var sb = new StringBuilder();
+        var memWriter = new StringWriter(sb);
+
+        var fakeContext = CreateFakeContext(memWriter);
+
+        var oldContext = HttpContext.Current;
+        HttpContext.Current = fakeContext;
+
+        CreateHtmlHelper(fakeContext).RenderAction(action);
+
+        HttpContext.Current = oldContext;
+
+        memWriter.Flush();
+        memWriter.Dispose();
+        return sb.ToString();
+    }
+
+    protected virtual HttpContext CreateFakeContext(StringWriter memWriter)
+    {
+        var fakeResponse = new HttpResponse(memWriter);
+        var context = new HttpContext(HttpContext.Current.Request, fakeResponse);
+
+        foreach (var key in HttpContext.Current.Items.Keys)
+            context.Items[key] = HttpContext.Current.Items[key];
+
+        foreach (string key in HttpContext.Current.Session.Keys)
+            context.Session[key] = HttpContext.Current.Session[key];
+
+        return context;
+    }
+
+    protected virtual HtmlHelper CreateHtmlHelper(HttpContext fakeContext)
+    {
+        var fakeControllerContext = CreateControllerContext(fakeContext, RouteCollection);
+        return new HtmlHelper(new ViewContext(fakeControllerContext,
+                                                  new FakeView(), new ViewDataDictionary(), new TempDataDictionary()), new FakePage());
+    }
+
+    protected virtual ControllerContext CreateControllerContext(HttpContext fakeContext, RouteCollection routeCollection)
+    {
+        return new ControllerContext(
+            new HttpContextWrapper(fakeContext),
+            routeCollection.GetRouteData(new HttpContextWrapper(HttpContext.Current)), new FakeController());
+    }
+
+    protected class FakeView : IView
+    {
+        public void Render(ViewContext viewContext, TextWriter writer)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    protected class FakeController : Controller
+    {
+
+    }
+
+    protected class FakePage : IViewDataContainer
+    {
+        public ViewDataDictionary ViewData
+        {
+            get { return new ViewDataDictionary(); }
+            set { }
+        }
+    }
+}
+</code></pre>
+
+<p>This uses a fake response that writes the result of the view into a stringbuilder. Then you use this like this:</p>
+
+<pre><code>var viewRenderer = new ViewRenderer();
+var body = viewRenderer.RenderViewAsString&lt;SomeController&gt;(x =&gt; x.ActionThatRendersHtmlMail(parameters));
+</code></pre>
+
+<p>Then you just send the mail with that body text. You can of course wrap this in you own class so you can call EmailTemplate.SubscriptionEmail(); (from your example).</p>

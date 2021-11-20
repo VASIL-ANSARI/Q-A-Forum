@@ -1,0 +1,55 @@
+<p>You have many questions. I try to answer some of them</p>
+
+<blockquote>
+  <p>io.jsonwebtoken.PrematureJwtException: JWT must not be accepted before
+  2016-06-14T10:20:09+0300. Current time: 2016-06-14T10:19:37+0300Â´</p>
+</blockquote>
+
+<p>You are using nbf (not before) attribute in JWT. Do not use it (it is optional) or sets a range of validity given that the clocks of the devices will not be synchronized</p>
+
+<p>From RFC 7519   </p>
+
+<blockquote>
+  <p>The "nbf" (not before) claim identifies the time before which the JWT 
+  MUST NOT be accepted for processing.  The processing of the "nbf"   claim requires that the current date/time MUST be after or equal to  the not-before date/time listed in the "nbf" claim. <strong>Implementers MAY provide for some small leeway, usually no more than a few minutes</strong>, to account for clock skew.  Its value MUST be a number containing a  NumericDate value.  <strong>Use of this claim is OPTIONAL.</strong></p>
+</blockquote>
+
+<p>Signed JWS</p>
+
+<blockquote>
+  <p>Exception: io.jsonwebtoken.UnsupportedJwtException: Signed JWSs are
+  not supported</p>
+</blockquote>
+
+<p>Do you want to validate the signing key at client side or at server side? 
+If you use the JWT for authentication replacing user &amp; password, and you are sending token in each request, you can validate the signature at server side.</p>
+
+<p>If you want to validate the key on the app, do not use a symmetric  key, because it could be a big vulnerability if it fell into the wrong hands. <a href="http://stackoverflow.com/questions/30523238/best-practices-for-server-side-handling-of-jwt-tokens">See</a>. You can use and asymmetric key pair. Sign the JWT in server with the private key and validate on device with public key.</p>
+
+<blockquote>
+  <ol>
+  <li>I don't have the library import javax.xml.bind.DatatypeConverter</li>
+  </ol>
+</blockquote>
+
+<pre><code>String base64 = Base64.encodeToString(data, Base64.DEFAULT);
+byte[] data = Base64.decode(base64, Base64.DEFAULT); 
+</code></pre>
+
+<blockquote>
+  <ol start="2">
+  <li>I don't know how to get the key.</li>
+  </ol>
+</blockquote>
+
+<p>Your key probably was generated on server side in this way</p>
+
+<pre><code> Key key = MacProvider.generateKey(SignatureAlgorithm.HS256);
+ byte data[] = key.getEncoded();
+</code></pre>
+
+<p>Make available the key <code>data[]</code> to client in the way you prefer. Using assymetric keys, you only need to make available the public key.</p>
+
+<pre><code> KeyPair keyPair = RsaProvider.generateKeyPair();
+ byte data[] = keyPair.getPublic().getEncoded();
+</code></pre>

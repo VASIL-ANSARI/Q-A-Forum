@@ -1,0 +1,79 @@
+<p>When dealing with MVVM, your Models(M) are going to be encapsulated in your ViewModel(VM) and exposed to the View(V) only through the methods and properties that you explicitly expose on your ViewModel.  Your ViewModel will function mainly as an adapter between your Model(s) and you View.  All of your logic interacting with your application layer, such as any of the serialization you might need, will also be housed within the ViewModel and separated from any code that is UI specific.  This makes it easier to test your core application code without getting bogged down in things that you don't necessarily care about, such as if something is displayed in a <code>TextBox</code> or a <code>Label</code>.  This is much more preferable over having something like object serialization happening in your <code>xaml.cs</code> file.</p>
+
+<p><strong>For Example:</strong></p>
+
+<p>Consider that your <code>Adventurer</code> class looks something like this:</p>
+
+<pre><code>public class Adventurer { 
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string Rank { get; set; } //Knight, Warlock, Whatever
+}
+</code></pre>
+
+<p>Your <code>MainViewModel</code> might look something like this:</p>
+
+<p>(Don't worry about <code>ViewModelBase</code>, just assume that for the purposes of this example it houses some code which allows your <code>MainViewModel</code> to implement <code>INotifyPropertyChanged</code>, a requirement for getting it to play nice with WPF's binding subsystem)</p>
+
+<pre><code>public class MainViewModel : ViewModelBase {
+
+    // When the ViewModel is created, populate _selectedAdventurer
+    // with an empty Adventurer so that your form has something to  
+    // bind to (and it can also be used as a "New" adventurer)
+    private Adventurer _selectedAdventurer = new Adventurer();
+
+    public string FirstName {
+        get {
+            return _selectedAdventurer.FirstName;
+        }
+        set {
+            _selectedAdventurer.FirstName = value;
+            // The following is implemented in our fictional
+            // ViewModelBase, and essentially raises a notification
+            // event to WPF letting it know that FirstName has changed
+            OnPropertyChanged("FirstName");
+        }
+    }
+
+    /*
+       The remaining properties are implemented in a similar fashion, and in 
+       this simple case are mainly acting as passthroughs to the view plus 
+       a little bit of binding code
+    */
+
+    // These methods will house your save/load logic. I will assume
+    // for simplicity that you already know how to wrap this logic in a
+    // Command that can be bound to the view
+    public void SaveAdventurer() {
+       if(_selectedAdventurer != null) {
+           SerializeToFile(_selectedAdventurer);
+       }
+    }
+
+    public void LoadAdventurer() {
+       _selectedAdventurer = LoadFromFile();
+    }
+
+    private void SerializeToFile(Adventurer adventurer) {
+       // Use your serializer and save to file
+    }
+
+    private Adventurer LoadFromFile() {
+       // Load from file and deserialize into Adventurer
+    }
+
+}
+</code></pre>
+
+<p>Now that you have a basic ViewModel wrapping your Model, you can easily bind UI controls to the properties on your VM once it is set as the <code>DataContext</code> for your view.</p>
+
+<pre><code>&lt;TextBox Text="{Binding FirstName}" /&gt;
+&lt;TextBox Text="{Binding LastName}" /&gt;
+&lt;TextBox Text="{Binding Rank}" /&gt;
+&lt;Button Value="Save" Command="{Binding SaveCommand}" /&gt;
+&lt;Button Value="Load" Command="{Binding LoadCommand}" /&gt;
+</code></pre>
+
+<p>Since you've set up your ViewModel to wrap your Model, and have properly bound the ViewModel properties to your View, when a user enters values into the textbox bound to <code>FirstName</code>, the value in <code>_selectedAdventurer.FirstName</code> will be directly updated with that input.  Essentially, the state of your underlying model will always be in sync with the values displayed in the UI.  Then when a user clicks the button labeled <code>Save</code>, your <code>SaveCommand</code> will execute and that will fire the code serialize the underlying <code>Adventurer</code> into a file, or database, or whatever.</p>
+
+<p>This of course is a very simple example and functions mostly as a data entry form, but hopefully it will help you grasp the concept.  In order to better encapsulate the <code>Adventurer</code> binding logic, you may choose to create a child <code>AdventurerViewModel</code> that will be exposed to the View, rather than putting the properties directly on <code>MainViewModel</code>.  Perhaps you will want to add a property <code>IEnumerable&lt;SaveGameFile&gt; SavegameFiles</code> which you could bind to a <code>DropDownList</code>, and allow users to select which file they want to load.  </p>

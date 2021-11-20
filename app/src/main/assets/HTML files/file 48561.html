@@ -1,0 +1,23 @@
+<p>There are a few possible issues I see right away.</p>
+
+<p>Before starting though, I wanted to mention that prefs() doesn't show the number of requests queued, it shows <em>the number of Request() objects that are alive</em>.  It's possible to reference a request object and keep it alive, even if it's no longer queued to be downloaded.</p>
+
+<p>I don't really see anything in the code you've provided that would cause this, though but you should keep it in mind.</p>
+
+<p>Right off the bat, I'd ask: are you using cookies?  If not, sites which pass around a session ID as a GET variable will generate a new sessionID for each page visit.  You'll essentially continue queuing up the same pages over and over again.  For instance, victorinox.com will have something like "jsessionid=18537CBA2F198E3C1A5C9EE17B6C63AD" in it's URL string, with the ID changing for every new page load.</p>
+
+<p>Second, you may that you're hitting a spider trap.  That is, a page which just reloads itself, with a new infinite amount of links.  Think of a calendar with a link to "next month" and "previous month".  I'm not directly seeing any on victorinox.com, though.</p>
+
+<p>Third, from the provided code your Spider is not constrained to any specific domain.  It will extract every link it finds on every page, running <code>parse_obj</code> on each one.  The main page to victorinox.com for instance has a link to <a href="http://www.youtube.com/victorinoxswissarmy">http://www.youtube.com/victorinoxswissarmy</a>.  This will in turn fill up your requests with tons of YouTube links.</p>
+
+<p>You'll need to troubleshoot more to find out exactly what's going on, though.</p>
+
+<p>Some strategies you may want to use:</p>
+
+<ol>
+<li>Create a new Downloader Middleware and log all of your requests (to a file, or database).  Review the requests for odd behaviour.</li>
+<li>Limit the Depth to prevent it from continuing down the rabbit hole infinitely.</li>
+<li>Limit the domain to test if it's still a problem.</li>
+</ol>
+
+<p>If you find you're legitimately just generating to many requests, and memory is an issue, enable the persistent job queue and save the requests to disk, instead.  I'd recommend against this as a first step, though, as it's more likely your crawler isn't working as you wanted it to.</p>

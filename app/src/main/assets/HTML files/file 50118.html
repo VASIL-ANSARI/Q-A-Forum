@@ -1,0 +1,28 @@
+<p>Because as soon as <code>requestStr</code> contains <code>KeyExchangeProtcolMsgs.reqStr</code>, <code>requestStr.contains(KeyExchangeProtcolMsgs.reqStr)</code> becomese <code>true</code>, so <code>requestStr.contains(KeyExchangeProtcolMsgs.reqStr) == false</code> becomes <code>true == false</code>, which is <code>false</code>, so the entire test in the while loop becomes <code>false</code>, so execution drops out of the while loop.</p>
+
+<p>There are a couple of ways to fix this, the easiest would be to have two while loops. The first just loops until <code>requestStr</code> is <code>KeyExchangeProtcolMsgs.reqStr</code>, and the second that accumulates the nonce until it ends with <code>KeyExchangeProtcolMsgs.nonceStr</code>. Something like this:</p>
+
+<pre><code>        String requestStr = "";
+        while (!requestStr.equals(KeyExchangeProtcolMsgs.reqStr)) {
+            ch = in.read();
+            requestStr = requestStr + (char) ch;
+        }
+
+        System.out.println("[I] SSL server received " + requestStr);
+
+        String nonceStr = "";
+        while (!requestStr.endsWith(KeyExchangeProtcolMsgs.nonceStr)) {
+            ch = in.read();
+            nonceStr = nonceStr + (char) ch;
+        }
+
+        // Whack #NONCE_END from the end to get just the nonce.
+
+        nonceStr = nonceStr.substring(0, nonceStr.length() - KeyExchangeProtcolMsgs.nonceStr.length());
+
+        System.out.println("[I] SSL server received " + nonceStr);
+</code></pre>
+
+<p>That's not tested but it should be close.</p>
+
+<p>You could do it with a single while loop by keeping some sort of state indicator so you know when you're accumulating the <code>reqStr</code> and when you're accumulating the <code>nonceStr</code>, but I think splitting it like this is cleaner.</p>

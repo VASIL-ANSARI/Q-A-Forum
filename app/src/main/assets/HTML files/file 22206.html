@@ -1,0 +1,35 @@
+<h2><code>std::wstring_convert</code></h2>
+
+<p>Given an <code>std::u32string</code> (a.k.a. <code>std::basic_string&lt;char32_t&gt;</code>) that holds UTF-32 code units in the form of <code>char32_t</code> elements, here's how to convert it to a sequence of UTF-8 code units in the form of bytes:</p>
+
+<pre><code>// Both &lt;locale&gt; and &lt;codecvt&gt; required
+
+std::u32string input = U"Hello, World";
+
+using Codecvt = std::codecvt_utf8&lt;char32_t&gt;;
+std::wstring_convert&lt;Codecvt, char32_t&gt; converter;
+
+// throws std::range_error if the conversion fails
+std::string result = converter.to_bytes(input);
+</code></pre>
+
+<p>Take note that a quirk of <code>std::wstring_convert</code> is that is always converts what the Standard calls a wide string (which is in fact any kind of specialization of <code>std::basic_string</code>, including <code>std::string</code>) to or from a byte string, which is a specialization of the form <code>std::basic_string&lt;char, std::char_traits&lt;char&gt;, Allocator&gt;</code>.</p>
+
+<p>What the source and target encodings will be depends on what code conversion facet is used -- here I am using one of the stock facets that come from <code>&lt;codecvt&gt;</code>. Any code conversion facet will do as long as it is Destructible, which is not the case for e.g. <code>std::codecvt&lt;wchar_t&gt;</code> -- it has a protected destructor.</p>
+
+<h2><code>std::wbuffer_convert</code></h2>
+
+<p>Here's a hopefully compelling use case: you have an <code>out</code> object which is an instance of <code>std::ostream</code> (a.k.a <code>std::basic_ostream&lt;char&gt;</code>) that expects UTF-8 encoded text. So for instance <code>out &lt;&lt; u8"Hello"</code> should work just fine. As it so happens though, you have a lot of UTF-32 encoded wide-strings (best candidate for that job would be <code>std::u32string</code>) coming from somewhere else in your program, which you need to pass to <code>out</code>. You could use <code>std::wstring_convert</code> repeatedly, but that can get old quickly.</p>
+
+<p>Here's another way:</p>
+
+<pre><code>std::wbuffer&lt;std::codecvt_utf8&lt;char32_t&gt;, char32_t&gt; wout { out.rdbuf() };
+std::u32string input = U"Hello";
+wout &lt;&lt; input;
+</code></pre>
+
+<p>That is, we can get a view of <code>out</code> that behaves as if it were an instance of <code>std::basic_stream&lt;char32_t&gt;</code> and that expects UTF-32 encoded text, and we didn't alter locales (that last bit being a big reason those convenience interfaces exist in the first place).</p>
+
+<p>I'd like to think that <code>std::wbuffer_convert</code> is complementary to <code>std::wstring_convert</code> rather than a competitor.</p>
+
+<p><sub>As a disclaimer, because I haven't laid my hands on an implementation that supports either of those features or <code>&lt;codecvt&gt;</code>, the code here is completely untested :(.</sub></p>

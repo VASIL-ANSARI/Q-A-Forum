@@ -1,0 +1,56 @@
+<p>try something like this</p>
+
+<pre><code>template&lt;typename T, typename V = bool&gt;
+struct is_objc_class : std::false_type { };
+
+template&lt;typename T&gt;
+struct is_objc_class&lt;T,
+typename std::enable_if&lt;std::is_convertible&lt;T, id&gt;::value, bool&gt;::type
+&gt; : std::true_type { };
+
+template &lt;
+class T,
+class = typename std::enable_if&lt;is_objc_class&lt;T&gt;::value&gt;::type
+&gt;
+std::ostream&amp; operator&lt;&lt; (std::ostream&amp; stream, T const &amp; t) {
+    stream &lt;&lt; [[t description] UTF8String];
+    return stream;
+}
+
+struct Logger
+{
+    Logger(std::ostream &amp;s):stream(s){}
+    std::ostream &amp;stream;
+
+    // for objc class
+    template &lt;class T&gt;
+    typename std::enable_if&lt;is_objc_class&lt;T&gt;::value, Logger&amp;&gt;::type
+    operator&lt;&lt; (T const &amp; t) {
+        stream &lt;&lt; [[t description] UTF8String];
+        return *this;
+    }
+
+    // for everything else
+    template &lt;class T&gt;
+    typename std::enable_if&lt;!is_objc_class&lt;T&gt;::value, Logger &amp;&gt;::type
+    operator&lt;&lt; (T const &amp; t) {
+        stream &lt;&lt; t;
+        return *this;
+    }
+};
+
+int main(int argc, char *argv[])
+{
+    std::cout &lt;&lt; std::boolalpha
+    &lt;&lt; is_objc_class&lt;id&gt;::value &lt;&lt; std::endl
+    &lt;&lt; is_objc_class&lt;int&gt;::value &lt;&lt; std::endl
+    &lt;&lt; is_objc_class&lt;NSString *&gt;::value &lt;&lt; std::endl
+    &lt;&lt; @"test" &lt;&lt; std::endl
+    &lt;&lt; @[@1] &lt;&lt; std::endl
+    ;
+
+    Logger l(std::cout);
+
+    l &lt;&lt; @"test" &lt;&lt; "test2" &lt;&lt; @1 &lt;&lt; 1;
+}
+</code></pre>

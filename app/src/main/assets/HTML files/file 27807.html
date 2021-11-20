@@ -1,0 +1,21 @@
+<p>One thing i would like to suggest instead of running multiple queries join your tables and work around in a go</p>
+
+<blockquote>
+  <p>SELECT DISTINCT post_id FROM {$wpdb->users}
+      WHERE display_name LIKE '%s' this is wrong query you cannot get the post ids from users table ,relation of posts and user is maintained in the posts table and each post contains user id in <code>post_author</code> column </p>
+</blockquote>
+
+<p>Try this one </p>
+
+<pre><code>$post_ids = $wpdb-&gt;get_col( $wpdb-&gt;prepare( "
+    SELECT p.ID FROM $wpdb-&gt;posts p
+INNER JOIN $wpdb-&gt;users u ON (p.`post_author` = u.`ID`)
+LEFT JOIN $wpdb-&gt;postmeta m ON (p.`ID`= m.`post_id`)
+WHERE ( u.display_name LIKE '%s' OR p.post_title LIKE '%s' 
+OR p.post_content LIKE '%s' OR m.meta_value LIKE '%s')
+GROUP BY p.`ID`
+", $keyword ) );
+
+//print_r($post_ids); //you will get the post ids
+$post_ids=array_values(array_unique($post_ids));
+</code></pre>

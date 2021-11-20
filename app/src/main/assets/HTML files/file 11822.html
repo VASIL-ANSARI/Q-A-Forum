@@ -1,0 +1,21 @@
+<p>You can use <code>NSOperationQueue</code>, <code>performSelectorInBackground</code> or Grand Central Dispatch (once you know how to use the later you'll use that very often as it makes threading very easy). The main point is simply is to not load them on the <em>main thread</em> and to load them one after another (if you try to load them all at once each in its own thread performance is likely to not be good either). When the loading is done, call a method on your main thread to assign the result.</p>
+
+<p>For example:</p>
+
+<pre><code>yourQueue = dispatch_queue_create("plist load queue", NULL);
+
+for (filename in plistFilesToLoad) {
+    dispatch_async(yourQueue, ^{
+        // This part will be executed in a thread,
+        // each block after the other.
+        NSDictionary *dict = [self loadPlist:filename];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // Assign the result on the main thread.
+            [self finishedLoading:filename withDictionary:dict];
+        });
+    });
+}
+</code></pre>
+
+<p>The <code>dispatch_async</code> calls come back quickly, so the loop itself will be executed quickly. But GCD will then execute each block one after another on a separate thread.</p>

@@ -1,0 +1,76 @@
+<p>First of All, you need to assign the Anonymous Inner Type AsyncTask class to a class variable. Before doing that you need to create a nested AsyncTask class within your Activity. <br/></p>
+
+<p>Your extended AsyncTask class should look something like this :<br/></p>
+
+<pre><code>public class MyContinousAsyncTask extends AsyncTask&lt;String, Void, String&gt;() {
+        @Override
+        protected String doInBackground(String... params) {             
+            timer = new Timer();
+            timerTask = new TimerTask() {
+
+                @Override
+                public void run() {
+                    getActivity().runOnUiThread(new Runnable() {                    
+                        @Override
+                        public void run() {
+                            tvPontuacao.setText(BatalhaConfigs.USUARIO_PONTUACAO);
+                            getAllBattles();
+                        }
+                    });                             
+                }
+            };
+            timer.scheduleAtFixedRate(timerTask, 100, 10000);
+            return "execute";
+        }
+
+    }
+</code></pre>
+
+<p>Then you need to declare a class variable of this Class in your Activity: <br/></p>
+
+<pre><code>private MyContinousAsyncTask myContinouslyRunningAsyncTask;
+</code></pre>
+
+<p>now after doing the above, just modify your <code>clockTask()</code> method like this: <br/></p>
+
+<pre><code>/** timer para atualizar o adapter */
+private void clockTask(){
+ myContinouslyRunningAsyncTask = new MyContinousAsyncTask();
+ myContinouslyRunningAsyncTask.execute("execute");
+
+}
+</code></pre>
+
+<p>now you should stop this AsyncTask on the <code>onPause()</code> Event of your Fragment, other wise you will be getting <code>NPE</code> because of accessing the de-allocated UI Components. <br/></p>
+
+<p>The code should look like this: <br/></p>
+
+<pre><code> @Override
+
+ protected void onPause() {
+    // TODO Auto-generated method stub
+    super.onPause();
+    if(myContinouslyRunningAsyncTask != null)
+    {
+      myContinouslyRunningAsyncTask.cancel();
+    }
+
+    if(timer != null)
+    {
+     timer.cancel();
+     timer.purge();
+    }
+}
+</code></pre>
+
+<p>To make your code further efficient, you should not call the <code>clockTask();</code> in <code>onActivityCreated(..)</code> method, but in <code>onResume()</code> method, like this: <br/></p>
+
+<pre><code>@Override
+protected void onResume() {
+    // TODO Auto-generated method stub
+    super.onResume();
+    clockTask();
+ }
+</code></pre>
+
+<p>I hope this helps.</p>

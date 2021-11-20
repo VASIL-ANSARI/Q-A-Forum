@@ -1,0 +1,18 @@
+<p>It seems like there are two problems here.</p>
+
+<p>The first one is a path you use. <code>SPARK_HOME</code> should point to the root directory of the Spark installation so in your case it should probably be <code>/home/dirk/spark-1.4.1-bin-hadoop2.6</code> not <code>/home/dirk/spark-1.4.1-bin-hadoop2.6/bin</code>.</p>
+
+<p>The second problem is a way how you use <code>setSparkHome</code>. If you check <a href="https://github.com/apache/spark/blob/3c0156899dc1ec1f7dfe6d7c8af47fa6dc7d00bf/python/pyspark/conf.py#L130">a docstring</a> its goal is to</p>
+
+<blockquote>
+  <p>set path where Spark is installed on worker nodes</p>
+</blockquote>
+
+<p><code>SparkConf</code> constructor assumes that <code>SPARK_HOME</code> on master is already set. <a href="https://github.com/apache/spark/blob/3c0156899dc1ec1f7dfe6d7c8af47fa6dc7d00bf/python/pyspark/conf.py#L104">It calls</a> <code>pyspark.context.SparkContext._ensure_initialized</code> <a href="https://github.com/apache/spark/blob/49351c7f597c67950cc65e5014a89fad31b9a6f7/python/pyspark/context.py#L234">which calls</a> <code>pyspark.java_gateway.launch_gateway</code>, <a href="https://github.com/apache/spark/blob/49351c7f597c67950cc65e5014a89fad31b9a6f7/python/pyspark/java_gateway.py#L48">which tries to acccess</a> <code>SPARK_HOME</code> and fails.</p>
+
+<p>To deal with this you should set <code>SPARK_HOME</code> before you create <code>SparkConf</code>.</p>
+
+<pre><code>import os
+os.environ["SPARK_HOME"] = "/home/dirk/spark-1.4.1-bin-hadoop2.6"
+conf = (SparkConf().setMaster('local').setAppName('a'))
+</code></pre>

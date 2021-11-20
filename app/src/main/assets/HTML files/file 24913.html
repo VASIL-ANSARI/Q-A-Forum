@@ -1,0 +1,62 @@
+<p>The <a href="http://vim.wikia.com/wiki/Move_to_next/previous_line_with_same_indentation" rel="nofollow">vim wiki</a> suggest bindings such as:</p>
+
+<pre><code>nnoremap &lt;M-,&gt; k:call search('^'. matchstr(getline(line('.')+1), '\(\s*\)') .'\S', 'b')&lt;CR&gt;^
+nnoremap &lt;M-.&gt; :call search('^'. matchstr(getline(line('.')), '\(\s*\)') .'\S')&lt;CR&gt;^
+</code></pre>
+
+<p>As well as offering a more comprehensive solution:</p>
+
+<pre><code>" Jump to the next or previous line that has the same level or a lower
+" level of indentation than the current line.
+"
+" exclusive (bool): true: Motion is exclusive
+" false: Motion is inclusive
+" fwd (bool): true: Go to next line
+" false: Go to previous line
+" lowerlevel (bool): true: Go to line with lower indentation level
+" false: Go to line with the same indentation level
+" skipblanks (bool): true: Skip blank lines
+" false: Don't skip blank lines
+function! NextIndent(exclusive, fwd, lowerlevel, skipblanks)
+  let line = line('.')
+  let column = col('.')
+  let lastline = line('$')
+  let indent = indent(line)
+  let stepvalue = a:fwd ? 1 : -1
+  while (line &gt; 0 &amp;&amp; line &lt;= lastline)
+    let line = line + stepvalue
+    if ( ! a:lowerlevel &amp;&amp; indent(line) == indent ||
+          \ a:lowerlevel &amp;&amp; indent(line) &lt; indent)
+      if (! a:skipblanks || strlen(getline(line)) &gt; 0)
+        if (a:exclusive)
+          let line = line - stepvalue
+        endif
+        exe line
+        exe "normal " column . "|"
+        return
+      endif
+    endif
+  endwhile
+endfunction
+
+" Moving back and forth between lines of same or lower indentation.
+nnoremap &lt;silent&gt; [l :call NextIndent(0, 0, 0, 1)&lt;CR&gt;
+nnoremap &lt;silent&gt; ]l :call NextIndent(0, 1, 0, 1)&lt;CR&gt;
+nnoremap &lt;silent&gt; [L :call NextIndent(0, 0, 1, 1)&lt;CR&gt;
+nnoremap &lt;silent&gt; ]L :call NextIndent(0, 1, 1, 1)&lt;CR&gt;
+vnoremap &lt;silent&gt; [l &lt;Esc&gt;:call NextIndent(0, 0, 0, 1)&lt;CR&gt;m'gv''
+vnoremap &lt;silent&gt; ]l &lt;Esc&gt;:call NextIndent(0, 1, 0, 1)&lt;CR&gt;m'gv''
+vnoremap &lt;silent&gt; [L &lt;Esc&gt;:call NextIndent(0, 0, 1, 1)&lt;CR&gt;m'gv''
+vnoremap &lt;silent&gt; ]L &lt;Esc&gt;:call NextIndent(0, 1, 1, 1)&lt;CR&gt;m'gv''
+onoremap &lt;silent&gt; [l :call NextIndent(0, 0, 0, 1)&lt;CR&gt;
+onoremap &lt;silent&gt; ]l :call NextIndent(0, 1, 0, 1)&lt;CR&gt;
+onoremap &lt;silent&gt; [L :call NextIndent(1, 0, 1, 1)&lt;CR&gt;
+onoremap &lt;silent&gt; ]L :call NextIndent(1, 1, 1, 1)&lt;CR&gt;
+</code></pre>
+
+<p>Which uses:</p>
+
+<ul>
+<li><code>[l</code> and <code>]l</code> jump to the previous or the next line with the same indentation level as the current line.</li>
+<li><code>[L</code> and <code>]L</code> jump to the previous or the next line with an indentation level lower than the current line.</li>
+</ul>

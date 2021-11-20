@@ -1,0 +1,85 @@
+<p>can't you just set the image like when you set the list items images?</p>
+
+<p>i think it isn't working because of this :</p>
+
+<pre><code>String Image=((ImageView)view.findViewById(R.id.list_image)).getImageMatrix().toString();
+</code></pre>
+
+<p>UPDATE:
+use this method to download the image :</p>
+
+<pre><code>public void downloadImage(String url, String pictureName) {
+        final HttpClient client = new DefaultHttpClient();
+        final HttpGet getRequest = new HttpGet(url);
+
+    String packageName = Environment.getExternalStorageDirectory() + "/"
+      + getString(R.string.app_name); 
+
+    folder = new File(packageName);
+    folder.mkdirs();
+    File f = new File(folder, pictureName);
+
+    try {
+        HttpResponse response = client.execute(getRequest);
+        final int statusCode = response.getStatusLine().getStatusCode();
+        if (statusCode != HttpStatus.SC_OK) {
+            Log.w("ImageDownloader", "Error " + statusCode +
+                    " while retrieving bitmap from " + url);
+
+        }
+
+        final HttpEntity entity = response.getEntity();
+        if (entity != null) {
+            InputStream inputStream = null;
+            try {
+                inputStream = entity.getContent();
+                // Bug on slow connections, fixed in future release.
+                Bitmap bm = BitmapFactory.decodeStream(new FlushedInputStream(inputStream));
+                 try {
+                     FileOutputStream out = new FileOutputStream(f.getAbsolutePath());
+                     bm.compress(Bitmap.CompressFormat.PNG, 90, out);
+                 } catch (Exception e) {
+                        e.printStackTrace();
+                 }
+                 bm.recycle();
+            } finally {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+                entity.consumeContent();
+            }
+        }
+    } catch (IOException e) {
+        getRequest.abort();
+        Log.w("ImageDownload", "I/O error while retrieving bitmap from " + url, e);
+    } catch (IllegalStateException e) {
+        getRequest.abort();
+        Log.w("ImageDownload", "Incorrect URL: " + url);
+    } catch (Exception e) {
+        getRequest.abort();
+        Log.w("ImageDownload", "Error while retrieving bitmap from " + url, e);
+    } finally {
+    }
+}
+</code></pre>
+
+<p>and in your SingleMenuItemActivity :</p>
+
+<pre><code>String  packageName = Environment.getExternalStorageDirectory() + "/"
+            + getString(R.string.app_name);
+
+folder = new File(packageName);
+folder.mkdirs();
+File f = new File(folder, pictureName);
+Bitmap bitmap = null;
+if (f.isFile())
+    try {
+        bitmap =  BitmapFactory.decodeStream(f.toURL().openStream());
+    } catch (MalformedURLException e) {
+         e.printStackTrace();
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+if (bitmap != null)
+    lblImage.setImageBitmap(bitmap);
+</code></pre>

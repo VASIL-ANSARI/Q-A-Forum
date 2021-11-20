@@ -1,0 +1,21 @@
+<p>Some serializers support callbacks; for example, both <code>BinaryFormatter</code> and <code>DataContractSerializer</code> (and protobuf-net, below) allow you to specify a before-serializaton callback, and since they <em>skip</em> the constructor, this may well be enough to initialize the object. The serializer is still <em>creating</em> it, though.</p>
+
+<hr>
+
+<p>Most serializers are fussy about wanting to create the new object themselves, however some will allow you to deserialize into an existing object. Well, actually the only one that leaps to mind is protobuf-net (disclosure: I'm the author)...</p>
+
+<p>This has 2 different features that might help here; for the <em>root</em> object (i.e. the outermost object in a graph) you can supply the existing object directly to either the <code>Merge</code> methods (in v1, also present in v2 for compatibility), or (in v2) the <code>Deserialize</code> methods; for example:</p>
+
+<pre><code>var obj = Serializer.Merge&lt;YourType&gt;(source, instance);
+</code></pre>
+
+<p>However, in a larger graph, you might want to supply other objects yourself (than just the root). The following is not exposed on the <em>attribute</em> API, but is a new feature in v2:</p>
+
+<pre><code>RuntimeTypeModel.Default[typeof(SomeType)].SetFactory(factoryMethod);
+</code></pre>
+
+<p>where <code>factoryMethod</code> can be either the <em>name</em> of a <code>static</code> method in <code>SomeType</code> (that returns a <code>SomeType</code> instance), or can be a <code>MethodInfo</code> to any <code>static</code> method anywhere. The method can additionally (optionally) take the serialization-context as a parameter if you want. This method should then be used to supply all new instances of <code>SomeType</code>.</p>
+
+<hr>
+
+<p>Note: protobuf-net is <em>not</em> quite the same as <code>BinaryFormatter</code>; for best effect, you need to tell it how to map your members - very similar to marking things as <code>[DataMember]</code> for WCF/DataContractSerializer. This <em>can</em> be attributes, but does not need to be.</p>

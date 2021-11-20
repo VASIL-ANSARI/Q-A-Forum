@@ -1,0 +1,36 @@
+<p>The problem is your are using a <code>struct</code> as the BindingList item type. The solution is you should change <code>struct</code> to <code>class</code> and it works GREAT. However if you want to keep using <code>struct</code>, I have an idea to make it works, of course it requires more code than simply changing <code>struct</code> to <code>class</code>. The whole idea is every time a cell has its value changed, the underlying item (which is a struct) should be assigned to a totally new struct item. That's the only way you can use to change the underlying value, otherwise the cell value after committing change won't be changed. I've found that the event <code>CellParsing</code> is the one suitable for this case to add custom code, and here is my code:</p>
+
+<pre><code>namespace DataGridViewList
+{
+   public partial class Form1 : Form
+   {
+     public struct LocationEdit
+     {
+       public string Key { get; set; }
+       private string _value;
+       public string Value { get { return _value; } set { _value = value; } }
+     };
+
+     public Form1()
+     {
+       InitializeComponent();
+       BindingList&lt;LocationEdit&gt; list = new BindingList&lt;LocationEdit&gt;();
+       list.Add(new LocationEdit { Key = "0", Value = "Home" });
+       list.Add(new LocationEdit { Key = "1", Value = "Work" });
+       dataGridView1.DataSource = list;
+     }
+     //CellParsing event handler for dataGridView1
+     private void dataGridView1_CellParsing(object sender, DataGridViewCellParsingEventArgs e){
+        LocationEdit current = ((BindingList&lt;LocationEdit&gt;)dataGridView1.DataSource)[e.RowIndex];
+        string key = current.Key;
+        string value = current.Value;
+        string cellValue = e.Value.ToString()
+        if (e.ColumnIndex == 0) key = cellValue;
+        else value = cellValue;
+        ((BindingList&lt;LocationEdit&gt;)dataGridView1.DataSource)[e.RowIndex] = new LocationEdit {Key = key, Value = value};
+     }
+   }
+}
+</code></pre>
+
+<p>I don't think it's a good idea to keep using <code>struct</code> that way, <code>class</code> would be better.</p>

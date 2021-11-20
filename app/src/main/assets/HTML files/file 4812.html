@@ -1,0 +1,44 @@
+<p>You may need to tell Perl that your source file contains utf8 characters.  Try:</p>
+
+<pre><code>#!/usr/bin/perl
+
+use utf8;   # **** Add this line
+
+$str = 'mÄ±sÄ±r';
+$str =~ m/m[Ä±i]s[Ä±i]r/ &amp;&amp; print "match double undotted Ä±\n";
+</code></pre>
+
+<p>Which doesn't help you with PHP but there may be a similar directive in PHP.  Otherwise, try using some form of escape-sequence to avoid putting the literal character in your source-code.  I know nothing about PHP so I can't help with that.</p>
+
+<p><strong><em>Edit</em></strong><br>
+I'm reading that PHP has no Unicode support.  Therefore, the unicode input you pass it is likely treated as the string of bytes that the unicode was encoded as.</p>
+
+<p>If you can be assured that your input is coming in as utf-8 then you can match for the utf-8 sequence for <code>Ä±</code> which is <code>\xc4 \xb1</code> as in:</p>
+
+<pre><code>$str = 'mÄ±sÄ±r';  # Make sure this source-file is encoded as utf-8 or this match will fail
+echo (preg_match('!m(i|\xc4\xb1)s(i|\xc4\xb1)r!', $str)) ? "ok\n" : "fail\n";
+</code></pre>
+
+<p>Does that work?</p>
+
+<p><strong>Edit again:</strong><br>
+I can explain why your first three tests pass.  Let's pretend that in your encoding, <code>Ä±</code> is encoded as <code>ABCDE</code>. then PHP sees the following:</p>
+
+<pre><code>echo 'match single normal i: ';
+$str = 'mi';
+echo (preg_match('!m[ABCDEi]!', $str)) ? "ok\n" : "fail\n";
+
+echo 'match single undotted ABCDE: ';
+$str = 'mABCDE';
+echo (preg_match('!m[ABCDEi]!', $str)) ? "ok\n" : "fail\n";
+
+echo 'match double normal i: ';
+$str = 'misir';
+echo (preg_match('!m[ABCDEi]s[ABCDEi]r!', $str)) ? "ok\n" : "fail\n";
+
+echo 'match double undotted ABCDE: ';
+$str = 'mABCDEsABCDEr';
+echo (preg_match('!m[ABCDEi]s[ABCDEi]r!', $str)) ? "ok\n" : "fail\n";
+</code></pre>
+
+<p>which makes it obvious why the first three tests pass and the last one fails.  If you use a start/end anchor <code>^...$</code> I think you'll find that only the first test passes.</p>

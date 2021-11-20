@@ -1,0 +1,73 @@
+<pre><code>  LT_printf(test_string);                       // doesn't need a cast
+  LT_printf((const char *)F("F TESTING!\r\n")); // these need a cast
+  LT_printf((const char *)&amp;test_struct);
+</code></pre>
+
+<p>You can't just cast away a different data type and expect it to work. Presuming that <code>test_string</code> works then it expects to print from RAM and not PROGMEM which is in a separate address space. </p>
+
+<p>The simple solution in your case is to derive the class that <code>LT_printf</code> is in (whatever that is) from <code>Print</code> and then <code>print</code>, <code>println</code> etc. will just work.</p>
+
+<p>For example, I have a library that prints to an I2C LCD. I derive it from <code>Print</code> like this:</p>
+
+<pre><code>class I2C_graphical_LCD_display : public Print
+</code></pre>
+
+<p>Now all your class has to do is implement <code>write</code> in your class (ie. writing a single byte) and the <code>Print</code> class takes care of the rest: both writing from RAM and PROGMEM via the <code>F()</code> macro.</p>
+
+<p>My answer doesn't address how to get <code>printf</code> to work, although you could look at <a href="http://playground.arduino.cc/Main/Printf" rel="nofollow">this</a>.</p>
+
+<p>You might be better off looking at the <a href="http://arduiniana.org/libraries/streaming/" rel="nofollow">Streaming</a> library which lets you stream output in a C++ style, rather than using printf-style outputting.</p>
+
+<hr>
+
+<p>Here is a simple way of implementing printf (however from RAM only) by adding a couple of helper functions:</p>
+
+<pre><code>int getChar (FILE *fp)
+  {
+  while (!(Serial.available()));
+  return (Serial.read());
+  }  // end of getChar
+
+int putChar (char c, FILE *fp)
+  {
+  Serial.write (c);
+  return c;
+  }  // end of putChar
+
+void setup ()
+  {
+  Serial.begin(115200);
+  fdevopen (putChar, getChar);
+  }  // end of setup
+
+void loop ()
+  {
+  int temp = 30;
+
+  printf ("The temperature is %d degrees C.\n", temp);
+  delay (100);
+  }  // end of loop
+</code></pre>
+
+<p><code>fdevopen</code> tells the Standard IO library how to get and put characters. In this particular case I am using <code>Serial</code>, but it could be <code>Serial1</code> or SoftwareSerial, etc.</p>
+
+<hr>
+
+<p>If you want to use PROGMEM constants (ie. <code>F()</code>) then I think the easiest is to use the Streaming library. eg.</p>
+
+<pre><code>#include &lt;Streaming.h&gt;
+
+void setup ()
+  {
+  Serial.begin (115200);
+  }  // end of setup
+
+void loop ()
+  {
+  int temp = 30;    
+  Serial &lt;&lt; F("The temperature is ") &lt;&lt; temp &lt;&lt; F(" degrees C") &lt;&lt; endl;
+  delay (100);
+  }  // end of loop
+</code></pre>
+
+<p>That is even more compact, and saves RAM by using the <code>F()</code> macro. It's pretty readable too.</p>

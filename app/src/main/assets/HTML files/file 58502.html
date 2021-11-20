@@ -1,0 +1,60 @@
+<ol>
+<li><p>Use <code>GroupJoin</code> instead of Join: (<code>_join x in y on x.a equals y.a
+into z_</code>)</p>
+
+<pre><code>var investorData = from investor in db.Investors
+                        join investorLine in db.InvestorStatementLines
+                        on investor.InvestorID equals investorLine.InvestorID
+                        into investorLine
+                        where investor.UserId == userId
+
+                        select new InvestorViewModel()
+                        {
+                            InvestorId = investor.InvestorID,
+                            InvestorName = investor.Name,
+                            FundingDate = investor.FundingDate,
+                            DueDate = investor.DueDate,
+                            FundsCommitted = investor.FundsCommitted,
+                            FundsInvested = investor.FundsInvested,
+                            StatementLines = investorLine
+                                .Select(t =&gt; new InvestorStatementLineVM
+                                {
+                                    Balance = t.Balance,
+                                    Credit = t.Credit,
+                                    Debit = t.Debit,
+                                    InvestorStatementLineDetails = t.Details,
+                                    Date = t.Date
+                                }).ToList()
+                        };
+</code></pre>
+
+<p>Also instead of performing the sub-query just use the data from the join you just performed.</p></li>
+<li><p><strong>A better option</strong>, using entity framework, is using <strong><a href="https://msdn.microsoft.com/en-us/data/jj713564.aspx" rel="nofollow">navigation properties</a></strong> and then you do not need to perform a join but you just have
+<code>InvestorStatementLines</code> as a property of your <code>investor</code>.</p>
+
+<p>To set the navigation properties:</p>
+
+<pre><code>public class InvestorViewModel
+{
+    public int InvestorId { get; set; }
+    public string InvestorName { get; set; }
+    public DateTime FundingDate { get; set; }
+    public DateTime? DueDate { get; set; }
+    public Decimal? FundsCommitted { get; set; }
+    public Decimal? FundsInvested { get; set; }
+    public virtual ICollection&lt;InvestorStatementLineVM&gt;  StatementLines { get; set; }
+}
+</code></pre>
+
+<p>And the query will be as simple as:</p>
+
+<pre><code>var investorData = from investor in db.Investors
+                   where investor.UserId == userId
+                   select new InvestorViewModel()
+                   {
+                       InvestorId = investor.InvestorID,
+                       ....
+                       StatementLines = investor.InvestorStatementLines.Select(....)
+                   };
+</code></pre></li>
+</ol>

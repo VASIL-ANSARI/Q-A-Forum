@@ -1,0 +1,36 @@
+<p>To answer the question posted, your problem appears to be that the username and password being are checked again when your user submits the form. Because the fields don't exist, the query finds zero rows, triggering your error message.</p>
+
+<p>There are a number of ways of fixing your problem, one way would be to use a <a href="http://www.php.net/manual/en/session.examples.basic.php" rel="nofollow">Session</a> to remember that a user is logged in. This could be implemented by altering your password check as follows:</p>
+
+<pre><code>session_start();
+
+if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) 
+{
+
+    $password = $_POST['password']; //retrieve variables for password and userId
+    $userid = $_POST['userid'];
+
+    $query  = "SELECT * FROM valid_logon WHERE userid = '".mysql_real_escape_string($userid)."' AND
+               password='".mysql_real_escape_string($password)."'";  //get query from database
+
+    $result = mysql_query($query);
+
+    $numresults = mysql_num_rows($result); //get row number
+    $row = mysql_fetch_array($result); //get array into variable
+    $dbuserid = $row['userid'];
+    $dbpassword = $row['password'];
+
+    if ($numresults&gt;0)
+    {
+       if ($userid == $dbuserid &amp;&amp; $password == $dbpassword)
+       {
+           $_SESSION['logged_in'] = TRUE;
+           process();
+       }   
+    }else{
+       err_msg();
+    }
+}
+</code></pre>
+
+<p>I've kept the code as similar to the original as possible, but I will echo the comments above on the need to secure your SQL calls. Have a look at using <a href="http://www.php.net/pdo" rel="nofollow">PDO</a> if possible, or at the very least start using <a href="http://php.net/manual/en/function.mysql-real-escape-string.php" rel="nofollow">mysql_real_escape_string</a> as above.</p>

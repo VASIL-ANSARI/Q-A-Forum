@@ -1,0 +1,35 @@
+<p>You must register an event-handler to handle an event. But you haven't shown us the aspx markup, so maybe you have missed to add the handler declaratively:</p>
+
+<pre><code>&lt;asp:gridview id="GridView1" 
+    onrowdatabound="GridView1_RowDataBound" 
+    runat="server"&gt;
+  &lt;/asp:gridview&gt;
+
+void GridView1_RowDataBound(Object sender, GridViewRowEventArgs e)
+{
+    if(e.Row.RowType == DataControlRowType.DataRow)
+    {
+         // e.Row is the GridViewRow
+         e.Row.BackColor = System.Drawing.Color.Green;
+    }
+}
+</code></pre>
+
+<p><strong>Update</strong> The reason for the <code>IndexOutOfRangeException</code> is that you are accessing the first row before it is created:</p>
+
+<pre><code>GridViewRow grv=GridView1.Rows[0];
+</code></pre>
+
+<p>This is a nasty one. <code>RowDataBound</code> is called for every <code>GridViewRow</code>, not only for the <code>DataItems</code> but also for the <code>Header</code>,<code>Footer</code> and <code>Pager</code>. The first one that will be created is the <code>Header</code>. But <code>GridView.Rows</code> does return only <code>GridViewRows</code> with <code>RowType</code> = <code>DataRow</code>. So you are trying to access the first "data-row" during the creation of the <code>header</code> row.</p>
+
+<p>To fix it use the code above and check the <code>RowType</code>.</p>
+
+<pre><code>if(e.Row.RowType == DataControlRowType.DataRow)
+{
+    // now you ca safely access the first row in this way, 
+    // altghough i assume that you should use my code above 
+    // to set the color of every GridViewRow
+    GridViewRow grv=GridView1.Rows[0]; 
+</code></pre>
+
+<p>Apart from that you should also <code>DataBind</code> the grid only <code>if(!IsPostBack)</code> as Dragan has mentioned if you're using <code>ViewState</code> (default).</p>

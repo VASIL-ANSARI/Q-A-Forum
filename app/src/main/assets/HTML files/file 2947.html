@@ -1,0 +1,49 @@
+<p>I figured it out. 
+Maven plugin works fine but the problem was with my spring config:
+I had:</p>
+
+<pre><code>&lt;bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager"&gt;
+    &lt;property name="entityManagerFactory" ref="entityManagerFactory"/&gt;
+&lt;/bean&gt;
+&lt;tx:annotation-driven transaction-manager="transactionManager"/&gt;
+</code></pre>
+
+<p>What I needed was:</p>
+
+<pre><code>&lt;bean id="transactionManager"   class="org.springframework.orm.hibernate3.HibernateTransactionManager"&gt;
+    &lt;property name="sessionFactory" ref="sessionFactory"/&gt;
+&lt;/bean&gt;
+&lt;bean class="org.springframework.transaction.aspectj.AnnotationTransactionAspect" factory-method="aspectOf"&gt;
+    &lt;property name="transactionManager" ref="transactionManager"/&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p>Now it works fine. And performace of my @Transactional methods improved and that what I was aming for.</p>
+
+<p>Here is my maven aspectj plugin config:</p>
+
+<pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+    &lt;artifactId&gt;aspectj-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;1.3&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;aspectLibraries&gt;
+            &lt;aspectLibrary&gt;
+                &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-aspects&lt;/artifactId&gt;
+            &lt;/aspectLibrary&gt;
+       &lt;/aspectLibraries&gt;
+        &lt;source&gt;1.5&lt;/source&gt;
+        &lt;showWeaveInfo&gt;true&lt;/showWeaveInfo&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;compile&lt;/goal&gt;
+            &lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+</code></pre>
+
+<p>hope this helps someone.</p>

@@ -1,0 +1,29 @@
+<h3>Answer to original question</h3>
+
+<p>The <code>User</code> model needs to be a subclass of <code>db.Model</code> (or a mapped class) to work with SQLAlchemy.</p>
+
+<pre><code>class User(UserMixin, db.Model):
+    ...
+</code></pre>
+
+<h3>Answer to first update</h3>
+
+<p>You don't seem to understand what is getting returned by session.query.  If you query a single model, the "rows" that are returned are instances of the model.  The rows will never be None.  When you're checking for existence, you should just use <code>.first()</code> if you are applying filters, or <code>.get(primary_key)</code> if you are filtering by primary key.  This gets the first result only since the users are unique anyway</p>
+
+<p>This is what your <code>get_user_by_id</code> should look like:</p>
+
+<pre><code>def get_user_by_id(id):
+    return User.query.get(id)
+</code></pre>
+
+<p>This is what your <code>get_user</code> should look like:</p>
+
+<pre><code>def get_user(kwargs):
+    u = User.query.filter(db.or_(
+        User.id == kwargs.get('id'),
+        User.email == kwargs.get('email')
+    )).first()
+    if u is None: # user didn't exist in db
+        return create_browserid_user(kwargs)
+    return u
+</code></pre>

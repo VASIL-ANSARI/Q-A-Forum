@@ -1,0 +1,54 @@
+<p>This seems to work for me.</p>
+
+<pre><code>UIImage* modifyImage(UIImage* image)
+{
+    size_t w = image.size.width;
+    size_t h = image.size.height;
+    CGFloat scale = image.scale;
+
+    // Create the bitmap context
+    UIGraphicsBeginImageContext(CGSizeMake(w*scale, h*scale));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+
+    // NOTE you may have to setup a rotation here based on image.imageOrientation
+    // but I didn't need to consider that for my images.
+    CGContextScaleCTM(context, scale, scale);
+    [image drawInRect:CGRectMake(0, 0, w, h)];
+
+    unsigned char* data = CGBitmapContextGetData (context);
+    if (data != NULL) {
+        size_t height = CGBitmapContextGetHeight(context);
+        size_t width = CGBitmapContextGetWidth(context);
+        size_t bytesPerRow = CGBitmapContextGetBytesPerRow(context);
+
+        for (int y = 0; y &lt; height; y++) {
+            for (int x = 0; x &lt; width; x++) {
+                // Not sure why the color info is in BGRA format
+                // Look at CGBitmapContextGetBitmapInfo(context) if this format isn't working for you
+                int offset = y * bytesPerRow + x * 4;
+                unsigned char* blue =  &amp;data[offset];
+                unsigned char* green = &amp;data[offset+1];
+                unsigned char* red = &amp;data[offset+2];
+                unsigned char* alpha = &amp;data[offset+3];
+
+                int newRed = ...; // color calculation code here
+                int newGreen = ...;
+                int newBlue = ...;
+
+                // Assuming you don't want to change the original alpha value.
+                *red = (newRed * *alpha)/255;
+                *green = (newGreen * *alpha)/255;
+                *blue = (newBlue * *alpha)/255; 
+            }               
+        }
+    }
+
+    CGImageRef newImage = CGBitmapContextCreateImage(context);
+
+    UIImage *done = [UIImage imageWithCGImage:newImage scale:image.scale orientation: image.imageOrientation];
+    CGImageRelease(newImage);
+    UIGraphicsEndImageContext();
+
+    return done;
+}
+</code></pre>

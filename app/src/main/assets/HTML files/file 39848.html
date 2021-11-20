@@ -1,0 +1,70 @@
+<p>(Note: Answer has been heavily edited)</p>
+
+<h2>Summary</h2>
+
+<p><a href="http://stackoverflow.com/a/26321623/1028230">John Papa says to use <code>latedef</code> in JSHint</a> and, at least implicitly, to ignore JSLint issues.  (<code>latedef</code> defined <a href="http://jshint.com/docs/options/#latedef" rel="nofollow">here</a>.)</p>
+
+<p>I believe there's a plays-nicely solution (see below), however, that includes the advantages of Papa's suggested style with code that lints in JSHint <em>and</em> JSLint.</p>
+
+<p>JSHint is "wrong" not to complain about <code>close2</code>. JSLint catches it exactly like you'd expect.</p>
+
+<hr>
+
+<h2><code>close</code> but not <code>close2</code> is a JSHint problem</h2>
+
+<p>For what it's worth, if you paste your code (jslint formatted Pasteee with both close &amp; close2 <a href="http://paste.ee/p/NC5KD" rel="nofollow"><strong>here</strong></a>) into <a href="http://jslint.com" rel="nofollow">JSLint.com</a>, <strong>both</strong> <code>close</code> and <code>close2</code> cause errors. If you're not seeing an error for <code>close2</code>, I'm guessing it's JSHint's problem, but it'd be more useful to see exactly what you're linting through JSHint (in context) to know for sure.</p>
+
+<p>So <code>close</code> is not a special name to JSLint.  I would like to see your "actual" code in context to see if JSLint would say something similar</p>
+
+<p>Just to be clear, this breaks on <a href="http://jslint.com" rel="nofollow">JSLint.com</a>:</p>
+
+<pre><code>/*jslint sloppy:true, white:true */
+/*global $scope */
+
+$scope.close2 = close2;
+
+function close2() {
+    return "something";
+}
+</code></pre>
+
+<p>That <strong>will</strong> produce <code>'close2' was used before it was defined. $scope.close2 = close2;</code></p>
+
+<p>If you want to know why JSHint is, I believe, breaking, we can go JSHint code spelunking, but to answer your JS<strong>L</strong>int tag (at least) the behavior you're seeing isn't happening.</p>
+
+<hr>
+
+<h2>How to fix</h2>
+
+<p>See <a href="http://stackoverflow.com/questions/26288367/does-jshint-understand-angular">this SO answer</a> on exactly what you're discussing here, where <a href="http://stackoverflow.com/a/26321623/1028230">John Papa says to use <code>latedef</code> in JSHint</a>. One way around the linting issue is to ignore Papa and <a href="http://stackoverflow.com/a/26288458/1028230">define the function first</a>, but, as you mention in your <a href="http://stackoverflow.com/questions/27286700/javascript-jshint-close-is-defined-but-never-used/27295783?noredirect=1#comment43073121_27295783">comment, below</a>, that's not ideal.</p>
+
+<p>So here's the best compromise I could come up with...</p>
+
+<ol>
+<li>Declare, but don't define, variables that will hold functions.</li>
+<li>Insert your Angular directive</li>
+<li>Define your functions from 1.</li>
+</ol>
+
+<p>That definitely mutes the JSHint error, since the code that caused it isn't there any more. If I was doing Angular and needed to follow Papa-style, that's what I'd do to keep Crockford's blessing.</p>
+
+<p>Example:</p>
+
+<pre><code>(function () {
+    'use strict';
+    // 1. Declare your function names. Minimally spammy!
+    var theController;
+
+    // 2. Directive
+    angular
+        .module('myApp')
+        .controller('myAppCtrl', theController);
+
+    // 3. *Define* the functions. No `latedef` needed, and JSLint compliant.
+    // Keeps "the list of calls at the top of the page" and allows you to
+    // "jump to each definition if you need more details". QED? ;^)
+    theController = function () {
+        return "so jslint doesn't complain about empty blocks";
+    };
+}());
+</code></pre>

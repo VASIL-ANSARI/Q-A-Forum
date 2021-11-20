@@ -1,0 +1,66 @@
+<h2>WinAPI part</h2>
+
+<ol>
+<li>Use <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ms633499%28v=vs.85%29.aspx" rel="nofollow">FindWindow</a> function to obtain HWND of the target window.</li>
+<li>Use <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ms633519%28v=vs.85%29.aspx" rel="nofollow">GetWindowRect</a> to obtain current position of the window.</li>
+</ol>
+
+<h2>Qt part</h2>
+
+<ol>
+<li>Make your top level <code>QWidget</code> or <code>QMainWindow</code> frameless and make it to stay on top using <a href="http://qt-project.org/doc/qt-4.8/qt.html#WindowType-enum" rel="nofollow">window flags</a> <code>Qt::FramelessWindowHint</code> and <code>Qt::WindowStaysOnTopHint</code>.</li>
+<li>Make it transparent using <a href="http://qt-project.org/doc/qt-4.8/qt.html#WidgetAttribute-enum" rel="nofollow">attribute</a> <code>Qt::WA_TranslucentBackground</code>.</li>
+<li>Setup a <code>QTimer</code> to request window rect periodically and adjust the widget position.</li>
+</ol>
+
+<h2>Example code (tested)</h2>
+
+<p>Add in header:</p>
+
+<pre><code>private:
+  HWND target_window;
+
+private slots:
+  void update_pos();
+</code></pre>
+
+<p>Source:</p>
+
+<pre><code>#include "Windows.h"
+#include &lt;QDebug&gt;
+#include &lt;QTimer&gt;
+
+MainWindow::MainWindow(QWidget *parent) :
+  QMainWindow(parent),
+  ui(new Ui::MainWindow)
+{
+  ui-&gt;setupUi(this);
+  setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+  setAttribute(Qt::WA_TranslucentBackground);
+  // example of target window class: "Notepad++"
+  target_window = FindWindowA("Notepad++", 0); 
+  if (!target_window) {
+    qDebug() &lt;&lt; "window not found";
+    return;
+  }
+  QTimer* timer = new QTimer(this);
+  connect(timer, SIGNAL(timeout()), this, SLOT(update_pos()));
+  timer-&gt;start(50); // update interval in milliseconds 
+}
+
+MainWindow::~MainWindow() {
+  delete ui;
+}
+
+void MainWindow::update_pos() {
+  RECT rect;
+  if (GetWindowRect(target_window, &amp;rect)) {
+    setGeometry(rect.left, rect.top, rect.right - rect.left, 
+                rect.bottom - rect.top);
+  } else {
+    //maybe window was closed
+    qDebug() &lt;&lt; "GetWindowRect failed";
+    QApplication::quit();
+  }
+}
+</code></pre>

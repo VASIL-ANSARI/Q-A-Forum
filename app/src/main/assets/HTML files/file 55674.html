@@ -1,0 +1,28 @@
+<p>There is no inherit ordering of data in a relational database. You have to specify which field it is that you wish to order by like:</p>
+
+<pre><code>INSERT INTO table2 
+SELECT * 
+FROM table1 
+WHERE column1=smth 
+ORDER BY &lt;field to sort by here&gt; 
+LIMIT 1;
+</code></pre>
+
+<p>Relying on the order a record is written to a table is a very bad idea. If you have an auto-numbered <code>id</code> on <code>table1</code> then just use <code>ORDER BY id DESC LIMIT 1</code> to sort the result set by ID in descending order and pick the last one.</p>
+
+<hr>
+
+<p>Updated to address OP's question about <code>mysqli_insert_id</code></p>
+
+<p>According to the Mysql reference the function called here is <code>last_insert_id()</code> where it states:</p>
+
+<blockquote>
+  <p>Important If you insert multiple rows using a single INSERT statement,
+  LAST_INSERT_ID() returns the value generated for the first inserted
+  row only. The reason for this is to make it possible to reproduce
+  easily the same INSERT statement against some other server.</p>
+</blockquote>
+
+<p>Unfortunately, you'll have to do a second query to get the true "Last inserted id". Your best bet might be to run a <code>SELECT COUNT(*) FROM table1 WHERE column1=smth;</code> and then use that <code>count(*)</code> return to add to the <code>mysqli_insert_id</code> value. That's not great, but if you have high volume where this one function is getting hit a lot, this is probably the safest route.</p>
+
+<p>The less safe route would be <code>SELECT max(id) FROM table2</code> or <code>SELECT max(id) FROM table2 Where column1=smth</code>. But... again, depending on your keys and the number of times this insert is getting hit, this might be risky.</p>

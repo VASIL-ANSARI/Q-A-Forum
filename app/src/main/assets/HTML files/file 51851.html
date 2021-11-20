@@ -1,0 +1,41 @@
+<p>OK I know this is an old question but I've been banging my head over the walls on this issue also, so hoping this will help somebody, here is my solution to the problem.
+To be fair, my "solution" feels more like a convoluted workaround to me than a proper solution, but at least it works.</p>
+
+<p><strong>The short answer</strong> is that the key to make it work is to use <code>NSURLProtectionSpace</code> to set a default permanent credential for all sessions. This prevents the delegate from being called when presented with a challenge of type <code>NSURLAuthenticationMethodClientCertificate</code>.</p>
+
+<p><strong>The long answer</strong> follows below.</p>
+
+<p>In your code, this will not work :</p>
+
+<pre><code>credential = self.clientCertCredential;
+disposition = NSURLSessionAuthChallengeUseCredential;
+//
+// Redacted for clarity
+//
+completionHandler(disposition, credential);
+</code></pre>
+
+<p>Because in a background session, the delegate cannot have access to <code>self.clientCertCredential</code> (God only knows why).</p>
+
+<p>However I found out that the background session will not try to call the delegate if you have previously defined a default credential in an <code>NSURLProtectionSpace</code>.</p>
+
+<p>So scratch all of your <code>else if</code> block and instead do the following :</p>
+
+<pre><code>NSURLProtectionSpace *space = [NSURLProtectionSpace 
+    initWithHost:@"your_address"
+    port:your_port
+    protocol:@"https"
+    realm:@"your_realm"
+    authenticationMethod:NSURLAuthenticationMethodClientCertificate];
+[[NSURLCredentialStorage sharedCredentialStorage] 
+    setDefaultCredential:self.clientCertCredential
+    forProtectionSpace:space];
+</code></pre>
+
+<p>If the <em>host</em>, <em>port</em> and <em>realm</em> parameters match exactly those of your server, then when the challenge is presented to the background session, the <code>challenge.protectionSpace</code> will find the default credential automagically.</p>
+
+<p>In order for it to work, this code will need to be executed before you try to make any request with the background session. You can do it whenever you load the client certificate into <code>self.clientCertCredential</code> for instance.</p>
+
+<p>But beware !!! There is one more subtlety here. Whenever you do so, make sure you load the certificate using the persistence option <code>NSURLCredentialPersistencePermanent</code>. Otherwise it will not work.</p>
+
+<p>One last note. Depending on your use case, the drawback of using this hack is that you might find yourself with a bunch of permanently persisted credentials if several <code>NSURLProtectionSpaces</code>. You might then have to do some housekeeping after setting <code>defaultCredential</code> for the  <code>NSURLCredentialStorage</code> class. This is beyond the scope of this answer, but the class has some convenience methods such as <code>-removeCredential:forProtectionSpace:</code> which are documented here <a href="https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSURLCredentialStorage_Class/" rel="nofollow">https://developer.apple.com/library/mac/documentation/Cocoa/Reference/Foundation/Classes/NSURLCredentialStorage_Class/</a></p>

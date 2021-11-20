@@ -1,0 +1,152 @@
+<p>Your answer is a out of order pastiche with sections that don't follow logically from the previous.</p>
+
+<p>Specific issues:</p>
+
+<p>This logic:</p>
+
+<pre><code>if (count != 13 || count != 15 || count != 16)
+</code></pre>
+
+<p>invalidates every card, the <strong>or</strong>s (||) should be <strong>and</strong>s (&amp;&amp;) for this to work.</p>
+
+<p>This loop makes no sense:</p>
+
+<pre><code>while (card_num &gt;= 0)
+{
+    digit = card_num % 10 ;
+    count++ ;
+    temp_num = (card_num - digit) / 10 ;
+    break ;
+    ...
+}
+</code></pre>
+
+<p>The <code>break</code> is unconditional so it exits the loop and ignores the next twenty lines.</p>
+
+<p>You appear to have spliced in subroutines from elsewhere as you call <code>return</code> five times, only the last of which is valid:</p>
+
+<pre><code>return sum_a ;
+return sum_b ;
+return count ;
+return company_id ;
+return 0 ;
+</code></pre>
+
+<p>In several places you use <code>card_num</code> when you should be using <code>temp_num</code>.</p>
+
+<p>You fail to exit the program once you know the card is invalid -- instead you just keep on testing.  You fail to acknowledge when a card is valid.</p>
+
+<p>You count the number of digits in the card number but wait until after you run other checks before testing if that digit count was valid or not.</p>
+
+<p>What follows is my rework of your code to address the above and some style issues:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;cs50.h&gt;
+#include &lt;math.h&gt;
+
+int main(void)
+{
+    printf("Please give me your credit card number: ") ;
+
+    long long card_num = 0LL;
+
+    while (card_num &lt; 1LL || card_num &gt; 9999999999999999LL)
+    {
+        card_num = GetLongLong();
+    }
+
+    // Make a copy of the card number to be used and modified throughout the process.
+
+    long long temp_num = card_num;
+
+    // Isolate every digit from the credit card number using a loop and the variable 'digit'.
+    // Keep track of the amount and position of each digit using variable 'count'.
+
+    int count = 0;
+
+    while (temp_num &gt; 0LL)
+    {
+        temp_num = temp_num / 10LL;
+        count++;
+    }
+
+    // If the number entered doesn't have the right amount of digits according
+    // to variable 'count', declare the number as invalid.
+
+    if (count != 13 &amp;&amp; count != 15 &amp;&amp; count != 16)
+    {
+        printf("This is an invalid number (# of digits).\n");
+        return 1;
+    }
+
+    // Reset value of variable 'temp_num' and apply calculations that will isolate the first two digits. 
+    // Store the results in a variable 'company_id'.
+
+    temp_num = card_num;
+
+    while (temp_num &gt; 100LL)
+    {
+        temp_num = temp_num / 10LL;
+    }
+
+    int company_id = temp_num;
+
+    // Print the type of credit card depending on the company ID and amount of digits.
+
+    if (company_id &gt; 50 &amp;&amp; company_id &lt; 56 &amp;&amp; count == 16)
+    {
+        printf("MASTERCARD\n") ;
+    }
+    else if ((company_id == 34 || company_id == 37) &amp;&amp; (count == 15)) 
+    {
+        printf("AMEX\n") ;
+    }
+    else if ((company_id / 10 == 4) &amp;&amp; (count == 13 || count == 16 || count == 19))
+    {
+        printf("VISA\n") ;
+    }
+    else
+    {
+        printf("This card was issued by an unknown company.\n");
+    }
+
+    // Apply Luhn's algorithm.
+
+    int sum = 0;
+
+    temp_num = card_num;
+
+    for (int i = 1; i &lt;= count; i++)
+    {
+        int digit = temp_num % 10LL;
+
+        if (i % 2 == 0)
+        {
+            digit *= 2;
+
+            if (digit &gt; 9)
+            {
+                digit -= 9;
+            }
+        }
+
+        sum += digit;
+
+        temp_num /= 10LL;
+    }
+
+    // Checking the validity of the number according to Luhn's algorithm
+
+    if (sum % 10 != 0)
+    {
+        printf("This is an invalid number (Luhn's algorithm).\n");
+        return 1; 
+    }
+
+    printf("This is a valid number.\n");
+
+    return 0;
+} 
+</code></pre>
+
+<p>This is not a finished program -- there's error checking and other details needed.  Rather than summing the digits when a doubled card number is greater than 9, I used the simpler approach of subtracting 9.</p>

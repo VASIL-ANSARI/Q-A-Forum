@@ -1,0 +1,84 @@
+<p>Here check it out ...</p>
+
+<pre><code>public class Main_WB extends Activity {
+EditText edt1, edt2;
+// TextView txt_1;
+
+Button btn;
+
+ArrayList&lt;String&gt; result;
+
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.main);
+
+    edt1 = (EditText) findViewById(R.id.editText1);
+    edt2 = (EditText) findViewById(R.id.editText2);
+    btn = (Button) findViewById(R.id.button1);
+
+    result = new ArrayList&lt;String&gt;();
+
+    btn.setOnClickListener(new View.OnClickListener() {
+        public void onClick(View v) {
+            result.addAll(getTMSChart(edt1.getText().toString(), edt2.getText().toString()));
+
+            Intent in = new Intent(getApplicationContext(), ResultActivity.class);
+
+            in.putExtra("gotonextpageX", result.get(0));
+            in.putExtra("gotonextpageY", result.get(1));
+
+            startActivity(in);
+        }
+    });
+}
+
+private ArrayList&lt;String&gt; getTMSChart(String FromDate, String ToDate) {
+    // txt_1 = (TextView)findViewById(R.id.textView1);
+
+    System.setProperty("http.keepAlive", "false");
+    SoapSerializationEnvelope envelope = new SoapSerializationEnvelope(SoapEnvelope.VER11);
+
+    envelope.dotNet = true;
+
+    String NAMESPACE = "http://tempuri.org/";
+    String URL = "http://54.251.60.177/TMSOrdersService/TMSDetails.asmx";
+    String METHOD = "GetTMSChart";
+
+    SoapObject request = new SoapObject(NAMESPACE, METHOD);
+    request.addProperty("FromDate", FromDate);
+    request.addProperty("ToDate", ToDate);
+
+    envelope.setOutputSoapObject(request);
+    HttpTransportSE androidHttpTransport = new HttpTransportSE(URL);
+
+    String x = "", y = "";
+
+    ArrayList&lt;String&gt; stringResult = new ArrayList&lt;String&gt;();
+
+    try {
+        androidHttpTransport.call(NAMESPACE + METHOD, envelope);
+        SoapObject result = (SoapObject) envelope.bodyIn;
+        SoapObject root = (SoapObject) ((SoapObject) (result).getProperty(0)).getProperty("NewDataSet");
+        int tablesCount = root.getPropertyCount();
+
+        for (int i = 0; i &lt; tablesCount; i++) {
+            SoapObject table = (SoapObject) root.getProperty(i);
+            int propertyCount = table.getPropertyCount();
+
+            for (int j = 0; j &lt; propertyCount; j++) {
+
+                stringResult.add(table.getPropertyAsString("Order_No").toString());
+                stringResult.add(table.getPropertyAsString("Freight_Rate").toString());
+            }
+        }
+    } catch (Exception e) {
+    }
+
+    return stringResult;
+
+}
+}
+</code></pre>
+
+<p>And dont change your second class, this must work.</p>

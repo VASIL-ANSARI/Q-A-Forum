@@ -1,0 +1,30 @@
+<p>According to <a href="http://dev.mysql.com/doc/refman/5.1/en/grant.html" rel="nofollow">the MySQL <code>GRANT</code> documentation</a>, wildcard characters <code>_</code> and <code>%</code> need to be backslash-escaped to be used as literals in the database name.  In your attempt at the top, you have escaped one <code>_</code> as <code>\_</code> but not the other.  If you do escape both underscores, you can achieve correct grants.  The trick though, is that you must <em>also</em> escape them later when issuing the <code>GRANT</code> statement as the <code>creator</code> user to the <code>test</code> user:</p>
+
+<p>Login as root (or a fully privileged user):</p>
+
+<pre><code>-- As root:
+GRANT CREATE USER, CREATE ON *.* TO 'creator'@'localhost' IDENTIFIED BY 'password';
+-- Escape both underscores here
+GRANT ALL PRIVILEGES ON `my\_prefix\_%`.* TO 'creator'@'localhost' WITH GRANT OPTION;
+</code></pre>
+
+<p>Login as <code>creator</code>:</p>
+
+<pre><code>CREATE DATABASE IF NOT EXISTS `my_prefix_test`;
+Query OK, 1 row affected (0.00 sec)
+CREATE USER 'test'@'localhost' IDENTIFIED BY 'password';
+Query OK, 0 rows affected (0.00 sec)
+
+-- Issue the GRANT but escape the underscores.
+-- because creator@localhost does not have permission to grant on 
+-- a pattern like myXprefixXtest, as the unescaped _ wildcards would allow
+GRANT ALL PRIVILEGES ON `my\_prefix\_test`.* TO 'test'@'localhost';
+Query OK, 0 rows affected (0.00 sec)
+</code></pre>
+
+<p>Login as <code>test</code>, the grant works:</p>
+
+<pre><code>USE my_prefix_test;
+CREATE TABLE t (id INT);
+Query OK, 0 rows affected (0.00 sec)
+</code></pre>

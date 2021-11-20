@@ -1,0 +1,100 @@
+<p>Every time you hit "start", this code gets run:</p>
+
+<pre><code>self.startDate = [NSDate date];
+</code></pre>
+
+<p>This resets the start time you are using. Move that out somewhere so that it only happens once instead of on every time you start the timer and I think the result will be closer to what you want. Perhaps you can just store an extra <code>BOOL</code> that gets switched the first time the timer is started.</p>
+
+<p><strong>Edit:</strong> </p>
+
+<p>Very good point brought up by Stonz2 that I overlooked. Doing it this way will cause the time to skip once you start it back up. In order to fix this you will need to store a separate <code>NSDate</code> when you stop the timer, to represent the "paused" time. Then, when you are starting the timer back up again, you will need to add the "paused" time to the "start" time so that the continuation is fluid.</p>
+
+<h1><strong>Edit2:</strong></h1>
+
+<p>I threw this into a project and here is some working code.</p>
+
+<p>I added an extra property:</p>
+
+<pre><code>@property (nonatomic, strong) NSDate *pauseDate;
+</code></pre>
+
+<p>In <code>onStopPressed:</code>, I added this to initialize the pause time:</p>
+
+<pre><code>_pauseDate = [NSDate date];
+</code></pre>
+
+<p>Then, in <code>onStartPressed:</code>, I added the following code to ensure a single initialization of the <code>startDate</code> and to do the math to get the elapsed time after pausing:</p>
+
+<pre><code>    // if we have a start date, don't initialize again
+    if(! _startDate)
+    {
+        self.startDate = [NSDate date];
+    }
+    else
+    {
+        if(_pauseDate)
+        {
+            NSTimeInterval startTime = _startDate.timeIntervalSince1970;
+            NSTimeInterval pauseTime = _pauseDate.timeIntervalSince1970;
+
+            // The actual elapsed time before we paused.
+            NSTimeInterval elapsedTime = pauseTime - startTime;
+
+            // Set a new start time to match our elapsed time.
+            NSTimeInterval currentTime = [NSDate date].timeIntervalSince1970;
+            NSTimeInterval newStartTime = currentTime - elapsedTime;
+            _startDate = [NSDate dateWithTimeIntervalSince1970:newStartTime];
+            _pauseDate = nil;
+        }
+    }
+</code></pre>
+
+<p>Also, in order to make your reset work correctly, in <code>onResetPressed:</code> you will need to add:</p>
+
+<pre><code>_startDate = nil;
+_pauseDate = nil;
+</code></pre>
+
+<p>Just tested this and it works like a champ.</p>
+
+<p><strong>Edit3: full method as per comment thread</strong></p>
+
+<pre><code>- (IBAction)onStartPressed:(id)sender
+{
+    if(startsPressed &lt; 1) {
+        if(startPressed) return;
+        startPressed = true;
+        stopPressed =false;
+        if(! _startDate)
+        {
+            self.startDate = [NSDate date];
+        }
+        else
+        {
+            if(_pauseDate)
+            {
+                NSTimeInterval startTime = _startDate.timeIntervalSince1970;
+                NSTimeInterval pauseTime = _pauseDate.timeIntervalSince1970;
+                NSTimeInterval elapsedTime = pauseTime - startTime;
+                NSTimeInterval currentTime = [NSDate date].timeIntervalSince1970;
+                NSTimeInterval newStartTime = currentTime - elapsedTime;
+                _startDate = [NSDate dateWithTimeIntervalSince1970:newStartTime];
+                _pauseDate = nil;
+            }
+        }
+
+        //create the stop watch timer that fires every 100ms
+        self.stopWatchTimer =
+        [NSTimer scheduledTimerWithTimeInterval:1.0/100.0
+                                         target:self
+                                       selector:@selector(updateTimer)
+                                       userInfo:nil
+                                        repeats:YES];
+    } else {
+
+        startPressed = true;
+        stopPressed = false;
+
+    }
+}
+</code></pre>

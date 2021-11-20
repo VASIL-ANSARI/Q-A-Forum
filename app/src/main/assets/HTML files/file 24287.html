@@ -1,0 +1,37 @@
+<p>I'm assuming you're using ARC.
+Remove this code:</p>
+
+<pre><code>{
+NSOutputStream *outputStream;
+NSInputStream *inputStream;
+}
+
+@synthesize inputStream, outputStream;
+</code></pre>
+
+<p>It's just confusing you between the properties and the instance variables. And the result of having it is that you're setting the instance variable directly and your stream instances are being deallocated by ARC.</p>
+
+<p>Instead, once you've deleted that code above, access the streams with <code>self.inputStream</code> and <code>self.outputStream</code>. This will allow the properties to work properly and ensure that the 'retain' spec that you configure is respected.</p>
+
+<p>Your original code might also just not be trying to set the properties...
+Your configuration should be:</p>
+
+<pre><code>    NSInputStream *inputStream = (NSInputStream *) readStream;
+    NSOutputStream *outputStream = (NSOutputStream *) writeStream;
+
+    [inputStream setDelegate:self];
+    [outputStream setDelegate:self];
+    [inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    [outputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    [inputStream open];
+    [outputStream open];
+
+self.inputStream = inputStream;
+self.outputStream = outputStream;
+</code></pre>
+
+<p>Then change the property to:</p>
+
+<pre><code>@property (strong) NSInputStream *inputStream;
+@property (strong) NSOutputStream *outputStream;
+</code></pre>

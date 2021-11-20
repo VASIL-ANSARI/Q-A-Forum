@@ -1,0 +1,114 @@
+<p>You way does not work, you are creating a new instance of GameViewController rather than accessing the current GameViewController</p>
+
+<pre><code> var vc = GameViewController() // This creates new instance of GameViewController
+</code></pre>
+
+<p>The best way to do access the current gameViewController is usually using delegation or NSNotificationCenter rather than getting a reference to it.</p>
+
+<p>You could also put your shareSheet function into GameScene and show it on the rootViewController.</p>
+
+<pre><code>  self.view?.window?.rootViewController?.presentViewController(tweetSheet...
+</code></pre>
+
+<p>As an alternative may I suggest you make a reusable helper so in your future games it will be much easier to reuse this code. </p>
+
+<p>I use protocol extension in Swift 2 to achieve this. Create a new swift file, call it something like SocialHelper and add this code (just copy the 2 methods and change it to twitter, the code is the same)</p>
+
+<pre><code>  import SpriteKit
+  import Social
+
+ /// URLs
+ private struct URL {
+          static let iTunesApp = NSURL(string: "Your iTunes app link")
+          static let facebookApp = NSURL(string: "Your Facebook app link")
+          static let facebookWeb = NSURL(string: "Your Facebook web link")
+  }
+
+   /// Text strings
+  private struct TextString {
+       static let shareSheetText = "Can you beat my score"
+       static let error = "Error"
+       static let enableSocial = "Please sign in to your account first"
+       static let settings = "Settings"
+      static let ok = "OK"
+  }
+
+  /// Social
+  protocol Social {}
+  extension Social where Self: SKScene {
+
+  /// Open facebook
+ func openFacebook() {
+      guard let facebookApp = URL.facebookApp else { return }
+      guard let facebookWeb = URL.facebookWeb else { return }
+
+      if UIApplication.sharedApplication().canOpenURL(facebookApp){     
+          UIApplication.sharedApplication().openURL(facebookApp)
+     } else {
+        UIApplication.sharedApplication().openURL(facebookWeb)
+   }
+}
+
+  /// Share to facebook
+  func shareToFacebook() {
+
+      guard SLComposeViewController.isAvailableForServiceType(SLServiceTypeFacebook) else {
+             showAlert()
+             return
+       }
+
+     let facebookSheet = SLComposeViewController(forServiceType: SLServiceTypeFacebook)
+     facebookSheet.completionHandler = { result in
+
+           switch result {
+
+           case .Cancelled:
+               print("Facebook message cancelled")
+              break
+
+          case .Done:
+              print("Facebook message complete")
+              break
+          }
+      }
+
+      let text = TextString.shareSheetText //
+      facebookSheet.setInitialText(text) // share sheet text for Facebook will not work anymore if app is installed
+    facebookSheet.addImage(Your UIImage)
+    //facebookSheet.addURL(URL.iTunesApp) // seems to mess up image, Facebook only
+
+        self.view?.window?.rootViewController?.presentViewController(facebookSheet, animated: true, completion: nil)
+     }
+
+   /// Show alert
+  private func showAlert() {
+        let alertController = UIAlertController(title: TextString.error, message: TextString.enableSocial, preferredStyle: .Alert)
+
+        let okAction = UIAlertAction(title: TextString.ok, style: .Cancel) { _ in }
+          alertController.addAction(okAction)
+
+       let settingsAction = UIAlertAction(title: TextString.settings, style: .Default) { _ in
+
+          if let url = NSURL(string: UIApplicationOpenSettingsURLString) {
+             UIApplication.sharedApplication().openURL(url)
+         }
+     }
+     alertController.addAction(settingsAction)
+
+   self.view?.window?.rootViewController?.presentViewController(alertController, animated: true, completion: nil)
+      }
+  }
+</code></pre>
+
+<p>Now in the scene you want to show the shareSheet you simply conform to the proctocol</p>
+
+<pre><code>  class YourScene: SKScene, Social {....
+</code></pre>
+
+<p>and call the method as if it is part of the scene itself.</p>
+
+<pre><code> openFacebook()    // opens app or safari
+ shareToFacebook()
+</code></pre>
+
+<p>Hope this helps</p>

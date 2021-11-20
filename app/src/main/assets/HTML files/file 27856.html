@@ -1,0 +1,116 @@
+<p>I think you can do this with a two step process. The first step is as Mihai Maruseac described in his (now deleted) answer, to find the size of the set by iterating over the possible sizes until you find the appropriate one. Here's code for that:</p>
+
+<pre><code>def find_size(n, i):
+    """Return a tuple, (k, i), where s is the size of the i-1'th set in the
+       cardinally-ordered powerset of {0..n-1}, and i is the remaining index
+       within the combinations of that size."""
+    if not 0 &lt;= i &lt; 2**n:
+        raise ValueError('index is too large or small')
+    for k in range(n+1):
+        c = comb(n, k)
+        if c &gt; i:
+            return k, i
+        else:
+            i -= c
+</code></pre>
+
+<p>Once you have determined the size, you can use the <a href="http://en.wikipedia.org/wiki/Combinatorial_number_system#Finding_the_k-combination_for_a_given_number" rel="nofollow">combinatorial number system</a> to find the right k-combination from the lexicographical ordering:</p>
+
+<pre><code>def pick_set(n, i):
+    """Return the i-1'th set in the cardinally-ordered powerset of {0..n-1}"""
+    s, i = find_size(n, i)
+    result = []
+    for k in range(s, 0, -1):
+        prev_c = 0
+        for v in range(k, n+1):
+            c = comb(v, k)
+            if i &lt; c:
+                result.append(v-1)
+                i -= prev_c
+                break
+            prev_c = c
+    return tuple(result)
+</code></pre>
+
+<p>Both of those functions require a function to calculate the number of k-combinations for a set of size n, <sub>n</sub>C<sub>k</sub> (which I've called <code>comb</code>). <a href="http://stackoverflow.com/questions/3025162/statistics-combinations-in-python">This other question</a> has several suggested solutions for finding that value, including <code>scipy.misc.comb</code>, <code>gmpy.comb</code> and a few pure-python implementations. Or, since it's called repeatedly with sequentially increasing values (e.g. <code>comb(n, 0)</code>, <code>comb(n, 1)</code>, etc. or <code>comb(k, k)</code>, <code>comb(k+1, k)</code>, etc.) you could instead use an inline calculation that takes advantage the previously calculated value to give better performance.</p>
+
+<p>Example usage (using a <code>comb</code> function minimally adapted from <a href="http://stackoverflow.com/a/3025547/1405065">J.F. Sebastian's answer</a> in the question linked above):</p>
+
+<pre><code>&gt;&gt;&gt; for i in range(2**4):
+        print(i, pick_set(4, i))
+
+0 ()
+1 (0,)
+2 (1,)
+3 (2,)
+4 (3,)
+5 (1, 0)
+6 (2, 0)
+7 (2, 1)
+8 (3, 0)
+9 (3, 1)
+10 (3, 2)
+11 (2, 1, 0)
+12 (3, 1, 0)
+13 (3, 2, 0)
+14 (3, 2, 1)
+15 (3, 2, 1, 0)
+</code></pre>
+
+<p>Note that if you plan on iterating over combinations (as I did in the example), you can probably do so more efficiently than by running the full algorithm, as there are more efficient algorithms for finding the next combination of a given size (though you'll need a bit of extra logic to bump up to the next larger size of combinations when you've exhausted the initial size).</p>
+
+<p>Edit: Here are implementations of some of the optimizations I mentioned briefly above:</p>
+
+<p>First off, generators that efficiently calculate combination values for ranges of <code>n</code> or <code>k</code> values:</p>
+
+<pre><code>def comb_n_range(start_n, stop_n, k):
+    c = comb(start_n, k)
+    yield start_n, c
+    for n in range(start_n+1, stop_n):
+        c = c * n // (n - k)
+        yield n, c
+
+def comb_k_range(n, start_k, end_k):
+    c = comb(n, start_k)
+    yield start_k, c
+    for k in range(start_k+1, end_k):
+        c = c * (n - k + 1) // k
+        yield k, c
+</code></pre>
+
+<p>The <code>for ... in range(...): c = comb(...); ...</code> bits in the code above can be adjusted to use these, which should be a bit faster.</p>
+
+<p>Next, a function that returns the next combination in lexicographical order:</p>
+
+<pre><code>def next_combination(n, c):
+    if c[-1] == n-len(c)+1:
+        raise ValueError("no more combinations")
+    for i in range(len(c)-1, -1, -1):
+        if i == 0 or c[i] &lt; c[i-1] - 1:
+            return c[:i] + (c[i] + 1,) + tuple(range(len(c)-2-i,-1,-1))
+</code></pre>
+
+<p>And a generator that uses <code>next_combination</code> to yield a range of values from the powerset, defined by a <code>slice</code> object:</p>
+
+<pre><code>def powerset_slice(n, s):
+    start, stop, step = s.indices(2**n)
+    if step &lt; 1:
+        raise ValueError("invalid step size (must be positive)")
+
+    if start == 0:
+        c = ()
+    else:
+        c = pick_set(n, start)
+
+    for _ in range(start, stop, step):
+        yield c
+        for _ in range(step):
+            try:
+                c = next_combination(n, c)
+            except ValueError:
+                if len(c) == n:
+                    return
+                c = tuple(range(len(c), -1, -1))
+</code></pre>
+
+<p>You could integrate this into the class you are using by making <code>__getitem__</code> return the generator if it is passed a <code>slice</code> object, rather than an <code>int</code>. This would let you make <code>__iter__</code> faster by simply turning its body into: <code>return self[:]</code>.</p>

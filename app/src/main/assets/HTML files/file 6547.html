@@ -1,0 +1,48 @@
+<p>Apple doesn't believe in quit buttons. But you could throw another exception that you don't catch causing your app to crash, but if your app crashes then it won't get approved.</p>
+
+<p>I think the closest you can get it to just disable backgrounding by setting UIApplicationExitsOnSuspend to true in your info.plist and then pressing the home button will quit your app. You could make the quit button a link to any other app in that case.</p>
+
+<p>Changing the if statement to always raise an exception should make your app crash so it will quit.</p>
+
+<pre><code>- (void)handleException:(NSException *)exception
+{
+    [self validateAndSaveCriticalApplicationData];
+
+    UIAlertView *alert =
+        [[[UIAlertView alloc]
+            initWithTitle:NSLocalizedString(@"Unhandled exception", nil)
+            message:[NSString stringWithFormat:NSLocalizedString(
+                @"You can try to continue but the application may be unstable.\n\n"
+                @"Debug details follow:\n%@\n%@", nil),
+                [exception reason],
+                [[exception userInfo] objectForKey:UncaughtExceptionHandlerAddressesKey]]
+            delegate:self
+            cancelButtonTitle:NSLocalizedString(@"Quit", nil)
+            otherButtonTitles:NSLocalizedString(@"Continue", nil), nil]
+        autorelease];
+    [alert show];
+
+    CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+    CFArrayRef allModes = CFRunLoopCopyAllModes(runLoop);
+
+    while (!dismissed)
+    {
+        for (NSString *mode in (NSArray *)allModes)
+        {
+            CFRunLoopRunInMode((CFStringRef)mode, 0.001, false);
+        }
+    }
+
+    CFRelease(allModes);
+
+    NSSetUncaughtExceptionHandler(NULL);
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGILL, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGFPE, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    signal(SIGPIPE, SIG_DFL);
+
+    [exception raise];
+}
+</code></pre>

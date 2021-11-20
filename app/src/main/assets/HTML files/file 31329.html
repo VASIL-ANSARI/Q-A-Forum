@@ -1,0 +1,152 @@
+<p>While the client is still connected to the server, don't close the socket on the server app deliberately. As you must keep alive the connection to receive another message, repeat the receive function call. If there is no data sent from the client, the Receive() function call will automatically block your current thread to wait for available data. If you click send message on the client application again, the data will be available for the server and will unblock that blocking part on the server app.</p>
+
+<p>Your server application might be blocking the UI thread on the AcceptSocket() and Receive() part. When the StartServer button is clicked, your server window (UI) might become not responding because of no incoming connection available and you cannot see messages on your listStatus control. Thus, it is better to put those pieces of Socket code to run on a seperate thread in order not to block the UI thread. To work on the UI component from the seperate thread, a thread-safe UI manipulation is required to do so.</p>
+
+<p>Here is the changes I have made:</p>
+
+<p>Server</p>
+
+<pre><code>namespace Tcp_Server
+{
+    public partial class Form1 : Form
+    {
+        delegate void AddTextCallback(string text);
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void btnStartServer_Click(object sender, EventArgs e)
+        {
+            ThreadPool.QueueUserWorkItem(new WaitCallback(ServerHandler));
+        }
+
+        private void ServerHandler(object args)
+        {
+            TcpListener _listner = new TcpListener(IPAddress.Parse("127.0.0.1"), 7777);
+
+            // Start The Listner:
+            _listner.Start();
+
+            //Show the server is now listening (Note: UI Thread-Safe is required):
+            AddText("Server started - Listening on port 7777");
+
+            //Create a socket to accept - This is a Blocking Call:
+            Socket _sock = _listner.AcceptSocket();
+
+            //When Client Connects show server has accepted the socket:
+            AddText("User from IP " + _sock.RemoteEndPoint);
+
+            while (_sock.Connected)
+            {
+
+                // Create Byte to Receive Data:
+                byte[] _Buffer = new byte[1024];
+
+                // Create integer to hold how large the Data Received is:
+                int _DataReceived = _sock.Receive(_Buffer);
+
+                if (_DataReceived == 0)
+                {
+                    // Socket has been shutdown by the client.
+                    break;
+                }
+
+                // Lets Server Know Message is Received:
+                AddText("Message Received...");
+
+                // Convert Buffer to a String:
+                string _Message = Encoding.ASCII.GetString(_Buffer);
+
+                // Post Message to the Server Window:
+                AddText(_Message);
+            }
+
+            _sock.Close();
+            //When Client disconnect from the server:
+            AddText("Client Disconnected.");
+
+            _listner.Stop();
+            AddText("Server Stop.");
+        }
+
+
+        private void AddText(string text)
+        {
+            // InvokeRequired required compares the thread ID of the 
+            // calling thread to the thread ID of the creating thread. 
+            // If these threads are different, it returns true. 
+            if (this.listStatus.InvokeRequired)
+            {
+                AddTextCallback d = new AddTextCallback(AddText);
+                this.Invoke(d, new object[] { text });
+            }
+            else
+            {
+                this.listStatus.Items.Add(text);
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>Client</p>
+
+<pre><code>namespace Tcp_Client
+{
+    public partial class Form1 : Form
+    {
+        // Defind the TCP Client:
+        TcpClient _Client = null;
+        Stream _Stream = null;
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void btnConnect_Click(object sender, EventArgs e)
+        {
+            _Client = new TcpClient();
+
+            // Connect the TCP Client:
+            _Client.Connect("127.0.0.1", 7777);
+
+            // Show the Client has Connected:
+            listStatus.Items.Add("Connected to Server 127.0.0.1");
+
+            // Create a Stream:                
+            _Stream = _Client.GetStream();
+        }
+
+        private void btnSend_Click(object sender, EventArgs e)
+        {
+            if (_Client.Connected)
+            {
+                // Create Instance of an Encoder:
+                ASCIIEncoding _Asc = new ASCIIEncoding();
+
+                byte[] _Buffer = new byte[1024];
+
+                // Create Buffer to Send Message:
+                _Buffer = _Asc.GetBytes(txtMessage.Text);
+
+                // Show Client is Sending Message:
+                listStatus.Items.Add("Tranmitting Message...");
+
+                // Write Message to the Stream:
+                _Stream.Write(_Buffer, 0, _Buffer.Length);
+            }
+        }
+
+        private void btnDisconnect_Click(object sender, EventArgs e)
+        {
+            _Stream.Close();
+            _Stream.Dispose();
+            _Client.Close();
+            listStatus.Items.Add("Disconnected from server.");
+        }
+    }
+}
+</code></pre>

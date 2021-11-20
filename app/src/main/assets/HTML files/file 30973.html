@@ -1,0 +1,29 @@
+<p>I traced the issue to the function "_layoutSidePanels" in the JASidePanelController.</p>
+
+<p>In your app delegate, I commented out the following code and it seems to fix the grey view growing and shrinking.</p>
+
+<pre><code>rootViewController.shouldResizeLeftPanel = YES;
+</code></pre>
+
+<p>If you follow the code through, when the searchbar is selected you call setCenterPanelHidden, which subsequently calls _layoutSidePanels, which runs the following code:</p>
+
+<pre><code>if (self.leftPanel.isViewLoaded) {
+    CGRect frame = self.leftPanelContainer.bounds;
+    if (self.shouldResizeLeftPanel) {
+        frame.size.width = self.leftVisibleWidth;
+    }
+    self.leftPanel.view.frame = frame;
+}
+</code></pre>
+
+<p>Changing the frame of the sidepanel seems to be the cause, and as I said commenting that code out fixes the issue on my end.</p>
+
+<p>Edit: Also at first it seemed like the search bar was moving up and down a point, but upon further inspection it appears that it is always slightly underneath the navigation bar, but you don't notice it until you select the searchbar and the rest of the view "greys" out, so that little space that was white between the blue nav bar and light grey search bar becomes dark grey like the rest of the tableview below.</p>
+
+<p>Edit #2: Took me a while, but I managed to figure out where the heck that grey mask was coming from. Your UISearchDisplayController is what is responsible for the greyish background that appears when the search bar becomes first responder, and when I removed the following two lines of code the issue you were seeing went away:</p>
+
+<pre><code>self.searchController = [[UISearchDisplayController alloc] initWithSearchBar:self.searchBar contentsController:self];
+self.searchController.searchResultsDataSource = self;
+</code></pre>
+
+<p>Doing this was just to demonstrate the cause of the issue, but removing those lines of code disable whatever functionality you were going to gain from using the search display controller. I don't know exactly what you're hoping to do, so I can't really give you any advice about how to proceed, but hopefully I've pointed you in the right direction as to the causes!</p>

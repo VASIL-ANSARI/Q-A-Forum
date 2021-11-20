@@ -1,0 +1,39 @@
+<p>Since you linked to the mail function, the call to <code>mail</code> is likely hardcoded into your code. So have a look at</p>
+
+<ul>
+<li><a href="http://sebastian-bergmann.de/archives/885-Stubbing-Hard-Coded-Dependencies.html">http://sebastian-bergmann.de/archives/885-Stubbing-Hard-Coded-Dependencies.html</a></li>
+</ul>
+
+<p>Install the <a href="https://github.com/sebastianbergmann/php-test-helpers">testhelper extension</a> and mock the call to <code>mail</code>. Then have the mock validate that it got called with the correct values when your wrapper's send method is called, e.g. define a custom mail function somewhere:</p>
+
+<pre><code>function mail_mock()
+{
+    $allThatWasPassedToTheFunction = func_get_args();
+    return $allThatWasPassedToTheFunction;
+}
+</code></pre>
+
+<p>Then in your <code>send()</code> test, do something like</p>
+
+<pre><code>public function testSendReceivesExpectedValues()
+{
+    // replace hardcoded call to mail() with mock function
+    rename_function('mail', 'mail_orig');
+    rename_function('mail_mock', 'mail');
+
+    // use the wrapper
+    $testClass = new MailWrapper('foo@example.com');
+    $results = $testClass-&gt;send();
+
+    // assert the result
+    $this-&gt;assertSame('foo@example.com', $results[0]);
+    $this-&gt;assertSame('Default Title', $results[1]);
+    $this-&gt;assertSame('Default Message', $results[2]);
+}
+</code></pre>
+
+<p>Note that the above assumes your send function will return the result of the <code>mail()</code> call.</p>
+
+<p>In general, you will always try to substitute an external subsystem, like sendmail or a database or the filesystem with a <a href="http://www.martinfowler.com/articles/mocksArentStubs.html#TheDifferenceBetweenMocksAndStubs">Mock or a Stub</a>, so you can concentrate on testing your own code in isolation of the external subsystem. You dont need to test that <code>mail</code> actually works.</p>
+
+<p>Also see <a href="http://www.phpunit.de/manual/3.6/en/test-doubles.html">http://www.phpunit.de/manual/3.6/en/test-doubles.html</a></p>

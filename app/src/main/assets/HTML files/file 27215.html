@@ -1,0 +1,35 @@
+<p>Your query seems awefully complex for what you are trying to achieve. As far as I can tell the only fields that are relevant for your original query are <code>user_one</code> and <code>user_two</code> in <code>friends</code> and <code>user_id</code> in <code>users</code>. By using sub-queries, the runtime of the query will increase exponantially.</p>
+
+<p>That would mean you could rewrite it to the following query, which should be a lot faster, because mysql can short-circuit out a lot of results instead of having to do every single sub-query. It returns all users that are friends from friends from a certain user I'll call 'x' from here on. Friends of 'x' that are not a friend of a friend are not returned and because of the AND at the end, it will not return the user itself either.</p>
+
+<pre class="lang-sql prettyprint-override"><code>SELECT DISTINCT c.* FROM friends as a, friends as b, users as c
+WHERE (a.user_one = 1 AND (
+  (a.user_two = b.user_one AND b.user_two = c.user_id) OR
+  (a.user_two = b.user_two AND b.user_one = c.user_id)
+  ) OR (a.user_two = 1 AND (
+  (a.user_one = b.user_one AND b.user_two = c.user_id) OR
+  (a.user_one = b.user_two AND b.user_one = c.user_id)
+  )
+ )) AND c.user_id != 1
+ORDER BY c.`user_id` ASC
+</code></pre>
+
+<p>To remove all users that are direct friends from 'x' from the results you can use <code>NOT IN( ... )</code>. I use a sub-query for this, as I don't believe there is a way to do this without sub-queries. I could have joined an extra <code>friends</code> table, but even if I test if the current user is a friend from <code>c.user_id</code> against that newly joined table, the query could procceed by matching any of the other friends in that part of the query, which is something we don't want. The sub-queries will (or should) execute exactly once per unique friend-from-friend. I think the performance would be better if you had those queries seperate and compared both returned arrays with each other, but that would not allow you to use <code>LIMIT</code> in the query.</p>
+
+<pre class="lang-sql prettyprint-override"><code>SELECT DISTINCT c.* FROM friends as a, friends as b, users as c
+WHERE (a.user_one = 1 AND (
+  (a.user_two = b.user_one AND b.user_two = c.user_id) OR
+  (a.user_two = b.user_two AND b.user_one = c.user_id)
+  ) OR (a.user_two = 1 AND (
+  (a.user_one = b.user_one AND b.user_two = c.user_id) OR
+  (a.user_one = b.user_two AND b.user_one = c.user_id)
+  )
+ )) AND c.user_id != 1 AND
+ c.user_id NOT IN (
+   SELECT friends.user_two FROM friends WHERE friends.user_one = 1 UNION
+   SELECT friends.user_one FROM friends WHERE friends.user_two = 1
+ )
+ORDER BY c.`user_id` ASC
+</code></pre>
+
+<p>I believe this should link to the correct sqlfiddle: <a href="http://sqlfiddle.com/#!2/6c14e/2" rel="nofollow">http://sqlfiddle.com/#!2/6c14e/2</a></p>

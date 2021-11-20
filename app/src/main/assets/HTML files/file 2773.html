@@ -1,0 +1,43 @@
+<p>No. Only the last input element will be available. </p>
+
+<p>If you want multiple inputs with the same name use <code>name="foo[]"</code> for the input name attribute. <code>$_POST</code> will then contain an array for foo with all values from the input elements.</p>
+
+<pre><code>&lt;form method="post"&gt;
+    &lt;input name="a[]" value="foo"/&gt;
+    &lt;input name="a[]" value="bar"/&gt;
+    &lt;input name="a[]" value="baz"/&gt;
+    &lt;input type="submit" /&gt;
+&lt;/form&gt;
+</code></pre>
+
+<p>See the <a href="http://reference.sitepoint.com/html/input/name">HTML reference at Sitepoint</a>.</p>
+
+<p>The reason why <code>$_POST</code> will only contain the last value if you don't use <code>[]</code> is because PHP will basically just explode and foreach over the raw query string to populate <code>$_POST</code>. When it encounters a name/value pair that already exists, it will overwrite the previous one.</p>
+
+<p>However, you can still access the raw query string like this:</p>
+
+<pre><code>$rawQueryString = file_get_contents('php://input'))
+</code></pre>
+
+<p>Assuming you have a form like this:</p>
+
+<pre><code>&lt;form method="post"&gt;
+    &lt;input type="hidden" name="a" value="foo"/&gt;
+    &lt;input type="hidden" name="a" value="bar"/&gt;
+    &lt;input type="hidden" name="a" value="baz"/&gt;
+    &lt;input type="submit" /&gt;
+&lt;/form&gt;
+</code></pre>
+
+<p>the $<code>rawQueryString</code> will then contain <code>a=foo&amp;a=bar&amp;a=baz</code>.</p>
+
+<p>You can then use your own logic to parse this into an array. A naive approach would be</p>
+
+<pre><code>$post = array();
+foreach (explode('&amp;', file_get_contents('php://input')) as $keyValuePair) {
+    list($key, $value) = explode('=', $keyValuePair);
+    $post[$key][] = $value;
+}
+</code></pre>
+
+<p>which would then give you an array of arrays for each name in the query string.</p>

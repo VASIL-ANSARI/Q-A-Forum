@@ -1,0 +1,45 @@
+<p>What you need to do is use a different DataSet per Query.</p>
+
+<p>Personally I'd split your Query code into a separate Function taking the Event and Distance as Parameters and returning your DataTable;</p>
+
+<pre><code>Private Function GetResults(ByVal EventCode As Integer, ByVal RaceDistance As Integer) As DataTable
+
+    Dim query As String = "SELECT RaceNo, FirstName, LastName, 
+                           RaceDistance, RaceTime 
+                           FROM " &amp; EventCode &amp; _
+                         " WHERE NOT ISNULL(RaceTime) 
+                           AND RaceDistance = '" &amp; RaceDistance &amp; "' 
+                           ORDER BY RaceDistance ASC, RaceTime ASC;"
+
+    Dim connection As New MySqlConnection(frmMain.connStr)
+    Dim da As New MySqlDataAdapter(query, connection)
+    Dim ds As New DataSet
+
+    Try
+        If da.Fill(ds) Then
+            Return ds.Tables(0)
+        End If
+    Catch ex As Exception
+        Console.WriteLine(ex.Message)
+    Finally
+
+        da = Nothing
+        connection.Close()
+        connection = Nothing
+    End Try
+End Sub
+</code></pre>
+
+<p>I've assumed your Data Types here, you will of course need to modify this to use the correct Data Types.</p>
+
+<p>Then you can attach your DataSources using;</p>
+
+<pre><code>dgvLoadResultsA.DataSource = GetResults(EventCodeA, RaceDistanceA)
+dgvLoadResultsB.DataSource = GetResults(EventCodeB, RaceDistanceB)
+dgvLoadResultsC.DataSource = GetResults(EventCodeC, RaceDistanceC)
+dgvLoadResultsD.DataSource = GetResults(EventCodeD, RaceDistanceD)
+</code></pre>
+
+<p>Ideally you'd also pass in your Connection String to the GetResults Function, then your Function is Unit Testable, but I'll leave that decision to you.</p>
+
+<p>Of course, you should ideally check that your Function returns a valid DataTable before attaching. But I didn't want to over complicate the solution!</p>

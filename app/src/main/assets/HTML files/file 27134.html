@@ -1,0 +1,40 @@
+<p>It's hard to guess exactly what you are using this for but based on your use of GetQueryParameters as a proc name, I'm guessing this if for different queries/searches.</p>
+
+<p>If these all return the same type (a search result) and the reason you want to do this in EF is that strong typing, you could do something like the following:
+(Example uses a test context in EF5 and LinqPad)</p>
+
+<pre><code>using (var context = new TestEntities())
+{
+    string procname = "GetPrograms";
+    // context has method GetPrograms(int? id)
+
+    // Method1 - use the method on the context
+    // This won't work dynamically
+    IEnumerable&lt;GetPrograms_Result&gt; result1 = context.GetPrograms(4);
+    result1.Dump("Method1");
+
+    // Method2 - use reflection to get and use the method on the context
+    // Building your parameters needs to be in the order they are on the method
+    // This gets you an IEnumerable, but not a strongly typed one
+
+    MethodInfo method = context.GetType().GetMethod(procname);
+    method.GetParameters();
+    List&lt;object&gt; parameters = new List&lt;object&gt;();
+    parameters.Add(4);
+
+    IEnumerable result2 = (IEnumerable) method.Invoke(context,parameters.ToArray());
+    result2.Dump("Method2");
+
+    // Method3 - make a SqlQuery call on a common return type, passing a dynamic list
+    // of SqlParameters.  This return type can be but dows not need to be an Entity type
+
+    var argList = new List&lt;SqlParameter&gt;();
+    argList.Add(new SqlParameter("@id",4));
+
+    object[] prm = argList.ToArray();
+    var csv = String.Join(",",argList.Select (l =&gt; l.ParameterName));
+
+    IEnumerable&lt;GetPrograms_Result&gt; result3 = context.Database.SqlQuery&lt;GetPrograms_Result&gt;("exec " + procname + " " + csv ,prm);
+    result3.Dump("Method3");
+}
+</code></pre>

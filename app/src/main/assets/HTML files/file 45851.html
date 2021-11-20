@@ -1,0 +1,45 @@
+<p>You're hit by the two pass run <a href="http://docs.chef.io/chef_client.html#the-chef-client-title-run" rel="nofollow">See this</a> also named compile vs converge.</p>
+
+<p>Chef does things in a certain order, it first compile the recipes to build a resource  collection (compile time), once that's done it execute the code for each resource to ensure it's in the desired state (converge time).</p>
+
+<p>Your <code>Dir.glob</code> is in the recipe, when it's executed (at compile time) the mount resource has not been run and nothing was mounted.</p>
+
+<p>You can embed your existing code into a <a href="https://docs.chef.io/resource_ruby_block.html" rel="nofollow"><code>ruby_block</code></a> resource so it will be run at convergence time and after the mount if it's later in the recipe code.</p>
+
+<pre><code>ruby_block 'List available devices' do 
+  block do
+    devices = Dir.glob('/dev/xvd?')                                                                                                                  
+    devices.each do |device|                                                         
+      Chef::Log.info("devices available: #{device}")                                        
+    end
+  end 
+end
+</code></pre>
+
+<p>You can't use directly resources inside a <code>ruby_block</code>, that's why I used <code>Chef::Log.info</code> but the documentation has examples about it.</p>
+
+<hr>
+
+<p>Update per comment:</p>
+
+<p>Try this:</p>
+
+<pre><code>mount "/data" do 
+  source "/dev/xvdf" # do whatever needs to be done there.
+end
+
+ohai "reload filsystem" do
+  action :reload
+  plugin "filesystem"
+end
+
+ruby_block "List filesystems" do
+  block do
+    node['filesystem'].each do |dev,properties|
+      Chef::Log.warn("#{dev} is mounted on #{properties['mount']}")
+    end
+  end
+end
+</code></pre>
+
+<p>This time I used the warn level, so you'll see something printed, if not try running with <code>chef-client -l info</code></p>

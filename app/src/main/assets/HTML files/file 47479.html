@@ -1,0 +1,40 @@
+<p>If you have a table of months that you care about, you can do:</p>
+
+<pre><code>select m.*,
+       (select count(*)
+        from table t
+        where t.activate_date &lt;= m.month_end and
+              t.deactivate_date &gt;= m.month_start
+       ) as Actives
+from months m;
+</code></pre>
+
+<p>If you don't have such a table handy, you can create one on the fly:</p>
+
+<pre><code>select m.*,
+       (select count(*)
+        from table t
+        where t.activate_date &lt;= m.month_end and
+              t.deactivate_date &gt;= m.month_start
+       ) as Actives
+from (select date('2015-01-01') as month_start, date('2015-01-31') as month_end union all
+      select date('2015-02-01') as month_start, date('2015-02-28') as month_end union all
+      select date('2015-03-01') as month_start, date('2015-03-31') as month_end union all
+      select date('2015-04-01') as month_start, date('2015-04-30') as month_end
+     ) m;
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>A potentially faster way is to calculate a cumulative sum of activations and deactivations and then take the maximum per month:</p>
+
+<pre><code>select year(date), month(date), max(cumes)
+from (select d, (@s := @s + inc) as cumes
+      from (select activate_date as d, 1 as inc from table t union all
+            select deactivate_date, -1 as inc from table t
+           ) t cross join
+           (select @s := 0) param
+      order by d
+     ) s
+group by year(date), month(date);
+</code></pre>

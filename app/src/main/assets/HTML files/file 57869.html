@@ -1,0 +1,39 @@
+<p>I would get rid of <code>getMeteorData</code> at all and turn to <a href="https://guide.meteor.com/react.html#using-createContainer" rel="nofollow"><code>createContainer</code></a>. Data flow gets clear and simple most of the time, including this specific case. Here it goes.</p>
+
+<p>First thing first, create a container to fetch data.</p>
+
+<pre><code>export default theContainer = createContainer(() =&gt; {
+  // Subscribe to the publication which publishes the data.
+  const subscription = Meteor.subscribe(...);
+  // Derive the data for the input box and form the props to pass down.
+  const props = {
+    answer: getAnswer(subscription)
+  };
+  return props;
+}, theComponent);
+</code></pre>
+
+<p><code>theContainer</code> acts as a container component and transferes the contained data  to the presentational component <code>theComponent</code> by props. Be noted that the function given to <code>createContainer</code> is responsive, meaning that changes to reactive data sources in that function trigger rerun and result in rerender of <code>theComponent</code>.</p>
+
+<p>By now we are all armed. Since data in the Mongo collection (Minimongo exactly) is synced by the props passed down, <code>theComponent</code> is aware of the synchronization by a prop transition.</p>
+
+<pre><code>export default class theComponent extends React.Component {
+  ...
+
+  componentWillReceiveProps(nextProps) {
+    if (this.props.answer !== nextProps.answer) {
+      this.setState({
+        answer: nextProps.answer
+      });
+    }
+  }
+
+  render() {
+    return &lt;input value={this.state.answer} onChange={this.onChange} /&gt;;
+  }
+}
+</code></pre>
+
+<p>While such transition occurs, the upcoming value is updated to the state, and this controlled component will render the input based on the updated new value.</p>
+
+<p>On the other hand, while the user starts typing, the change handler <code>this.onChange</code> updates the user's input to the state with every key stoke for this is a controlled component. However, the handler updates the Mongo collection (again, Minimongo exactly) only when the preset duration has elapsed to save data transmission.</p>

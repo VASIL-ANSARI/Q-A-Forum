@@ -1,0 +1,42 @@
+<p><code>wordDocument.MainDocumentPart.Document.Body.Descendants&lt;SdtElement&gt;()</code> returns <code>IEnumerable&lt;SdtElement&gt;</code> and you are assiging it to <code>SdtElemtnt</code>. Try using <code>var</code> or the actual return type.</p>
+
+<p><strong>Update:</strong></p>
+
+<p>Your code is a working one. What you are doing wrong is this line <code>sdtElement.RemoveAllChildren();</code></p>
+
+<p>An sdt element (Content control) contains other elements like  sdtPr (content control properties), sdtContent (the actual content inside the content control) etc. as in the below eg.</p>
+
+<pre><code> &lt;w:sdt&gt;
+    &lt;w:sdtPr&gt;
+        ...
+    &lt;/w:sdtPr&gt;
+    &lt;w:sdtContent&gt;
+      ....
+    &lt;/w:sdtContent&gt;
+  &lt;/w:sdt&gt;
+</code></pre>
+
+<p>What your <code>sdtElement.RemoveAllChildren();</code> doing is to delete everything inside the sdt element and replacing them as:</p>
+
+<pre><code>&lt;w:sdt&gt;
+   &lt;w:altChunk r:id="AltChunkIdffebf242-30b3-4905-bf39-fc0077be9474" /&gt;
+&lt;/w:sdt&gt;
+</code></pre>
+
+<p>Which is making your program to throw exception on secondrun as in line <code>destinationdocument.MainDocumentPart.Document.Body.Descendants&lt;SdtElement&gt;().Where(b =&gt; b.SdtProperties.GetFirstChild&lt;Tag&gt;() != null).FirstOrDefault();</code> your replaced document sdt element has no <code>SdtProperties</code> and also no <code>Tag</code> or <code>sdtContent</code>. </p>
+
+<p>To workaround this problem try inserting your altchunk block into the content control content element (<code>sdtContent</code>) instead of the sdt element directly as below:</p>
+
+<pre><code>using (
+    FileStream fileStream = File.Open("file.docx",
+                                        FileMode.Open))
+{
+    chunk.FeedData(fileStream);
+    AltChunk altChunk = new AltChunk();
+    altChunk.Id = altChunkId;
+    //sdtElement.RemoveAllChildren();
+    sdtElement.Elements&lt;SdtContentBlock&gt;().FirstOrDefault().Append(altChunk); // This is going to add to the existing content.
+}
+</code></pre>
+
+<p>Hope this helps!</p>

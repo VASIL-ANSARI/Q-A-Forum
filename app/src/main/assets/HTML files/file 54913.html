@@ -1,0 +1,18 @@
+<p>The <code>NotImplementedError</code> exception is raised because the <a href="https://docs.python.org/3/library/asyncio-eventloop.html#connect-pipes" rel="nofollow">connect pipes coroutines</a> are not supported by the <code>SelectorEventLoop</code>, which is the default event loop set on <code>asyncio</code>. You need to use a <a href="https://docs.python.org/3/library/asyncio-eventloops.html#asyncio.ProactorEventLoop" rel="nofollow"><code>ProactorEventLoop</code></a> to support pipes on Windows. However, it would still not work because apparently the <code>connect_read_pipe</code> and <code>connect_write_pipe</code> functions doesn't support <code>stdin</code>/<code>stdout</code>/<code>stderr</code> or files in Windows as Python 3.5.1.</p>
+
+<p>One way to read from <code>stdin</code> with an asynchronous behavior is using a thread with the loop's <code>run_in_executor</code> method. Here is a simple example for reference:</p>
+
+<pre><code>import asyncio
+import sys
+
+async def aio_readline(loop):
+    while True:
+        line = await loop.run_in_executor(None, sys.stdin.readline)
+        print('Got line:', line, end='')
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(aio_readline(loop))
+loop.close()
+</code></pre>
+
+<p>In the example the function <code>sys.stdin.readline()</code> is called within another thread by the <code>loop.run_in_executor</code> method. The thread remains blocked until <code>stdin</code> receives a linefeed, in the mean time the loop is free to execute others coroutines if they existed.</p>

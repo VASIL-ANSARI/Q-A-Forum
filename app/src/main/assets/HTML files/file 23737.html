@@ -1,0 +1,58 @@
+<p>I see there is a problem in business logic of your app. Why would you need your AttributeType to know about any of subject?</p>
+
+<pre><code>class Subject &lt; ActiveRecord::Base
+  has_many :subject_attributes
+  has_many :attribute_types, through: :subject_attributes
+end
+
+class SubjectAttribute &lt; ActiveRecord::Base
+  belongs_to :attribute_type
+  belongs_to :subject
+  attr_accessible :attribute_type_id, :subject_id, :value
+end
+
+class AttributeType &lt; ActiveRecord::Base
+  attr_accessible :type_name
+end
+</code></pre>
+
+<p>After that if you insert some data:</p>
+
+<pre><code>s1 = Subject.create
+s2 = Subject.create
+
+sat1 = AttributeType.create(type_name: "Age")
+sat2 = AttributeType.create(type_name: "Sex")
+sat3 = AttributeType.create(type_name: "Username")
+
+SubjectAttribute.create(subject:s1, attribute_type:sat1, value: 20)
+SubjectAttribute.create(subject:s1, attribute_type:sat2, value:"male")
+SubjectAttribute.create(subject:s2, attribute_type:sat1, value:21)
+SubjectAttribute.create(subject:s2, attribute_type:sat3, value:"user1")
+</code></pre>
+
+<p>you will be able to make selects.
+In your example you use several attributes, so you have to make several requests:</p>
+
+<p>that way you'll find subject with value name:    </p>
+
+<pre><code>names = Subject.joins(:attribute_types).where("attribute_types.type_name = 'Username'   
+                                               and value like '%user%'")
+=&gt; [#&lt;Subject id: 2, created_at: "2013-05-29 11:11:51", updated_at: "2013-05-29 11:11:51"&gt;]
+</code></pre>
+
+<p>that way you'll find subject with value age</p>
+
+<pre><code>ages = Subject.joins(:attribute_types).where("attribute_types.type_name = 'Age' 
+                                              and value &gt;= 18")
+=&gt; [#&lt;Subject id: 1, created_at: "2013-05-29 11:11:42", updated_at: "2013-05-29 11:11:42"&gt;, 
+   #&lt;Subject id: 2, created_at: "2013-05-29 11:11:51", updated_at: "2013-05-29 11:11:51"&gt;]
+</code></pre>
+
+<p>That way you'll find intersected subjects</p>
+
+<pre><code>subjects = (names&amp;ages)
+=&gt; [#&lt;Subject id: 2, created_at: "2013-05-29 11:11:51", updated_at: "2013-05-29 11:11:51"&gt;] 
+</code></pre>
+
+<p>Using dynamic attribute_types makes select really hard. so if you ok with making separate request for each type-value params, use it. Otherwise maybe its really just columns of Subjects?</p>

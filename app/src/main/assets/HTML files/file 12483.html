@@ -1,0 +1,368 @@
+<p>Excellent question!</p>
+
+<p><strong>I. Here is an XSLT 2.0 solution</strong> (65 lines, can be converted to XSLT 1.0 almost mechanically):</p>
+
+<pre><code>&lt;xsl:stylesheet version="2.0"
+     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema"
+     xmlns:my="my:my" exclude-result-prefixes="xs my"&gt;
+     &lt;xsl:output omit-xml-declaration="yes" indent="yes"/&gt;
+
+     &lt;xsl:variable name="vItems" select="/*/*/string(.)"
+      as="item()+"/&gt;
+
+
+     &lt;xsl:template match="/"&gt;
+      &lt;xsl:sequence select="my:fill($vItems, 3)"/&gt;
+     &lt;/xsl:template&gt;
+
+     &lt;xsl:function name="my:fill" as="element()+"&gt;
+      &lt;xsl:param name="pItems" as="item()*"/&gt;
+      &lt;xsl:param name="pK" as="xs:integer"/&gt;
+
+      &lt;xsl:variable name="pN" select="count($pItems)"/&gt;
+
+      &lt;xsl:choose&gt;
+       &lt;xsl:when test="$pN le $pK"&gt;
+        &lt;xsl:sequence select="my:fillRow($pItems)"/&gt;
+       &lt;/xsl:when&gt;
+       &lt;xsl:otherwise&gt;
+        &lt;xsl:variable name="vColSize"
+         select="ceiling($pN div $pK)"/&gt;
+
+        &lt;xsl:variable name="vCol-1" select=
+         "$pItems[position() le $vColSize]"/&gt;
+
+        &lt;xsl:variable name="vSubTable"
+         select="my:fill($pItems[position() gt $vColSize],
+                         $pK -1
+                        )
+         "/&gt;
+
+         &lt;xsl:sequence select="my:merge($vCol-1, $vSubTable)"/&gt;
+       &lt;/xsl:otherwise&gt;
+      &lt;/xsl:choose&gt;
+     &lt;/xsl:function&gt;
+
+     &lt;xsl:function name="my:fillRow" as="element()"&gt;
+      &lt;xsl:param name="pItems" as="item()*"/&gt;
+
+      &lt;row&gt;
+       &lt;xsl:for-each select="$pItems"&gt;
+        &lt;cell&gt;&lt;xsl:sequence select="."/&gt;&lt;/cell&gt;
+       &lt;/xsl:for-each&gt;
+      &lt;/row&gt;
+     &lt;/xsl:function&gt;
+
+     &lt;xsl:function name="my:merge" as="element()*"&gt;
+      &lt;xsl:param name="pCol" as="item()*"/&gt;
+      &lt;xsl:param name="pTable" as="element()*"/&gt;
+
+      &lt;xsl:for-each select="$pCol"&gt;
+       &lt;xsl:variable name="vrowPos" select="position()"/&gt;
+       &lt;row&gt;
+        &lt;cell&gt;&lt;xsl:sequence select="."/&gt;&lt;/cell&gt;
+        &lt;xsl:sequence select="$pTable[position() eq $vrowPos]/cell"/&gt;
+       &lt;/row&gt;
+      &lt;/xsl:for-each&gt;
+     &lt;/xsl:function&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p><strong>when this transformation is applied on the provided (most complex) 7-items case</strong>:</p>
+
+<pre><code>&lt;titles&gt;
+ &lt;t&gt;A&lt;/t&gt;
+ &lt;t&gt;B&lt;/t&gt;
+ &lt;t&gt;C&lt;/t&gt;
+ &lt;t&gt;D&lt;/t&gt;
+ &lt;t&gt;E&lt;/t&gt;
+ &lt;t&gt;F&lt;/t&gt;
+ &lt;t&gt;G&lt;/t&gt;
+&lt;/titles&gt;
+</code></pre>
+
+<p><strong>the wanted, correct result is produced</strong>:</p>
+
+<pre><code>&lt;row&gt;
+   &lt;cell&gt;A&lt;/cell&gt;
+   &lt;cell&gt;D&lt;/cell&gt;
+   &lt;cell&gt;F&lt;/cell&gt;
+&lt;/row&gt;
+&lt;row&gt;
+   &lt;cell&gt;B&lt;/cell&gt;
+   &lt;cell&gt;E&lt;/cell&gt;
+   &lt;cell&gt;G&lt;/cell&gt;
+&lt;/row&gt;
+&lt;row&gt;
+   &lt;cell&gt;C&lt;/cell&gt;
+&lt;/row&gt;
+</code></pre>
+
+<p><strong>I have verified that the expected, correct result is produced for every</strong> <code>N = 1 to 7</code>.</p>
+
+<p>Explanation:</p>
+
+<p>We are building the required table <em>recursively</em> on the number of items in the input sequence (<code>pN</code>):</p>
+
+<ol>
+<li><p>The <em>base</em> of the recursion is for any <code>$pN</code> not greater than <code>$pK</code> (the required number of columns). In this basic case the table has a single row.</p></li>
+<li><p>In the general case <code>$pN &gt; $pK</code> ; then we build the leftmost column <code>$vCol-1</code> and, recursively, a smaller table with the rest of the items and new number of required columns: <code>$pK -1</code>.</p></li>
+<li><p>In case 2. above, we finally merge the column and the sub-table to produce the resulting table.</p></li>
+</ol>
+
+<hr>
+
+<p><strong>II. Equivalent XSLT 2.0 solution, writenn in a "more XSLT 2.0 style" (60 lines):</strong></p>
+
+<pre><code>&lt;xsl:stylesheet version="2.0"
+ xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema"
+ xmlns:my="my:my" exclude-result-prefixes="xs my"&gt;
+ &lt;xsl:output omit-xml-declaration="yes" indent="yes"/&gt;
+
+ &lt;xsl:variable name="vItems" select="/*/*/string(.)"
+  as="item()+"/&gt;
+
+
+ &lt;xsl:template match="/"&gt;
+  &lt;xsl:sequence select="my:fill($vItems, 3)"/&gt;
+ &lt;/xsl:template&gt;
+
+ &lt;xsl:function name="my:fill" as="element()+"&gt;
+  &lt;xsl:param name="pItems" as="item()*"/&gt;
+  &lt;xsl:param name="pK" as="xs:integer"/&gt;
+
+  &lt;xsl:sequence select=
+   "for $vN in count($pItems)
+     return
+       if($vN le $pK)
+         then my:fillRow($pItems)
+         else
+           (for $vColSize in xs:integer(ceiling($vN div $pK))
+             return
+               my:merge((for $i in 1 to $vColSize
+                           return $pItems[$i]),
+                             my:fill((for $i in $vColSize+1 to $vN
+                                       return $pItems[$i]),
+                                      $pK -1
+                                     )
+                        )
+            )
+   "/&gt;
+ &lt;/xsl:function&gt;
+
+ &lt;xsl:function name="my:fillRow" as="element()"&gt;
+  &lt;xsl:param name="pItems" as="item()*"/&gt;
+
+  &lt;row&gt;
+   &lt;xsl:for-each select="$pItems"&gt;
+    &lt;cell&gt;&lt;xsl:sequence select="."/&gt;&lt;/cell&gt;
+   &lt;/xsl:for-each&gt;
+  &lt;/row&gt;
+ &lt;/xsl:function&gt;
+
+ &lt;xsl:function name="my:merge" as="element()*"&gt;
+  &lt;xsl:param name="pCol" as="item()*"/&gt;
+  &lt;xsl:param name="pTable" as="element()*"/&gt;
+
+  &lt;xsl:for-each select="$pCol"&gt;
+   &lt;xsl:variable name="vrowPos" select="position()"/&gt;
+   &lt;row&gt;
+    &lt;cell&gt;&lt;xsl:sequence select="."/&gt;&lt;/cell&gt;
+    &lt;xsl:sequence select="$pTable[position() eq $vrowPos]/cell"/&gt;
+   &lt;/row&gt;
+  &lt;/xsl:for-each&gt;
+ &lt;/xsl:function&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<hr>
+
+<p><strong>III. XSLT 1.0 solution</strong> (75 lines) </p>
+
+<p>This is the first XSLT 2.0 solution (above), translated almost mechanically to XSLT 1.0:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0"
+ xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+ xmlns:ext="http://exslt.org/common" exclude-result-prefixes="ext"&gt;
+     &lt;xsl:output omit-xml-declaration="yes" indent="yes"/&gt;
+
+     &lt;xsl:variable name="vItems" select="/*/*"/&gt;
+
+     &lt;xsl:template match="/"&gt;
+      &lt;xsl:call-template name="fill"&gt;
+       &lt;xsl:with-param name="pItems" select="$vItems"/&gt;
+       &lt;xsl:with-param name="pK" select="3"/&gt;
+      &lt;/xsl:call-template&gt;
+     &lt;/xsl:template&gt;
+
+     &lt;xsl:template name="fill"&gt;
+      &lt;xsl:param name="pItems"/&gt;
+      &lt;xsl:param name="pK"/&gt;
+
+      &lt;xsl:variable name="vN" select="count($pItems)"/&gt;
+
+      &lt;xsl:choose&gt;
+       &lt;xsl:when test="not($vN &gt; $pK)"&gt;
+        &lt;row&gt;
+         &lt;xsl:call-template name="fillRow"&gt;
+          &lt;xsl:with-param name="pItems" select="$pItems"/&gt;
+         &lt;/xsl:call-template&gt;
+        &lt;/row&gt;
+       &lt;/xsl:when&gt;
+       &lt;xsl:otherwise&gt;
+        &lt;xsl:variable name="vColSize"
+         select="ceiling($vN div $pK)"/&gt;
+
+        &lt;xsl:variable name="vCol-1" select=
+         "$pItems[not(position() &gt; $vColSize)]"/&gt;
+
+        &lt;xsl:variable name="vrtfSubtable"&gt;
+         &lt;xsl:call-template name="fill"&gt;
+          &lt;xsl:with-param name="pItems" select=
+           "$pItems[position() &gt; $vColSize]"/&gt;
+          &lt;xsl:with-param name="pK" select="$pK -1"/&gt;
+         &lt;/xsl:call-template&gt;
+        &lt;/xsl:variable&gt;
+
+        &lt;xsl:variable name="vSubTable" select=
+        "ext:node-set($vrtfSubtable)/*"/&gt;
+
+         &lt;xsl:call-template name="merge"&gt;
+          &lt;xsl:with-param name="pCol" select="$vCol-1"/&gt;
+          &lt;xsl:with-param name="pTable" select="$vSubTable"/&gt;
+         &lt;/xsl:call-template&gt;
+       &lt;/xsl:otherwise&gt;
+      &lt;/xsl:choose&gt;
+     &lt;/xsl:template&gt;
+
+     &lt;xsl:template name="fillRow"&gt;
+      &lt;xsl:param name="pItems"/&gt;
+
+       &lt;xsl:for-each select="$pItems"&gt;
+        &lt;cell&gt;&lt;xsl:value-of select="."/&gt;&lt;/cell&gt;
+       &lt;/xsl:for-each&gt;
+     &lt;/xsl:template&gt;
+
+     &lt;xsl:template name="merge"&gt;
+      &lt;xsl:param name="pCol"/&gt;
+      &lt;xsl:param name="pTable"/&gt;
+
+      &lt;xsl:for-each select="$pCol"&gt;
+       &lt;xsl:variable name="vrowPos" select="position()"/&gt;
+       &lt;row&gt;
+        &lt;cell&gt;&lt;xsl:value-of select="."/&gt;&lt;/cell&gt;
+        &lt;xsl:copy-of select="$pTable[position() = $vrowPos]/cell"/&gt;
+       &lt;/row&gt;
+      &lt;/xsl:for-each&gt;
+     &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<hr>
+
+<p><strong>IV. Finally, a pure, generative (non-recursive) XSLT 1.0 solution</strong>:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0"
+ xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+ &lt;xsl:output omit-xml-declaration="yes" indent="yes"/&gt;
+
+ &lt;xsl:param name="pK" select="3"/&gt;
+
+ &lt;xsl:variable name="vItems" select="/*/*"/&gt;
+
+ &lt;xsl:template match="/"&gt;
+  &lt;xsl:call-template name="genTable"/&gt;
+ &lt;/xsl:template&gt;
+
+ &lt;xsl:template name="genTable"&gt;
+  &lt;xsl:param name="pItems" select="$vItems"/&gt;
+  &lt;xsl:param name="pK" select="$pK"/&gt;
+
+  &lt;xsl:variable name="vN" select=
+   "count($vItems)"/&gt;
+  &lt;xsl:variable name="vnumRows"
+     select="ceiling($vN div $pK)"/&gt;
+
+  &lt;table&gt;
+   &lt;xsl:for-each select=
+     "$pItems[not(position() &gt; $vnumRows)]"&gt;
+     &lt;xsl:call-template name="genRow"&gt;
+      &lt;xsl:with-param name="pRowInd" select="position()"/&gt;
+      &lt;xsl:with-param name="pItems" select="$vItems"/&gt;
+      &lt;xsl:with-param name="pK" select="$pK"/&gt;
+     &lt;/xsl:call-template&gt;
+   &lt;/xsl:for-each&gt;
+  &lt;/table&gt;
+ &lt;/xsl:template&gt;
+
+ &lt;xsl:template name="genRow"&gt;
+  &lt;xsl:param name="pRowInd" select="position()"/&gt;
+  &lt;xsl:param name="pItems" select="$vItems"/&gt;
+  &lt;xsl:param name="pK" select="$pK"/&gt;
+
+  &lt;xsl:variable name="vN" select=
+   "count($vItems)"/&gt;
+  &lt;xsl:variable name="vFullCols" select=
+   "$vN mod $pK"/&gt;
+  &lt;xsl:variable name="vFullColSize" select=
+   "ceiling($vN div $pK)"/&gt;
+
+   &lt;tr&gt;
+     &lt;td&gt;&lt;xsl:value-of select="$pItems[number($pRowInd)]"/&gt;&lt;/td&gt;
+
+   &lt;xsl:for-each select=
+    "$pItems[position() &gt; 1
+           and
+             not(position() &gt; $pK)
+            ]"&gt;
+    &lt;xsl:variable name="vX" select="position()+1"/&gt;
+
+    &lt;xsl:variable name="vMinFullColsAndX" select=
+    "($vX &gt; $vFullCols) * $vFullCols
+     +
+      not($vX &gt; $vFullCols) * $vX
+    "/&gt;
+
+    &lt;xsl:variable name="vAmmt1" select=
+    "$vMinFullColsAndX * $vFullColSize
+    "/&gt;
+
+    &lt;xsl:variable name="vAmmt2" select=
+    "($vX -1 - $vMinFullColsAndX) * ($vFullColSize -1)
+    "/&gt;
+
+    &lt;xsl:variable name="vValue" select=
+    "$vAmmt1 + $vAmmt2"/&gt;
+
+    &lt;xsl:if test="not(($pRowInd -1) * $pK +$vX &gt; $vN)"&gt;
+     &lt;td&gt;&lt;xsl:value-of select=
+     "$pItems[position()=$pRowInd+$vValue]"/&gt;
+     &lt;/td&gt;
+    &lt;/xsl:if&gt;
+   &lt;/xsl:for-each&gt;
+  &lt;/tr&gt;
+
+ &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p><strong>when applied on the same XML document (above), the wanted, correct result is produced</strong>:</p>
+
+<pre><code>&lt;table&gt;
+   &lt;tr&gt;
+      &lt;td&gt;A&lt;/td&gt;
+      &lt;td&gt;D&lt;/td&gt;
+      &lt;td&gt;F&lt;/td&gt;
+   &lt;/tr&gt;
+   &lt;tr&gt;
+      &lt;td&gt;B&lt;/td&gt;
+      &lt;td&gt;E&lt;/td&gt;
+      &lt;td&gt;G&lt;/td&gt;
+   &lt;/tr&gt;
+   &lt;tr&gt;
+      &lt;td&gt;C&lt;/td&gt;
+   &lt;/tr&gt;
+&lt;/table&gt;
+</code></pre>

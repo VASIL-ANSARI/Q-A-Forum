@@ -1,0 +1,35 @@
+<p>As you see in the <code>ProjectMetaSerializer</code>, the fields <code>id</code> and <code>name</code> are ReadOnlyFields. So you can't use them in <code>post</code> request.</p>
+
+<pre><code>class ProjectMetaSerializer(serializers.ModelSerializer):
+    seqrecords = SeqRecordSerializer(many=True)
+
+    class Meta:
+        model = ProjectMeta
+        fields = ['seqrecords',]
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    project_meta = ProjectMetaSerializer(many=True)
+
+    class Meta:
+        model = Project
+        fields = ['id', 'name', 'project_meta']
+        ReadOnlyField = ['id']
+
+def create(self, validated_data):
+    project = Project(name=validated_data['name'])
+    project.save()
+    # This is where it all fails
+    for seq in validated_data['seqrecords']:
+        sequence = SeqRecord.objects.filter(id=seq['id'])
+        meta = ProjectMeta(project=project,
+                           sequence=sequence,
+                           order=seq['order'])
+        meta.save()
+    return project
+
+class SeqRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SeqRecord
+        fields = ['id', 'name', 'sequence']
+</code></pre>

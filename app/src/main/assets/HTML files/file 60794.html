@@ -1,0 +1,33 @@
+<p>I found that it works if, instead of changing the XML directly, I change the DomDocument and mark the XFA as changed. Below is the corrected code:</p>
+
+<pre><code>var pdfReader = new PdfReader(originalPdfDocumentPath);
+
+pdfReader.RemoveUsageRights();
+
+var pdfStamper = new PdfStamper(pdfReader, new FileStream(newPdfDocumentPath, FileMode.Create, FileAccess.Write, FileShare.None), '\0', true);
+
+var originalXml = pdfReader.AcroFields.Xfa.DomDocument.InnerXml;
+
+var newXml = originalXml.Replace("Table2.Row1.instanceManager.removeInstance(1)", "Table2._Row1.removeInstance(this.parent.parent.index)");
+
+/* New Code */
+var doc = new XmlDocument();
+doc.LoadXml(newXml);
+
+pdfStamper.AcroFields.Xfa.DomDocument = doc;
+pdfStamper.AcroFields.Xfa.Changed = true;
+/* End of New Code */
+
+pdfStamper.Close();
+
+pdfReader.Close();
+</code></pre>
+
+<p>I should note that, even though this code changes the javascript in the PDF file, it also disables the extended features in Adobe Acrobat Reader. You can find more information regarding this here:</p>
+
+<p><a href="http://developers.itextpdf.com/question/why-do-i-get-error-saying-use-extended-features-no-longer-available" rel="nofollow">http://developers.itextpdf.com/question/why-do-i-get-error-saying-use-extended-features-no-longer-available</a></p>
+
+<blockquote>
+  <p>"The problem is related to whether or not your document is Reader Enabled. Reader-enabling can only be done using Adobe software. It is a process that requires a digital signature using a private key from Adobe. When a valid signature is present, specific functionality (as defined in the usage rights when signing) is unlocked in Adobe Reader.
+  You change the content of such a PDF, hence you break the signature."</p>
+</blockquote>

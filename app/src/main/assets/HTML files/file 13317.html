@@ -1,0 +1,76 @@
+<p>The current <strong>@paginate</strong> decorator on TG doesn't permit to handle multiple paginators on the same page. A new version of the decorator will be available from the next release. In the mean time you can replace the <strong>@paginate</strong> decorator with the following implementation (just save it as myproject.lib.paginate and import it instead of tg.decorators.paginate):</p>
+
+<pre><code>from tg.decorators import Decoration
+from tg.paginate import Page
+from tg.util import Bunch, partial
+from tg import request
+
+class paginate(object):
+    def __init__(self, name, use_prefix=False,
+        items_per_page=10, max_items_per_page=0):
+        self.name = name
+        prefix = use_prefix and name + '_' or ''
+        self.page_param = prefix + 'page'
+        self.items_per_page_param = prefix + 'items_per_page'
+        self.items_per_page = items_per_page
+        self.max_items_per_page = max_items_per_page
+
+    def __call__(self, func):
+        decoration = Decoration.get_decoration(func)
+        decoration.register_hook('before_validate', self.before_validate)
+        decoration.register_hook('before_render', self.before_render)
+        return func
+
+    def before_validate(self, remainder, params):
+        page_param = params.pop(self.page_param, None)
+        if page_param:
+            try:
+                page = int(page_param)
+                if page &lt; 1:
+                    raise ValueError
+            except ValueError:
+                page = 1
+        else:
+            page = 1
+
+        try:
+            paginators_data = request.paginators
+        except:
+            paginators_data = request.paginators = {'_tg_paginators_params':{}}
+
+        paginators_data['_tg_paginators_params'][self.page_param] = page_param
+        paginators_data[self.name] = paginator = Bunch()
+
+        paginator.paginate_page = page or 1
+        items_per_page = params.pop(self.items_per_page_param, None)
+        if items_per_page:
+            try:
+                items_per_page = min(
+                    int(items_per_page), self.max_items_per_page)
+                if items_per_page &lt; 1:
+                    raise ValueError
+            except ValueError:
+                items_per_page = self.items_per_page
+        else:
+            items_per_page = self.items_per_page
+        paginator.paginate_items_per_page = items_per_page
+        paginator.paginate_params = params.copy()
+        paginator.paginate_params.update(paginators_data['_tg_paginators_params'])
+        if items_per_page != self.items_per_page:
+            paginator.paginate_params[self.items_per_page_param] = items_per_page
+
+    def before_render(self, remainder, params, output):
+        if not isinstance(output, dict) or not self.name in output:
+            return
+
+        paginator = request.paginators[self.name]
+        collection = output[self.name]
+        page = Page(collection, paginator.paginate_page,
+            paginator.paginate_items_per_page, controller='/')
+        page.kwargs = paginator.paginate_params
+        if self.page_param != 'name':
+            page.pager = partial(page.pager, page_param=self.page_param)
+        if not getattr(tmpl_context, 'paginators', None):
+            tmpl_context.paginators = Bunch()
+        tmpl_context.paginators[self.name] = output[self.name] = page
+</code></pre>

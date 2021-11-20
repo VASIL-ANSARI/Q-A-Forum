@@ -1,0 +1,91 @@
+<p>What if  your singleton was performing operations on a database or writing data to a file? You would not want that occurring in a unit test. You would want to mock out the object to perform some operations in memory instead so you could verify them without having permanent side effects. Unit tests should be self contained and should not create connections to databases or perform other operations with outside systems that could fail and then cause your unit test to fail for an unrelated reason. </p>
+
+<p>Example with pseudo-java (I'm a C# dev):</p>
+
+<pre><code>public class MySingleton {
+
+    private static final MySingleton instance = new MySingleton();
+
+    private MySingleton() { }
+
+    public int doSomething() {
+        //create connection to database, write to a file, etc..
+        return something;
+    }
+
+    public static MySingleton getInstance() {
+        return instance;
+    }
+}
+
+public class OtherClass {
+
+        public int myMethod() {
+            //do some stuff
+            int result = MySingleton.getInstance().doSomething();
+
+            //do some other suff
+            return something;
+        }
+}
+</code></pre>
+
+<p>In order to test <code>myMethod</code> we have to make an actual database call, file operation etc</p>
+
+<pre><code>@Test
+public void testMyMethod() {
+    OtherClass obj = new OtherClass();
+
+    //if this fails it might be because of some external code called by 
+    //MySingleton.doSomething(), not necessarily the logic inside MyMethod()
+
+    Asserts.assertEqual(1, obj.myMethod());
+}
+</code></pre>
+
+<p>If <code>MySingleton</code> was instead something like:</p>
+
+<pre><code>public class MyNonSingleton implements ISomeInterface {
+
+    public MyNonSingleton() {}
+
+    @Override
+    public int doSomething() {
+        //create connection to database, write to a file, etc..
+        return something;
+    }
+
+}
+</code></pre>
+
+<p>you could then inject it as a dependency into MyOtherClass like this:</p>
+
+<pre><code>public class OtherClass {
+
+    private ISomeInterface obj;
+
+    public OtherClass(ISomeInterface obj) {
+        this.obj = obj;
+    }
+
+    public int myMethod() {
+        //do some stuff
+        int result = obj.doSomething();
+
+        //do some other stuff
+        return something;
+    }
+}
+</code></pre>
+
+<p>then you can test like this:</p>
+
+<pre><code>@Test
+public void TestMyMethod() {
+    OtherClass obj = new OtherClass(new MockNonSingleton());
+
+    //now our mock object can fake the database, filesystem etc. calls to isolate the testing to just the logic in myMethod()
+
+    Asserts.assertEqual(1, obj.myMethod());
+}
+</code></pre>

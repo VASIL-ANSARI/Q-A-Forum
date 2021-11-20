@@ -1,0 +1,30 @@
+<p>Your diagnose is correct, this code is prone to lose condition notifications in the way you described. I.e. after one thread locked the mutex but before waiting on the condition variable another thread may call notify_all() so that the first thread misses that notification.</p>
+
+<p>A simple fix is to lock the mutex before decrementing the counter and while notifying:</p>
+
+<pre><code>void task_pool::fence_impl(void *arg)
+{
+    auto f = static_cast&lt;fence*&gt;(arg);
+    std::unique_lock&lt;std::mutex&gt; lock(f-&gt;resume_mutex);
+    if (--f-&gt;counter == 0) {
+        f-&gt;resume.notify_all();
+    }
+    else do {
+        f-&gt;resume.wait(lock);
+    } while(f-&gt;counter);
+}
+</code></pre>
+
+<p>In this case the counter need not be atomic.</p>
+
+<p>An added bonus (or penalty, depending on the point of view) of locking the mutex before notifying is (from <a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/pthread_cond_signal.html" rel="nofollow">here</a>):</p>
+
+<blockquote>
+  <p>The pthread_cond_broadcast() or pthread_cond_signal() functions may be called by a thread whether or not it currently owns the mutex that threads calling pthread_cond_wait() or pthread_cond_timedwait() have associated with the condition variable during their waits; however, <strong>if predictable scheduling behavior is required, then that mutex shall be locked by the thread calling pthread_cond_broadcast() or pthread_cond_signal()</strong>.</p>
+</blockquote>
+
+<p>Regarding the <code>while</code> loop (from <a href="http://pubs.opengroup.org/onlinepubs/009696899/functions/pthread_cond_wait.html" rel="nofollow">here</a>): </p>
+
+<blockquote>
+  <p>Spurious wakeups from the pthread_cond_timedwait() or pthread_cond_wait() functions may occur. Since the return from pthread_cond_timedwait() or pthread_cond_wait() does not imply anything about the value of this predicate, the predicate should be re-evaluated upon such return.</p>
+</blockquote>

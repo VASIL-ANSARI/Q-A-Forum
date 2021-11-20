@@ -1,0 +1,100 @@
+<p>SQLFiddle doesn't work right now, but I'll try to explain you how to accomplish your goal.</p>
+
+<p>First, you need to know the week for each <code>tint</code> date with WEEKOFYEAR() function. This value helps you to sum every week separately. Then, you can make a query like this: </p>
+
+<pre><code>select WEEKOFYEAR(tin) as numWeek,
+           DATE(tin) as dateJob, 
+           DAYOFWEEK(tin) dayOfWeek,
+           usr,
+           job,
+           (IF( ISNULL(tout), UNIX_TIMESTAMP(), UNIX_TIMESTAMP(tout) ) - UNIX_TIMESTAMP(tin)) as DiffInOut
+    from wtime;
+</code></pre>
+
+<p>Now, you can group your data using with every field (numWeek, usr, dayOfWeek, dateJob and job) to get the detailed query:</p>
+
+<pre><code>select numWeek,
+       usr,
+       dayOfWeek,
+       datejob,
+       job,
+       sum(DiffInOut)
+from
+  (
+    select WEEKOFYEAR(tin) as numWeek,
+           DATE(tin) as dateJob, 
+           DAYOFWEEK(tin) dayOfWeek,
+           usr,
+           job,
+           (IF( ISNULL(tout), UNIX_TIMESTAMP(), UNIX_TIMESTAMP(tout) ) - UNIX_TIMESTAMP(tin)) as DiffInOut
+    from wtime
+  ) result
+group by numWeek, usr, dayOfWeek, datejob, job
+</code></pre>
+
+<p>and later make an union to get only info per week..</p>
+
+<pre><code>union
+select numWeek,
+       usr,
+       dayOfWeek,
+       null,
+       null,
+       sum(DiffInOut)
+from
+  (
+    select WEEKOFYEAR(tin) as numWeek,
+           NULL as dateJob, 
+           8 dayOfWeek,
+           usr,
+           job,
+           (IF( ISNULL(tout), UNIX_TIMESTAMP(), UNIX_TIMESTAMP(tout) ) - UNIX_TIMESTAMP(tin)) as DiffInOut
+    from wtime
+  ) result
+group by numWeek, usr, dayOfWeek
+order by numWeek, usr, dayOfWeek;
+</code></pre>
+
+<p><a href="http://www.sqlfiddle.com/#!9/621be/18" rel="nofollow">SQLFiddle Example</a></p>
+
+<p>I hope that SQL Fiddle works for you.</p>
+
+<p>Result:</p>
+
+<pre><code>| numWeek |   usr | dayOfWeek |                    datejob |     job | sum(DiffInOut) |
+|---------|-------|-----------|----------------------------|---------|----------------|
+|      46 | M0005 |         3 | November, 10 2015 00:00:00 | A001942 |          61314 |
+|      46 | M0005 |         8 |                     (null) |  (null) |          61314 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | A001843 |          61314 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | A001814 |              0 |
+|      46 | M0006 |         8 |                     (null) |  (null) |          61314 |
+|      46 | M0007 |         3 | November, 10 2015 00:00:00 | A001814 |          61314 |
+|      46 | M0007 |         3 | November, 10 2015 00:00:00 | .000002 |              0 |
+|      46 | M0007 |         8 |                     (null) |  (null) |          61314 |
+</code></pre>
+
+<p><strong>PD:</strong> Field <code>8 dayOfWeek</code> is a little trick to order week row correctly.</p>
+
+<p><strong>PD2:</strong> My query with your SQL Fiddle example, throws this result:</p>
+
+<pre><code>| numWeek |   usr | dayOfWeek |                    datejob |     job | sum(DiffInOut) |
+|---------|-------|-----------|----------------------------|---------|----------------|
+|      45 | M0006 |         4 | November, 04 2015 00:00:00 | ...ENDE |          50972 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | A001860 |           6080 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | ...ENDE |         310399 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | .000001 |           1935 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | .000002 |           4528 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | .000031 |          13434 |
+|      45 | M0006 |         5 | November, 05 2015 00:00:00 | A001814 |           9204 |
+|      45 | M0006 |         8 |                     (null) |  (null) |         396552 |
+|      46 | M0006 |         2 | November, 09 2015 00:00:00 | ...ENDE |          51363 |
+|      46 | M0006 |         2 | November, 09 2015 00:00:00 | .000001 |            114 |
+|      46 | M0006 |         2 | November, 09 2015 00:00:00 | .000002 |           4382 |
+|      46 | M0006 |         2 | November, 09 2015 00:00:00 | A001843 |          13738 |
+|      46 | M0006 |         2 | November, 09 2015 00:00:00 | A001860 |          17046 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | ...ENDE |           1561 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | .000002 |           4374 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | A001814 |           4924 |
+|      46 | M0006 |         3 | November, 10 2015 00:00:00 | A001843 |          25662 |
+|      46 | M0006 |         8 |                     (null) |  (null) |         123164 |
+</code></pre>

@@ -1,0 +1,23 @@
+<p>I might be missing something, but can you not use <code>MIN</code> instead of <code>TOP 1 ... ORDER BY</code>, since you are ordering by EndDate, StartDate DESC, and only selecting EndDate, the start date is not relevant to the sort, it is only considered when you have 2 end dates that are the same, but since you are only selecting end date it doesn't matter which of the two (or more end dates) are used:</p>
+
+<pre><code>SELECT  D.StartDate,
+        (   SELECT  MIN(E.EndDate)
+            FROM    Dates E
+            WHERE   E.EndDate &gt;= D.EndDate
+            AND     NOT EXISTS 
+                    (   SELECT  1
+                        FROM    Dates E2
+                        WHERE   E.StartDate &lt; E2.StartDate
+                        AND     E.EndDate &gt; E2.StartDate
+                    )
+        ) EndDate
+FROM    Dates D
+WHERE   NOT EXISTS 
+        (   SELECT  1
+            FROM    Dates D2
+            WHERE   D.StartDate &lt; D2.EndDate
+            AND     D.EndDate &gt; D2.EndDate
+        );
+</code></pre>
+
+<p><strong><a href="http://sqlfiddle.com/#!4/2e766/13" rel="nofollow">Example on SQL Fiddle</a></strong></p>

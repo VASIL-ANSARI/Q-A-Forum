@@ -1,0 +1,70 @@
+<p>In an effort to help somebody in the future, I figured out the problem. The stub needs to be setup with the function and then the stub needs injected into the <code>proxyquire</code> configuration.</p>
+
+<p>This is likely because it's not an <code>object.func</code> that I'm watching but rather an existing function.</p>
+
+<pre><code>var proxyquire = require('proxyquire');
+var expect = require('chai').expect;
+var sinon = require('sinon');
+var mockReq = require('./../mockReq');
+var mockRes = require('./../mockRes');
+var utils = require('./../utils');
+var config = require('./../../server-config');
+
+var mailerErr;
+var mailerTemplate;
+function mailerStub(to, subject, html, callback) {
+  callback(mailerErr);
+}
+var mailerStubSpy = sinon.spy(mailerStub);
+
+var emailTemplatesErr;
+var templateErr;
+var templateHtml;
+var emailTemplatesStub = function emailTemplates(root, callback) {
+  callback(emailTemplatesErr, function template(name, locals, callback) {
+    callback(templateErr, templateHtml);
+  })
+};
+
+var sut = proxyquire('./../../middleware/sendEmail', {
+  '../mailer': mailerStubSpy,
+  'email-templates': emailTemplatesStub
+});
+
+describe('middleware/sendEmail', function sendEmailSpec() {
+  beforeEach(function() {
+    mailerErr = false;
+    mailerTemplate = undefined;
+
+    emailTemplatesErr = false;
+    templateErr = false;
+    templateHtml = undefined;
+  });
+
+  it('should send an email', function(done) {
+    var req = new mockReq();
+    var res = new mockRes(next);
+
+    res.email = {
+      templateName: 'template-name',
+      to: 'test@test.com',
+      subject: 'some subject',
+      locals: {
+        firstName: 'test'
+      }
+    };
+
+    templateHtml = 'HTML';
+
+    sut(req, res, next);
+
+    function next(msg) {
+      expect(msg).to.be.false;
+      expect(mailerStubSpy.called).to.be.true;
+      //expect(spy.calledWith(res.email.to, res.email.subject, templateHtml)).to.be.true;
+
+      done();
+    }
+  });
+});
+</code></pre>

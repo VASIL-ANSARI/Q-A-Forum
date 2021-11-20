@@ -1,0 +1,36 @@
+<p>You could use <a href="http://docs.scipy.org/doc/numpy/reference/generated/numpy.ix_.html" rel="nofollow"><code>np.ix_</code></a> to construct the desired index arrays:</p>
+
+<pre><code>In [91]: S[np.ix_([i,j],[i,j])]
+Out[91]: 
+array([[1, 0],
+       [0, 3]])
+
+In [92]: tmp_arr = np.eye(2)*555
+
+In [93]: tmp_arr
+Out[93]: 
+array([[ 555.,    0.],
+       [   0.,  555.]])
+
+In [94]: S[np.ix_([i,j],[i,j])] = tmp_arr
+
+In [95]: S
+Out[95]: 
+array([[555,   0,   0],
+       [  0, 555,   0],
+       [  0,   0,   9]])
+</code></pre>
+
+<hr>
+
+<p>Using <code>np.ix_</code> is good for making assignments to <code>S</code>, but note there are faster ways to select the subarray:</p>
+
+<pre><code>In [99]: %timeit S.take([i, j], axis=1).take([i, j], axis=0)
+100000 loops, best of 3: 3.32 Âµs per loop
+In [97]: %timeit S[:, [i, j]][[i, j], :]
+100000 loops, best of 3: 8.8 Âµs per loop
+In [96]: %timeit S[np.ix_([i,j],[i,j])]
+100000 loops, best of 3: 13 Âµs per loop
+</code></pre>
+
+<p>But unlike these other methods, <code>S[np.ix_(...)] = ...</code> does not use <em>chained indexing</em>, so <code>S.__setitem__</code> gets called and the assignment affects <code>S</code>. In contrast, <code>S[:, [i, j]]</code> returns a <em>copy</em> of a subarray of <code>S</code>, so assigning to <code>S[:, [i, j]][[i, j], :]</code> affects only this copy of the subarray, not <code>S</code> itself. Since no reference to this copy of the subarray is maintained, Python throws away the copy after the assignment is made, so the assignment is lost. That is why chained indexing is no good for assigning to <code>S</code>.</p>

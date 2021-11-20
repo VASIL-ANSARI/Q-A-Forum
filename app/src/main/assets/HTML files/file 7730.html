@@ -1,0 +1,52 @@
+<p>Upon looking at your code, here's a quick summary of what I would do:</p>
+
+<p><strong>Remove <code>ProgressChanged</code> handler.</strong> It is intended for reporting current status to user, which you don't do. Instead, call <code>Items.Add</code> in <code>DoWork</code> handler.</p>
+
+<p><strong>Create <code>EventLog</code> once.</strong> This just seems nicer and saves you from potentially creating it in a loop if you aren't careful.</p>
+
+<p><strong>Instead of parsing text with regex, create a special class.</strong> This is <strong>really</strong> important and will save you a lot of pain when you need more accurate behavior or don't wish to display index at all. Regular expressions are slow, and <strong>data intended for display to user must never be parsed. You must use classes.</strong> </p>
+
+<p><strong>Use meaningful names.</strong> I know that you didn't clean up the code, but if you want someone to help you over the internet, you really should.</p>
+
+<p><strong>Finally, get item by index.</strong> If you looked into <a href="http://msdn.microsoft.com/en-us/library/system.diagnostics.eventlogentrycollection.aspx" rel="nofollow">the documentation</a>, you would have <a href="http://msdn.microsoft.com/en-us/library/system.diagnostics.eventlogentrycollection.item.aspx" rel="nofollow">noticed</a> there's an indexer property that gets item directly by its index.</p>
+
+<pre><code>class EntryItem {
+    public EntryItem (EventLogEntry entry) 
+    {
+        EntryIndex = entry.Index;
+        ItemText = string.Format ("{0} - {1} - {2}     - {3}",
+            entry.Index,
+            entry.EntryType,
+            entry.TimeWritten,
+            entry.Source);
+    }
+
+    public string ItemText { get; private set; }
+    public int EntryIndex { get; private set; }
+
+    public override string ToString ()
+    {
+        return ItemText;
+    }
+}
+
+private EventLog log = new EventLog {
+    Log = "System"
+};
+
+private void eventLoader_DoWork (object sender, DoWorkEventArgs e)
+{
+    foreach (EventLogEntry entry in this.log.Entries)
+        this.Dispatcher.BeginInvoke (() =&gt; eventListBox.Items.Add (new EntryItem (entry)));
+}
+
+private void eventListBox_SelectionChanged (object sender, SelectionChangedEventArgs e)
+{
+    EntryItem item = eventListBox.SelectedItem as EntryItem;
+    if (item == null)
+        return;
+
+    var entry = log.Entries [item.EntryIndex];
+    currentEntryLabel.Content = entry.Message;
+}
+</code></pre>

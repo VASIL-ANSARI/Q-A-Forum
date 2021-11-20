@@ -1,0 +1,55 @@
+<p>It's very unclear what your SQL schema looks like, but in your update statement, everything after <code>FROM</code> isn't being used for any purpose. Your <code>WHERE</code> clause doesn't mention <code>SessionalMarks</code>, so each time you loop through your <code>for</code> loop you're updating <em>all</em> rows in that table.</p>
+
+<p>If you post your SQL schema of these three tables, it might help us understand the shape of your data and help you write a better query. The way you've described it, it sounds like the <code>DATA</code> table ought to contain the marks for each student, but you've apparently put that data in the <code>SessionalMarks</code> table instead.</p>
+
+<p>However, your code has some problems besides the one you've mentioned:</p>
+
+<ul>
+<li><p>You're composing a SQL query by joining strings together, and it looks like those strings might have come from the user. This exposes you to a SQL injection attack, or at least if the user types a <code>'</code> your program will behave incorrectly.</p></li>
+<li><p>You're opening and closing the database connection repeatedly, instead of opening it once and closing it when you're finished.</p></li>
+</ul>
+
+<p>To fix these problems, you probably should (a) use a parameterized SQL query, and (b) open and close the database connection outside of the loop.</p>
+
+<p>This isn't perfect, but it's a start:</p>
+
+<pre><code>// this query needs to be fixed
+string query = @"UPDATE SessionalMarks 
+                SET SessionalMarks.Hourly1Marks = @hourly1
+                   ,SessionalMarks.Hourly2Marks = @hourly2
+                FROM Student,DATA
+                WHERE Student.StudentId = DATA.StudentId
+                AND Student.StudentId = @studentid";
+
+// Make sure we dispose of the SqlCommand when we're finished with it
+using (SqlCommand cmd = new SqlCommand(query, conn))
+{
+    // Create my three parameters, don't need a value yet
+    // Need to make sure we have the right SqlDbType specified
+    cmd.Parameters.Add( new SqlParameter("@hourly1", SqlDbType.Decimal) );
+    cmd.Parameters.Add( new SqlParameter("@hourly2", SqlDbType.Decimal) );
+    cmd.Parameters.Add( new SqlParameter("@studentid", SqlDbType.Int) );
+
+    conn.Open();
+
+    try
+    {
+        // For each row in our DataGridView
+        // We could also use foreach(DataGridViewRow row in dataGridView1.Rows)
+        for (int i = 0; i &lt; this.dataGridView1.Rows.Count - 1; i++)
+        {
+            // Fill in our parameters with our values
+            cmd.Parameters[0].Value = dataGridView1[1,i].Value.ToString();
+            cmd.Parameters[1].Value = dataGridView1[2,i].Value.ToString();
+            cmd.Parameters[2].Value = Convert.ToString(dataGridView1[3, i].Value);
+
+            cmd.ExecuteNonQuery();
+        }
+    }
+    finally
+    {
+        // Close our database connection even if cmd.ExecuteNonQuery() throws
+        conn.Close();
+    }
+}
+</code></pre>

@@ -1,0 +1,102 @@
+<p>The way i like to accomplish this is by keeping references to my input elements. This way i can easily fetch their input values without having to search through the entire element tree. I'm doing so by encapsulating the creation logic for a particular screen in a separate clase, like this:</p>
+
+<pre><code>public class BookASessionScreen
+{
+    private RootElement _root = null;
+
+    private EntryElement _firstName = null;
+
+    private EntryElement _lastName = null;
+
+    private EntryElement _email = null;
+
+    private DateElement _date = null;
+
+    private RootElement _typeOfShoot = null;
+
+    private EntryElement _message = null;
+
+    private void CreateRoot()
+    {
+        _firstName = new EntryElement("First Name", "First Name", "");
+        _lastName = _firstName = new EntryElement("First Name", "First Name", "");
+        _email = new EntryElement("Email", "Email", "") { KeyboardType = UIKeyboardType.EmailAddress };
+        _date = new DateElement("Event Date", DateTime.Now);
+        _typeOfShoot = new RootElement ("Type of Shoot", new RadioGroup (0)){
+            new Section () {
+                new RadioElement("Wedding"),
+                new RadioElement("Portrait"),
+                new RadioElement("Boudoir"),
+                new RadioElement("Other")
+            }
+        };
+        _message = new EntryElement("Message", "Message", "");
+
+        _root = new RootElement("Book a Session") {
+            new Section() {
+                _firstName,
+                _lastName,
+                _email,
+                _date,
+                _typeOfShoot,
+                _message
+            } ,
+            new Section () {
+                new StringElement("Send", delegate { 
+                    //BookASession.SendMessage(_firstName.Value, _lastName.Value, ...)
+                })
+            }
+        };
+    }
+
+    public RootElement Root 
+    {
+        get {
+            if (_root == null) {
+                CreateRoot();
+            }
+            return _root;
+        }
+    }
+}
+</code></pre>
+
+<p>Also, you may want to decouple the form processing logic by having the class expose an event, like this:</p>
+
+<p>1 - Create a class that will hold the event data, extending EventArgs:</p>
+
+<pre><code>public class BookASessionArgs : EventArgs
+{
+    public string FirstName
+    {
+        get;
+        set;
+    }
+
+    public string LastName
+    {
+        get;
+        set;
+    }
+
+    public string Email
+    {
+        get;
+        set;
+    }
+}
+</code></pre>
+
+<p>2 - Declare your event in BookASessionScreen:</p>
+
+<pre><code>public event EventHandler BookASession;</code></pre>
+
+<p>3 - Fire the event in your delegate</p>
+
+<pre><code>if (BookASession != null) {
+    BookASession(this, new BookASessionArgs() {
+        FirstName = _firstName.Value,
+        LastName = _lastName.Value
+        //..
+    });
+}</code></pre>

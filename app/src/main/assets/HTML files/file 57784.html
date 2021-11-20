@@ -1,0 +1,23 @@
+<p>There's no way to avoid this warning, because there's no way to safely define an interface that has a generic varargs method.</p>
+
+<p>Another implementation of <code>CollectiorIF</code> could misuse the parameter, rendering any caller of <code>CollectorIF.addAll()</code> vulnerable to strange runtime behavior. You could make a case that interfaces and non-final methods <em>should</em> allow <code>@SafeVarargs</code> (and require that implementing/overriding methods be similarly annotated), but presently the Java devs made a conscious decision not to support that pattern.</p>
+
+<p>The JLS provides a little more background:</p>
+
+<blockquote>
+  <p>The annotation is not usable where method overriding occurs. Annotation inheritance only works on classes (not methods, interfaces, or constructors), so an @SafeVarargs-style annotation cannot be passed through instance methods in classes or through interfaces.</p>
+  
+  <p><a href="https://docs.oracle.com/javase/specs/jls/se8/html/jls-9.html#jls-9.6.4.7" rel="nofollow">~JLS Â§9.6.4.7</a></p>
+</blockquote>
+
+<p>In the meantime you have two choices; ignore the warning or refactor your API.</p>
+
+<p>Refactoring your API is actually likely to be exactly what you want, since generic vararg methods should only be used as bridges to the real, properly-generic implementation. Instead of defining it as part of your interface (and therefore requiring all implementations implement it) provide it as a static utility method, thereby making the interface's API smaller while still giving callers the flexibility to use varargs. As of Java 8 the utility method can even be defined in the interface.</p>
+
+<pre><code>@SafeVarargs
+public static &lt;T&gt; void addAll(CollectorIF&lt;T&gt; collector, T... values) {
+  collector.addAll(Arrays.asList(values));
+}
+</code></pre>
+
+<p>Your interface should then define a <code>addAll(Iterable&lt;T&gt; values)</code> method which lets implementors avoid the crufty world of generic varargs entirely.</p>

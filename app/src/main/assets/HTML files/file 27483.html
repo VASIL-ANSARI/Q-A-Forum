@@ -1,0 +1,59 @@
+<p>OK, you got the data in a format that's more convoluted than it would need to be. They could easily have stuffed the whole day into a netCDF file. And indeed, one option for you to solve this would have been to combine all files into one with a times dimension, using for example the NCO command line tools.</p>
+
+<p>But here is a solution that uses the scipy netcdf module. I believe it is deprecated -- myself, I prefer the NetCDF4 library. The main approach is: preset your output data structure with <code>np.nan</code> values; loop through your input files and retrieve precipitation and station ids; for each of your stationids of interest, retrieve index, and then precipitation at that index; add to the output structure. (I didn't do the work to extract timestamps - that's up to you.) </p>
+
+<pre><code>import glob
+import numpy as np
+from scipy.io import netcdf
+
+# load data file names 
+stationdata = glob.glob('gauge*.nc')
+stationdata.sort()
+# initialize np arrays of integer gauging station ids
+gauge_id_list = ['570002','570021','570025','570028','570030','570032','570031','570035','570036',
+                 '570047','570772','570781','570910','570903','570916','570931','570943','570965',
+                 '570968','570983','570986','70214','70217','70349','70351']
+gauge_ids = np.array(gauge_id_list).astype('int32')
+ngauges = len(gauge_ids)
+ntimesteps = 48
+# initialize output dictionary
+dtypes = zip(gauge_id_list, ['float32']*ngauges)
+timeseries_per_station = np.empty((ntimesteps,))
+timeseries_per_station.fill(np.nan)
+timeseries_per_station = timeseries_per_station.astype(dtypes)
+
+# Instead of using the index, you could extract the datetime stamp 
+for timestep, datafile in enumerate(stationdata):
+    data = netcdf.NetCDFFile(datafile, 'r')
+    precip = data.variables['precip'].data
+    stid = data.variables['stid'].data
+    # create np array of indices of the gaugeid present in file
+    idx = np.where(np.in1d(stid, gauge_ids))[0]
+    for i in idx:
+        timeseries_per_station[str(stid[i])][timestep] = precip[i]
+    data.close()
+
+np.set_printoptions(precision=1)
+for gauge_id in gauge_id_list:
+    print "Station %s:" % gauge_id
+    print timeseries_per_station[gauge_id]
+</code></pre>
+
+<p>The output looks like this:</p>
+
+<pre><code>Station 570002:
+[ 1.9  0.3  0.   nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan]
+Station 570021:
+[  0.   0.   0.  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan  nan
+  nan  nan  nan]
+...
+</code></pre>
+
+<p>(Obviously, there were only three files.)</p>
+
+<p><strong>Edit:</strong> The OP noted that the code wasn't running without errors for him because his variable names are "precipitation" and "station_id". The code runs for me on the files he posted. Obviously, he should be using whatever variable names are used in the files that he was supplied with. As they seem to be custom-produced files for his use, it is conceivable that the authors may not be consistent in variable naming. </p>

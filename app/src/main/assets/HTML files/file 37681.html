@@ -1,0 +1,40 @@
+<p>In order to avoid nesting to describe sequences in RSpec you might want to check out <a href="http://betterspecs.org/#contexts" rel="nofollow">contexts</a>. As was pointed out in the comment to my answer, you cannot remove the duplicity of the <code>visit_root_path</code> due to the fact that the various test cases need different prerequisites (i.e. one needs 1 post to be created, the other needs 2). </p>
+
+<p>I'd write this test suite like so:</p>
+
+<pre><code>describe 'micropost pluralization' do
+  let :new_user { create :user } 
+  before :all do
+    sign_in new_user
+  end
+
+  context 'no microposts' do
+    it 'should have no microposts' do
+      visit_root_path
+      expect(page).to have_text('0 microposts')
+    end
+  end 
+
+  context 'one or more microposts' do
+    # you could have a before :each here do create the posts, but
+    # since you only have two test cases I don't feel it's necessary.
+
+    it 'should have one micropost' do
+      create :micropost, user: new_user, content: 'Lorem ipsum'
+      visit_root_path
+      expect(page).to have_text('1 micropost')
+    end  
+
+    it 'should have two microposts' do
+      2.times.do { create :micropost, user: new_user, content: 'Lorem ipsum' }
+      visit_root_path
+      expect(page).to have_text('2 microposts')
+    end
+  end # end context
+
+end # end describe
+</code></pre>
+
+<p>It might not look perfectly DRY, but it certainly looks readable to me.</p>
+
+<p>I cannot recommend <a href="http://betterspecs.org/" rel="nofollow">betterspecs</a> enough for test writing by the way :-)</p>

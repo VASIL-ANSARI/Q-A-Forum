@@ -1,0 +1,42 @@
+<h3>The problem is that you're manually allocating memory in your <a href="http://stackoverflow.com/a/3172588/2976878"><code>ImageBitmap</code></a> object, but you are never releasing it.</h3>
+
+<p>The two suspects are the bitmap context (<code>context</code>), and the bitmap data (<code>contextData</code>). Both of these are not managed by ARC, so you'll want to be freeing both of these yourself once you are done with them.</p>
+
+<p>In ARC, you can simply implement the <code>dealloc</code> method in your <code>ImageBitmap</code> class and put your cleanup code there.</p>
+
+<p><strong>For example:</strong></p>
+
+<pre><code>-(void) dealloc {
+    CGContextRelease(context); // releases the bitmap context, if it was created (CGContextRelease checks for NULL)
+    free(contextData); // releases the bitmap data (it was explicitly created, so no need to check)
+}
+</code></pre>
+
+<hr>
+
+<h3>It's also worth noting you should make <code>init</code> unavailable, and mark your designated initialiser.</h3>
+
+<p>This is because you <em>cannot</em> use your <code>imageFromContext</code> and <code>pixelAtX:Y:</code> instance methods without having created your instance through your custom <code>initWithSize:bitmapInfo:</code> initialiser, as it creates the bitmap context and allocates the memory for the bitmap data.</p>
+
+<p><strong>Therefore if you were to create your instance by calling <code>init</code>, and call one of your instance methods, you would most likely get a crash.</strong></p>
+
+<p>To remedy this, you can mark the <code>init</code> method as unavailable in your <code>ImageBitmap.h</code> file, and also mark your <code>initWithSize:bitmapInfo:</code> method as the designated initialiser.</p>
+
+<pre><code>-(instancetype) init NS_UNAVAILABLE;
+
+-(id)initWithSize:(CGSize)size bitmapInfo:(CGBitmapInfo)bmInfo NS_DESIGNATED_INITIALIZER;
+</code></pre>
+
+<p>All the <code>NS_UNAVAILABLE</code> does is prevent you from creating your instance by just calling <code>init</code>, forcing you to use your custom initialisers.</p>
+
+<p>If you try to do <code>[[ImageBitmap alloc] init]</code>, the compiler will show you the following error:</p>
+
+<p><a href="http://i.stack.imgur.com/nsFDW.png" rel="nofollow"><img src="http://i.stack.imgur.com/nsFDW.png" alt="enter image description here"></a></p>
+
+<p>All the <code>NS_DESIGNATED_INITIALIZER</code> does is make sure that any extra initialisers in <code>ImageBitmap</code> must create new instances through your initialiser, and will show you the following warning if they don't:</p>
+
+<p><a href="http://i.stack.imgur.com/6V2Re.png" rel="nofollow"><img src="http://i.stack.imgur.com/6V2Re.png" alt="enter image description here"></a></p>
+
+<p><a href="https://developer.apple.com/library/mac/releasenotes/ObjectiveC/ModernizationObjC/AdoptingModernObjective-C/AdoptingModernObjective-C.html#//apple_ref/doc/uid/TP40014150-CH1-SW8" rel="nofollow">See here for more info on <code>NS_DESIGNATED_INITIALIZER</code>.</a></p>
+
+<p><strong>Now, in practise these are really just formalities as you're the only one who's going to be using this, and you know you have to use the custom initialisers. However, it's good to get these formalities right if you ever want to share your code with other people.</strong></p>

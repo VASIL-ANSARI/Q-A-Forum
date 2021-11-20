@@ -1,0 +1,24 @@
+<p>The unit of time used by the <code>clock</code> function is arbitrary. On most platforms, it is unrelated to the processor speed. It's more commonly related to the frequency of an external timer interrupt âÂ which may be configured in software â or to a historical value that's been kept for compatibility through years of processor evolution. You need to use the macro <code>CLOCKS_PER_SEC</code> to convert to real time.</p>
+
+<pre><code>printf("Total time taken by CPU: %fs\n", (double)total_t / CLOCKS_PER_SEC);
+</code></pre>
+
+<p>The C standard library was designed to be implementable on a wide range of hardware, including processors that don't have an internal timer and rely on an external peripheral to tell the time. Many platforms have more precise ways to measure wall clock time than <code>time</code> and more precise ways to measure CPU consumption than <code>clock</code>. For example, on POSIX systems (e.g. Linux and other Unix-like systems), you can use <a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/getrusage.html" rel="nofollow"><code>getrusage</code></a>, which has microsecond precision.</p>
+
+<pre><code>struct timeval start, end;
+struct rusage usage;
+getrusage(RUSAGE_SELF, &amp;usage);
+start = usage.ru_utime;
+â¦
+getrusage(RUSAGE_SELF, &amp;usage);
+end = usage.ru_utime;
+printf("Total time taken by CPU: %fs\n", (double)(end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e-6);
+</code></pre>
+
+<p>Where available, <a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/clock_gettime.html" rel="nofollow"><code>clock_gettime(CLOCK_THREAD_CPUTIME_ID)</code></a> or <code>clock_gettime(CLOCK_PROCESS_CPUTIME_ID)</code> may give better precision. It has nanosecond precision.</p>
+
+<p>Note the difference between precision and accuracy: precision is the unit that the values are reported. Accuracy is how close the reported values are to the real values. Unless you are working on a <a href="https://en.wikipedia.org/wiki/Real-time_computing" rel="nofollow">real-time system</a>, there are no hard guarantees as to how long a piece of code takes, including the invocation of the measurement functions themselves.</p>
+
+<p>Some processors have <em>cycle</em> clocks that count processor cycles rather than wall clock time, but this gets very system-specific.</p>
+
+<p>Whenever making benchmarks, beware that what you are measuring is the execution of this particular executable on this particular CPU in these particular circumstances, and the results may or may not generalize to other situations. For example, the empty loop in your question will be optimized away by most compilers unless you turn optimizations off. Measuring the speed of unoptimized code is usually pointless. Even if you add real work in the loop, beware of toy benchmarks: they often don't have the same performance characteristics as real-world code. On modern high-end CPUs such as found in PC and smartphones, benchmarks of CPU-intensive code is often very sensitive to cache effects and the results can depend on what else is running on the system, on the exact CPU model (due to different cache sizes and layouts), on the address at which the code happens to be loaded, etc.</p>

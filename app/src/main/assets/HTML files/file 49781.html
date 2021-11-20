@@ -1,0 +1,11 @@
+<p>You need to be more careful about which process/rank is allocating memory, and which process/rank is therefore freeing memory.</p>
+
+<p>In your current implementation, you'll want <code>rank == ROOT</code> to allocate and initialize <code>matrix</code>, <code>sendcount</code>, and <code>displs</code>. You'll want every rank to allocate and initialize <code>sendcount</code> and <code>displs</code> (otherwise, when they each enter <code>MPI_Scatterv</code> how do they know what exactly they'll be receiving?). Finally, they'll also need to allocate but <em>not</em> initialize <code>recvbuf</code>. The initialization of this buffer happens internally to the <code>MPI_Scatterv</code> routine.</p>
+
+<p>[Side note: You don't technically need to have each rank initialize <code>sendcount</code> and <code>displs</code>, although this will certainly be fastest. If only the <code>rank == ROOT</code> process has the knowledge to calculate these values, then you'll have to <code>MPI_Bcast</code> both of these arrays to every process before entering the <code>MPI_Scatterv</code> routine.]</p>
+
+<p>And of course you'll then have to ensure that only the correct ranks free the correct memory they previously allocated.</p>
+
+<p>The reason this worked in your static initialization is that each rank "allocated" the memory when you initially statically defined your arrays. Assuming you did this naively, you probably previously used excess memory in that implementation (because, as seen above, not every rank needs to allocate memory for every matrix/array you are using).</p>
+
+<p>Hope this helps.</p>

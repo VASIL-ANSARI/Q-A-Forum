@@ -1,0 +1,90 @@
+<p>Find the element with selenium and pass it to <a href="http://selenium-python.readthedocs.org/en/latest/api.html#selenium.webdriver.remote.webdriver.WebDriver.execute_script" rel="nofollow"><code>execute_script()</code></a> to click:</p>
+
+<pre><code>link = browser.find_element_by_xpath('//div[@class="vbseo_liked"]/a[contains(@onclick, "return vbseoui.others_click(this)")]')
+browser.execute_script('arguments[0].click();', link)
+</code></pre>
+
+<hr>
+
+<p>Since I know the context of the problem, here is the set of things for you to do to solve it:</p>
+
+<ul>
+<li>click on the "11 others" link  via javascript relying on the solution provided here: <a href="http://stackoverflow.com/questions/2705583/how-to-simulate-a-click-with-javascript">How to simulate a click with JavaScript?</a></li>
+<li><p>make a <a href="http://stackoverflow.com/a/29377790/771848">custom expected condition</a> to wait for the element text not to ends with "11 others like this." text (this is a solution to the problem you had at <a href="http://stackoverflow.com/questions/29361133/expected-conditions-with-selenium/29361478#29361478">Expected conditions with selenium</a>):</p>
+
+<pre><code>class wait_for_text_not_to_end_with(object):
+    def __init__(self, locator, text):
+        self.locator = locator
+        self.text = text
+
+    def __call__(self, driver):
+        try :
+            element_text = EC._find_element(driver, self.locator).text.strip()
+            return not element_text.endswith(self.text)
+        except StaleElementReferenceException:
+            return False
+</code></pre></li>
+</ul>
+
+<p>Implementation:</p>
+
+<pre><code>from selenium import webdriver
+from selenium.common.exceptions import StaleElementReferenceException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+
+class wait_for_text_not_to_end_with(object):
+    def __init__(self, locator, text):
+        self.locator = locator
+        self.text = text
+
+    def __call__(self, driver):
+        try :
+            element_text = EC._find_element(driver, self.locator).text.strip()
+            return not element_text.endswith(self.text)
+        except StaleElementReferenceException:
+            return False
+
+
+browser = webdriver.PhantomJS()
+browser.maximize_window()
+browser.get("http://www.jamiiforums.com/kenyan-news/225589-kenyan-and-tanzanian-surburbs.html")
+
+username = browser.find_element_by_id("navbar_username")
+password = browser.find_element_by_name("vb_login_password_hint")
+
+username.send_keys("MarioP")
+password.send_keys("codeswitching")
+
+browser.find_element_by_class_name("loginbutton").click()
+
+wait = WebDriverWait(browser, 30)
+wait.until(EC.visibility_of_element_located((By.XPATH, '//h2[contains(., "Redirecting")]')))
+wait.until(EC.title_contains('Kenyan &amp; Tanzanian'))
+wait.until(EC.visibility_of_element_located((By.ID, 'postlist')))
+
+# click "11 others" link
+link = browser.find_element_by_xpath('//div[@class="vbseo_liked"]/a[contains(@onclick, "return vbseoui.others_click(this)")]')
+link.click()
+browser.execute_script("""
+function eventFire(el, etype){
+  if (el.fireEvent) {
+    el.fireEvent('on' + etype);
+  } else {
+    var evObj = document.createEvent('Events');
+    evObj.initEvent(etype, true, false);
+    el.dispatchEvent(evObj);
+  }
+}
+
+eventFire(arguments[0], "click");
+""", link)
+
+# wait for the "div" not to end with "11 others link this."
+wait.until(wait_for_text_not_to_end_with((By.CLASS_NAME, 'vbseo_liked'), "11 others like this."))
+
+print 'success!!'
+browser.close()
+</code></pre>

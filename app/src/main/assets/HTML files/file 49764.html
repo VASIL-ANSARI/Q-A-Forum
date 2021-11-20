@@ -1,0 +1,69 @@
+<p>This is called cooperative multiple inheritance in python and works just fine.</p>
+
+<p>What you refer to as an "Addon" class, is generally called a "Mixin".</p>
+
+<p>Just call the <code>super</code> method in your Mixin class:</p>
+
+<pre><code>class MyAddOn(object):
+    def remove_unusable_data(self):
+       ...
+
+    def categorize_data(self):
+        super(MyAddon,self).categorize_data()
+        self.remove_unusable_data()
+</code></pre>
+
+<p>I'd like to note some things:</p>
+
+<ul>
+<li>The method resolution order is left to right</li>
+<li>You have to call super</li>
+<li>You should be using **kwargs for cooperative inheritance</li>
+</ul>
+
+<hr>
+
+<p>It seems counterintuitive to call <code>super</code> here, as the parent of <code>MyAddon</code> does not have an attribute called <code>categorize_data</code>, and you would expect this notation to fail.</p>
+
+<p>This is where the <code>super</code> function comes into play. <a href="https://rhettinger.wordpress.com/2011/05/26/super-considered-super/" rel="nofollow">Some</a> consider this behaviour to be the best thing about python. </p>
+
+<p>Unlike in <em>C++</em> or <em>Java</em> the <code>super</code> function does not necessarily call the class' parent class. In fact it is impossible to know in advance which function will be called by <code>super</code> because it will be decided at run-time based on the <a href="https://www.python.org/download/releases/2.3/mro/" rel="nofollow">method resoltion order</a>.</p>
+
+<p><code>super</code> in python should really be called <code>next</code> because it will call the next method in the inheritance tree.</p>
+
+<p>For Mixins it is especially important to call super, even if you're inheriting from <code>object</code>.</p>
+
+<p>For further information I advise to watch Raymond Hettinger's excellent talk on <a href="https://www.youtube.com/watch?v=EiOglTERPEo" rel="nofollow">Super considered Super</a> from pycon 2015.</p>
+
+<hr>
+
+<p>It's an excellent pattern to use in python. Here is a pattern I encounter often when programming structured applications obeying the <a href="https://en.wikipedia.org/wiki/Open/closed_principle" rel="nofollow">open-closed principle</a>:</p>
+
+<p>I have this library class which is used in production:</p>
+
+<pre><code>class BaseClassA(object):
+   def __init__(self, **kwargs):
+       ... Do something that's important for many modules
+   def ...   
+
+class BaseClassB(object):
+   def __init__(self, **kwargs):
+       ... Do something that's important for many modules
+   def ...   
+</code></pre>
+
+<p>Now you get a feature request that in a particular case both <code>BaseClassA</code> and <code>BaseClassB</code> should implement feature X.</p>
+
+<p>According to open-close you shouldn't have to touch existing code to implement the feature, and according to DRY you shouldnt repeat the code.</p>
+
+<p>The solution is to create a <code>FeatureMixin</code> and create empty child classes which inherit from the base class and the mixin:</p>
+
+<pre><code>class FeatureMixin(object):
+    def __init__(self,**kwargs):
+        ...do something specific
+        return super(FeatureMixin,self).__init__(**kwargs)
+class ExtendedA(FeatureMixin,BaseClassA):
+   pass
+class ExtendedB(FeatureMixin,BaseClassB):
+   pass
+</code></pre>

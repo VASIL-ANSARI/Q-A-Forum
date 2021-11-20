@@ -1,0 +1,43 @@
+<p>First, it's <strong>values</strong> not value.</p>
+
+<p>Why don't you use a module providing this functionality, like <a href="https://www.drupal.org/project/profile2" rel="nofollow">profile2</a> ?</p>
+
+<p>The user is not created in your submithandler, so either you save it:</p>
+
+<pre><code>function foo_user_register_form_submit($form, &amp;$form_state){
+    $edit = array(
+          'name' =&gt; $form_state['values']['name'], 
+          'pass' =&gt; user_password(),
+          'mail' =&gt; $form_state['values']['mail'],
+          'init' =&gt; $form_state['values']['mail'], 
+          'status' =&gt; 1, 
+          'access' =&gt; REQUEST_TIME,
+          'field_first_name' =&gt; array(LANGUAGE_NONE =&gt; array(array('value' =&gt; $form_state['values']['field_first_name']))),
+    );
+    user_save(drupal_anonymous_user(), $edit);
+}
+</code></pre>
+
+<p>For more details see the <a href="https://www.drupal.org/node/1063598" rel="nofollow">docs</a>.</p>
+
+<p>Or you could try to add a custom submit handler, which would be fired after the user is created, in form_alter:</p>
+
+<pre><code>$form['#submit'][] = 'your_custom_submit_handler_function';
+</code></pre>
+
+<p>In there the user should already be created. so:</p>
+
+<pre><code>function your_custom_submit_handler_function(&amp;$form, &amp;$form_state)
+    {
+        $fe_id = db_insert('field_revision_field_first_name')
+        -&gt;fields(array(
+            'field_first_name_value' =&gt; $form_state['values']['field_first_name'],
+            ))-&gt;execute();
+        drupal_set_message(t('your form entry has been added'));
+    }
+</code></pre>
+
+<blockquote>
+  <p>But keep in mind, that this custom inserting maybe needs some more
+  code, here you only add the revision entry ..</p>
+</blockquote>

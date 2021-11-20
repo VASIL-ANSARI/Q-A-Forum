@@ -1,0 +1,27 @@
+<p>What you have is currently valid. However, you should prefer to use SFINAE and <a href="http://en.cppreference.com/w/cpp/header/type_traits"><code>&lt;type_traits&gt;</code></a> instead since it would dispatch to a different function based on the type rather than rely on a branch condition (which may or may not be optimised away).</p>
+
+<p>You can use <a href="http://en.cppreference.com/w/cpp/types/enable_if"><code>std::enable_if</code></a> to do the following:</p>
+
+<pre><code>template&lt;typename T, 
+         typename std::enable_if&lt;std::is_integral&lt;T&gt;::value, int&gt;::type = 0&gt;
+void foo(const T&amp; t) {
+    isInt(t);
+}
+
+template&lt;typename T, 
+         typename std::enable_if&lt;std::is_floating_point&lt;T&gt;::value, int&gt;::type = 0&gt;
+void foo(const T&amp; t) {
+    isFloat(t);
+}
+
+template&lt;typename T, 
+         typename std::enable_if&lt;!std::is_integral&lt;T&gt;::value &amp;&amp; 
+                                 !std::is_floating_point&lt;T&gt;::value, int&gt;::type = 0&gt;
+void foo(const T&amp; t) {
+    isString(t);
+}
+</code></pre>
+
+<p><a href="http://coliru.stacked-crooked.com/a/01f0edf095279d9c">Live Demo</a></p>
+
+<p>The reason that the second parameter for <code>enable_if</code> is set to <code>int</code> is to save us some typing. If the <code>int</code> is left out then we'd have to do <code>typename = typename std::enable_if&lt;std::is_integral&lt;T&gt;::value&gt;::type</code> instead of just setting it to <code>0</code> which would save us a couple characters to type. They're equivalent for all intents and purposes. </p>

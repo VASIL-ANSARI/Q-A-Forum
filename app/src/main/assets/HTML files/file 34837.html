@@ -1,0 +1,18 @@
+<p>I would like to convince you, if possible, to <em>not</em> encode your data this way, (<a href="http://blog.codinghorror.com/web-discussions-flat-by-design/" rel="nofollow">independent of how terrible an idea it is</a>)</p>
+
+<p>Lets suppose you have a <em>really hot</em> post, goes viral, et-cetera.  That means all of your users are viewing it and many are trying to comment on it.  with all of your nested discussion embedded in a single row, all updates must apply to <em>that</em> row.  This in turn means that every update on that discussion competes with every other to update that one attribute.  As you might imagine, this write contention will make your database slow way down.</p>
+
+<p>A second reason is that it violates the rules of <a href="http://en.wikipedia.org/wiki/First_normal_form" rel="nofollow">first normal form</a>; in the sense that the comment attribute on the table you're showing contains more than one value.  The motivating reasoning for this widely applied rule is that it makes a larger number of queries possible.  In your design, it would be very difficult to <code>delete from COMMENTS where USER = 'spammy-user'</code>*, or even <code>select * from COMMENTS where text like '%Trending Topic%'</code>.  In general, if you might ever want to look at <em>part</em> of a value in a column, rather than the whole thing, then you're probably looking at an opportunity for normalization.</p>
+
+<p>The rule I try to use is "each 'kind of thing' gets its own table".  as comments are a 'kind of thing', we'll split them out:</p>
+
+<pre><code>create table COMMENTS(
+    COMMENT_ID serial primary key,
+    POST_ID integer not null foreign key references POSTS(ID),
+    PARENT_COMMENT_ID integer foreign key references COMMENTS(COMMENT_ID),
+    CREATED_BY ...
+    CONTENT ...
+)
+</code></pre>
+
+<p>with the convention that comments having a null parent_comment_id are the roots of threaded discussions.</p>

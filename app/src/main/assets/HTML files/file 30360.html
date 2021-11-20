@@ -1,0 +1,27 @@
+<p>A few notes:</p>
+
+<ol>
+<li>Make sure you are sanitizing query via <code>get_message</code>.  Or you are opening yourself up to some serious <a href="http://rails-sqli.org/" rel="nofollow">security problems</a>.</li>
+<li>Ensure you are using the same versions of the mysql gem, ruby and MySql.  Differences in any of these may alter the expected output.</li>
+<li>If you are at your wits end and are unable to resolve the underlying issue, you can always send a custom delimiter and use it to split.  Unfortunately, it will muck up the case that is actually working and will need to be stripped out.</li>
+</ol>
+
+<p>Here's how I would approach debugging the issue on the dedicated machine:</p>
+
+<pre><code>def db_query
+ que = get_sanitized_message
+ results = @con.query(que)
+ require 'pry'
+ binding.pry
+
+ results.each {|x| chan_send(x)}
+end
+</code></pre>
+
+<ol>
+<li>Add the <a href="https://github.com/pry/pry" rel="nofollow">pry gem</a> to your Gemfile, or <code>gem install pry</code>.</li>
+<li>Update your code to use <code>pry</code>: see above</li>
+<li>This will open up a pry console when the <code>binding.pry</code> line is hit and you can interrogate almost everything in your running application.</li>
+<li>I would take a look at <code>results</code> and see if it's an array.  Just type <code>results</code> in the console and it will print out the value.  Also type out <code>results.class</code>.  It's possible that query is returning some special result set object that is not an array, but that has a method to access the result array.</li>
+<li>If <code>results</code> is an array, then the issue is most likely in <code>chan_send</code>. Perhaps it needs to be using something like <code>puts</code> vs <code>print</code> to ensure there's a new line after each message.  Is it possible that you have different versions of your codebase deployed? I would also add a <code>sleep 1</code> within the each block to ensure that this is not related to your handling of messages arriving at the same time.</li>
+</ol>

@@ -1,0 +1,46 @@
+<p>The easiest way is to summarize by customer to get the date of the first transaction per customer.  And then summarize that:</p>
+
+<pre><code>  select year(firstdate) as yyyy, month(firstdate) as mm,
+         count(*) as NumFirsts
+  from (select consumerid, min(date) as firstdate
+        from transaction
+        group by consumerid
+       ) c
+  group by year(firstdate), month(firstdate)
+  order by year(firstdate), month(firstdate);
+</code></pre>
+
+<p>If you are reading this in java, you might just want to do the cumulative sum there.  Otherwise, you can do it in MySQL using variables:</p>
+
+<pre><code>select c.*, (@s := @s + NumFirsts) as CumeFirsts
+from (select year(firstdate) as yyyy, month(firstdate) as mm,
+             count(*) as NumFirsts
+      from (select consumerid, min(date) as firstdate
+            from transaction
+            group by consumerid
+           ) c
+      group by year(firstdate), month(firstdate)
+     ) c cross join
+     (select @s := 0) params
+order by yyyy, mm;
+</code></pre>
+
+<p>Handling months with zero first transactions is also a pain.  It helps if you have a calendar table or know that there are some transactions during the month.  For instance, you can do:</p>
+
+<pre><code>select ym.yyyy, ym.mm, coalesce(NumFirsts, 0) as NumFirsts,
+       (@s := @s + coalesce(NumFirsts, 0)) as CumeFirsts
+from (select distinct year(date) as yyyy, month(date)
+      from transactions
+     ) ym left join
+     (select year(firstdate) as yyyy, month(firstdate) as mm,
+             count(*) as NumFirsts
+      from (select consumerid, min(date) as firstdate
+            from transaction
+            group by consumerid
+           ) c
+      group by year(firstdate), month(firstdate)
+     ) c
+     on c.yyyy = ym.yyyy and c.mm = y.mm cross join
+     (select @s := 0) params
+order by yyyy, mm;
+</code></pre>

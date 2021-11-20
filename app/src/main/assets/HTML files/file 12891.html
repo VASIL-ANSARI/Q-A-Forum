@@ -1,0 +1,81 @@
+<p>Step 1: set up a temp table containing the desired "time blocks" that you want to total for.  These blocks could be for any range of time; in your example, it would be one entry for ever day (24-hour period) in the month.</p>
+
+<pre><code>CREATE TABLE #TimeRanges
+ (
+   RangeStart  datetime  not null
+  ,RangeEnd    datetime  not null
+ )
+</code></pre>
+
+<p>Left-outer-joining this table on your data ensures you get at least one row per time block (day), even if there were no alarms occuring that day:</p>
+
+<pre><code>SELECT
+   tr.RangeStart  --  Use start of each time block to identify the block
+  ,md.CompId      --  With left outer join, will be 0 or more rows for each block
+  ,sum(datediff(hh
+                ,case
+                   when tr.RangeStart &gt; md.StartAlarmDate then tr.RangeStart
+                   else md.StartAlarmDate
+                 end
+                ,case
+                   when tr.RangeEnd &gt; md.EndAlarmDate then tr.RangeEnd
+                   else md.EndAlarmDate
+                 end))  HoursInRange
+ from #TimeRanges tr
+  left outer join MyData md
+   on md.StartAlarmDate &lt; tr.RangeEnd
+    and md.EndAlarmDate &gt; tr.From
+ group by
+   tr.RangeStart
+ ,md.CompId
+</code></pre>
+
+<p>(I can't test this code, some debugging may be required--but the concept is solid.  I'll let you worry about rounding partial hours, and whether you want > and &lt;, or >= and &lt;= (things may get tricky if an alarm starts and/or ends at the exact same point in time as a block boundary).</p>
+
+<hr>
+
+<p><strong>Edit/Addenda</strong></p>
+
+<p>Here's a fairly basic way to set up the temp table used in the routine (this code, I tested):</p>
+
+<pre><code>--  Set up and initialize some variables
+DECLARE
+  @FirstDay      datetime
+ ,@NumberOfDays  int
+
+SET @FirstDay = 'Oct 1, 2011'  --  Without time, this makes it "midnight the morning of" that day
+SET @NumberOfDays = 91  --  Through Dec 31
+
+
+--  Creates a temporary table that will persist until it is dropped or the connection is closed
+CREATE TABLE #TimeRanges
+  (
+    RangeStart  datetime  not null
+   ,RangeEnd    datetime  not null
+  ) 
+
+--  The order in which you add rows to the table is irrelevant. By adding from last to first, I
+--  only have to fuss around with one variable, instead of two (the counter and the end-point)
+
+WHILE @NumberOfDays &gt;= 0
+ BEGIN
+    INSERT #TimeRanges (RangeStart, RangeEnd)
+     values ( dateadd(dd, @NumberOfDays, @FirstDay)       --  Start of day
+             ,dateadd(dd, @NumberOfDays + 1, @FirstDay))  --  Start of the next day
+
+
+    SET @NumberOfDays = @NumberOfDays - 1
+ END
+
+
+--  Review results
+SELECT *
+ from #TimeRanges
+ order by RangeStart
+
+
+--  Not necessary, but doesn't hurt, especially when testing code
+DROP TABLE #TimeRanges
+</code></pre>
+
+<p>Note that by making RangeEnd the start of the next day, you have to be careful with your greaterthans and lessthans. The details can get very finicky and fussy there, and you'll want to do a lot of edge-case testing (what if alarm starts, or ends, exactly at Dec 16 2011 00:00.000). I'd go with that, because overall it's simpler to code for than for junk like 'Dec 16, 2011 23:59.997'</p>

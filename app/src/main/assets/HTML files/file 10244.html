@@ -1,0 +1,24 @@
+<p>You could use dynamic SQL to do it, inside a stored procedure. It'd look something like this (untested):</p>
+
+<pre><code>CREATE PROCEDURE drop_like (IN pattern VARCHAR(64))
+BEGIN
+  DECLARE q tinytext;
+  DECLARE done INT DEFAULT FALSE;
+  DECLARE cur CURSOR FOR
+    SELECT CONCAT('DROP TABLE "', table_schema, '"."', table_name, '"')
+    FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_name LIKE pattern;
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+  OPEN cur;
+
+  drop_loop: LOOP
+    FETCH cur INTO q;
+    IF done THEN
+      LEAVE drop_loop;
+    END IF;
+    PREPARE stmt FROM @q;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+  END LOOP;
+  CLOSE cur;
+END;
+</code></pre>

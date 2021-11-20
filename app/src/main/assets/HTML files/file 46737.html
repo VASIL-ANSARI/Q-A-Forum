@@ -1,0 +1,73 @@
+<p>If you want a fast AJAX solution, here's what I would do</p>
+
+<p>First, add an ID to your list so it's easy to manipulate</p>
+
+<pre><code>&lt;ul id="my_id" class="users"&gt;&lt;/ul&gt;
+</code></pre>
+
+<p>I really don't understand why you need that <code>&lt;%= form_for @nearby_shows.first %&gt;</code> for ? If I understand well, you just want to show a select, and update the list of nearby shows based on what the user selects ?</p>
+
+<p><strong>routes.rb</strong></p>
+
+<pre><code>resource :shows do
+  get 'update_nearby', on: :collection, constraints: { format: 'js' }
+end
+# GET /shows/update_nearby, meant to be used only with AJAX
+</code></pre>
+
+<p><strong>your_view.html.erb</strong></p>
+
+<pre><code>&lt;%= form_tag update_nearby_shows_path, remote: :true do |f| %&gt;
+&lt;p&gt; Radius (in miles): &lt;%= select_tag(:radii, [10,20,30,40,50], {},
+   :style =&gt; "width:50px", :selected =&gt; @radii, :onchange =&gt;
+   "location.href = '#{shows_path}'") %&gt; &lt;/p&gt;
+&lt;% end %&gt;
+
+&lt;!-- On Submit, it will request a JS response 
+     You can add some JS to submit the form everytime the select changes --&gt;
+</code></pre>
+
+<p>Add some JS specific respone</p>
+
+<p><strong>your_controller.rb</strong></p>
+
+<pre><code>def update_nearby
+  find_nearby_shows
+end
+
+private
+def find_nearby_shows
+  @radii = params[:radii] ? params[:radii] : 50
+  @nearby_venues = Venue.near("Boulder, CO",@radii,:select =&gt;
+    "id").to_a
+  @nearby_shows = Show.where(show_venue: @nearby_venues)
+end
+</code></pre>
+
+<p><strong>update_nearby.js.erb</strong></p>
+
+<pre><code>&lt;% if @nearby_shows %&gt;
+  // Empty the list
+  var id = $("#my_id").empty()
+  &lt;% @nearby_shows.each do %&gt;
+    // Add one &lt;li&gt; per show
+    $("&lt;li&gt;", { 'html': "&lt;%= escape_javascript(link_to(nearby_show.show_name, nearby_show)) %&gt;"}).appendTo(id)
+  &lt;% end %&gt;
+&lt;% end %&gt;
+</code></pre>
+
+<p>Bonus : you said you wanted to save the radius ? You can actually try to add it to the user session</p>
+
+<pre><code>def index
+  ...
+  @radii = session[:saved_radii] ? session[:saved_radii] : DEFAULT_RADIUS
+  ...
+end
+
+def update_nearby
+   find_nearby_shows
+   session[:saved_radii] = @radii
+end
+</code></pre>
+
+<p>But if you really want to save it for the user, you should have a <code>preferred_radii</code> field in your User model</p>

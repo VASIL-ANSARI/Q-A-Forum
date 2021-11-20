@@ -1,0 +1,20 @@
+<p>If you're using a relation (rather than a pointer) then you need to be aware that relations store arrays of their destination objects. So, when you execute </p>
+
+<pre><code>var relation = self.vitrine.relationForKey("client")
+relation.addObject(self.client) 
+</code></pre>
+
+<p>you're adding <code>self.client</code> to the array of <code>client</code>s. If a vitrine can only have a single owner, and this should be stored in the client field, then you probably want to use a Pointer rather than a Relation.</p>
+
+<p>Because of this array, your code as written just won't work. You need get the relation from your vitrine object, query it, extract the element from the array you want, and then you can use it.</p>
+
+<pre><code>let x: PFRelation = object["client"] as! PFRelation
+let query = x.query()
+// Lets say that you are only interested in the first element in your array...
+query.getFirstObjectInBackgroundWithBlock { first, error in
+  // Should do error checking here
+  cell.clientNameTextView.text = first!.objectForKey("name") as? String
+}
+</code></pre>
+
+<p>This method is also a bit inefficient. You should use some form of caching, or ideally, determine if you really do need to use a Relation or if a Pointer will suffice. If a Pointer will do, you can also include the data it points to when you run your original query via the <code>includeKey</code> method on <code>PFQuery</code>. You can't use <code>includeKey</code> on a Relation.</p>

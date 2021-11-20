@@ -1,0 +1,46 @@
+<p>I am not 100% clear on your logic, but I think you are looking for something like this:</p>
+
+<pre><code>CREATE TRIGGER dbo.TableA_Update 
+ON dbo.TableA
+FOR UPDATE
+AS
+BEGIN
+    UPDATE  TableB
+    SET     Desc3 = i.Desc1,
+            Desc4 = i.Desc2
+    FROM    TableB b
+            INNER JOIN inserted i           
+                ON i.ID_AA = b.ID_BA        -- MATCH CRITERIA IN QUESTION
+                AND i.Status = 'success'    -- NEW STATUS IS "SUCCESS"
+            INNER JOIN deleted d
+                ON d.ID_AA = i.ID_AA
+                AND d.Status != 'success'   -- PREVIOUS STATUS WAS NOT "SUCCESS"
+END
+</code></pre>
+
+<p><strong>EDIT</strong></p>
+
+<p>If there is not a corresponding row in <code>TableB</code> you may want to consider using <code>MERGE</code> </p>
+
+<pre><code>CREATE TRIGGER dbo.TableA_Update 
+ON dbo.TableA
+FOR UPDATE
+AS
+BEGIN
+    ;WITH Updated AS
+    (   SELECT  i.ID_AA, i.Desc1, i.Desc2
+        FROM    inserted i
+                INNER JOIN deleted d
+                    ON d.ID_AA = i.ID_AA
+                    AND d.Status != 'success'   -- PREVIOUS STATUS WAS NOT "SUCCESS"
+        WHERE   i.Status = 'success'
+    )
+    MERGE INTO TableB USING Updated ON ID_AA = ID_BA
+    WHEN MATCHED THEN
+        UPDATE
+        SET Desc3 = Desc1,
+            Desc4 = Desc2
+    WHEN NOT MATCHED THEN
+        INSERT (ID_BA, Desc3, Desc4) VALUES (ID_AA, Desc1, Desc2);
+END
+</code></pre>

@@ -1,0 +1,42 @@
+<p>I solved it (when I ran into the same problem, but with something other than validation).</p>
+
+<p>Short answer: you can call send(:included, base) on the module you want to bring in. Within the higher-up included() definition, you need to check whether the base is a Class or a Module.</p>
+
+<p>Why would you ever want to do this? Well, I've got some modules that extract some common functionality out of my models. For instance, the module <code>HasAllocable</code> sets up a polymorphic <code>belongs_to</code> relationship, and a getter/setter pair for a virtual attribute. Now I have another module that needs to pull in <code>HasAllocable</code>, to spare the base classes from having to remember it.</p>
+
+<p>I'd be interested to know whether this smells funny to anyone. I haven't seen anything like it on the web, so I wonder if multiple layers of model inheritance is more of an antipattern.</p>
+
+<pre><code>module Grandpa
+
+  def self.included(base)
+    if base.kind_of?(Class)
+      base.validate :must_be_ok
+    end
+  end
+
+end
+
+module Dad
+
+  include Grandpa
+
+  def self.included(base)
+    if base.kind_of?(Class)
+      # you can do this
+      #base.send(:include, Grandpa)
+      # you can also do this
+      Grandpa.send(:included, base)
+      # this does not invoke Grandpa.included(Kid)
+      #super(base)
+
+      base.validate :must_be_ok_too
+    end
+  end
+
+end
+
+class Kid  &lt; ActiveRecord::Base
+  include Dad
+  validate :must_be_ok_three
+end
+</code></pre>

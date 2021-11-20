@@ -1,0 +1,11 @@
+<p>The problem is probably due to the bad transaction management. All your code should be done in a single transaction, rather than having a transaction for each DAO call. The service layer should be the one which demarcates transaction, and not the DAO layer.</p>
+
+<p>I can imagine what Hibernate does:</p>
+
+<ol>
+<li>You call <code>dao.get(Product.class, 2)</code>. This returns a detached product pointing to the category with ID 67 (for example). The result is detached because the transaction ends when the call to the DAO ends.</li>
+<li>You call <code>dao.get(Product.class, 3)</code>. This returns a detached product pointing to the category with ID 67 (for example). But since the call runs in another transaction, you get a second, different, Category instance (with the same ID as the first one).</li>
+<li>You call saveOrUpdate on the product. This cascades to the category, and Hibernate must thus attach category1 and category2 to the session. Since they both have the same ID, one of the cascade may not be done.</li>
+</ol>
+
+<p>If you use a single transaction to get both products, they will both have the same category instance, and the problem will not occur. Calling <code>merge</code> instead of <code>saveOrUpdate</code> should also work: Hibernate will copy the state of both categories to a third, attached one. But the right thing to do is to use a transaction involving both calls to the DAO.</p>

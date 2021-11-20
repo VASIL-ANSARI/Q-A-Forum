@@ -1,0 +1,72 @@
+<p>Do you really have 23 seperate variables? Better put all into one dictionary, so that it's clearer, what belongs together, and you don't have to count so much. The error is, that execute expects a list as last argument, and <code>link_result</code> is probably a string with more than one character, e.g. a list with more than one element:</p>
+
+<pre><code>result = {
+    "Sale_Rent": Sale_Rent_result,
+    "Type": Type_result,
+    "Area": area_result,
+    "Nearby": nearby_result,
+    "Title": title_result,
+    "Price": price_result,
+    "PricePerSqrFt": Pricepersq_result,
+    "Bedroom": bedroom_result,
+    "Agency_Fee": agencyfee_result,
+    "Bathroom": bathroom_result,
+    "Size": size_result,
+    "ZonedFor": Zoned_for_result,
+    "Freehold": Freehold_result,
+    "Prop_ref": propertyref_result,
+    "Furnished_status": furnished_result,
+    "Rent_payment": rent_is_paid_result,
+    "Building_info": building_result,
+    "Amenities": Amenities_result,
+    "Trade_name": tradename_result,
+    "Licence": licencenum_result,
+    "RERA_ID": reraid_result,
+    "Phone_info": phone_result,
+    "Short_link": link_result,
+}
+
+db= MySQLdb.connect("localhost","XXX","XXX","hmm_Raw_Data")
+cursor=db.cursor()
+
+
+#checking phase to stop scrapping
+
+
+sql = """SELECT Short_link FROM RentalWanted WHERE Short_link=%s"""
+
+rows = cursor.execute(sql,(result["Short_link"],))
+
+if rows&gt;=1:
+    duplicate_count+=1
+    print duplicate_count
+
+    # if duplicate_count&gt;=15:
+    #   print "The program has started getting duplicates now- The program is terminating"
+    #   sys.exit()
+else:
+    query = """INSERT INTO RentalWanted ({fields}) VALUES ({values})"""
+    query = query.format(fields=','.join(result), values=','.join(['%s']*len(result)))
+    cursor.execute(query, result.values())
+
+db.commit()
+cursor.close()
+db.close()
+</code></pre>
+
+<p>And better make the column <code>Short_link</code> unique and catch the error, if you try to insert another row with the same link, instead of checking the constraint by hand:</p>
+
+<pre><code>db= MySQLdb.connect("localhost","XXX","XXX","hmm_Raw_Data")
+cursor=db.cursor()
+try:
+    query = """INSERT INTO RentalWanted ({fields}) VALUES ({values})"""
+    query = query.format(fields=','.join(result), values=','.join(['%s']*len(result)))
+    cursor.execute(query, result.values())
+except mysql.connector.IntegrityError:
+    duplicate_count+=1
+    print duplicate_count
+else:
+    db.commit()
+cursor.close()
+db.close()
+</code></pre>

@@ -1,0 +1,36 @@
+<p>If you want the <code>longRunningFunction()</code> itself to stop, then you need to implement logic in that method to do so. How to do that depends on the exact implementation of the method, which you haven't provided, so that would be unanswerable given your current question.</p>
+
+<p>However, in many cases it's sufficient to simply abandon an operation, letting it run to completion on its own but simply ignoring the result. You might call that "getting on with your life". :)</p>
+
+<p>If that's the case here, then something like this should work for you:</p>
+
+<pre><code>Task&lt;T&gt; resultTask = Task.Run(() =&gt; longRunningFunction(parameter));
+
+// maximum execution time of this block: 4 seconds
+await Task.WhenAny(resultTask, Task.Delay(4000));
+
+if (resultTask.IsCompleted)
+{
+    doSthWithResult(resultTask.Result);
+}
+else
+{
+    Console.WriteLine("TimeOut occurred");
+}
+</code></pre>
+
+<p>Replace <code>T</code> in the <code>resultTask</code> declaration with whatever the actual return type for <code>longRunningFunction()</code> is.</p>
+
+<p>Note that the above is opportunistic, in that even if the long-running operation takes longer than 4 seconds and the <code>Task.Delay(4000)</code> wins the race, as long as it completes by the time your code gets back to the <code>if (resultTask.IsCompleted</code> check, it will still be considered a success. If you want to give it a strict cut-off, ignoring the result if the <code>Task.Delay(4000)</code> completes first even if the operation finishes by the time you actually check which finished first, you can do that by looking at which task finished first:</p>
+
+<pre><code>Task winner = await Task.WhenAny(resultTask, Task.Delay(4000));
+
+if (resultTask == winner)
+{
+    doSthWithResult(resultTask.Result);
+}
+else
+...
+</code></pre>
+
+<p>Finally: even if you do need the <code>longRunningFunction()</code> to stop, you can use the above technique and then interrupt the operation in the <code>else</code> clause where you report the time-out (via whatever mechanism is appropriate in your case&hellip;again, without the actual code it's not possible to say exactly what that would be).</p>

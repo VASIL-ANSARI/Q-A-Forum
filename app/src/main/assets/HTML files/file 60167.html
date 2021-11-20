@@ -1,0 +1,24 @@
+<p>Redux is not supposed to "replace the initial idea of react.js", think of it more like a library to managed shared state between components and to coordinate state mutations.
+Redux does use a pub/sub pattern indeed, see the store methods here:
+<a href="http://redux.js.org/docs/api/Store.html#store-methods" rel="nofollow">http://redux.js.org/docs/api/Store.html#store-methods</a>
+You'll find a <code>subscribe</code> method that is used by components to subscribe to changes in the state tree. Normally you don't use store.subscribe directly, as the Redux-React bindings (Redux <code>connect</code> basically) do that for you. You can check out the actual implementation here, it's not that complicated to follow (in fact to me that's the main benefit of Redux over other Flux implementations): <a href="https://github.com/reactjs/react-redux/blob/master/src/components/connect.js#L199" rel="nofollow">https://github.com/reactjs/react-redux/blob/master/src/components/connect.js#L199</a></p>
+
+<p>That code, apart from subscribing to the changes emitted by the store, it also perform some optimisations, such as passing new props to the component (and hence triggering a re-render) only if it's really needed.</p>
+
+<p>Consider also that it's perfectly fine to keep using the components internal state together with Redux. You can use the internal state to store state you don't need/want to share with other components.</p>
+
+<p>You see the need of something like Redux when you have a more complicated application, with top-level components that need to talk to each other (actions) and somehow share some state.</p>
+
+<p>Actions in Redux are by default just POJO (plain old javascript objects), you can think of them as "events" that you often dispatch in response to user-triggered actions (e.g. user clicked on a button), but you're not limited to that, you can dispatch an action from wherever you want). The Redux store listens for these actions and call the reducers (pure functions) passing the action object you dispatched. Reducers see all the actions and if needed they can return a new, updated state for the slice of state they manage. In this sense, a reducer is a function that processes the actions and updates the state as needed. 
+In turn, when a reducer updates the state (by returning a new copy of the state), connected components (subscribed to the changes in the state) will be passed new props and will re-render to reflect the changes.</p>
+
+<p>Sometimes, dispatching just plain js objects is not enough and you need more control. That becomes clear when you need to perform more complicated logic, let's say you need to update a counter in the state based on the response from an AJAX call. 
+With redux-thunk you can dispatch functions (as opposed to just plain objects). By dispatching a function, you're effectively implementing the inversion of control pattern in a very simple way. You action becomes a "recipe" (contained in the function) and not just a simple statement (with a POJO action).</p>
+
+<p>Why just POJOs supported "out of the box", for actions, why isn't there a base Action class or something? Mainly because there's no need for that. A simple object (considered as a bag for values basically) with a <code>type</code> property is all you really need, it's basically the simplest possible interface. You can consider this to be programming against an interface (the action) instead of an implementation.</p>
+
+<p>Why a global state is better, instead of each component managing its own state? Mainly because managing the state is actually the hardest part of a non-trivial js app. By using Redux, you extract all that logic from the UI layer, making it easier to test. In fact, you should ideally be able test all the real "business logic" of a Redux app without even rendering a single component.</p>
+
+<p>Components become "dumber" and "purer" as they just render what they are told to do. "Purer" here means that because they don't hold any state, what you see rendered just depends on the inputs (read "props") at any given point in time, and not by any history, hence "stateless".</p>
+
+<p>Having the state as a single, json serialisable object also makes it easy to debug, to snapshot it and send/restore from a server or local storage.</p>

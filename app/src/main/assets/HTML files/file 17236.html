@@ -1,0 +1,101 @@
+<p>Since this is using jQuery, couldn't you use the standard jQuery multiple selector method? It would look like this:</p>
+
+<pre><code>$("#drop1, #drop2, #drop3").dropzone();
+</code></pre>
+
+<p>Or if you are trying to do a class, you would do this:</p>
+
+<pre><code>$(".drop_zone").dropzone();
+</code></pre>
+
+<p>This isn't tested, and I have never used this plugin. I'm just assuming this would work since it is based off jQuery.</p>
+
+<p>Since that isn't working, try replacing the code for jquery.dnd-file-upload.js with the following:</p>
+
+<pre><code>(function ($) {
+
+$.fn.dropzone = function (options) {
+var opts = {};
+var uploadFiles = function (files) {
+$.fn.dropzone.newFilesDropped(); for (var i = 0; i &lt; files.length; i++) {
+var file = filesi?;
+// create a new xhr object var xhr = new XMLHttpRequest(); var upload = xhr.upload; upload.fileIndex = i; upload.fileObj = file; upload.downloadStartTime = new Date().getTime(); upload.currentStart = upload.downloadStartTime; upload.currentProgress = 0; upload.startData = 0;
+// add listeners upload.addEventListener("progress", progress, false);
+xhr.onload = function (event) {
+load(event, xhr);
+};
+xhr.open(opts.method, opts.url); xhr.setRequestHeader("Cache-Control", "no-cache"); xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest"); xhr.setRequestHeader("X-File-Name", file.fileName); xhr.setRequestHeader("X-File-Size", file.fileSize); xhr.setRequestHeader("Content-Type", "multipart/form-data"); xhr.send(file);
+$.fn.dropzone.uploadStarted(i, file);
+}
+};
+var drop = function (event) {
+var dt = event.dataTransfer; var files = dt.files;
+event.preventDefault(); uploadFiles(files);
+return false;
+};
+var log = function (logMsg) {
+if (opts.printLogs) {
+// console &amp;&amp; console.log(logMsg);
+}
+};
+// invoked when the input field has changed and new files have been dropped // or selected var change = function (event) {
+event.preventDefault();
+// get all files ... var files = this.files;
+// ... and upload them uploadFiles(files);
+};
+var progress = function (event) {
+if (event.lengthComputable) {
+var percentage = Math.round((event.loaded 100) / event.total); if (this.currentProgress != percentage) {
+// log(this.fileIndex + " --&gt; " + percentage + "%");
+this.currentProgress = percentage; $.fn.dropzone.fileUploadProgressUpdated(this.fileIndex, this.fileObj, this.currentProgress);
+var elapsed = new Date().getTime(); var diffTime = elapsed - this.currentStart; if (diffTime &gt;= opts.uploadRateRefreshTime) {
+var diffData = event.loaded - this.startData; var speed = diffData / diffTime; // in KB/sec
+$.fn.dropzone.fileUploadSpeedUpdated(this.fileIndex, this.fileObj, speed);
+this.startData = event.loaded; this.currentStart = elapsed;
+}
+}
+}
+};
+var load = function (event, xhr) {
+var now = new Date().getTime(); var timeDiff = now - this.downloadStartTime; if (opts.onLoadComplete) {
+opts.onLoadComplete(xhr.responseText);
+} $.fn.dropzone.uploadFinished(this.fileIndex, this.fileObj, timeDiff); log("finished loading of file " + this.fileIndex);
+};
+var dragenter = function (event) {
+event.stopPropagation(); event.preventDefault(); return false;
+};
+var dragover = function (event) {
+event.stopPropagation(); event.preventDefault(); return false;
+};
+// Extend our default options with those provided. opts = $.extend({}, $.fn.dropzone.defaults, options);
+var id = this.attr("id"); var dropzone = document.getElementById(id);
+log("adding dnd-file-upload functionalities to element with id: " + id);
+// hack for safari on windows: due to not supported drop/dragenter/dragover events we have to create a invisible &lt;input type="file" /&gt; tag instead if ($.client.browser == "Safari" &amp;&amp; $.client.os == "Windows") {
+var fileInput = $("&lt;input&gt;"); fileInput.attr({
+type: "file"
+}); fileInput.bind("change", change); fileInput.css({
+'opacity': '0', 'width': '100%', 'height': '100%'
+}); fileInput.attr("multiple", "multiple"); fileInput.click(function () {
+return false;
+}); this.append(fileInput);
+} else {
+dropzone.addEventListener("drop", drop, true); var jQueryDropzone = $("#" + id); jQueryDropzone.bind("dragenter", dragenter); jQueryDropzone.bind("dragover", dragover);
+}
+return this;
+};
+$.fn.dropzone.defaults = {
+url: "", method: "POST", numConcurrentUploads: 3, printLogs: false, // update upload speed every second uploadRateRefreshTime: 1000
+};
+// invoked when new files are dropped $.fn.dropzone.newFilesDropped = function () { };
+// invoked when the upload for given file has been started $.fn.dropzone.uploadStarted = function (fileIndex, file) { };
+// invoked when the upload for given file has been finished $.fn.dropzone.uploadFinished = function (fileIndex, file, time) { };
+// invoked when the progress for given file has changed $.fn.dropzone.fileUploadProgressUpdated = function (fileIndex, file,
+newProgress) {
+};
+// invoked when the upload speed of given file has changed $.fn.dropzone.fileUploadSpeedUpdated = function (fileIndex, file,
+KBperSecond) {
+};
+})(jQuery);
+</code></pre>
+
+<p>This was suggested by the user rik.leigh@gmail.com here <a href="http://code.google.com/p/dnd-file-upload/wiki/howto" rel="nofollow">http://code.google.com/p/dnd-file-upload/wiki/howto</a></p>

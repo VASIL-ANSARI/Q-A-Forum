@@ -1,0 +1,78 @@
+<p>You have closed the definition of your class before including the <code>run</code> method. Check here:</p>
+
+<pre><code>class NewThread implements Runnable{
+    Thread t;
+
+    NewThread(){
+        t = new Thread(this, "Demo Thread");
+        System.out.println("Child Thread "+t);
+        t.start();
+    }
+} // &lt;-- remove this
+public void run() {
+    //implementation...
+}
+//&lt;-- add the } here
+//rest of your code...
+</code></pre>
+
+<hr>
+
+<p>Apart from the notorious error other people points, your design is pretty odd. A <code>Runnable</code> should not contain a single <code>Thread</code> to execute its job since the <code>Runnable</code> will be executed by another <code>Thread</code>. This is an overview of your threads current design (or how it should behave):</p>
+
+<pre><code>Main thread
+    |
+    | ----&gt;   new NewThread(pass the Runnable)
+    |              |
+    |              |
+    |              |
+    |              |  -----------------------&gt;  new Thread().start()
+    |              |                                     |
+    |              |                                     |
+    .              .                                     .
+    .              .                                     .
+    .              .                                     .
+</code></pre>
+
+<p>This is how your code should look like:</p>
+
+<pre><code>import java.util.*;
+
+class NewThread implements Runnable{
+    //a Runnable shouldn't have another thread
+    NewThread() {
+    }
+}
+
+public void run(){
+    for (int i=5;i&gt;0;i--) {
+        System.out.println("Child Thread:"+i);
+        try {
+            Thread.sleep(1000);
+        } catch(InterruptedException e) {
+            //interrupted exception will somewhat wake the thread up
+            //so it must handle the Thread#sleep method only.
+            System.out.println("Child Interrupted");
+        }
+    }
+    System.out.println("Child Thread Exiting");
+}
+
+public class ThreadDemo{
+    public static void main(String[] args) {
+        thread curr = thread.currentThread();
+        System.out.println("Current Thread"+curr);
+        //pass the runnable to a thread and start the thread
+        new Thread(new NewThread()).start();
+        for (int i=0;i&gt;5;i--) {
+            System.out.println("Parent Thread"+i);
+            try {
+                Thread.sleep(1000);
+            } catch(InterruptedException e){
+                System.out.println("Main thread interrupted");
+            }
+        }
+        System.out.println("Main Thread Exiting");      
+    }
+}
+</code></pre>

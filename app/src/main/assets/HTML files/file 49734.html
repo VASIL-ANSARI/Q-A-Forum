@@ -1,0 +1,47 @@
+<p><strong>Yes, it is possible to detect Eddystone beacons in the background with the <a href="http://altbeacon.github.io/android-beacon-library/" rel="nofollow">Android Beacon Library.</a></strong> You do so in the same manner as with AltBeacon or iBeacon.  Details are described in the <a href="http://altbeacon.github.io/android-beacon-library/samples.html" rel="nofollow">Starting App in the Background</a> section of the samples.</p>
+
+<p><strong>EDIT:</strong> As fof Library version 2.7, support for hardware accelerated discovery of Eddystone frames has been added, meaning that on Android 5+ devices you can get background detections within about 5 seconds.</p>
+
+<p>The basic idea is you need to create a central android <code>Application</code> class for your app, and create a <code>RegionBootstrap</code> object in the <code>onCreate</code> method of that class.  It is important to remember that you must register this <code>Application</code> class in your manifest.  The sample code linked above shows you how to do this.</p>
+
+<p>So you'd end up with something like below:</p>
+
+<pre><code>public class MyApplication extends Application implements BootstrapNotifier {
+    private static final String TAG = "MyApplication";
+    private RegionBootstrap regionBootstrap;
+    private BackgroundPowerSaver backgroundPowerSaver;
+    private BeaconManager mBeaconManager;
+
+    public void onCreate() {
+        super.onCreate();
+        mBeaconManager = org.altbeacon.beacon.BeaconManager.getInstanceForApplication(this);
+        mBeaconManager.getBeaconParsers().clear();
+        mBeaconManager.getBeaconParsers().add(new BeaconParser().
+            setBeaconLayout(BeaconParser.EDDYSTONE_UID_LAYOUT));
+        Identifier myBeaconNamespaceId = Identifier.parse("0xe2bfcc3cc2370789caef");
+        Region region = new Region("my-beacon-region", myBeaconNamespaceId, null, null);
+
+        regionBootstrap = new RegionBootstrap(this, region);
+
+        backgroundPowerSaver = new BackgroundPowerSaver(this);
+    }
+
+    @Override
+    public void didEnterRegion(Region region) {
+
+            Log.d("radbeacon", "Beacon detected with namespace id " + region.getId1() +" and instance id: " + region.getId2());
+    }
+
+    @Override
+    public void didExitRegion(Region region) {
+
+        Log.d("radbeacon", "Beacon out of region with namespace id " + region.getId1() +" and instance id: " + region.getId2());
+    }
+
+    @Override
+    public void didDetermineStateForRegion(int i, Region region) {
+          //Ignore
+    }
+...
+}
+</code></pre>

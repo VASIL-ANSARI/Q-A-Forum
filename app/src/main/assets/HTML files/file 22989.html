@@ -1,0 +1,66 @@
+<p>My solution up to this point is to create a layout where a view takes up the same view as the surfaceview.</p>
+
+<p>Then I get the view bounds for the preview (in my case it's the size of the screen)</p>
+
+<pre><code>//Get our screen size
+    Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE))
+            .getDefaultDisplay();
+    DisplayMetrics metrics = getResources().getDisplayMetrics();
+    Point size = new Point();
+    try {
+        display.getSize(size);
+        w_width = size.x;
+        w_height = size.y;
+    } catch (NoSuchMethodError e) {
+        w_width = display.getWidth();
+        w_height = display.getHeight();
+    }
+</code></pre>
+
+<p>Then I set the callback to be:</p>
+
+<pre><code>callback = new Camera.PictureCallback() {
+            @Override
+            public void onPictureTaken(byte[] bytes, Camera camera) {
+                //Get the view bounds to determine how to manipulate this image
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+
+                //If the image is smaller than the screen, don't make the image bigger
+                int finalWidth = (w_width &lt; options.outWidth) ? w_width : options.outWidth;
+                int finalHeight = (w_height &lt; options.outHeight) ? w_height : options.outHeight;
+                int inSampleSize = 1;
+                options = new BitmapFactory.Options();
+                if (finalHeight &gt; w_height || finalWidth &gt; w_width) {
+
+                    // Calculate ratios of height and width to requested height and width
+                    final int heightRatio = Math.round((float) finalHeight / (float) w_height);
+                    final int widthRatio = Math.round((float) finalWidth / (float) w_width);
+
+                    // Choose the smallest ratio as inSampleSize value, this will guarantee
+                    // a final image with both dimensions larger than or equal to the
+                    // requested height and width.
+                    inSampleSize = heightRatio &lt; widthRatio ? heightRatio : widthRatio;
+                }
+
+                options.inSampleSize = inSampleSize;
+
+                //Decode the smaller image
+                Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+
+                //Rotate the image correctly
+                Matrix mat = new Matrix();
+                mat.postRotate(orientation);
+                Bitmap newBitmap = Bitmap.createBitmap(b, 0, 0, options.outWidth, options.outHeight, mat, true);
+                imagePreview.setBackgroundDrawable(new BitmapDrawable(newBitmap));
+                imagePreview.setVisibility(View.VISIBLE);
+            }
+        };
+</code></pre>
+
+<p>So basically the surface view never stops showing the preview, but the imageview hides it so the user can't see it.</p>
+
+<p>Then if the user decides not to keep the image then I just re-hide the view and the surfaceView will keep showing the live preview. Luckily the GS3 does not seem to mind someone calling "camera.startPreview();" even when the preview is already happening.</p>
+
+<p>I really don't like this answer but it's all I have at the moment that works on the galaxy S3. It has worked on older devices (2.3 and up) that I have tried but it is definitely just a work-around.</p>

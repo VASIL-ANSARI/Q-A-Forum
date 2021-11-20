@@ -1,0 +1,67 @@
+<p>Your problem is that you seem to not quite understand how grid works. For example, you are putting only two widgets in the red frame (self.myentry and self.text) yet you are putting them in column 2 and 4. Are you aware that the columns are relative to their parent, not the GUI as a whole? You want them in column 0 <em>of the red frame</em>, then you want the red frame in the second column of <em>it's</em> parent. </p>
+
+<p>The way to solve this is to divide and conquer. First, divide the main screen up into it's logical parts, and lay out those logical parts so they resize properly. Then, for anything inside each part, lather, rinse repeat. Using frames for organization is the way to go.</p>
+
+<p>Here's how I would tackle your problem (though there's certainly more than one way to solve this problem). First, you have two major areas of the screen: the top portion which has the green, blue and red frames and their contents, and the bottom part which holds the buttons. The top area should grow and shrink in all directions, the bottom area only grows in the X direction. I would create two frames for this, one for each part, and use pack since pack is the simplest geometry manager. The top frame should be configured to fill both directions and expand. The bottom part (with the buttons) should only fill in the X direction.</p>
+
+<p>You now have two areas that are independent of each other and have proper resize behavior: the "main" area and the "toolbar" area. You are free to arrange the inner contents of these frames however you wish without having to worry about how that affects the main layout.</p>
+
+<p>In the bottom frame, if you want all the widgets to be the same size, use pack and have them all fill X and expand, and they will equally fill the area. If you want them to be different sizes, use grid so you can control each column separately.</p>
+
+<p>For the top part, it has three sub-sections: the red, green and blue frames. Since they are not all arranged horizontally or vertically I would use grid. Place green in cell 0,0, blue in cell 0,1, and red in cell 1,1 spanning two rows. Give row 0 and column 1 a weight of 1 so it takes up all the slack.</p>
+
+<p>As I wrote earlier, this isn't the only way to "divide and conquer" this specific problem. Instead of seeing the main app as two parts -- top and bottom, with the top part having three sub-parts, another choice is to see that your main window has four parts: green, blue, red and toolbar. The key isn't to pick the perfect definition, but to break the layout problem down into chunks working from the outside in.</p>
+
+<p>Here is a working example:</p>
+
+<pre><code>from Tkinter  import *
+
+ALL=N+S+E+W
+
+class Application(Frame):
+
+    def __init__(self,master=None):
+        Frame.__init__(self,master)
+
+        # the UI is made up of two major areas: a bottom row
+        # of buttons, and a top area that fills the result of 
+        # UI
+        top_frame = Frame(self)
+        button_frame = Frame(self)
+
+        button_frame.pack(side="bottom", fill="x")
+        top_frame.pack(side="top", fill="both", expand=True)
+
+        # top frame is made up of three sections: two smaller
+        # regions on the left, and a larger region on the right
+        ul_frame = Frame(top_frame, background="green", width=200)
+        ll_frame = Frame(top_frame, background="blue", width=200)
+        right_frame = Frame(top_frame, background="red")
+
+        ul_frame.grid(row=0, column=0, sticky=ALL)
+        ll_frame.grid(row=1, column=0, sticky=ALL)
+        right_frame.grid(row=0, column=1, rowspan=2, sticky=ALL)
+        top_frame.columnconfigure(1, weight=1)
+        top_frame.rowconfigure(0, weight=1)
+        top_frame.rowconfigure(1, weight=1)
+
+        # the right frame is made up of two widgets, an entry
+        # on top and a text below
+        entry = Entry(right_frame)
+        text = Text(right_frame)
+
+        entry.pack(side="top", fill="x")
+        text.pack(side="top", fill="both", expand=True)
+
+        # the button frame has five equally spaced buttons
+        for color in ('Red', 'Blue', 'Green', 'Black'):
+            b = Button(button_frame, text=color)
+            b.pack(side="left", fill="x", expand=True)
+        quit_button = Button(button_frame, text="Quit")
+        quit_button.pack(side="left", fill="x", expand=True)
+
+root = Tk()
+app = Application(root)
+app.pack(fill="both", expand=True)
+root.mainloop()
+</code></pre>

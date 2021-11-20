@@ -1,0 +1,188 @@
+<p>It isn't quite out of the box but CXF does support JSON bindings to rest services.  See <a href="http://cxf.apache.org/docs/jax-rs-data-bindings.html#JAX-RSDataBindings-JSONsupport">cxf jax-rs json docs here.</a> You'll still need to do some minimal configuration to have the provider available and you need to be familiar with jettison if you want to have more control over how the JSON is formed.</p>
+
+<p><strong>EDIT:</strong> Per comment request, here is some code.  I don't have a lot of experience with this but the following code worked as an example in a quick test system.</p>
+
+<pre><code>//TestApi parts
+@GET
+@Path ( "test" )
+@Produces ( "application/json" )
+public Demo getDemo () {
+    Demo d = new Demo ();
+    d.id = 1;
+    d.name = "test";
+    return d;
+}
+
+//client config for a TestApi interface
+List providers = new ArrayList ();
+JSONProvider jsonProvider = new JSONProvider ();
+Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt; ();
+map.put ( "http://www.myserviceapi.com", "myapi" );
+jsonProvider.setNamespaceMap ( map );
+providers.add ( jsonProvider );
+TestApi proxy = JAXRSClientFactory.create ( url, TestApi.class, 
+    providers, true );
+
+Demo d = proxy.getDemo ();
+if ( d != null ) {
+    System.out.println ( d.id + ":" + d.name );
+}
+
+//the Demo class
+@XmlRootElement ( name = "demo", namespace = "http://www.myserviceapi.com" )
+@XmlType ( name = "demo", namespace = "http://www.myserviceapi.com", 
+    propOrder = { "name", "id" } )
+@XmlAccessorType ( XmlAccessType.FIELD )
+public class Demo {
+
+    public String name;
+    public int id;
+}
+</code></pre>
+
+<p>Notes:</p>
+
+<ol>
+<li>The providers list is where you code configure the JSON provider on the client.  In particular, you see the namespace mapping.  This needs to match what is on your server side configuration.  I don't know much about Jettison options so I'm not much help on manipulating all of the various knobs for controlling the marshalling process.</li>
+<li>Jettison in CXF works by marshalling XML from a JAXB provider into JSON.  So you have to ensure that the payload objects are all marked up (or otherwise configured) to marshall as application/xml before you can have them marshall as JSON.  If you know of a way around this (other than writing your own message body writer), I'd love to hear about it.</li>
+<li>I use spring on the server so my configuration there is all xml stuff.  Essentially, you need to go through the same process to add the JSONProvider to the service with the same namespace configuration.  Don't have code for that handy but I imagine it will mirror the client side fairly well.</li>
+</ol>
+
+<p>This is a bit dirty as an example but will hopefully get you going.</p>
+
+<p><strong>Edit2:</strong> An example of a message body writer that is based on xstream to avoid jaxb.</p>
+
+<pre><code>@Produces ( "application/json" )
+@Consumes ( "application/json" )
+@Provider
+public class XstreamJsonProvider implements MessageBodyReader&lt;Object&gt;,
+    MessageBodyWriter&lt;Object&gt; {
+
+@Override
+public boolean isWriteable ( Class&lt;?&gt; type, Type genericType, 
+    Annotation[] annotations, MediaType mediaType ) {
+    return MediaType.APPLICATION_JSON_TYPE.equals ( mediaType ) 
+        &amp;&amp; type.equals ( Demo.class );
+}
+
+@Override
+public long getSize ( Object t, Class&lt;?&gt; type, Type genericType, 
+    Annotation[] annotations, MediaType mediaType ) {
+    // I'm being lazy - should compute the actual size
+    return -1;
+}
+
+@Override
+public void writeTo ( Object t, Class&lt;?&gt; type, Type genericType, 
+    Annotation[] annotations, MediaType mediaType, 
+    MultivaluedMap&lt;String, Object&gt; httpHeaders, OutputStream entityStream ) 
+    throws IOException, WebApplicationException {
+    // deal with thread safe use of xstream, etc.
+    XStream xstream = new XStream ( new JettisonMappedXmlDriver () );
+    xstream.setMode ( XStream.NO_REFERENCES );
+    // add safer encoding, error handling, etc.
+    xstream.toXML ( t, entityStream );
+}
+
+@Override
+public boolean isReadable ( Class&lt;?&gt; type, Type genericType, 
+    Annotation[] annotations, MediaType mediaType ) {
+    return MediaType.APPLICATION_JSON_TYPE.equals ( mediaType ) 
+        &amp;&amp; type.equals ( Demo.class );
+}
+
+@Override
+public Object readFrom ( Class&lt;Object&gt; type, Type genericType, 
+    Annotation[] annotations, MediaType mediaType, 
+    MultivaluedMap&lt;String, String&gt; httpHeaders, InputStream entityStream ) 
+    throws IOException, WebApplicationException {
+    // add error handling, etc.
+    XStream xstream = new XStream ( new JettisonMappedXmlDriver () );
+    return xstream.fromXML ( entityStream );
+}
+}
+
+//now your client just needs this
+List providers = new ArrayList ();
+XstreamJsonProvider jsonProvider = new XstreamJsonProvider ();
+providers.add ( jsonProvider );
+TestApi proxy = JAXRSClientFactory.create ( url, TestApi.class, 
+    providers, true );
+
+Demo d = proxy.getDemo ();
+if ( d != null ) {
+    System.out.println ( d.id + ":" + d.name );
+}
+</code></pre>
+
+<p>The sample code is missing the parts for robust media type support, error handling, thread safety, etc.  But, it ought to get you around the jaxb issue with minimal code.</p>
+
+<p><strong>EDIT 3 - sample server side configuration</strong>
+As I said before, my server side is spring configured.  Here is a sample configuration that works to wire in the provider:</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;beans xmlns="http://www.springframework.org/schema/beans"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:jaxrs="http://cxf.apache.org/jaxrs"
+xmlns:cxf="http://cxf.apache.org/core"
+xsi:schemaLocation="http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+    http://cxf.apache.org/jaxrs http://cxf.apache.org/schemas/jaxrs.xsd
+    http://cxf.apache.org/core http://cxf.apache.org/schemas/core.xsd"&gt;
+
+&lt;import resource="classpath:META-INF/cxf/cxf.xml" /&gt;
+
+&lt;jaxrs:server id="TestApi"&gt;
+    &lt;jaxrs:serviceBeans&gt;
+        &lt;ref bean="testApi" /&gt;
+    &lt;/jaxrs:serviceBeans&gt;
+    &lt;jaxrs:providers&gt;
+        &lt;bean id="xstreamJsonProvider" class="webtests.rest.XstreamJsonProvider" /&gt;
+    &lt;/jaxrs:providers&gt;
+&lt;/jaxrs:server&gt;
+
+&lt;bean id="testApi" class="webtests.rest.TestApi"&gt;
+&lt;/bean&gt;
+
+&lt;/beans&gt;
+</code></pre>
+
+<p>I have also noted that in the latest rev of cxf that I'm using there is a difference in the media types, so the example above on the xstream message body reader/writer needs a quick modification where isWritable/isReadable change to:</p>
+
+<pre><code>return MediaType.APPLICATION_JSON_TYPE.getType ().equals ( mediaType.getType () )
+    &amp;&amp; MediaType.APPLICATION_JSON_TYPE.getSubtype ().equals ( mediaType.getSubtype () )
+    &amp;&amp; type.equals ( Demo.class );
+</code></pre>
+
+<p><strong>EDIT 4 - non-spring configuration</strong>
+Using your servlet container of choice, configure</p>
+
+<pre><code>org.apache.cxf.jaxrs.servlet.CXFNonSpringJaxrsServlet
+</code></pre>
+
+<p>with at least 2 init params of:</p>
+
+<pre><code>jaxrs.serviceClasses
+jaxrs.providers
+</code></pre>
+
+<p>where the serviceClasses is a space separated list of the service implementations you want bound, such as the TestApi mentioned above and the providers is a space separated list of message body providers, such as the XstreamJsonProvider mentioned above.  In tomcat you might add the following to web.xml:</p>
+
+<pre><code>&lt;servlet&gt;
+    &lt;servlet-name&gt;cxfservlet&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;org.apache.cxf.jaxrs.servlet.CXFNonSpringJaxrsServlet&lt;/servlet-class&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;jaxrs.serviceClasses&lt;/param-name&gt;
+        &lt;param-value&gt;webtests.rest.TestApi&lt;/param-value&gt;
+    &lt;/init-param&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;jaxrs.providers&lt;/param-name&gt;
+        &lt;param-value&gt;webtests.rest.XstreamJsonProvider&lt;/param-value&gt;
+    &lt;/init-param&gt;
+    &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
+&lt;/servlet&gt;
+</code></pre>
+
+<p>That is pretty much the quickest way to run it without spring.  If you are not using a servlet container, you would need to configure the JAXRSServerFactoryBean.setProviders with an instance of XstreamJsonProvider and set the service implementation via the JAXRSServerFactoryBean.setResourceProvider method.  Check the CXFNonSpringJaxrsServlet.init method to see how they do it when setup in a servlet container.</p>
+
+<p>That ought to get you going no matter your scenario.</p>

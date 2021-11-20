@@ -1,0 +1,21 @@
+<p>For me, this had to do with the RDS SSL Certificate Rotation that happened on April 3rd, 2015.</p>
+
+<p>However, in my case, just using the root certificate did not work, and I had to use a intermediate certificate for my region as well.  Details:</p>
+
+<ol>
+<li>Go into the AWS rds console and reboot your RDS instance. </li>
+<li><p>Download the new root certificate <a href="https://s3.amazonaws.com/rds-downloads/rds-ca-2015-root.pem">https://s3.amazonaws.com/rds-downloads/rds-ca-2015-root.pem</a>.  Put it into the config directory of your app.</p></li>
+<li><p>Download the intermediate certificate for your database region 
+<a href="http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html">here</a>.  I had to use the US east one, but you will have to pick the one for your region.</p></li>
+<li><p>This is the key step.  You need to combine the intermediate certificate and the root certificate into one file so that the intermediate certificate is above the root certificate, forming a certificate chain.  Open the intermediate certificate using a text editor, copy its contents, and paste them into config/rds-ca-2015-root.pem, on top, above the root cetrtificate.  So, after you are done, config/rds-ca-2015-root.pem should be the intermediate certificate followed by the root certificate, all in this file. </p></li>
+<li><p>Get your current database url
+<code>heroku config
+</code>
+and then look for the DATABASE_URL property</p></li>
+<li><p>Update your database URL to use the new certificate file.  All you should have to change is the name of the certificate (since its now called 
+rds-ca-2015-root.pem)<br>
+<code>heroku config:add DATABASE_URL="mysql2://DB_NAME:DB_PASSWORD@DB_URL/DB_NAME?sslca=config/rds-ca-2015-root.pem"
+</code></p></li>
+<li><p>Commit the changes and redeploy to Heroku.
+Good luck! </p></li>
+</ol>

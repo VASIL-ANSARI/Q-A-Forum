@@ -1,0 +1,32 @@
+<pre><code>del inputFile[line:line + chunkSize]
+</code></pre>
+
+<p>will remove those items.  However, your map is stepping through the entire file, which makes me wonder: are you trying to remove them as they're parsed?  This requires the map or parser to alter an input argument, which invites trouble.</p>
+
+<p>If you're only trying to save memory usage, it's a little late: you already saved the entire file in InputFile.  If you need only to clean up after the parsing, then use the extreme form of <strong>del</strong>ete, once, after the parsing is finished:</p>
+
+<pre><code>del inputFile[:]
+</code></pre>
+
+<p>If you want to reduce the memory requirement up front, you have to back up a step.  Instead of putting the entire file into a list, try making an nice input pipeline.  You didn't post the context of this code, so I'm going to use a generic case with a couple of name assumptions:</p>
+
+<pre><code>def line_chunk_stream(input_stream, chunk_size):
+    # Generator to return a stream of paring units,
+    #   &lt;chunk_size&gt; lines each.
+    # To make sure you could check the logic here,
+    #   I avoided several Pythonic short-cuts.
+    line_count = 0
+    parse_chunk = []
+    for line in input_stream:
+        line_count += 1
+        parse_chunk.append(line)
+        if line_count % chunk_size == 0:
+            yield parse_chunk
+            del parse_chunk[:]
+
+input_stream = open("source_file", 'r')
+parse_stream = line_chunk_stream(input_stream, chunk_size)
+parserMethod(parse_stream)
+</code></pre>
+
+<p>I hope that at least one of these solves your underlying problem.</p>

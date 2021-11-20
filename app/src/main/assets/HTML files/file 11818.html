@@ -1,0 +1,87 @@
+<p>I think it's a wrong way to keep View in <strong>FeedType</strong> object. Keep only data in FeedType.</p>
+
+<p>For example create new class <strong>FeedContent</strong> which contains parsed data about feed content (not any views):</p>
+
+<pre><code>class FeedContent {
+
+... // i.e. private List&lt;String&gt; contents;
+
+}
+</code></pre>
+
+<p>Then change your <strong>FeedType</strong> class:</p>
+
+<pre><code>public class FeedType {
+
+private Bitmap profilePicSrc;
+private String name;
+private FeedContent feedContent;
+private Context context;
+private final String PIC_BASE_SRC = "xxx";
+private final String PIC_END_SRC = "xxx";
+
+
+public FeedType(String contactId, String name, FeedContent feedContent, Context context){
+    try {
+        this.profilePicSrc = BitmapFactory.decodeStream((InputStream)new URL(PIC_BASE_SRC + contactId.toString() + PIC_END_SRC).getContent());
+    } catch (MalformedURLException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
+    this.name = name;
+    this.context = context;
+    this.feedContent = feedContent;
+}
+
+public String getName(){
+    return name;
+}
+
+public Bitmap getProfilePicture(){
+    return profilePicSrc;
+}
+
+public FeedContent getContent(){
+    return this.feedContent;
+}
+</code></pre>
+
+<p>}</p>
+
+<p>And then make your <strong>FeedListAdapter</strong> like:</p>
+
+<pre><code>private class FeedListAdapter extends ArrayAdapter&lt;Object&gt; {
+
+    public FeedListAdapter() {
+        super(Feeds.this, R.layout.feed, new Object[feedArrLength]);
+    }
+
+    public View getView(int position, View convertView, ViewGroup parent) {
+        View feed = convertView;
+        FeedWrapper wrapper = null;
+
+        if (feed == null) {
+
+            feed = getLayoutInflater().inflate(R.layout.feed, parent, false);
+            wrapper = new FeedWrapper(feed);
+            feed.setTag(wrapper);
+        }
+        else {
+            wrapper = (FeedWrapper)feed.getTag();
+        }
+
+        wrapper.getName().setText(arr.get(position).getName());
+        wrapper.getProfilePicture().setImageBitmap(arr.get(position).getProfilePicture());
+        View feedContentView = createContentView(arr.get(position).getContent());
+        wrapper.getContent().addView(feedContentView);
+        return(feed);
+    }
+
+    private View createContentView(FeedContent feedContent) {
+        ... // Here you shuold inflate new view and fill it with data from "feedContent"
+    }
+}
+</code></pre>

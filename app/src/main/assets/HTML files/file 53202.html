@@ -1,0 +1,90 @@
+<p>You get strings from standard input with <code>scanf</code>, but you should tell <code>scanf</code> the maximum number of bytes to store to the destination arrays to avoid buffer overruns:</p>
+
+<pre><code>scanf("%19s", addfname);
+...
+scanf("%19s", addlname);
+...
+scanf("%19s", addpnumber);
+</code></pre>
+
+<p>The way you call <code>addentry</code> is incorrect:</p>
+
+<pre><code>addentry(pnum, pcontacts, addfname[20], addlname[20], addpnumber[20]);
+</code></pre>
+
+<p>You actually try to read the byte just after the end of <code>addfname</code>, <code>addlname</code> and <code>addpnumber</code>.  You should instead pass the arrays themselves, that will be passed to the function <code>addentry</code> as pointers to their first bytes:</p>
+
+<pre><code>addentry(pnum, pcontacts, addfname, addlname, addpnumber);
+</code></pre>
+
+<p><code>addentry</code> should reallocate the array with <code>realloc</code>.  It should be passed a pointer to the array pointer to it can update the pointer in <code>main</code>.</p>
+
+<p><code>addentry</code> does not copy the strings correctly: it only copies one, but with a syntax error.</p>
+
+<p>Here is a corrected version:</p>
+
+<pre><code>void addentry(int, entry**, char addfname[20], char addlname[20], char addpnumber[20]);
+
+int main(void) {
+    int selection = 0;
+    int inputtest = 1;
+    int pnum = 0; // keeps track of number of contacts
+
+    char addfname[20];
+    char addlname[20];
+    char addpnumber[20];
+
+    entry *pcontacts = NULL;
+
+    for (;;) {
+        do {
+            printf("\nPhonebook Menu\n\n");
+            printf("1:\tAdd contact\n");
+            printf("2:\tDelete contact\n");
+            printf("3:\tDisplay contacts\n");
+            printf("4:\tExit\n");
+            printf("\nChoose an action (1-4): ");
+            scanf("%d", &amp;selection);
+
+            if (selection &lt; 1 || selection &gt; 4) {
+                printf("Invalid input. Please enter an integer between 1 and 4.\n");
+                inputtest = 0;
+            }
+            if (selection == 4) {
+                free(pcontacts);  /* OK for NULL */
+                printf("\nThank you for using this phonebook.");
+                return 0;
+            }
+            switch (selection) {
+              case 1:
+                printf("\nEnter first name: ");
+                scanf("%19s", addfname);
+                printf("Enter last name: ");
+                scanf("%19s", addlname);
+                printf("Enter phone number (no spaces): ");
+                scanf("%19s", addpnumber);
+                addentry(pnum, &amp;pcontacts, addfname, addlname, addpnumber);
+                pnum++;
+                break;
+            }   
+        } while (inputtest == 1);   
+    }
+}
+
+/* add an entry at position pnum */
+void addentry(int pnum, entry **pp, char addfname[20], char addlname[20], char pnumber[20]) {
+
+     entry *pcontact = *pp;
+     pcontacts = realloc(pcontacts, (pnum + 1) * sizeof(entry));
+
+     if (pcontacts != NULL) {
+         *pp = pcontacts; /* update pointer in main */
+         strcpy(pcontacts[pnum].fname, addfname);
+         strcpy(pcontacts[pnum].lname, addlname);
+         strcpy(pcontacts[pnum].pnumber, addpnumber);
+         printf("\nContact has been added.");
+     } else {
+         printf ("No memory is available.\n");
+     }
+}
+</code></pre>

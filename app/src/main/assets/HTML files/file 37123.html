@@ -1,0 +1,45 @@
+<p>Here is a way to find the correct argument to give to <code>getMethod( name, type )</code> using reflection.</p>
+
+<p>Code:</p>
+
+<pre><code>package so;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
+public abstract class Foo&lt;T&gt; implements F&lt;T&gt; {
+
+   public static Class&lt;?&gt; getParameterizedType( Class&lt;?&gt; clazz ) {
+      Type t = clazz.getGenericSuperclass();
+      while( t != Object.class ) {
+         if( t instanceof ParameterizedType ) {
+            final Type[] actualTypeArguments =
+               ((ParameterizedType)t).getActualTypeArguments();
+            for( final Type arg : actualTypeArguments ) {
+               return (Class&lt;?&gt;)arg;
+            }
+         }
+         t = ((Class&lt;?&gt;)t).getGenericSuperclass();
+      }
+      throw new IllegalStateException();
+   }
+
+   public static void main( String args[] ) throws Exception {
+      final Object fooBar = new FooBar();
+      final Class&lt;?&gt; clazz = fooBar.getClass();
+      final Class&lt;?&gt; finishArgType = getParameterizedType( clazz );
+      System.err.println( "finishArgType = " + finishArgType );
+      final Method mth = clazz.getMethod( "onFinish", finishArgType );
+      if( mth.isAnnotationPresent( MyAnnot.class )) {
+         System.err.println( "Yessssssss!" );
+      }
+   }
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>finishArgType = class so.Drawable
+Yessssssss!
+</code></pre>

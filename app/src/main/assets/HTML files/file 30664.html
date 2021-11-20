@@ -1,0 +1,84 @@
+<p>I use something like this:</p>
+
+<pre><code>// Your http url
+
+NSURL* url = @"&lt;your web url&gt;";
+
+AFHTTPClient* client = [[AFHTTPClient alloc]initWithBaseURL:url];
+
+
+
+// create request
+NSMutableURLRequest *request=[NSMutableURLRequest
+                              requestWithURL:[NSURL URLWithString:strUrl]
+                              cachePolicy: NSURLRequestReloadIgnoringLocalCacheData 
+                              timeoutInterval:60.f];
+
+// set http method as POST
+[request setHTTPMethod:@"POST"];
+
+// TODO: set your params for post, convert them to post data and set to requesr
+// NSMutableDictionary* authParams = @{ "param1" : @"val1", @"param2" : @"val2"}
+// [request setHTTPBody:postData]
+
+// sample file upload combined with post action
+request = [client multipartFormRequestWithBaseRequest:request parameters:authParams constructingBodyWithBlock:^(id&lt;AFMultipartFormData&gt; formData) {
+
+    // Important!! : file path MUST BE real file path (so -&gt; "file://localhost/.../../file.txt") so i use [NSURL fileURLWithPath:]
+    NSError* err;
+    [formData appendPartWithFileURL:[NSURL fileURLWithPath:filePathToUpload] name:[fileInfo objectForKey:@"fileName"] error:&amp;err];
+
+}];
+
+AFHTTPRequestOperation *operationX = [[AFHTTPRequestOperation alloc] initWithRequest:request];
+
+[operationX setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+
+    // call to external completion block
+
+} failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+
+    // call to external failure block
+
+}];
+
+// run operation
+[yourOperationQueue addOperation:operationX];
+</code></pre>
+
+<p>// =============</p>
+
+<pre><code>//implementing in AFHTTPClient ( for upload case , to reuse you own request)
+
+- (NSMutableURLRequest *)multipartFormRequestWithBaseRequest:(NSMutableURLRequest*)request
+                                         parameters:(NSDictionary *)parameters
+                          constructingBodyWithBlock:(void (^)(id &lt;AFMultipartFormData&gt; formData))block
+{
+
+__block AFStreamingMultipartFormData *formData = [[AFStreamingMultipartFormData alloc]   initWithURLRequest:request stringEncoding:self.stringEncoding];
+
+if (parameters) {
+    for (AFQueryStringPair *pair in AFQueryStringPairsFromDictionary(parameters)) {
+        NSData *data = nil;
+        if ([pair.value isKindOfClass:[NSData class]]) {
+            data = pair.value;
+        } else if ([pair.value isEqual:[NSNull null]]) {
+            data = [NSData data];
+        } else {
+            data = [[pair.value description] dataUsingEncoding:self.stringEncoding];
+        }
+
+        if (data) {
+            [formData appendPartWithFormData:data name:[pair.field description]];
+        }
+    }
+}
+
+if (block) {
+    block(formData);
+}
+
+return [formData requestByFinalizingMultipartFormData];
+</code></pre>
+
+<p>}</p>

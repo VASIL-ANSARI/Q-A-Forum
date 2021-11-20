@@ -1,0 +1,40 @@
+<p>Remember, PHP has a variable in the ini file that says how long a script should run. <a href="http://www.php.net/manual/en/info.configuration.php#ini.max-execution-time" rel="nofollow">max-execution-time</a></p>
+
+<p>Make sure that you are not going over this, or use the set_time_limit() to increase execution time.  Is this program running through a web server or via cli? </p>
+
+<p><strong>Adding:</strong>  My Bad Experiences with PHP.  Looking through some background scripts I wrote earlier this year.  Sorry, but PHP is a terrible scripting language for doing anything for long lengths of time.  I see that the newer PHP (which we haven't upgraded to) adds the functionality to force the GC to run.  The problem I've been having is from using too much memory because the GC almost never runs to clean up itself.  If you use things that recursively reference themselves, they also will never be freed.</p>
+
+<p>Creating an array of 100,000 items makes memory, but then setting the array to an empty array or splicing it all out, does NOT free it immediately, and doesn't mark it as unused (aka making a new 100,000 element array increases memory).</p>
+
+<p>My personal solution was to write a perl script that ran forever, and system("php my_php.php"); when needed, so that the interpreter would free completely.  I'm currently supporting 5.1.6, this might be fixed in 5.3+ or at the very least, now they have GC commands that you can use to force the GC to cleanup.</p>
+
+<p>Simple script</p>
+
+<pre>
+#!/usr/bin/perl -w
+
+use strict;
+
+while(1) {
+  if( system("php /to/php/script.php") != 0 ) {
+    sleep(30);
+  }
+}
+</pre>
+
+<p>then in your php script</p>
+
+<pre>
+&lt;?php
+
+// do a single processing block
+
+if( $moreblockstodo ) {
+  exit(0);
+} else {
+  // no? then lets sleep for a bit until we get more
+  exit(1);
+}
+
+?&gt;
+</pre>

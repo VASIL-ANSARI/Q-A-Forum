@@ -1,0 +1,19 @@
+<p>@Duncan proposed the following explanation:</p>
+
+<blockquote>
+  <p>The first call to close() returns quickly, yet the OS is still flushing data to disk. The subsequent calls to close() can't complete until the previous flushing is complete.</p>
+</blockquote>
+
+<p>I think this is close to the mark, but not exactly correct.</p>
+
+<p>I think that what is actually going on here is that the first copy is filling up the operating system's file buffer cache with large numbers of dirty pages.  The internal daemon that flushes the dirty pages to discs may start working on them, but it is still going when you start the second copy.</p>
+
+<p>When you do the second copy, the OS tries to acquire buffer cache pages for reading and writing.  But since the buffer cache is full of dirty pages the read and write calls are repeatedly blocked, waiting for free pages to become available.  But before a dirty page can be recycled, the data in the page needs to be written to disc.  The net result is that the copy slows down to the effective data write rate.</p>
+
+<hr>
+
+<p>A 30 second pause may not be sufficient to complete flushing the dirty pages to disc.</p>
+
+<p>One thing you could try is to do an <code>fsync(fd)</code> or <code>fdatasync(fd)</code> between the copies. In Java, the way to do that is to call <code>FileDescriptor.sync()</code>.</p>
+
+<p>Now, I can't say if this is going to improve total copy throughput, but I'd expect a <code>sync</code> operation to be better at writing out (just) one file than relying on the page eviction algorithm to do it.</p>

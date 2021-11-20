@@ -1,0 +1,36 @@
+<p>From the docs for <code>ResourceClosedException</code>:</p>
+
+<blockquote>
+  <p>Indicates an attempt was made to use a closed resource (Session,
+  SessionFactory, etc).</p>
+</blockquote>
+
+<p>Now, when using "try with resources", the <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html" rel="nofollow">documentation</a> says:</p>
+
+<blockquote>
+  <p>Note: A try-with-resources statement can have catch and finally blocks
+  just like an ordinary try statement. In a try-with-resources
+  statement, any catch or finally block is run <strong>after the resources
+  declared have been closed</strong>.</p>
+</blockquote>
+
+<p>So by the time you call <code>rollback()</code> the <code>Session</code> will already have been closed.</p>
+
+<p>The simplest solution here would be to move your existing catch block to an <strong>inner</strong> try/catch block around the transaction-management code, e.g.:</p>
+
+<pre><code>try (Session session = ourSessionFactory.openSession()) {
+    try {
+       tx = session.beginTransaction();
+       Person p = new Person(name, affiliation);
+       personID = (Integer) session.save(p);
+       tx.commit();
+    }
+    catch (HibernateException e) {
+        if (tx != null) {
+             tx.rollback();
+        }
+    }
+}
+</code></pre>
+
+<p>This ensures that the <code>Session</code> only gets closed once you've (at least) requested rollback.</p>

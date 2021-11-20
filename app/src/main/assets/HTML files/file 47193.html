@@ -1,0 +1,36 @@
+<p><strong>In controller:</strong><br>
+Its not good to send bulk objects like <code>params</code> and <code>File</code> object in <code>redis-server</code> via <code>sidekiq</code>. Lets make it simple</p>
+
+<pre><code>def my_mail
+    # get absolute path of temporary location uploaded file
+    attachment_tmp_path = File.absolute_path(params[:attachment].tempfile)
+    MyMailer.delay.my_mail(attachment_tmp_path)
+end
+</code></pre>
+
+<p><strong>In Mailer:</strong></p>
+
+<pre><code>def my_mail(attachment_tmp_path)
+    attachments['attachment'] = File.read(attachment_tmp_path)
+    mail(from: ENV['MY_MAIL'], to: ENV['MAIL_RECIVER'], subject: 'this is subject')
+end
+</code></pre>
+
+<blockquote>
+  <p><strong>Why security issue is warned?</strong><br>
+  It is not considered good to directly use <code>params</code> without using strong params to limit only permitted attributes.</p>
+  
+  <p><strong>Note</strong>:<br>
+  Tmp uploaded files may not be available always as you have used <code>sidekiq</code> for background processing file uploaded by <code>sidekiq-client</code> may not be available when <code>sidekiq-server (Background version)</code> tries to access that tmp file when <code>sidekiq-server</code> being busy processed this task after very long long time.</p>
+</blockquote>
+
+<p><strong>Conditions your approach may not work</strong>:  </p>
+
+<ul>
+<li><p>When you goto to production and need to run multiple instance. Lets
+say you need a separate utility instance to run <code>sidekiq</code> and
+<code>redis</code>. Then your <code>sidekiq-server</code> cannot locate the <code>tmp</code> location
+of <code>application_master</code>.  </p></li>
+<li><p>When you <code>sidekiq-server</code> is busy in
+processing or is down for some time and resumes after long long time</p></li>
+</ul>

@@ -1,0 +1,27 @@
+<p><em>this is not working and I don't know why</em></p>
+
+<p>Because you are using <code>dup()</code>.  To redirect the standard input of the child process to the pipe, the correct system call to use is <code>dup2()</code></p>
+
+<pre><code>case 0:
+    close( fd[1] );
+    dup2( fd[0], 0 ); // this "dup"s the read-end of the pipe onto STDIN
+    close( fd[0] );
+</code></pre>
+
+<p>Note that you don't need the <code>dup()</code> call at all in the parent code branch.  Just write to the write-end of the pipe:</p>
+
+<pre><code>write( fd[1], "Hello World\n", 12 );
+</code></pre>
+
+<p>However, if you want to use execvp in the parent branch also, to launch another program with its standard output redirected, then you would have to use <code>dup2()</code> here also:</p>
+
+<pre><code>dup2( fd[1], 1 ); // this "dup"s the write-end of the pipe onto STDOUT
+close( fd[1] );
+</code></pre>
+
+<p>Read the <a href="http://linux.die.net/man/2/dup2" rel="nofollow">manpage</a> for <code>dup2</code> for details.</p>
+
+<p>Also, another problem with your code is the use of execvp with <code>argv</code> as the argument list.  This will cause programs like <code>rev</code> and <code>wc</code> to receive the entire command line of the parent program and thus find an argument to process rather than read from standard input.  You probably want</p>
+
+<pre><code>execvp( argv[1], &amp;argv[1] );
+</code></pre>

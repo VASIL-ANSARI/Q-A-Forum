@@ -1,0 +1,77 @@
+<p>So I came up with a solution, that's a little odd, but keeps things modular, works well. I've created a class called PropertyEnforcer which registers itself as a KVO observer of an object's property and re-sets that property any time it changes.</p>
+
+<p>PropertyEnforcer.h:</p>
+
+<pre><code>#import &lt;Foundation/Foundation.h&gt;
+
+@interface PropertyEnforcer : NSObject
+
++ (void) enforceProperty:(NSString*)keyPath ofObject:(id)target toValue:(id)value;
+
+@end
+</code></pre>
+
+<p>PropertyEnforcer.m:</p>
+
+<pre><code>#import "PropertyEnforcer.h"
+#import &lt;objc/runtime.h&gt;
+
+@interface PropertyEnforcer ()
+
+@property (retain) NSString *keyPath;
+@property (retain) id value;
+@property (assign) id target;
+
+@end
+
+@implementation PropertyEnforcer
+
+- (void) dealloc {
+    [_target removeObserver:self forKeyPath:_keyPath context:NULL];
+    [super dealloc];
+}
+
+- (void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if( (([_target valueForKey:_keyPath] == nil) &amp;&amp; (_value==nil)) || [[_target valueForKey:_keyPath] isEqual:_value]) {
+        return;
+    } else {
+        [_target setValue:_value forKeyPath:_keyPath];
+    }
+}
+
++ (void) enforceProperty:(NSString*)keyPath ofObject:(id)target toValue:(id)value {
+    PropertyEnforcer *enforcer=[[PropertyEnforcer alloc] init];
+    enforcer.value=value;
+    enforcer.keyPath=keyPath;
+    enforcer.target=target;
+
+    [target addObserver:enforcer forKeyPath:keyPath options:NSKeyValueObservingOptionInitial|NSKeyValueObservingOptionNew context:NULL];
+
+    objc_setAssociatedObject(target,
+                             _cmd, // using this technique we can only attach one PropertyEnforcer per target
+                             enforcer,
+                             OBJC_ASSOCIATION_RETAIN);
+
+    [enforcer release];
+}
+
+@end
+</code></pre>
+
+<p>Now I can change the change the original code to:</p>
+
+<pre><code>- (IBAction) consoleBarButtonHit:(id)sender {
+    UIViewController *consoleNavigationController=[self.storyboard instantiateViewControllerWithIdentifier:@"consoleNavigationController"];
+    _consolePopoverController=[[UIPopoverController alloc] initWithContentViewController:consoleNavigationController];
+    _consolePopoverController.delegate=self;
+
+    [_consolePopoverController presentPopoverFromBarButtonItem:sender permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+
+    // make sure those passthroughViews are always nil !
+    [PropertyEnforcer enforceProperty:@"passthroughViews" ofObject:_consolePopoverController toValue:nil];
+}
+</code></pre>
+
+<p>The PropertyEnforcer registers itself as an associated object so we don't ever have to keep track of it. It will automatically unregister itself as a KVO observer and be destroyed whenever the UIPopoverController is destroyed.</p>
+
+<p>This is the best, least hackish, solution that I could come up with.</p>

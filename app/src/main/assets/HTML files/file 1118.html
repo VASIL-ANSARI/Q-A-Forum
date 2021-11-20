@@ -1,0 +1,157 @@
+<p>I have the same issue.  For the moment, I've worked around it by writing a BasicHandler extension, and then walking the SOAPPart myself and moving the namespace reference up to a parent node.  I don't <em>like</em> this solution, but it does seem to work.</p>
+
+<p>I really hope somebody comes along and tells us what we have to do.</p>
+
+<p><strong><em>EDIT</em></strong></p>
+
+<p>This is way too complicated, and like I said, I don't like it at all, but here we go.  I actually broke the functionality into a few classes (This wasn't the only manipulation that we needed to do in that project, so there were other implementations)  I really hope that somebody can fix this soon.  This uses dom4j to process the XML passing through the SOAP process, so you'll need dom4j to make it work.</p>
+
+<pre><code>public class XMLManipulationHandler extends BasicHandler {
+private static Log log = LogFactory.getLog(XMLManipulationHandler.class);
+private static List processingHandlers;
+
+public static void setProcessingHandlers(List handlers) {
+	processingHandlers = handlers;
+}
+
+protected Document process(Document doc) {
+	if (processingHandlers == null) {
+		processingHandlers = new ArrayList();
+		processingHandlers.add(new EmptyProcessingHandler());
+	}
+	log.trace(processingHandlers);
+	treeWalk(doc.getRootElement());
+	return doc;
+}
+
+protected void treeWalk(Element element) {
+	for (int i = 0, size = element.nodeCount(); i &lt; size; i++) {
+		Node node = element.node(i);
+		for (int handlerIndex = 0; handlerIndex &lt; processingHandlers.size(); handlerIndex++) {
+			ProcessingHandler handler = (ProcessingHandler) processingHandlers.get(handlerIndex);
+			handler.process(node);
+		}
+		if (node instanceof Element) {
+			treeWalk((Element) node);
+		}
+	}
+}
+
+public void invoke(MessageContext context) throws AxisFault {
+	if (!context.getPastPivot()) {
+		SOAPMessage message = context.getMessage();
+		SOAPPart soapPart = message.getSOAPPart();
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+		try {
+			message.writeTo(baos);
+			baos.flush();
+			baos.close();
+
+			ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+			SAXReader saxReader = new SAXReader();
+			Document doc = saxReader.read(bais);
+			doc = process(doc);
+			DocumentSource ds = new DocumentSource(doc);
+			soapPart.setContent(ds);
+			message.saveChanges();
+		} catch (Exception e) {
+			throw new AxisFault("Error Caught processing document in XMLManipulationHandler", e);
+		}
+	}
+}
+
+}
+
+
+public interface ProcessingHandler {
+    public Node process(Node node);
+}
+
+
+public class NamespaceRemovalHandler implements ProcessingHandler {
+private static Log log = LogFactory.getLog(NamespaceRemovalHandler.class);
+private Namespace namespace;
+private String targetElement;
+private Set ignoreElements;
+
+public NamespaceRemovalHandler() {
+	ignoreElements = new HashSet();
+}
+
+public Node process(Node node) {
+	if (node instanceof Element) {
+		Element element = (Element) node;
+		if (element.isRootElement()) {
+			// Evidently, we never actually see the root node when we're called from
+			// SOAP...
+		} else {
+			if (element.getName().equals(targetElement)) {
+				log.trace("Found the target Element.  Adding requested namespace");
+				Namespace already = element.getNamespaceForURI(namespace.getURI());
+				if (already == null) {
+					element.add(namespace);
+				}
+			} else if (!ignoreElements.contains(element.getName())) {
+				Namespace target = element.getNamespaceForURI(namespace.getURI());
+				if (target != null) {
+					element.remove(target);
+					element.setQName(new QName(element.getName(), namespace));
+				}
+			}
+			Attribute type = element.attribute("type");
+			if (type != null) {
+				log.trace("Replacing type information: " + type.getText());
+				String typeText = type.getText();
+				typeText = typeText.replaceAll("ns[0-9]+", namespace.getPrefix());
+				type.setText(typeText);
+			}
+		}
+	}
+
+	return node;
+}
+
+public Namespace getNamespace() {
+	return namespace;
+}
+
+public void setNamespace(Namespace namespace) {
+	this.namespace = namespace;
+}
+
+/**
+ * @return the targetElement
+ */
+public String getTargetElement() {
+	return targetElement;
+}
+
+/**
+ * @param targetElement the targetElement to set
+ */
+public void setTargetElement(String targetElement) {
+	this.targetElement = targetElement;
+}
+
+/**
+ * @return the ignoreElements
+ */
+public Set getIgnoreElements() {
+	return ignoreElements;
+}
+
+/**
+ * @param ignoreElements the ignoreElements to set
+ */
+public void setIgnoreElements(Set ignoreElements) {
+	this.ignoreElements = ignoreElements;
+}
+
+public void addIgnoreElement(String element) {
+	this.ignoreElements.add(element);
+}
+}
+</code></pre>
+
+<p>No warranty, etc, etc.</p>

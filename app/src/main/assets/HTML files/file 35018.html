@@ -1,0 +1,37 @@
+<p>This has happened because your test cases are not properly designed.</p>
+
+<p>Firstly, If you wish the data to be added to the database, you should commit the changes after any update/insert operation. You have to do a rollback only if there are any exceptions during transactions.</p>
+
+<p>Design your tests some thing like this.</p>
+
+<pre><code>        @BeforeTest
+        public void setUp() {
+            personDao.setEntityManager(entityManager);
+            entityManager.getTransaction().begin();
+
+        }
+
+        @AfterTest
+        public void tearDown() {
+            // TODO clear all inserted data either using sql statement or JPA
+            //Rollback only if there is any exception
+            entityManager.getTransaction().rollback();
+        }
+
+
+        @Test
+        public void findPersonById() {
+        Long id = System.currentTimeMillis();
+
+            personDao.savePerson(new Person(id,"Hans"));
+            entityManager.flush();
+
+           // TODO your assert statements go in here
+           /* Data is visible till here during your debug. 
+              Once AfterTest is executed then the your data would be rolled back
+            */
+        }
+</code></pre>
+
+<p>I have used testNG as my Unit testing tool, pls use appropriate tool based on your requirements.
+Also, if you are enityManager.flush() insert/update statements would be sent to the DB but wont be committed until commit instruction is sent to the DB by HIbernate. Pls refer <a href="http://stackoverflow.com/a/4275973">this</a> answer for further details</p>

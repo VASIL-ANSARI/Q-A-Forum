@@ -1,0 +1,35 @@
+<p>Rather than return a User to the base logger, which would be exposing it to concepts it shouldn't really know about, why not implement a tagging or additional information system?  To extend your existing LogContext:</p>
+
+<pre><code>public class LogContext : DbContext
+{
+    private readonly Func&lt;string&gt; _getAdditionalInfoFunc;
+    public LogContext(string context, Func&lt;string&gt; getAdditionalInfoFunc)
+        : base(context)
+    {
+            _getAdditionalInfoFunc = getAdditionalInfoFunc;
+    }
+
+    public override int SaveChanges()
+    {
+        ChangeTracker.DetectChanges();
+        var added = ChangeTracker.Entries()
+                    .Where(x =&gt; x.State == EntityState.Added).ToList();
+        var modified = ChangeTracker.Entries()
+                    .Where(x =&gt; x.State == EntityState.Modified).ToList();
+        var deleted = ChangeTracker.Entries()
+                    .Where(x =&gt; x.State == EntityState.Deleted).ToList();
+
+        string extraInfo = _getAdditionalInfoFunc != null
+                         ? _getAdditionalInfoFunc()
+                         : string.Empty;
+
+        Logger.RecordAdded(added, extraInfo);
+        Logger.RecordModified(modified, extraInfo);
+        Logger.RecordDeleted(deleted, extraInfo);
+    }
+} 
+</code></pre>
+
+<p>This would be a pretty flexible solution.  You can then have the injector inject a func that returns a string with as much context-relevant information as you need, in a free format.</p>
+
+<p>The benefit of this over injecting different implementations depending on the location of the class that needs it is that there may be times where your low level code is called within the context of a user action.  If you serve specific loggers to specific classes, you'll potentially lose that relevant context information.  If you instead have a func that always checks for user context, when the logger logs it will find context for any call in which context exists.</p>

@@ -1,0 +1,60 @@
+<p>because in the second part you've created a <code>pandas.io.parsers.TextFileReader object</code> (iterator)... </p>
+
+<p>Demo:</p>
+
+<pre><code>In [17]: df = pd.DataFrame(np.random.randint(0, 10, size=(20, 3)), columns=list('abc'))
+
+In [18]: df.to_csv('d:/temp/test.csv')
+
+In [19]: reader = pd.read_csv('d:/temp/test.csv', chunksize=10, index_col=0)
+
+In [20]: print(reader)
+&lt;pandas.io.parsers.TextFileReader object at 0x000000000827CB70&gt;
+</code></pre>
+
+<p>How to use this iterator</p>
+
+<pre><code>In [21]: for df in reader:
+   ....:     print(df)
+   ....:
+   a  b  c
+0  0  5  6
+1  6  0  6
+2  2  5  0
+3  3  6  2
+4  5  7  2
+5  5  2  9
+6  0  0  1
+7  4  8  3
+8  1  8  0
+9  0  8  8
+    a  b  c
+10  7  9  1
+11  6  7  9
+12  7  3  2
+13  6  4  4
+14  7  4  1
+15  2  6  5
+16  5  2  2
+17  9  9  7
+18  4  9  0
+19  0  1  9
+</code></pre>
+
+<p>In the first part of your code you've read the whole CSV file in one DF (Data Frame). Obviously it takes longer because the iterator object (<code>reader</code> in the demo above) doesn't read the data from the CSV file until you start to iterate over it</p>
+
+<p>Example: let's create a 1M rows DF and compare the timing of <code>pd.read_csv(...)</code> and <code>pd.read_csv(..., chunksize=1000)</code>:</p>
+
+<pre><code>In [24]: df = pd.DataFrame(np.random.randint(0, 10, size=(10**6, 3)), columns=list('abc'))
+
+In [25]: df.shape
+Out[25]: (1000000, 3)
+
+In [26]: df.to_csv('d:/temp/test.csv')
+
+In [27]: %timeit pd.read_csv('d:/temp/test.csv', index_col=0)
+1 loop, best of 3: 1.21 s per loop
+
+In [28]: %timeit pd.read_csv('d:/temp/test.csv', index_col=0, chunksize=1000)
+100 loops, best of 3: 4.42 ms per loop
+</code></pre>

@@ -1,0 +1,42 @@
+<p>It returns <code>undefined</code> because at  <code>return allSegements</code> <code>allSegements</code> is undefined.</p>
+
+<p>Your using a promise, yet your forgot to return it properly</p>
+
+<pre><code>app.service("DashboardService",function($q,$http,errorMessages){
+       var allSegements = [];
+        return {
+                // For selected Only
+                getSegments : getSegments
+            }
+         function getSegments(){
+                var deferred = $q.defer();
+                $http({
+                    url: "/getAllSegments",
+                    method: "GET"
+                }).success(function (data, status, headers, config) {
+                    deferred.resolve(data);
+                    allSegements = data;
+                }).error(function (data, status, headers, config) {
+                    //logger.logError('Error while retrieving Versions details');
+                     deferred.reject();//--------- REJECT IF ERROR
+                });
+                return deferred.promise;//------- RETURN THE PROMISE
+            }
+    });
+
+   app.run(['$rootScope','DashboardService',function($rootScope,DashboardService) {
+    // use then to get the data from your promise ince it's ready
+    DashboardService.getSegments().then(function(data){
+            $rootScope.SegmentSelectedGlobal = data;       
+    });
+}]);
+</code></pre>
+
+<p>Note if you want to wait for the promised to be resolved before loading your page, use the <code>resolve</code> attribute (available in both ngRoute/ui-router) : </p>
+
+<pre><code> resolve:{
+     segments:['DashboardService', function(DashboardService){
+           return DashboardService.getSegments();//we return the promise, the resolve parameter will take the result, in case of error page won't be loaded.
+     }];
+ }
+</code></pre>

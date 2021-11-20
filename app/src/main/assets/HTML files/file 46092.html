@@ -1,0 +1,55 @@
+<pre><code>create table items
+(   -- endless self-join hierarchy
+    itemId int auto_increment primary key,
+    parent int not null,    -- 0 if no parent, avoid nulls
+    itemName varchar(200) not null, -- "Our Wedding (My 2nd, your 1st)"
+    pathToFile varchar(200) null    -- "/users/all/jpg/miama.jpg"
+);
+
+create table users
+(   userId int auto_increment primary key,
+    fullname varchar(100) not null
+);
+
+create table items_users_rights_junction
+(   id int auto_increment primary key,
+    itemId int not null,
+    userId int not null,
+    rightsMask int not null, -- here is your Visibility
+
+    -- FK's to enforce referential integrity:
+    CONSTRAINT fk_rights_items
+        FOREIGN KEY (itemId) 
+        REFERENCES items(itemId),
+    CONSTRAINT fk_rights_users
+        FOREIGN KEY (userId) 
+        REFERENCES users(userId),
+    unique key (itemId,userId), -- no dupes on combo
+    key (userId,itemId) -- go the other way, benefits by covered index
+);
+</code></pre>
+
+<p>Subversioning is baked in (naturally) to the items hierarchy. Populate and query at will. Self-join knowledge would be helpful.</p>
+
+<p>To make it a very useful covered index on (user_id,itemId,rightsMask) that would never need to go to data page for rights. Rather all is in the index with left-most being userId. This covering index could still be considered <code>thin</code>.</p>
+
+<blockquote>
+  <p>A covering index refers to the case when all columns selected are
+  covered by an index, in that case InnoDB (not MyISAM) will never read
+  the data in the table, but only use the data in the index,
+  significantly speeding up the select.</p>
+</blockquote>
+
+<p>Some sample data for the first two tables:</p>
+
+<pre><code>insert users (fullName) values ('Kim Jones'),('Harry Smith');
+
+truncate table items;   -- will be run a few times to get demo data right
+insert items (parent,itemName,pathToFile) values (0,'Our Wedding',null);    -- id #1 top level no parent
+insert items (parent,itemName,pathToFile) values (1,'Our Wedding - Cake pictures',null);    #2 place holder
+insert items (parent,itemName,pathToFile) values (1,'DJ spins the tunes',null); -- #3 place holder
+insert items (parent,itemName,pathToFile) values (2,'She smears cake','/users/all/jpg/miama.jpg');  -- #4
+insert items (parent,itemName,pathToFile) values (2,'He feeds the bride','/users/all/jpg/cake123.jpg'); -- #5
+insert items (parent,itemName,pathToFile) values (5,'He feeds the bride take 2','/users/all/jpg/cake123-2.jpg'); -- #6
+insert items (parent,itemName,pathToFile) values (5,'He feeds the bride take 3','/users/all/jpg/cake123-3.jpg'); -- #7
+</code></pre>

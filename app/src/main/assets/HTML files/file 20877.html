@@ -1,0 +1,65 @@
+<p>If the database must use a delimited long-string field for "keywords" rather than putting them in rows, then you will want to use the <a href="http://dev.mysql.com/doc/refman/5.0/en/string-comparison-functions.html#operator_like" rel="nofollow">LIKE Operator</a></p>
+
+<p>Assuming your <code>[keywords]</code> column is formatted like this:</p>
+
+<p>'chocolate,ganache,strawberry'</p>
+
+<p>You can search for "similar" cakes like this:</p>
+
+<pre><code>SELECT
+    columns
+FROM
+    table t
+WHERE
+    t.[keywords] LIKE '%chocolate%'
+    OR t.[keywords] LIKE '%cheesecake%'
+</code></pre>
+
+<p>Though, if you can change the schema, I would do so. Searching normalized keyword <strong>rows</strong> will be much more efficient and fast than having the DB parse through text using <code>LIKE</code></p>
+
+<p>If you could make a <code>keywords</code> <strong>table</strong>, which references the parent table by ID, you could do an equality search using a <code>JOIN</code> which would be superior, in my opinion.</p>
+
+<p>It might have three columns: Id, ParentId, Keyword</p>
+
+<p><strong>EDIT:</strong> So based on your update, you have a <code>cakewords</code> table which can be searched.</p>
+
+<p>This is untested, and there is likely a more efficient way using no <code>IN</code> clause. But the idea is that you know all the keyword id's for your specific cake. Then you are looking for other cakes having keywords in that collection.</p>
+
+<pre><code>SELECT
+    columns
+FROM
+    cake AS cs
+JOIN
+    cakewords AS csw
+        ON csw.[cakeid] = cs.[id]
+WHERE
+    csw.[wordid] IN
+        (SELECT
+            cw.[wordid]
+        FROM
+            cakewords AS cw
+        JOIN
+            cakes AS c
+                ON c.[id] = cw.[cakeid]
+        WHERE
+            c.[id] = @pMyCurrenctCakeId
+        (
+</code></pre>
+
+<p><strong>EDIT2:</strong> Here is a good related question:</p>
+
+<p><a href="http://stackoverflow.com/questions/615098/whats-the-optimal-solution-for-tag-keyword-matching">What&#39;s the optimal solution for tag/keyword matching?</a></p>
+
+<p>Based on an answer within, you might try this:</p>
+
+<pre><code>SELECT DISTINCT
+    c.[id]
+FROM
+    cakewords AS cw1
+INNER JOIN cakewords cw2 
+    ON cw2.[wordid] = cw1.[wordid]
+INNER JOIN cake AS c 
+    ON c.[id] = cw.[cakeid]
+WHERE
+    cw1.[cakeid] = @current_cake_id
+</code></pre>

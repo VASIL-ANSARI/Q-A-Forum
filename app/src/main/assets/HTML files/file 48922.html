@@ -1,0 +1,48 @@
+<p>This shows the treatment of an IN variable, not an out, as I was a little confused by the OUT part of what you are saying. Meaning, have an IN for an IN. If you need an OUT, give that separately. In my mind.</p>
+
+<p>If you need to use other parameters inside your prepared statement, see the reference <a href="http://dev.mysql.com/doc/refman/5.7/en/sql-syntax-prepared-statements.html" rel="nofollow">SQL Syntax for Prepared Statements</a> halfway down that page around the area <code>EXECUTE stmt2 USING @a, @b;</code>.</p>
+
+<p>So to be clear, parameters like <code>@a</code> above are great for normal parameters one would like plugged into prepared statements (like in PHP or JAVA). The trick with yours is that lists <strong>don't</strong> work well in that fashion, and <strong>require</strong> the prepared statement string to be constructed with <code>concat</code>. One can mix and match the two. Meaning you can put one together that requires a <code>concat</code> in the part that is required, as well as execute it <code>USING</code> ... with the variables that don't require <code>concat</code>.</p>
+
+<p>But here is yours.</p>
+
+<h2>Schema</h2>
+
+<pre><code>create table thingsCoveted
+(   id int auto_increment primary key,
+    thing varchar(100) not null
+);
+insert thingsCoveted(thing) values ('Fritos'),('crackers'),('gold');
+</code></pre>
+
+<h2>Stored Proc</h2>
+
+<pre><code>drop procedure if exists sp_name1;
+DELIMITER $$
+CREATE procedure sp_name1 (
+IN theList varchar(100) -- comes in like '1,3', need to strip off single quotes
+)
+BEGIN
+    -- declare preparedSql varchar(100);
+    declare theSize int;
+    set theSize=length(theList);
+    set @preparedSql=concat("select * from thingsCoveted where id in (",substring(theList,2,theSize-2),")");
+    -- select @preparedSql; -- left here for debug view if you un-rem it
+    PREPARE stmt FROM @preparedSql;
+    execute stmt;
+
+END $$
+DELIMITER ;
+</code></pre>
+
+<h2>Test It</h2>
+
+<pre><code>set @var1="'1,3'"; 
+call sp_name1(@var1);
++----+--------+
+| id | thing  |
++----+--------+
+|  1 | Fritos |
+|  3 | gold   |
++----+--------+
+</code></pre>

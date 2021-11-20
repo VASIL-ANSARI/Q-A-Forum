@@ -1,0 +1,88 @@
+<p>I just spoke with someone who walked me through the problem I was having, not all of which was related to the code I posted above.  Am posting some details here.  Am sure there are other ways to fix this, but this is how we covered it.  Hope it's helpful.  </p>
+
+<h2>Primary Issue:  no <code>each_serializer</code></h2>
+
+<p>Specifically related to the language as posted above:  I was not including reference to <code>each_serializer</code> in my <code>render</code> statement in my model.  This issue is referenced in this thread here as well:  <a href="http://stackoverflow.com/questions/29930777/rails-active-model-serializer-not-doing-anything">rails active model serializer not doing anything</a>.  </p>
+
+<p><strong>controller</strong></p>
+
+<pre><code>class KoboDataController &lt; ApplicationController
+  def index
+    @kobo_info = KoboApi.get_api_info
+    @kobo_info.each do |kobo_info|
+      begin
+        #this pulls in new records that have been added to the api and adds them to the database.  it doesn't pull in records from the api that are already in the db
+        KoboApi.find_or_create_by(lemurs_quantity: kobo_info['lemurs_quantity'], month_and_year:  Date.parse(kobo_info['month_and_year']))
+          # some of my records don't have valid date values, so `rescue` is added to keep rails from returning a `notfound` page.
+          # quick tutorial here:  http://www.rubytutorial.io/rails-rescue_from/
+      rescue
+        puts "rescued"
+      end
+    end
+    # I needed to update my render logic.
+    # see addition of `each_serializer` here.
+    # @kobo_info has also changed to KoboApi.all as well.
+    render(
+      json: KoboApi.all,
+      each_serializer: KoboApiSerializer
+    )
+  end
+end
+</code></pre>
+
+<p>If my database had been configured correctly, this should have fixed it for me.</p>
+
+<p>Also, just in case there was an issue with the <code>Active Model Serializers</code> i was using, we updated my gem file to replace the line I had (<code>gem 'active_model_serializers', '~&gt; 0.8.3'</code>) with the following:  </p>
+
+<pre><code>gem 'active_model_serializers', :git =&gt; 'git://github.com/AskNative/active_model_serializers.git', :branch =&gt; '0-8-stable'  
+</code></pre>
+
+<h2>Second Issue:  incorrect db table name</h2>
+
+<p>However, I had an issue with the two-word table name I had created.  I had created my table with a camelCase name structure, and rails was expecting separated_words (ie: with underscore).  </p>
+
+<p>You can see the table name here is <code>koboApis</code>:</p>
+
+<p><strong>original migration</strong></p>
+
+<pre><code>class KoboApis &lt; ActiveRecord::Migration
+  def change
+    create_table :koboApis do |t|
+      t.integer :lemurs_quantity
+      t.date  :month_and_year
+      t.text :_geolocation
+      t.text :lemur_category
+    end
+  end
+end
+</code></pre>
+
+<p>You can see in my original schema that the table name is indeed <code>kobo_apis</code>, and not `koboApis'.  </p>
+
+<p><strong>schema</strong></p>
+
+<pre><code>ActiveRecord::Schema.define(version: 20160620063545) do
+
+  create_table "kobo_apis", force: :cascade do |t|
+    t.integer "lemurs_quantity"
+    t.date    "month_and_year"
+    t.text    "_geolocation"
+    t.text    "lemur_category"
+  end
+end
+</code></pre>
+
+<p>The table Rails was expecting didn't even exist because of this.</p>
+
+<p>We fixed this by running a second migration at the terminal:  <code>rails g migration RenameOldTableToNewTable</code>.  I then added this logic to the new migration file:  <code>rename_table :koboApis, :kobo_apis</code>.  Entire migration file here:  </p>
+
+<p><strong>update migration file</strong></p>
+
+<pre><code>class RenameOldTableToNewTable &lt; ActiveRecord::Migration
+  def change
+     rename_table :koboApis, :kobo_apis
+  end
+end
+</code></pre>
+
+<p>I ran <code>rake db:drop db:create db:migrate</code> to update everything, and then my Rails Api page rendered correctly.  </p>

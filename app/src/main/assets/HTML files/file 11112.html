@@ -1,0 +1,30 @@
+<p>I would change your design so you don't rely on the FileSystemWatcher for any changes.  Instead poll the directory or the file that your watching for any changes.  You can then use the FileSystemWatcher in conjunction with this to wake it up as soon as possible if we know there are changes.  This way, if you miss an event, you'd still recover from it based on your poll time-out.</p>
+
+<p>e.g.</p>
+
+<pre><code>    static void Main(string[] args)
+    {
+        FileSystemWatcher watcher = new FileSystemWatcher(@"f:\");
+        ManualResetEvent workToDo = new ManualResetEvent(false);
+        watcher.NotifyFilter = NotifyFilters.LastWrite;
+        watcher.Changed += (source, e) =&gt; { workToDo.Set(); };
+        watcher.Created += (source, e) =&gt; { workToDo.Set(); };
+
+        // begin watching
+        watcher.EnableRaisingEvents = true;
+
+        while (true)
+        {
+            if (workToDo.WaitOne())
+            {
+                workToDo.Reset();
+                Console.WriteLine("Woken up, something has changed.");
+            }
+            else
+                Console.WriteLine("Timed-out, check if there is any file changed anyway, in case we missed a signal");
+
+            foreach (var file in Directory.EnumerateFiles(@"f:\")) 
+                Console.WriteLine("Do your work here");
+        }
+    }
+</code></pre>

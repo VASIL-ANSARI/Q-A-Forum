@@ -1,0 +1,13 @@
+<p>I assume you were measuring the total api response time of your own rails app on heroku.
+To high probability it is deployed on unicorn with a couple of dyno workers. Every time web request comes in, it is handled by a unicorn worker process. As it is talking to a 3d party it will be doing blocking io communication, meaning it will cause this worker process to wait until the communication with the 3d party completes. While waiting, a unicorn worker, cannot handle any other http requests. So the bad throughput would result from your server being blocked most of the time. </p>
+
+<p>You would have following options to solve this:</p>
+
+<ul>
+<li><p>Switch to a multithreaded app server (e.g. puma)</p></li>
+<li><p>Switch to an evented app server (e.g. thin) and perform a non blocking io http request to the 3rd party with <code>EventMachine.em_http_request</code>. </p></li>
+</ul>
+
+<p>With a multithreaded solution you will have to tune your Threadpool number. Perhaps you would want to extract this feature into a separate app. Because it is totally fine to have a large Threadpool for Threads being most of the time in sleep mode, due to being blocked by io operations but not that fine for Threads doing a lot of cpu work as they will suffer from context switching.</p>
+
+<p>Being evented is a bit tricky with Rails and thin if you want also deliver the response to the client on the 3rd party call finished. But it seems <a href="http://www.jonb.org/2013/01/25/async-rails.html" rel="nofollow">possible</a>. It's a nobrainer with <a href="https://github.com/raggi/async_sinatra" rel="nofollow">async_sinatra</a>. One could also use some publish subscribe solution for the async responses.</p>

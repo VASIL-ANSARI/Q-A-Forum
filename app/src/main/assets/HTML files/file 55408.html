@@ -1,0 +1,44 @@
+<p>Let's refer to the documentation for the <code>angular.module().provider</code> method which is, in fact, a <a href="https://docs.angularjs.org/api/auto/service/$provide" rel="nofollow">$provide</a> service's method:</p>
+
+<blockquote>
+  <p><strong>provider(name, provider);</strong></p>
+  
+  <p>If the <em>provider</em> parameter is a constructor (function) - a new instance of the provider will be created using <code>$injector.instantiate()</code>, then treated as object.</p>
+</blockquote>
+
+<p>So, the second parameter of the <code>provider</code> method is a constructor function used to create an instance of the provider (an object with <code>$get</code> method). Now, let's see the instantiation process, here the source of the <code>$injector.instantiate()</code> method:</p>
+
+<pre><code>function instantiate(Type, locals, serviceName) {
+  var instance = Object.create((isArray(Type) ? Type[Type.length - 1] : Type).prototype || null);
+  var returnedValue = invoke(Type, instance, locals, serviceName);
+
+  return isObject(returnedValue) || isFunction(returnedValue) ? returnedValue : instance;
+}
+</code></pre>
+
+<p>where <code>Type</code> is our provider constructor.</p>
+
+<p>First, an <code>instance</code> object is created using the constructor's prototype. Then constructor (<code>Type</code>) is invoked with <code>this</code> bound to the newly created object <code>instance</code>. Now, notice the return statement:</p>
+
+<ul>
+<li>if the constructor returns an <code>object</code> (your first example) - it will be returned as a provider instance.</li>
+<li>if the constructor does not return anything (your second example) - the new object (<code>instance</code>, with your controller run against it) will be returned as a provider instance.</li>
+</ul>
+
+<p><strong>Answers to your questions:</strong></p>
+
+<ul>
+<li>both ways are correct;</li>
+<li>the difference is how the provider is created: in the first case you explicitly return the provider instance from the constructor, in the second case it is created as a new <code>Object</code> and then the constructor function is run with <code>this</code> bound to this new <code>Object</code>;</li>
+<li>the <code>this</code> object in the provider constructor is what eventually will be used as a provider instance throughout the application (only if the constructor does NOT return an object explicitly);</li>
+<li>the <code>this</code> object in the <code>$get</code> function is the same thing - the provider instance's reference, when you inject your service somewhere for the first time the <code>$get</code> function will be invoked with <code>this</code> bound to the provider instance, whatever <code>$get</code> returns will be injected throughout your application as your service.</li>
+</ul>
+
+<p>In addition to this, when you define your services using the <code>angular.module().service</code> shortcut method you can use both strategies as well, as internally the call to <code>service</code> method is similar to registering the following provider:</p>
+
+<pre><code>{
+  $get: function() {
+    return $injector.instantiate(constructor);
+  }
+}
+</code></pre>

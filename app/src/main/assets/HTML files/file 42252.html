@@ -1,0 +1,69 @@
+<p>What's happening here?</p>
+
+<ol>
+<li><code>set.Remove(blog);</code>            - this calls the previously configured lambda.</li>
+<li><code>data.Remove(entity);</code>         - The item is removed from the list.</li>
+<li><code>dbset.SetupData(data, find);</code> - We call SetupData again, to reconfigure the Substitute with the new list.</li>
+<li><code>SetupData</code> runs...</li>
+<li>In there, <code>dbSetup.Remove</code> is being called, in order to reconfigure what happens when Remove is called next time.</li>
+</ol>
+
+<p>Okay, we have a problem here. <code>dtSetup.Remove(Arg.Do&lt;T....</code> doesn't <em>reconfigure</em> anything, it rather <em>adds</em> a behavior to the Substitute's internal list of things that should happen when you call Remove. So we're currently running the previously configured Remove action (1) and at the same time, down the stack, we're adding an action to the list (5). When the stack returns and the iterator looks for the next action to call, the underlying list of mocked actions has changed. Iterators don't like changes.</p>
+
+<p>This leads to the conclusion: We can't modify what a Substitute does while one of its mocked actions is running. If you think about it, nobody who reads your test would assume this to happen, so you shouldn't do this at all.</p>
+
+<p>How can we fix it?</p>
+
+<pre><code>public static DbSet&lt;TEntity&gt; SetupData&lt;TEntity&gt;(
+    this DbSet&lt;TEntity&gt; dbset,
+    ICollection&lt;TEntity&gt; data = null,
+    Func&lt;object[], TEntity&gt; find = null) where TEntity : class
+{
+    data = data ?? new List&lt;TEntity&gt;();
+    find = find ?? (o =&gt; null);
+
+    Func&lt;IQueryable&lt;TEntity&gt;&gt; getQuery = () =&gt; new InMemoryAsyncQueryable&lt;TEntity&gt;(data.AsQueryable());
+
+    ((IQueryable&lt;TEntity&gt;) dbset).Provider.Returns(info =&gt; getQuery().Provider);
+    ((IQueryable&lt;TEntity&gt;) dbset).Expression.Returns(info =&gt; getQuery().Expression);
+    ((IQueryable&lt;TEntity&gt;) dbset).ElementType.Returns(info =&gt; getQuery().ElementType);
+    ((IQueryable&lt;TEntity&gt;) dbset).GetEnumerator().Returns(info =&gt; getQuery().GetEnumerator());
+
+#if !NET40
+    ((IDbAsyncEnumerable&lt;TEntity&gt;) dbset).GetAsyncEnumerator()
+                                            .Returns(info =&gt; new InMemoryDbAsyncEnumerator&lt;TEntity&gt;(getQuery().GetEnumerator()));
+    ((IQueryable&lt;TEntity&gt;) dbset).Provider.Returns(info =&gt; getQuery().Provider);
+#endif
+
+    dbset.Remove(Arg.Do&lt;TEntity&gt;(entity =&gt; data.Remove(entity)));
+    dbset.Add(Arg.Do&lt;TEntity&gt;(entity =&gt; data.Add(entity)));
+
+    return dbset;
+}
+</code></pre>
+
+<ol>
+<li>The <code>getQuery</code> lambda creates a new query. It always uses the captured list <code>data</code>.</li>
+<li>All <code>.Returns</code> configuration calls use a lambda. In there, we create a new query instance and delegate our call there.</li>
+<li><code>Remove</code> and <code>Add</code> only modify our captured list. We don't have to reconfigure our Substitute, because every call reevaluates the query using the lambda expressions.</li>
+</ol>
+
+<p>While I really like NSubstitute, I would strongly recommend looking into <strong><a href="https://effort.codeplex.com" rel="nofollow">Effort, the Entity Framework Unit Testing Tool</a>.</strong></p>
+
+<p>You would use it like this:</p>
+
+<pre><code>// DbContext needs additional constructor:
+public class MyDbContext : DbContext
+{
+    public MyDbContext(DbConnection connection) 
+        : base(connection, true)
+    {
+    }
+}
+
+// Usage:
+DbConnection connection = Effort.DbConnectionFactory.CreateTransient();    
+MyDbContext context = new MyDbContext(connection);
+</code></pre>
+
+<p>And there you have an actual DbContext that you can use with everything that Entity Framework gives you, including migrations, using a fast in-memory-database.</p>

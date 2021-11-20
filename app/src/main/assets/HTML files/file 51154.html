@@ -1,0 +1,30 @@
+<p>The reason your <code>#{item} W/COUPON</code> entry is modifying your <code>item</code> entry is you've handed both of them the same <code>info</code> object. That is, after the two key assignments, your hash looks like this:</p>
+
+<pre><code>{
+  item               =&gt; info,
+  "#{item} W/COUPON" =&gt; info
+}
+</code></pre>
+
+<p>Looking at it this way, it's clear that modifying one value modifies the other, and in fact modifies the original <code>info</code> variable - they're all the same object. A simple way to make your <code>hash_with_coupons</code> values independent is to call <code>dup</code> on <code>info</code> as you do the assignment:</p>
+
+<pre><code>hash_with_coupons[item] = info.dup
+hash_with_coupons["#{item} W/COUPON"] = info.dup
+# Make modifications
+</code></pre>
+
+<p>Then each of your hash keys gets a <em>copy</em> of <code>info</code>. <code>dup</code> does what's called a <em>shallow copy</em>, making a new <code>Hash</code> object with the same values as the old one. This will work as long as your <code>info</code> hash values are simple, like <code>Fixnum</code>s, and not references to more hashes, arrays, etc. that you want to modify. Otherwise, you'll need a <a href="http://stackoverflow.com/questions/8206523/how-to-create-a-deep-copy-of-an-object-in-ruby">deep copy</a> or you'll run into the same problem you're having now, just one level deeper.</p>
+
+<p>Since you're new, I'd recommend taking a different approach to better see which values are ending up in <code>hash_with_coupons</code>. Instead of assigning <code>info</code> and then modifying things inside your hash, assign brand new hashes with the data you want:</p>
+
+<pre><code>hash_with_coupons[item] = {
+  price: info[:price],
+  count: info[:count] - coupon_hash[:num]
+}
+hash_with_coupons["#{item} W/COUPON"] = {
+  price: info[:price] - coupon_hash[:cost],
+  count: 1
+}
+</code></pre>
+
+<p>This guarantees that the values of <code>hash_with_coupons</code> are distinct objects, so you won't accidentally modify both when you change one. It also makes it very clear which values end up where, so you can easily see if you start sharing references again.</p>

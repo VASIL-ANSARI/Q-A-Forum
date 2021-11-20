@@ -1,0 +1,68 @@
+<p>If can help this is how I did. By this way You can manage easily the values in your look up (reference or enum in c#).</p>
+
+<p>First the procedure:</p>
+
+<pre><code>    CREATE TYPE S_Reference.[ReferenceType] AS TABLE (
+    [Id] SMALLINT NOT NULL PRIMARY KEY, 
+    [Code] VARCHAR(40) UNIQUE NOT NULL, 
+    [Rank] SMALLINT UNIQUE NOT NULL CHECK([Rank]&gt;0),
+    [Description] VARCHAR(128) NOT NULL,
+    [Base] BIT NOT NULL DEFAULT 0);
+GO
+
+
+CREATE PROCEDURE [S_Reference].[P_M_ReferenceMerge]
+    @Values  S_Reference.[ReferenceType] READONLY,
+    @TableName NVARCHAR(50)
+AS
+
+CREATE TABLE #NewValues (
+    [Id] SMALLINT NOT NULL PRIMARY KEY, 
+    [Code] VARCHAR(40) UNIQUE NOT NULL, 
+    [Rank] SMALLINT UNIQUE NOT NULL CHECK([Rank]&gt;0),
+    [Description] VARCHAR(128) NOT NULL,
+    [Base] BIT NOT NULL DEFAULT 0);
+
+Insert INTO #NewValues
+select * From @Values
+
+DECLARE @SQLQuery NVARCHAR(MAX)
+SET @SQLQuery = 
+'DELETE 
+FROM ' + @TableName + '
+WHERE [Id] IN (SELECT [Id]
+                FROM ' + @TableName + '
+                EXCEPT
+                SELECT [Id]
+                FROM #NewValues)
+
+MERGE INTO ' + @TableName + ' Ori 
+USING #NewValues New 
+ON (Ori.[Id] = New.[Id]) 
+    WHEN MATCHED THEN 
+    UPDATE 
+        SET Ori.[Code] = New.[Code], 
+        Ori.[Rank] = New.[Rank], 
+        Ori.[Description] = New.[Description], 
+        Ori.[Base] = New.[Base] 
+    WHEN NOT MATCHED THEN 
+    INSERT ([Id] , [Code], [Rank], [Description] ,[Base]) 
+    Values (New.[Id] , New.[Code], New.[Rank], New.[Description] ,New.[Base]);'
+
+EXEC sp_executesql @SQLQuery
+RETURN 0
+</code></pre>
+
+<p>Usage</p>
+
+<pre><code>INSERT INTO 
+    @VALUES([Id],[Code],[Rank],[Description] ,[Base])
+Values
+    (1,'EUR',1,'EUR',0),
+    (2,'GBP',2,'GBP',0),
+    (3,'USD',3,'USD',0)
+EXEC [S_Reference].[P_M_ReferenceMerge]
+    @Values = @VALUES,
+    @TableName = 'S_Reference.T_R_Currency'
+DELETE FROM @VALUES
+</code></pre>

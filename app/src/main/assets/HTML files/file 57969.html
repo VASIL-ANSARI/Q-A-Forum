@@ -1,0 +1,41 @@
+<p>You misidentified the problem area. In that <code>if</code> branch, the deferred is resolved fine. The problem is the <code>else</code> branch:</p>
+
+<pre><code>â¦ else {
+  return $.promiseDelay(1000).then(function() {
+    return waitForJobStatus(jobID, timeStarted);
+  });
+}
+</code></pre>
+
+<p>Here, <code>def</code> is never resolves (and is not rejcted either)! This stems from your usage of the <a href="http://stackoverflow.com/q/23803743/1048572">deferred antipattern</a> - if you had not used a deferred, <code>return</code>ing from a <code>then</code> callback would indeed work. You are supposed to do such chaining only. If you are calling functions that already return promises, never create a deferred (you did unusually well by factoring out <code>$.promiseDelay</code> already)!</p>
+
+<pre><code>function waitForJobStatus(jobID, timeStarted) {
+  return getJobStatus(jobID).then(function(data) {
+    console.log(data);
+    var isFinished = data['job']['finished'];
+    var jobStatus = 'incomplete';
+    var jobStatus = data['job']['job_status'];
+    if (isFinished === true) {
+      console.log('resolving wait for job status');
+      return jobStatus; // this is correct indeed
+    } else {
+      return $.promiseDelay(1000).then(function() {
+        return waitForJobStatus(jobID, timeStarted);
+      });
+    }
+  });
+}
+
+function executeLinkAPIJob(type) {
+  return createLinkAPIJob(type).then(function(response) {
+    var jobID = response['data']['job_id'];
+    var timeStarted = new Date().getTime() / 1000;
+    console.log('waiting for job to finish');
+    return waitForJobStatus(jobID, timeStarted);
+  }).then(function(jobStatus) {
+    console.log('got job status, updating and resolving');
+    // A bunch of code here that doesn't matter for this issue...
+    return â¦;
+  });
+}
+</code></pre>

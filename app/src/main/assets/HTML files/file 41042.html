@@ -1,0 +1,54 @@
+<p>There might be a nicer way, but I usually do it like this:</p>
+
+<pre><code>from gi.repository import Gtk, Gdk, GLib
+
+def run_dialog(_None):
+    dialog = Gtk.FileChooserDialog("Please choose a folder", None,
+    Gtk.FileChooserAction.SELECT_FOLDER,
+        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        "Select", Gtk.ResponseType.OK))
+
+    response = dialog.run()
+    if response == Gtk.ResponseType.OK:
+        print("Select clicked")
+        print("Folder selected: " + dialog.get_filename())
+    elif response == Gtk.ResponseType.CANCEL:
+        print("Cancel clicked")
+
+    dialog.destroy()
+    Gtk.main_quit()
+
+
+Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT, run_dialog, None)
+Gtk.main()
+</code></pre>
+
+<p>This will call the <code>run_dialog</code> function as soon as the mainloop starts, which will display the dialog and then quit.</p>
+
+<p><strong>UPDATE:</strong> If you want to enclose that code in a function that returns the selected folder, you'll need to save the path to a non-local variable:</p>
+
+<pre><code>def run_folder_chooser_dialog():
+    result= []
+
+    def run_dialog(_None):
+        dialog = Gtk.FileChooserDialog("Please choose a folder", None,
+        Gtk.FileChooserAction.SELECT_FOLDER,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Select", Gtk.ResponseType.OK))
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            result.append(dialog.get_filename())
+        else:
+            result.append(None)
+
+        dialog.destroy()
+        Gtk.main_quit()
+
+
+    Gdk.threads_add_idle(GLib.PRIORITY_DEFAULT, run_dialog, None)
+    Gtk.main()
+    return result[0]
+</code></pre>
+
+<p>In python 3, you can use <code>nonlocal result</code> and <code>result= dialog.get_filename()</code> instead of the ugly list reference.</p>

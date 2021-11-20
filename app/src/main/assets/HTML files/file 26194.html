@@ -1,0 +1,68 @@
+<p>Nope, Fizz will be created with MyTask instance and it will persist druing multiple thread calls. If you want to have a Fizz copy for each thread you have to do it in lazy way.</p>
+
+<pre><code>public class MyTask implements Runnable {
+    @Inject
+    private Provider&lt;Fizz&gt; fizzProvider;
+
+    // Getters and setters for 'fizz'.
+
+    @Override
+    public void run() {
+        Fizz fizz = fizzProvider.get();
+        if(fizz.alleviatesBuzz())
+            doA();
+        else
+            doB();
+    }
+
+    private void doA() { ... }
+
+    private void doB() { ... }
+}
+</code></pre>
+
+<p>How ever if you put a Singleton flag to Fizz binding, the provider will return same instance when you call fizzProvider.get(), so all threads will have the same instance. You have to keep it non-singleton.</p>
+
+<p>Also your module is wrong, you should use method or implicit binding, not both. Also you can't provide instance and inject it's interface.</p>
+
+<pre><code>public class MyAppModule extends AbstractModule {
+    @Override
+    public void configure() {
+        bind(Fizz.class).to(FizzImpl.class);
+        //or bind(Fizz.class).toInstance(new FizzImpl(true, Buzz.ALWAYS, 35)); //Singleton!!
+        //or bind(Fizz.class).toProvider(new Provider&lt;Fizz&gt;() {
+        //      @Override
+        //      public Subject get() {
+        //        return new FizzImpl(true, Buzz.ALWAYS, 35);
+        //      }
+        //    });
+
+        // I don't think the functionality of MyThreadFactory
+        // really matters for the sake of this question.
+        bind(ThreadFactory.class).to(MyThreadFactory.class);
+    }
+}
+</code></pre>
+
+<p>or</p>
+
+<pre><code>public class MyAppModule extends AbstractModule {
+    @Override
+    public void configure() {
+    }
+
+    @Provides
+    Fizz providesFizz() {
+        return new FizzImpl(true, Buzz.ALWAYS, 35);
+    }
+
+    // I *believe* we always want the ThreadFactory to be singleton,
+    // because all of the threads spawn from it and its executor.
+    @Provides @Singleton
+    ThreadFactory providesThreadFactory() {
+        return new MyThreadFactory(12);
+    }
+}
+</code></pre>
+
+<p>Hope it will help!</p>

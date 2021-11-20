@@ -1,0 +1,27 @@
+<p>As far as I understood, you are trying to pass OpenCV haarcascades XML resource file into cvLoad function, which is not designed to work with Java resource files, since it is a C++ function, which has no idea about this notion.</p>
+
+<p>I had the same problem and the only workaround I found was copying this xml file from Java resource into temporary directory, feed it to cvLoad function and then delete it. It worked. And moreover there is a special OpenCV function for it, which does exactly all that.</p>
+
+<p>I used an example from <a href="https://github.com/bytedeco/javacv/blob/master/samples/FaceApplet.java" rel="nofollow">https://github.com/bytedeco/javacv/blob/master/samples/FaceApplet.java</a></p>
+
+<pre><code>String classiferName = "haarcascade_frontalface_alt.xml";
+
+// copying xml file into temp directory
+File classifierFile = Loader.extractResource(classiferName, null, "classifier", ".xml");
+if (classifierFile == null || classifierFile.length() &lt;= 0) {
+    throw new IOException("Could not extract \"" + classiferName + "\" from Java resources.");
+}
+
+// Preload the opencv_objdetect module to work around a known bug.
+Loader.load(opencv_objdetect.class);
+
+classifier = new CvHaarClassifierCascade(cvLoad(classifierFile.getAbsolutePath()));
+
+// deleting temp file
+classifierFile.delete();
+if (classifier.isNull()) {
+     throw new IOException("Could not load the classifier file.");
+}
+</code></pre>
+
+<p>Hope it helps!</p>

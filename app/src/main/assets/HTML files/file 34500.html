@@ -1,0 +1,34 @@
+<p>You have a problem of joining along two different dimensions, so the rows are multiplying.  You can solve this by pre-aggregating the data.  The following will fix this particular problem:</p>
+
+<pre><code>SELECT p.*,
+       (SUM(a.amount) + c.cnt) as accurred_fees
+FROM practices p INNER JOIN
+     adjustments a
+     ON a.practice_id = p.id INNER JOIN
+     (SELECT practice_id, count(*) as cnt
+      FROM claims c
+      GROUP BY practice_id
+     ) c
+     ON c.practice_id = p.id
+GROUP BY p.id;
+</code></pre>
+
+<p>You should probably preaggregate the adjustments as well:</p>
+
+<pre><code>SELECT p.*,
+       (a.amount + c.cnt) as accurred_fees
+FROM practices p INNER JOIN
+     (SELECT practice_id, SUM(amount) as amount
+      FROM adjustments a
+      GROUP BY practice_id
+     ) a
+     ON a.practice_id = p.id INNER JOIN
+     (SELECT practice_id, count(*) as cnt
+      FROM claims c
+      GROUP BY practice_id
+     ) c
+     ON c.practice_id = p.id
+GROUP BY p.id;
+</code></pre>
+
+<p>And you might want to consider <code>LEFT OUTER JOIN</code> rather than <code>INNER JOIN</code> so you get all practices, even those that might be missing adjustments or claims.</p>

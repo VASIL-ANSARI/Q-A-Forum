@@ -1,0 +1,24 @@
+<p>Rasters are 2-D arrays of values, with each value being stored in a pixel (which stands for picture element). Each pixel must contain some information. It is not possible to delete or remove pixels from the array because rasters are usually encoded as a simple 1-dimensional string of bits. Metadata commonly helps explain where line breaks are and the length of the bitstring, so that the 1-D bitstring can be understood as a 2-D array. If you "remove" a pixel, then you break the raster. The 2-D grid is no longer valid.</p>
+
+<p>Of course, there are many instances where you do want to effectively discard or clean the raster of data. Such an example might be to remove pixels that cover land from a raster of sea-surface temperatures. To accomplish this goal, many geospatial raster formats hold metadata describing what are called NoData values. Pixels containing a NoData value are <strong>interpreted</strong> as not existing. Recall that in a raster, each pixel must contain some information. The NoData paradigm allows the structure and format of rasters to be met, while also giving a way to <strong>mask</strong> pixels from being displayed or analyzed. There is still data (bits, 1s and 0s) at the masked pixels, but it only serves to identify the pixel as invalid.</p>
+
+<p>With this in mind, here is an example using <code>gdal</code> which will mask values in the range of 0-100 so they are NoData, and "do not exist". The NoData value will be specified as 0. </p>
+
+<pre><code>from osgeo import gdal
+
+# open dataset to read, and get a numpy array
+ds = gdal.Open("raster3.tif", 'r')
+myarray = ds.GetRasterBand(1).ReadAsArray()
+# modify numpy array to mask values
+myarray[myarray &lt;= 100] = 0
+
+# open output dataset, which is a copy of original
+driver = gdal.GetDriverByName('GTiff')
+ds_out = driver.CreateCopy("raster3_with_nodata.tif", ds)
+# write the modified array to the raster
+ds_out.GetRasterBand(1).WriteArray(myarray)
+# set the NoData metadata flag
+ds_out.GetRasterBand(1).SetNoDataValue(0)
+# clear the buffer, and ensure file is written
+ds_out.FlushCache()
+</code></pre>

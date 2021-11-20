@@ -1,0 +1,70 @@
+<p>You want the number of all +1 events <strong>since</strong> the moment you get at least 3 'pt' events.</p>
+
+<p>For 'since', I guess you want to order the events by ID.</p>
+
+<p>For pt, you need a <em>running total</em>. To achieve this in MySQL there are several answers on Stack Overflow (<a href="http://stackoverflow.com/questions/664700/calculate-a-running-total-in-mysql">this</a> is one).</p>
+
+<pre><code>SET @pts:=0;
+SELECT
+   *,
+   (@pts := @pts + (CASE WHEN event='pt' THEN 1 ELSE 0)) AS pts
+FROM Table 
+ORDER BY id;
+</code></pre>
+
+<p>But you want the count to be reset at every change of groupid, so:</p>
+
+<pre><code>SET @pts:=0,@gid:=-1;
+SELECT *,
+    (@pts := IF (@gid != groupid, 0, @pts + IF(event='pt', 1, 0))) AS pts, 
+    @gid:=groupid
+FROM eventi ORDER BY groupid, id;
+</code></pre>
+
+<p>So at every loop you save the current groupid value, but before doing so, you check if it's the same. If it is not, then you zero pts count.</p>
+
+<pre><code>+------+-------+---------+------+---------------+
+| id   | event | groupid | pts  | @gid:=groupid |
++------+-------+---------+------+---------------+
+|    1 | pt    |       1 |    0 |             1 |
+|    2 | pt    |       1 |    1 |             1 |
+|    3 | +1    |       1 |    1 |             1 |
+|    4 | pt    |       1 |    2 |             1 |
+|    5 | +1    |       1 |    2 |             1 |
+|    6 | +1    |       1 |    2 |             1 |
+|    7 | pt    |       2 |    0 |             2 |
+|    8 | pt    |       2 |    1 |             2 |
+|    9 | +1    |       2 |    1 |             2 |
+|   10 | pt    |       2 |    2 |             2 |
+|   11 | +1    |       2 |    2 |             2 |
+|   12 | +1    |       2 |    2 |             2 |
++------+-------+---------+------+---------------+
+</code></pre>
+
+<p>From here you see that the number of actual pts' is off by one (the check is done in reverse order than the increment).</p>
+
+<p>Now you can do the grouping:</p>
+
+<pre><code>SET @pts:=0,@gid:=-1; 
+SELECT groupid, SUM(IF(pts &gt;= 3 AND event='+1', 1,0)) AS event_sum FROM (
+    SELECT *,
+       (@pts := IF(@gid!=groupid, 0, @pts+IF(event='pt',1,0)))+1 AS pts,
+       @gid:=groupid
+    FROM eventi ORDER BY groupid, id 
+) AS a GROUP BY groupid;
+
+
++---------+-----------+
+| groupid | event_sum |
++---------+-----------+
+|       1 |         2 |
+|       2 |         2 |
++---------+-----------+
+</code></pre>
+
+<p>You can merge the SET in the same query, too:</p>
+
+<pre><code>SELECT ...  AS a, (SELECT @pts:=0,@gid:=-1) AS i GROUP BY groupid;
+</code></pre>
+
+<p>This is a <a href="http://sqlfiddle.com/#!9/18624b/4/0" rel="nofollow">test SQLfiddle</a>.</p>

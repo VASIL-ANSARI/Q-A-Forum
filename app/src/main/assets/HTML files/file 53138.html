@@ -1,0 +1,50 @@
+<p><code>YamlFileConfigurationSource</code> should not depends on <code>fileName</code> you can get it using <code>typeof(TConfiguration)</code></p>
+
+<pre><code>public class YamlFileConfigurationSource&lt;TConfiguration&gt;
+    : IConfigurationSource&lt;TConfiguration&gt; {
+
+    public YamlFileConfigurationSource() { }
+
+    public TConfiguration Current { 
+        get {
+            String fileName = typeof(TConfiguration).Name + ".config";
+            // get config from fileName
+        }
+    }
+}
+</code></pre>
+
+<p>If you want to dissociate the code where <code>TConfiguration</code> is converted to a fileName you can introduce a new component.</p>
+
+<pre><code>public interface IConfigurationFileProvider&lt;TConfiguration&gt; {
+    String GetFileName(); 
+}
+public class SimpleConfigurationFileProvider&lt;TConfiguration&gt;
+    : IConfigurationFileProvider&lt;TConfiguration&gt;  {
+    public String GetFileName() {
+        return typeof(TConfiguration) + ".config";
+    }
+}
+</code></pre>
+
+<p>and add this dependency on the constructor of <code>YamlFileConfigurationSource</code></p>
+
+<p>The registration will look like this : </p>
+
+<pre><code>builder.RegisterGeneric(typeof(YamlFileConfigurationSource&lt;&gt;))
+        .As(typeof(IConfigurationSource&lt;&gt;));
+builder.RegisterGeneric(typeof(SimpleConfigurationFileProvider&lt;&gt;))
+        .As(typeof(IConfigurationFileProvider&lt;&gt;));
+</code></pre>
+
+<hr>
+
+<p>By the way, for educational purpose, this is the way to do using the <code>WithParameter</code> method</p>
+
+<pre><code>builder.RegisterGeneric(typeof(YamlFileConfigurationSource&lt;&gt;))
+        .As(typeof(IConfigurationSource&lt;&gt;))
+        .WithParameter((pi, c) =&gt; pi.Name == "fileName",
+                       (pi, c) =&gt; pi.Member.DeclaringType.GetGenericArguments()[0].Name);
+</code></pre>
+
+<p>It should work, but it's a workaround, whereas the previous solution was more elegant.</p>

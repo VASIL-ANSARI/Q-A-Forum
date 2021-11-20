@@ -1,0 +1,30 @@
+<p>This is not the answer to your question, but it could help mitigate your "C# memory leak problem".</p>
+
+<p>Using the <a href="https://secure.wikimedia.org/wikipedia/en/wiki/Resource_Acquisition_Is_Initialization" rel="nofollow">RAII</a> pattern for C#, you can both dispose the unmanaged resources, and (as the object goes out of scope) let the GC dipose of the managed ones.</p>
+
+<p>The code I used at work is something like:</p>
+
+<pre><code>void ParseXmlString(string p_xmlString)
+{
+   using (var stringReader = new StringReader(p_xmlString))
+   using (var xmlReader = XmlReader.Create(stringReader))
+   {
+      while (xmlReader.Read())
+      {
+         // etc.
+      }
+   }
+}
+</code></pre>
+
+<p>As you can see ther, the xmlReader (<i>and the stringReader</i>) variable is a local one, created for each parsing attempt (*).</p>
+
+<p>Meaning they will be collected (**), and thus, <i>virtual memory leaks</i> avoided.</p>
+
+<p>Looking at the XmlReader class, I see no way to override the NameTable, so no way I see to offer an alternative implementation.</p>
+
+<p>Sorry.</p>
+
+<p>(*) <i>this could not suit your project, but it suits mine, so...</i></p>
+
+<p>(**) <i>I hope... You never know with GC, but then, you can still try <code>System.GC.Collect()</code> for that</i></p>

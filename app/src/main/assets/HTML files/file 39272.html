@@ -1,0 +1,42 @@
+<p>One way to do it is using a cursor/collection observer.  I'm using this method in my Meteor app to update a Flot chart and it works great.</p>
+
+<p>After your initial plot creation in <code>Template.example.rendered</code> function, add a cursor observer that updates your chart anytime a new document is added (or removed) on the collection:</p>
+
+<pre><code>//  Subscribe to collection (or no need to do this if it's already done on your route)
+Meteor.subscribe('dataReadings', someFilterVarOrNot);
+
+//  Add a cursor observer for all documents added with a date greater 
+//  than right now (uses moment.js)
+//  (If you don't do this, you'll get an "added" fire for every document 
+//  that's ALREADY been added - not sure why it does this but it does
+dataReadingsObserveHandle = DataReadings.find({
+  createdAt: {$gte: moment().toDate()}}).observe({
+
+    //  Fires anytime a new document is added
+    added: function(dataReading) {
+      $('#flot').data("plot").setData(dataReading.data);
+      $('#flot').data("plot").draw();
+
+      //  Or setup whatever query/calculation you need to assemble a 
+      //  new data set for your chart, there are also some other observers like
+      //  observeChanges() which let you see how a document has changed versus
+      //  being added or removed
+    },
+
+    //  Fires anytime a document is removed
+    removed: function(removedDataReading) {
+      //  Update and redraw chart like above...
+  }
+});
+</code></pre>
+
+<p>The <code>dataReadingsObserveHandle</code> is intentionally global so you can destroy it later because apparently a collection observer is server intensive.  This doesn't necessarily have to be global if you have scope access to it wherever it would need to be destroyed:</p>
+
+<pre><code>//  Once your chart no longer needs to be updated call...
+dataReadingsObserveHandle.stop();
+dataReadingsObserveHandle = null;
+</code></pre>
+
+<p>I believe when a user navigates to a different template and is no longer looking at your chart, the observer automatically gets destroyed.  See <a href="http://docs.meteor.com/#observe" rel="nofollow">http://docs.meteor.com/#observe</a> for more information.</p>
+
+<p>I would love to hear about other methods to do this using <code>ReactiveVar</code> or <code>Deps.dependency</code>.  Especially if they're more efficient</p>

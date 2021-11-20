@@ -1,0 +1,53 @@
+<blockquote>
+  <p>Why the order by makes so massive difference and how to optimize it?</p>
+</blockquote>
+
+<p>The <code>ORDER BY</code> needs to sort the resultset which may take long if it's big.</p>
+
+<p>To optimize it, you may need to index the tables properly.</p>
+
+<p>The index access path, however, has its drawbacks so it can even take longer.</p>
+
+<p>If you have something other than equijoins in your query, or the ranged predicates (like <code>&lt;</code>, <code>&gt;</code> or <code>BETWEEN</code>, or <code>GROUP BY</code> clause), then the index used for <code>ORDER BY</code> may prevent the other indexes from being used.</p>
+
+<p>If you post the query, I'll probably be able to tell you how to optimize it.</p>
+
+<p><strong>Update:</strong></p>
+
+<p>Rewrite the query:</p>
+
+<pre><code>SELECT  *
+FROM    View_Product_Joined j 
+LEFT JOIN
+        [dbo].[OPR_InventoryRules] irp
+ON      irp.ID = j.skuid
+        AND irp.InventoryRulesType = 'Product'
+LEFT JOIN
+        [dbo].[OPR_InventoryRules] irs
+ON      irs.ID = j.NodeSiteID
+        AND irs.InventoryRulesType = 'Store'
+CROSS APPLY
+        (
+        SELECT  TOP 1 *
+        FROM    OPR_PriceLookup pl
+        WHERE   pl.siteID = j.NodeSiteID
+                AND pl.skuid = j.skuid
+                AND pl.RoleID IN (-1, 13)
+        ORDER BY
+                pl.RoleID desc
+        ) pl
+WHERE   SiteName = N'EcommerceSite'
+        AND Published = 1
+        AND DocumentCulture = N'en-GB'
+        AND NodeAliasPath LIKE N'/Products/Cats/Computers/Computer-servers/%'
+        AND NodeSKUID IS NOT NULL
+        AND SKUEnabled = 1
+ORDER BY
+        NodeOrder ASC
+</code></pre>
+
+<p>The relation <code>View_Product_Joined</code>, as the name suggests, is probably a view.</p>
+
+<p>Could you please post its definition?</p>
+
+<p>If it is indexable, you may benefit from creating an index on <code>View_Product_Joined (SiteName, Published, DocumentCulture, SKUEnabled, NodeOrder)</code>.</p>

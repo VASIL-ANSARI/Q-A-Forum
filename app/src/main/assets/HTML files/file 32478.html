@@ -1,0 +1,40 @@
+<p>Changing your <code>@PrepareForTest</code> annotation value to <code>MySQLDatabaseConnectionFactory.class</code> will resolve this issue.</p>
+
+<blockquote>
+  <p>This annotation tells PowerMock to prepare certain classes for testing. Classes needed to be defined using this annotation are typically those that needs to be byte-code manipulated. This includes final classes, classes with final, private, static.</p>
+</blockquote>
+
+<p>In this situation PowerMockito have to replace invocation to static method <code>DriverManager.getConnection</code> with mocked code. This is done with usage of byte-code manipulation.</p>
+
+<h2>Full code</h2>
+
+<pre><code>@RunWith(PowerMockRunner.class)
+@PrepareForTest(MySQLDatabaseConnectionFactory.class)
+public class MySQLDatabaseConnectionFactoryTest {
+
+    private MySQLDatabaseConnectionFactory reference;
+
+    @Before
+    public void setUp() throws Exception {
+        reference = new MySQLDatabaseConnectionFactory();
+    }
+
+    @Test
+    public void testGetConnection() throws SQLException {
+
+        // given
+        PowerMockito.mockStatic(DriverManager.class);
+        BDDMockito.given(DriverManager.getConnection(anyString(), anyString(), anyString()))
+             .willReturn(mock(Connection.class));
+
+        // when
+        reference.getConnection();
+
+        // then
+        PowerMockito.verifyStatic();
+        DriverManager.getConnection("jdbc:mysql://myhost:1111/database", "username", "password");
+    }
+}
+</code></pre>
+
+<p><em>Thanks to <a href="http://stackoverflow.com/users/313516/szpak">@Szpak</a> for helping me to resolve this issue!</em></p>

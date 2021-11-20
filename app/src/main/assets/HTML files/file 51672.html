@@ -1,0 +1,78 @@
+<p>I think two aspects can possibly improve the performance: 1) using a matplotlib Collection (the current geopandas implementation is plotting each polygon separately) and 2) only updating the color of the polygons and not plotting it again each iteration (this you already do, but with using a collection this will be much simpler).</p>
+
+<p><strong>1) Using a matplotlib Collection to plot the Polygons</strong></p>
+
+<p>This is a possible implementation for a more efficient plotting function with geopandas to plot a GeoSeries of Polygons:</p>
+
+<pre><code>from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon
+import shapely
+
+def plot_polygon_collection(ax, geoms, values=None, colormap='Set1',  facecolor=None, edgecolor=None,
+                            alpha=0.5, linewidth=1.0, **kwargs):
+    """ Plot a collection of Polygon geometries """
+    patches = []
+
+    for poly in geoms:
+
+        a = np.asarray(poly.exterior)
+        if poly.has_z:
+            poly = shapely.geometry.Polygon(zip(*poly.exterior.xy))
+
+        patches.append(Polygon(a))
+
+    patches = PatchCollection(patches, facecolor=facecolor, linewidth=linewidth, edgecolor=edgecolor, alpha=alpha, **kwargs)
+
+    if values is not None:
+        patches.set_array(values)
+        patches.set_cmap(colormap)
+
+    ax.add_collection(patches, autolim=True)
+    ax.autoscale_view()
+    return patches
+</code></pre>
+
+<p>This is ca an order of 10x faster as the current geopandas plotting method.</p>
+
+<p><strong>2) Updating the colors of the Polygons</strong></p>
+
+<p>Once you have the figure, updating the colors of a Collection of Polygons, can be done in one step using the <code>set_array</code> method, where the values in the array indicate the color (converted to a color depending on the colormap)</p>
+
+<p>E.g. (considering <code>s_poly</code> a GeoSeries with polygons):</p>
+
+<pre><code>fig, ax = plt.subplots(subplot_kw=dict(aspect='equal'))
+col = plot_polygon_collection(ax, s_poly.geometry)
+# update the color
+col.set_array( ... )
+</code></pre>
+
+<hr>
+
+<p>Full example with some dummy data:</p>
+
+<pre><code>from shapely.geometry import Polygon
+
+p1 = Polygon([(0, 0), (1, 0), (1, 1)])
+p2 = Polygon([(2, 0), (3, 0), (3, 1), (2, 1)])
+p3 = Polygon([(1, 1), (2, 1), (2, 2), (1, 2)])
+s = geopandas.GeoSeries([p1, p2, p3])
+</code></pre>
+
+<p>Plotting this:</p>
+
+<pre><code>fig, ax = plt.subplots(subplot_kw=dict(aspect='equal'))
+col = plot_polygon_collection(ax, s.geometry)
+</code></pre>
+
+<p>gives:</p>
+
+<p><a href="http://i.stack.imgur.com/mzgJB.png" rel="nofollow"><img src="http://i.stack.imgur.com/mzgJB.png" alt="enter image description here"></a></p>
+
+<p>Then updating the color with an array indicating the clusters:</p>
+
+<pre><code>col.set_array(np.array([0,1,0]))
+</code></pre>
+
+<p>gives</p>
+
+<p><a href="http://i.stack.imgur.com/D6VBI.png" rel="nofollow"><img src="http://i.stack.imgur.com/D6VBI.png" alt="enter image description here"></a></p>

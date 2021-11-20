@@ -1,0 +1,30 @@
+<p>There are many possible problems with the .so file that could cause thisâno read access, a corrupted file, an empty file, a perfectly valid library but for the wrong platform/architecture, etc. Worse, the .so itself may be fine, but it may have load-time dependencies on a <em>different</em> file that has any of the above problems.</p>
+
+<p>Unfortunately, the Python 2.x importer doesn't show you <em>which</em> problem it's actually hit; all you can tell is that, for some reason, the call to open the shared library failed.</p>
+
+<p>It's worth noting that in 3.1 or later, you would have gotten a much more useful error message, something like this:</p>
+
+<pre><code>ImportError: dlopen(/usr/local/lib/python3.3/dist-packages/guppy/heapy/heapyc.so, 2): no suitable image found.  Did find:
+    /usr/local/lib/python3.3/dist-packages/guppy/heapy/heapyc.so: Permission denied
+</code></pre>
+
+<p>However, that's only possible because the importer was rewritten from scratch for 3.1, and there's no way such a radical change is ever going to be backported to 2.7.</p>
+
+<hr>
+
+<p>Most platforms come with tools that let you test shared libraries, and this is really the best way to diagnose the problem.</p>
+
+<p>But for a simple and platform-independent test, you can just use the <code>ctypes</code> library that comes with Python itself:</p>
+
+<pre><code>&gt;&gt;&gt; import ctypes
+&gt;&gt;&gt; ctypes.CDLL('/usr/local/lib/python2.7/dist-packages/guppy/heapy/heapyc.so')
+</code></pre>
+
+<p>You should get an error, like this:</p>
+
+<pre><code>OSError: /usr/local/lib/python2.7/dist-packages/guppy/heapy/heapyc.so: cannot open shared object file: Permission denied
+</code></pre>
+
+<p>In this case, the file isn't readable (or, on platforms that require shared libraries to be executable, it either isn't readable or isn't executable), which should be enough to fix the problem. So, a <code>chmod a+r</code> should fix it (although you may want to go further and figure out why it wasn't readable in the first place).</p>
+
+<p>If the error doesn't tell you enough to fix it yourself, and searching doesn't help, at least you can come to SO and ask a question that will be much more likely to get an immediate answerâ¦</p>

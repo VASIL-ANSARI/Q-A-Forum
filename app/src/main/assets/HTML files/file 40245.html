@@ -1,0 +1,33 @@
+<p>actually, I don't know about stored procedures, but you can call stored functions using code like examaple below. I'm new to C# and orchard, so may be my approach is not correct and good enough. At first you should get <code>ISessionLocator</code> object instance, using <code>IOrchardServices</code>, then create NHibernate <code>ISession</code> instance  and then <code>IQuery/ISQLQuery</code> with <code>CreateSQLQuery()</code>.</p>
+
+<p>here is example code of <code>Services</code> class</p>
+
+<pre><code>public class ExampleService {
+    private readonly IOrchardServices _oServices;          
+
+    public EParamsServices(IOrchardServices oServices) {
+         _oServices = oServices;
+    }
+
+    public float GetRegionPopulationDencity(int rId){
+
+        //resolve ISession locator (you can do this using dependencies in ctor)
+        ISessionLocator sl = _oServices.WorkContext.Resolve&lt;ISessionLocator&gt;();             
+
+        //create session
+        ISession _session = sl.For(null);
+
+        // create raw SQL query
+        return _session.CreateSQLQuery(@"SELECT data.RegionDencity(:rId) as result")
+                        .AddScalar("result", NHibernateUtil.Single)
+                        .SetParameter&lt;int&gt;("rId", rId)
+                        .List&lt;float&gt;()
+                        .FirstOrDefault&lt;float&gt;();             
+    }
+
+}
+</code></pre>
+
+<p>I think you can exec stored procs the same way, just change SQL code do <code>exec yourProcName</code> and <code>ExecuteUpdate()</code>  instead of <code>List()</code> method (I'm not sure in this part)</p>
+
+<p>you also should add reference to <code>NHibernate</code> assembly to your project and add <code>NHibernate</code> &amp; <code>Orchard.Data</code> to your <code>using</code> part.</p>

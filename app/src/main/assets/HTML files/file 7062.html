@@ -1,0 +1,33 @@
+<p>It's hard to tell without seeing your helper code, but <code>include</code> will insert all of the methods in that module into <em>instances</em> of the class you include into. <code>extend</code> is used to bring methods into a <em>class</em>. Therefore, if you just have methods defined in NumberHelper, these are being put onto all instances, but not the class, of MyClass.</p>
+
+<p>The way that lots of Rails extensions work is using techniques that have been consolidated into ActiveSupport::Concern. <a href="http://www.fakingfantastic.com/2010/09/20/concerning-yourself-with-active-support-concern/" rel="nofollow">Here</a> is a good overview.</p>
+
+<p>Essentially, extending ActiveSupport::Concern in your modules will allow you to specify, in sub-modules called ClassMethods and InstanceMethods, what functions you want to be added to classes and instances into which you include your module. For example:</p>
+
+<pre><code>module Foo
+    extend ActiveSupport::Concern
+    module ClassMethods
+        def bar
+            puts "I'm a Bar!"
+        end
+    end
+    module InstanceMethods
+        def baz
+            puts "I'm a Baz!"
+        end
+    end
+end
+
+class Quox
+    include Foo
+end
+
+Quox.bar
+=&gt; "I'm a Bar"
+Quox.new.baz
+=&gt; "I'm a Baz"
+</code></pre>
+
+<p>I've used this before to do things like define the bar function in ClassMethods, then also make it available to instances by defining a bar method of the same name that just calls this.class.bar, making it callable from both. There are lots of other helpful things that ActiveSupport::Concern does, like allowing you to define blocks that are called back when the module is included.</p>
+
+<p>Now, this is happening here specifically because you're <code>include</code>ing your helper, which might indicate that this functionality is more general-purpose than a helper - helpers are only automatically included in <em>views</em>, since they are only intended to help with views. If you want to use your helper in a view, you could use the <a href="http://ap.rubyonrails.org/classes/ActionController/Helpers/ClassMethods.html#M000103" rel="nofollow"><code>helper_method</code></a> macro in your class to make that method visible to your views, or, even better, make a module as above and not think about it as a helper, but use include to mix it in to the classes you want to use it in. I think I would go that route - there's nothing that says you can't make a HumanReadableNumber module and <code>include</code> it in NumberHelper to make it easily available across your views.</p>

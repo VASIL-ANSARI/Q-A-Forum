@@ -1,0 +1,33 @@
+<p>The function <code>Recv</code> will store a received message inside a variable. You have to supply the rank of the expected sender. Thus you always know who the sender is. A message passing interface does never need to identify someone, that information is always intrinsic to the system.</p>
+
+<p>If you expect multiple message from the same sender you can distinguish these using tags. You need to supply these tags yourself, there is no natural way to obtain these. Just label the messages somehow, number them.</p>
+
+<p>If you have a tag, the <code>Recv</code> function will only return when a message has been received which has a fitting source <strong>and</strong> tag. This is a blocking function call.</p>
+
+<p>In your case, <code>tag=-1</code> is equal to the universal constant <code>MPI.ANY_TAG</code> (verify via <code>print MPI.ANY_TAG</code>) and thus the <code>Recv</code> will accept any tag. But it will in no way overwrite its input variable <code>rnk</code>. Try <code>rnk = -2 # EDIT</code> and you'll see.</p>
+
+<p>You can write your code differently, though this will not change the underlying logic (i.e. you as a programmer must always know the sender) it just hides it, makes it implicit:</p>
+
+<pre><code>#passRandomDraw.py
+import numpy
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+
+randNum = numpy.zeros(1)
+rnk = -1 # EDIT
+
+if rank == 1:
+    randNum = numpy.random.random_sample(1)
+    print "Process", rank, "drew the number", randNum[0]
+    comm.Send(randNum, dest=0, tag=rank) # EDIT
+
+if rank == 0:
+    print "Process", rank, "before receiving has the number", randNum[0]
+    print "Sender rank:", rnk
+    status = MPI.Status()
+    comm.Recv(randNum, source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status) # EDIT
+    rnk = status.Get_source()
+    print "Process", rank, "received the number", randNum[0]
+    print "Sender rank:", rnk # EDIT
+</code></pre>

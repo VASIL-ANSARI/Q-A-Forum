@@ -1,0 +1,70 @@
+<p>I need to upload one single file at a time, It works for me, let me know:</p>
+
+<p><strong>upload.php:</strong></p>
+
+<pre><code>&lt;?php
+    $target = "data/"; 
+    $target = $target . basename( $_FILES['Filename']['name']) ; 
+    if(move_uploaded_file($_FILES['Filename']['tmp_name'], $target)) 
+    {
+    echo "The file ". basename( $_FILES['Filename']['name']). " has been uploaded";
+    } 
+    else {
+    echo "Sorry, there was a problem uploading your file.";
+    }       
+?&gt;
+</code></pre>
+
+<p><strong>C# code:</strong></p>
+
+<pre><code>    private async void StartMultipartUpload_Click(object sender, RoutedEventArgs e)
+    {
+        Uri uri;
+        if (!Uri.TryCreate(serverAddressField.Text.Trim(), UriKind.Absolute, out uri))
+        {
+            rootPage.NotifyUser("Invalid URI.", NotifyType.ErrorMessage);
+            return;
+        }
+
+        // Verify that we are currently not snapped, or that we can unsnap to open the picker.
+        if (ApplicationView.Value == ApplicationViewState.Snapped &amp;&amp; !ApplicationView.TryUnsnap())
+        {
+            rootPage.NotifyUser("File picker cannot be opened in snapped mode. Please unsnap first.", NotifyType.ErrorMessage);
+            return;
+        }
+
+        FileOpenPicker picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add("*");
+        IReadOnlyList&lt;StorageFile&gt; files = await picker.PickMultipleFilesAsync();
+
+        if (files.Count == 0)
+        {
+            rootPage.NotifyUser("No file selected.", NotifyType.ErrorMessage);
+            return;
+        }
+
+        List&lt;BackgroundTransferContentPart&gt; parts = new List&lt;BackgroundTransferContentPart&gt;();
+        for (int i = 0; i &lt; files.Count; i++)
+        {
+            BackgroundTransferContentPart part = new BackgroundTransferContentPart("Filename", files[i].Name);
+            part.SetFile(files[i]);
+            parts.Add(part);
+        }
+
+        BackgroundUploader uploader = new BackgroundUploader();
+        UploadOperation upload = await uploader.CreateUploadAsync(uri, parts);
+
+        String fileNames = files[0].Name;
+        for (int i = 1; i &lt; files.Count; i++)
+        {
+            fileNames += ", " + files[i].Name;
+        }
+
+        Log(String.Format("Uploading {0} to {1}, {2}", fileNames, uri.AbsoluteUri, upload.Guid));
+
+        // Attach progress and completion handlers.
+        await HandleUploadAsync(upload, true);
+    }
+</code></pre>
+
+<p>I used the same code of The SDK sample. <em>data/</em> folder is in the same folder of <strong>upload.php</strong> and my Uri is <code>http://mySite/myApp/upload.php</code></p>

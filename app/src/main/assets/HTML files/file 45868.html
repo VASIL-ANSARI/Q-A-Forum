@@ -1,0 +1,40 @@
+<p>Aside from the missing space that @EvgeniyDorofeev correctly pointed out, in your first query you're trying to using the <a href="http://docs.oracle.com/cd/E18283_01/server.112/e17118/ap_keywd001.htm" rel="nofollow">reserved word</a> <code>DATE</code> as a column alias, and that is confusing the parser. Use a different name:</p>
+
+<pre><code>"SELECT to_char(logdate,'dd-MON-yy') AS ACTIVITY_DATE, adj_login_time AS LOGIN, adj_logout_time AS LOGOUT, adj_lunch_in AS LUNCHIN, adj_lunch_out AS LUNCHOUT, round(logduration,2) AS LOGDURATION " +
+                        "FROM employee_time_log " +
+                        "WHERE employee_id_number = " +userInputIdNumber +" AND ROWNUM &lt;= 10 " +
+                        "ORDER BY logdate DESC");
+</code></pre>
+
+<p>Or if you really want it to have that name then use a quoted identifier (with escaped double quotes within your string), though I'd really recommend against that as it can cause confusion to the calling code too:</p>
+
+<pre><code>"SELECT to_char(logdate,'dd-MON-yy') AS \"DATE\", adj_login_time AS LOGIN, adj_logout_time AS LOGOUT, adj_lunch_in AS LUNCHIN, adj_lunch_out AS LUNCHOUT, round(logduration,2) AS LOGDURATION " +
+                        "FROM employee_time_log " +
+                        "WHERE employee_id_number = " +userInputIdNumber +" AND ROWNUM &lt;= 10 " +
+                        "ORDER BY logdate DESC");
+</code></pre>
+
+<p>In your second version you're using single quotes to attempt to make the identifiers quoted, but those are just seen as string literals rather than identifiers, and they are not valid at that point in the syntax. You have to use double quotes for quoted identifiers:</p>
+
+<pre><code>"SELECT to_char(logdate,'dd-MON-yy') AS \"Log Date\", adj_login_time AS \"Log In Time\", adj_logout_time AS \"Log Out Time\", adj_lunch_in AS \"Lunch In\", adj_lunch_out AS \"Lunch Out\", round(logduration,2) AS \"Log Duration\" " +
+                        "FROM employee_time_log " +
+                        "WHERE employee_id_number = " +userInputIdNumber +" AND ROWNUM &lt;= 10 " +
+                        "ORDER BY logdate DESC");
+</code></pre>
+
+<p>You're also doing your <code>ROWNUM</code> check in the wrong place; it will be applied before the <code>ORDER BY</code>, so you'll get ten indeterminate rows from any day, which will then be ordered. If you actually want to see the ten most recent rows then you'll need to do the ordering in a subquery and then apply the <code>ROWNUM</code> filter to that:</p>
+
+<pre><code>"SELECT * FROM (" +
+    "SELECT to_char(logdate,'dd-MON-yy') AS \"Log Date\", " +
+        "adj_login_time AS \"Log In Time\", " +
+        "adj_logout_time AS \"Log Out Time\", " +
+        "adj_lunch_in AS \"Lunch In\", " +
+        "adj_lunch_out AS \"Lunch Out\", " +
+        "round(logduration,2) AS \"Log Duration\" " +
+    "FROM employee_time_log " +
+    "WHERE employee_id_number = " +userInputIdNumber + " " +
+    "ORDER BY logdate DESC" +
+    ") WHERE ROWNUM &lt;= 10";
+</code></pre>
+
+<p>You should also consider using parameterised queries rather than embedding the <code>userInputIdNumber</code> in the string, partly because each ID will require a hard parse of the unique query, and partly to avoid SQL injection - especially if that value is being supplied by the user, as it seems to be.</p>

@@ -1,0 +1,37 @@
+<p>First of all you don't mention the JBoss version you're using. You've to take in mind that JBoss versions prior to AS7 include its own log4j version (libraries and configuration file: conf/jboss-log4j.xml), so by default JBoss will ignore the log4j.properties file you've in each of your projects.</p>
+
+<p>That said, you have two approaches to configure a log file for each application:</p>
+
+<ol>
+<li>Centralized way: configure it in Jboss, through the
+conf/jboss-log4j.xml. This way you won't need to modify your
+applications, or</li>
+<li>Modify your applications so that they take their own
+log4j libraries (you'll have to include them in the ear/war), not
+the Jboss ones.</li>
+</ol>
+
+<p>For the first approach you'll have to define an appender for each of your applications, and then categories for the application packages, in the conf/jboss-log4j.xml file. For example, to configure a log file for an application called app1.war which classes are in a package called com.foo.app1, you'd have to add:</p>
+
+<pre><code>   &lt;appender name="APP1_APPENDER" class="org.jboss.logging.appender.DailyRollingFileAppender"&gt;
+      &lt;errorHandler class="org.jboss.logging.util.OnlyOnceErrorHandler"/&gt;
+      &lt;param name="File" value="${jboss.server.log.dir}/app1.log"/&gt;
+      &lt;param name="Append" value="true"/&gt;
+      &lt;!-- Rollover at midnight each day --&gt;
+      &lt;param name="DatePattern" value="'.'yyyy-MM-dd"/&gt;    
+      &lt;layout class="org.apache.log4j.PatternLayout"&gt;
+         &lt;!-- The default pattern: Date Priority [Category] (Thread) Message\n --&gt;
+         &lt;param name="ConversionPattern" value="%d %-5p [%c] (%t) %m%n"/&gt;
+      &lt;/layout&gt;
+   &lt;/appender&gt;
+   ...
+   ...
+   &lt;category name="com.foo.app1" additivity="true"&gt;
+      &lt;priority value="INFO"/&gt;
+      &lt;appender-ref ref="APP1_APPENDER"/&gt;
+   &lt;/category&gt;
+</code></pre>
+
+<p>You'll have to add a customized set of blocks like this one for each project you want to define a log file for, respectively.</p>
+
+<p>If you prefer the second approach, as said you'll have to include the log4j libraries in each project and isolate each application so that it takes the libraries included in the application not the ones from JBoss. <a href="http://docs.jboss.org/process-guide/en/html/logging.html" rel="nofollow">Look at section 10.3.7 of the Jboss logging file</a> for more information about this approach.</p>

@@ -1,0 +1,58 @@
+<p>In OpenCV's core.hpp, there is this code</p>
+
+<pre><code>class CV_EXPORTS Mat
+{
+public:
+    ...
+    //! pointer to the data
+    uchar* data;
+    ...
+};
+</code></pre>
+
+<p>That means that regardless of what type of data is stored in a Mat, the data pointer is always a <code>uchar*</code>. Therefore the following line is wrong.</p>
+
+<pre><code>    mat.data[i] = (double)i/2;
+</code></pre>
+
+<p>If <code>i = 5</code>, then <code>(double)i/2 = 2.5</code>. The assignment to <code>mat.data[i]</code> implicitly casts <code>2.5</code> to an unsigned char, so the fraction part is discarded and <code>2</code> actually gets stored.
+You could try </p>
+
+<pre><code>  ((double*)mat.data)[i] = (double)i/2;
+  ...
+  printf("mat: %f\n", ((double*)mat.data)[i]);
+</code></pre>
+
+<p>But that is pretty ugly, and code that directly accesses the data pointer usually has a bad smell.
+A neater solution would be</p>
+
+<pre><code>double* p = mat.ptr&lt;double&gt;(0);
+for(int i = 0; i &lt; 10; ++i) {
+    p[i] = (double) i / 2;
+
+    printf("data: %f\n", (double) i / 2);
+    printf("mat:  %f\n", p[i]);
+}
+</code></pre>
+
+<hr>
+
+<p>Regarding the second part of your question, because a Mat is essentially a smart pointer, and you are not reallocating data in <code>func()</code>, it does not matter whether you pass the Mat by reference. Things will work just as well if you have:</p>
+
+<pre><code>void func(Mat mat) { ...
+</code></pre>
+
+<p>However, in main() the following line is wrong, as it is indexing the doubles as bytes</p>
+
+<pre><code>    cout &lt;&lt; "final value: " &lt;&lt; (double)test.data[i] &lt;&lt; endl;
+</code></pre>
+
+<p>Change it to the following and you will get the correct results.</p>
+
+<pre><code>    cout &lt;&lt; "final value: " &lt;&lt; ((double*)test.data)[i] &lt;&lt; endl;
+</code></pre>
+
+<p>There are, of course, many other possible ways of doing that, including:</p>
+
+<pre><code>    cout &lt;&lt; "final value: " &lt;&lt; test.at&lt;Vec&lt;double, 10&gt; &gt;(0, 0)[i] &lt;&lt; endl;
+</code></pre>

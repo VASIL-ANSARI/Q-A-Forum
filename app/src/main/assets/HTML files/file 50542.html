@@ -1,0 +1,26 @@
+<p>Well the error is caused by springs controllers mapping, when Spring sees url like</p>
+
+<pre><code>http://localhost:8080/webarch/webpage/1/https://en.wikipedia.org/wiki/Main_Page
+</code></pre>
+
+<p>It doesn't 'know' that the '<a href="https://en.wikipedia.org/wiki/Main_Page" rel="nofollow">https://en.wikipedia.org/wiki/Main_Page</a>' should be mapped as parameter to "{webpageId}/{webpageAddress}" mapping since every slash is interpreted as a  deeper controler method mapping. It looks for controller method mapping like <code>(webpage/1/http:{anotherMapping}/wiki{anotherMapping}/Main_Page{anotherMapping})</code> wich this kind of mapping is obviously not handled by "{webpageId}/{webpageAddress}"</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>According to your comment you can try something like this </p>
+
+<pre><code>@RequestMapping(value = "/{webpageId}/**", method = RequestMethod.GET)
+public String contentWebpageById(HttpServletRequest request) {
+
+    String pattern = (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);  
+
+    String extractedPathParam = pathMatcher.extractPathWithinPattern(pattern, request.getServletPath());
+    extractedPathParam = extractedPathParam.replace("http:/", "http://");
+    extractedPathParam = extractedPathParam.replace("https:/", "https://");
+    //do whatever you want with parsed string..
+}
+</code></pre>
+
+<p>Using spring 4.2.1</p>
+
+<p>SomeParsing should use some Regular Expression to extract only the URL 'variable'</p>

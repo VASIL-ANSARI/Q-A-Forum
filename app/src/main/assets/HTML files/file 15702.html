@@ -1,0 +1,118 @@
+<p>Your models are significantly incomplete, so please accept the following working solution as an attempt to remain close to your models, and the answer as just a suggestion for moving ahead.</p>
+
+<pre><code>class Designer
+    include Mongoid::Document
+    field :name, type: String
+    has_many :designs #, :order =&gt; "created_at"
+end
+
+class Design
+    include Mongoid::Document
+    belongs_to :designer
+
+    attr_accessible :image, :tags, :description, :title, :featured
+
+    #mount_uploader :image, DesignerUploader
+
+    field :width, type: Integer
+    field :height, type: Integer
+    field :description, type: String
+    field :title, type: String
+    field :tags, type: Array
+    field :featured, type: Boolean, default: false
+end
+
+class DesignsController &lt; ApplicationController
+  def newest
+    @designer = Designer.where(name: params['name']).first
+    @designs = Design.where(designer_id: @designer._id).where(title: params['title']).to_a
+    render :text =&gt; &lt;&lt;-EOF
+      params: #{params.inspect}
+      designer: #{@designer.inspect}
+      designs by title: #{@designs.inspect}:
+    EOF
+  end
+end
+</code></pre>
+
+<p>config/routes.rb </p>
+
+<pre><code>match ':controller/:action/:name/:title'
+</code></pre>
+
+<p>test/unit/designer_test.rb</p>
+
+<pre><code>require 'test_helper'
+
+class DesignerTest &lt; ActiveSupport::TestCase
+  def setup
+    Designer.delete_all
+    Design.delete_all
+  end
+
+  test "designer designs" do
+    design_title = 'little black dress'
+    designer = Designer.create(name: 'Coco', designs: [
+      Design.new(title: design_title, width: 300, height: 400),
+      Design.new(title: design_title, width: 600, height: 800),
+      Design.new(title: 'jersey traveling suit', width: 600, height: 800),
+    ])
+    p designer
+
+    # finds designs with designer and title on server
+    designs = Design.where(designer_id: designer._id).where(title: design_title).to_a
+    assert_equal(2, designs.size)
+    p designs
+
+    # finds all designer's designs and selects locally
+    designs = designer.designs.select{|design| design['title'] == design_title}
+    assert_equal(2, designs.size)
+    p designs
+  end
+end
+</code></pre>
+
+<p>test/functional/designs_controller_test.rb</p>
+
+<pre><code>require 'test_helper'
+
+class DesignsControllerTest &lt; ActionController::TestCase
+  def setup
+    Designer.delete_all
+    Design.delete_all
+  end
+
+  test "newest" do
+    design_title = 'little black dress'
+    designer = Designer.create(name: 'Coco', designs: [
+      Design.new(title: design_title, width: 300, height: 400),
+      Design.new(title: design_title, width: 600, height: 800),
+      Design.new(title: 'jersey traveling suit', width: 600, height: 800),
+    ])
+    get :newest, :name =&gt; 'Coco', :title =&gt; design_title
+    assert_response :success
+    assert_equal('Coco', assigns(:designer).name)
+    assert_equal(2, assigns(:designs).size)
+    assigns(:designs).each do |design|
+      assert_equal(design_title, design.title)
+    end
+    puts @response.body
+  end
+end
+</code></pre>
+
+<p>result</p>
+
+<pre><code>Run options: --name=test_newest
+
+# Running tests:
+
+      params: {"name"=&gt;"Coco", "title"=&gt;"little black dress", "controller"=&gt;"designs", "action"=&gt;"newest"}
+      designer: #&lt;Designer _id: 4fb28df8e4d30bd575000004, _type: nil, name: "Coco"&gt;
+      designs by title: [#&lt;Design _id: 4fb28df8e4d30bd575000001, _type: nil, designer_id: BSON::ObjectId('4fb28df8e4d30bd575000004'), width: nil, height: nil, description: nil, title: "little black dress", tags: nil, featured: false&gt;, #&lt;Design _id: 4fb28df8e4d30bd575000002, _type: nil, designer_id: BSON::ObjectId('4fb28df8e4d30bd575000004'), width: nil, height: nil, description: nil, title: "little black dress", tags: nil, featured: false&gt;]:
+.
+
+Finished tests in 0.043330s, 23.0787 tests/s, 115.3935 assertions/s.
+
+1 tests, 5 assertions, 0 failures, 0 errors, 0 skips
+</code></pre>

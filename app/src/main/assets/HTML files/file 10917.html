@@ -1,0 +1,37 @@
+<p>In general, the absolute method of defining points in time in any SCM is clearly the checkin-id.<br> Using labels to abstract this, is in TFS not the optimum as discussed <a href="http://blogs.msdn.com/b/buckh/archive/2006/08/28/diff-between-labels.aspx" rel="nofollow">here</a> &amp; <a href="http://blogs.msdn.com/b/bharry/archive/2005/11/18/494439.aspx" rel="nofollow">here</a>. A better approach is to use builds instead, especially in a modern CI environment.<br></p>
+
+<p>In order to retrieve the max changeset that was contained in a given build you 'd have to do something like this:<br></p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using Microsoft.TeamFoundation.Build.Client;
+using Microsoft.TeamFoundation.Client;
+
+namespace GetChangesetsFromBuild
+{
+    class Program
+    {
+        static void Main()
+        {
+            TfsTeamProjectCollection tpc = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(new Uri("http://TFSServer:8080/Name"));
+            IBuildServer bs = (IBuildServer)tpc.GetService(typeof(IBuildServer));
+
+            IBuildDetail build = bs.GetAllBuildDetails(new Uri("vstfs:///..."));
+
+            List&lt;IChangesetSummary&gt; associatedChangesets = InformationNodeConverters.GetAssociatedChangesets(build);
+
+            int idMax = associatedChangesets[0].ChangesetId; 
+        }
+    }
+}
+</code></pre>
+
+<p><br>
+A difficulty with the above is to retrieve the BuildUri of the builds you are interested in. In order to get this information you could do something like this:<br></p>
+
+<pre><code>IBuildDetail[] builds = bs.QueryBuilds("TeamPorjectName", "yourBuildDefinitionName")
+</code></pre>
+
+<p>and then retrieve the Uri's that are important to you.<br></p>
+
+<p>This is also a good vehicle if you eventually insist on using labels: Besides <code>Uri</code>, each <code>build[]</code> has also a <code>LabelName</code>.</p>

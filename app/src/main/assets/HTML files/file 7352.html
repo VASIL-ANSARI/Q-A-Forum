@@ -1,0 +1,34 @@
+<p>Use <code>mb_substr($string, 0, 1, 'utf-8')</code> to get the character instead.</p>
+
+<p>What happens in your code is that the expression <code>$string[0]</code> gets the first <em>byte</em> of the UTF-8 encoded representation of your string because PHP strings are effectively arrays of bytes (PHP does not internally recognize encodings).</p>
+
+<p>Since the first character in your string is composed in more than one byte (<a href="http://en.wikipedia.org/wiki/UTF-8#Description">UTF-8 encoding rules</a>), you are effectively only getting part of the character. Furthermore, these rules make the byte you are retrieving invalid to stand as a character on its own, which is why you see the question mark.</p>
+
+<p><a href="http://www.php.net/manual/en/function.mb-substr.php"><code>mb_substr</code></a> knows the encoding rules, so it will not naively give you back just one byte; it will get as many as needed to encode the first character.</p>
+
+<p>You can see that <code>$string[0]</code> gives you back just one byte with:</p>
+
+<pre><code>$string = "Ã¼ÃÃ¶ÃÃ¤Ã";
+echo strlen($string[0]);
+</code></pre>
+
+<p>While <code>mb_substr</code> gives you back two bytes:</p>
+
+<pre><code>$string = "Ã¼ÃÃ¶ÃÃ¤Ã";
+echo strlen(mb_substr($string, 0, 1, 'utf-8'));
+</code></pre>
+
+<p>And these two bytes are in fact just one character (you need to use <a href="http://www.php.net/manual/en/function.mb-strlen.php"><code>mb_strlen</code></a> for this):</p>
+
+<pre><code>$string = "Ã¼ÃÃ¶ÃÃ¤Ã";
+echo mb_strlen(mb_substr($string, 0, 1, 'utf-8'), 'utf-8');
+</code></pre>
+
+<p>Finally, as Marwelln points out below, the situation becomes more tolerable if you use <a href="http://php.net/manual/en/function.mb-internal-encoding.php"><code>mb_internal_encoding</code></a> to get rid of the <code>'utf-8'</code> redundancy:</p>
+
+<pre><code>$string = "Ã¼ÃÃ¶ÃÃ¤Ã";
+mb_internal_encoding('utf-8');
+echo mb_strlen(mb_substr($string, 0, 1));
+</code></pre>
+
+<p><strong>You can <a href="http://ideone.com/n70vH">see most of the above in action</a>.</strong></p>

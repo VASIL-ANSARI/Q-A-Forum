@@ -1,0 +1,93 @@
+<p>Briefly:</p>
+
+<ol>
+<li>Always use transactions</li>
+<li>Don't use <code>Close()</code>, instead wrap your calls on an <code>ISession</code> inside a <code>using</code> statement or <strong>manage the lifecycle of your ISession somewhere else</strong>.</li>
+</ol>
+
+<p>From <a href="http://nhibernate.info/doc/nh/en/index.html#manipulatingdata-flushing">the documentation</a>:</p>
+
+<blockquote>
+  <p>From time to time the <code>ISession</code> will execute the SQL statements needed to synchronize the ADO.NET connection's state with the state of objects held in memory. This process, flush, occurs by default at the following points</p>
+  
+  <ul>
+  <li>from some invocations of <code>Find()</code> or <code>Enumerable()</code></li>
+  <li>from <code>NHibernate.ITransaction.Commit()</code></li>
+  <li>from <code>ISession.Flush()</code> </li>
+  </ul>
+  
+  <p>The SQL statements are issued in the following order</p>
+  
+  <ol>
+  <li>all entity insertions, in the same order the corresponding objects were saved using <code>ISession.Save()</code></li>
+  <li>all entity updates</li>
+  <li>all collection deletions</li>
+  <li>all collection element deletions, updates and insertions</li>
+  <li>all collection insertions</li>
+  <li>all entity deletions, in the same order the corresponding objects were deleted using <code>ISession.Delete()</code></li>
+  </ol>
+  
+  <p>(An exception is that objects using native ID generation are inserted when they are saved.)</p>
+  
+  <p><strong>Except when you explicity <code>Flush()</code>, there are absolutely no guarantees about when the Session executes the ADO.NET calls, only the order in which they are executed</strong>. However, NHibernate does guarantee that the <code>ISession.Find(..)</code> methods will never return stale data; nor will they return the wrong data.</p>
+  
+  <p>It is possible to change the default behavior so that flush occurs less frequently. The <code>FlushMode</code> class defines three different modes: only flush at commit time (and only when the NHibernate <code>ITransaction</code> API is used), flush automatically using the explained routine, or never flush unless <code>Flush()</code> is called explicitly. The last mode is useful for long running units of work, where an <code>ISession</code> is kept open and disconnected for a long time.</p>
+</blockquote>
+
+<p>...</p>
+
+<p>Also refer to <a href="http://nhibernate.info/doc/nh/en/index.html#manipulatingdata-endingsession">this section</a>:</p>
+
+<blockquote>
+  <p>Ending a session involves four distinct phases:</p>
+  
+  <ul>
+  <li>flush the session</li>
+  <li>commit the transaction</li>
+  <li>close the session</li>
+  <li>handle exceptions </li>
+  </ul>
+  
+  <h2>Flushing the Session</h2>
+  
+  <p>If you happen to be using the <code>ITransaction</code> API, you don't need to worry about this step. It will be performed implicitly when the transaction is committed. Otherwise you should call <code>ISession.Flush()</code> to ensure that all changes are synchronized with the database.</p>
+  
+  <h2>Committing the database transaction</h2>
+  
+  <p>If you are using the NHibernate ITransaction API, this looks like:</p>
+
+<pre><code>tx.Commit(); // flush the session and commit the transaction
+</code></pre>
+  
+  <p>If you are managing ADO.NET transactions yourself you should manually <code>Commit()</code> the ADO.NET transaction.</p>
+
+<pre><code>sess.Flush();
+currentTransaction.Commit();
+</code></pre>
+  
+  <p>If you decide not to commit your changes:</p>
+
+<pre><code>tx.Rollback();  // rollback the transaction
+</code></pre>
+  
+  <p>or:</p>
+
+<pre><code>currentTransaction.Rollback();
+</code></pre>
+  
+  <p>If you rollback the transaction you should immediately close and discard the current session to ensure that NHibernate's internal state is consistent.</p>
+  
+  <h2>Closing the ISession</h2>
+  
+  <p>A call to <code>ISession.Close()</code> marks the end of a session. The main implication of Close() is that the ADO.NET connection will be relinquished by the session.</p>
+
+<pre><code>tx.Commit();
+sess.Close();
+
+sess.Flush();
+currentTransaction.Commit();
+sess.Close();
+</code></pre>
+  
+  <p>If you provided your own connection, <code>Close()</code> returns a reference to it, so you can manually close it or return it to the pool. Otherwise <code>Close()</code> returns it to the pool. </p>
+</blockquote>

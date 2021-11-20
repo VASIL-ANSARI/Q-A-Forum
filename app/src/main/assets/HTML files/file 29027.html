@@ -1,0 +1,34 @@
+<p>I would solve this by passing a reference to the record(s) you want to process, and use so called "inline table-valued function" to return the record(s) after processing the initial records. </p>
+
+<p>You find the table-function reference here: 
+<a href="http://technet.microsoft.com/en-en/library/ms186755.aspx" rel="nofollow">http://technet.microsoft.com/en-en/library/ms186755.aspx</a></p>
+
+<p>A Sample: </p>
+
+<pre><code>    CREATE FUNCTION Sales.CustomerExtendedInfo (@CustomerID int)
+RETURNS TABLE
+AS
+RETURN 
+(
+    SELECT FirstName + LastName AS CompleteName, 
+           DATEDIFF(Day,CreateDate,GetDate()) AS DaysSinceCreation
+    FROM Customer_Detail
+    WHERE CustomerID = @CustomerID
+
+);
+GO
+</code></pre>
+
+<p>StoreID would be the Primary-Key of the Records you want to process. </p>
+
+<p>Table-Function can afterwards be joined to other Query results if you want to process more than one record at once.  </p>
+
+<p>Here is a Sample: </p>
+
+<pre><code>SELECT  * FROM Customer_Detail
+CROSS APPLY Sales.CustomerExtendedInfo (CustomerID) 
+</code></pre>
+
+<p>Using a normal Stored Procedure would do the same more or less, but it's a bit tricky to work with the results programmatically. </p>
+
+<p>But keep one thing in mind: SQL-Server is not really good for "functional-programming". It's brilliant working with data and sets of data, but the more you use it as a "application server" the more you will realize it's not made for that. </p>

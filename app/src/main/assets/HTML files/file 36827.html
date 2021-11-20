@@ -1,0 +1,63 @@
+<p>I think your best bet is to use queues for this. I created a <code>BroadcastQueue</code> class which makes it a little easier to manage sending one value to many consumers. The producer calls <code>BroadcastQueue.broadcast()</code>, which will send a value to all the registered consumers. Consumers  register by calling <code>BroadcastQueue.register</code>, which returns a unique <code>gevent.queue.Queue()</code> object. The consumers then use that object to <code>get</code> messages from the producer.</p>
+
+<pre><code>import gevent
+from gevent.queue import Queue
+
+
+class BroadcastQueue(object):
+    def __init__(self):
+        self._queues = []
+
+    def register(self):
+        q = Queue()
+        self._queues.append(q)
+        return q
+
+    def broadcast(self, val):
+        for q in self._queues:
+            q.put(val)
+
+
+def setter(bqueue):
+    '''After 3 seconds, wake all threads waiting on the value of evt'''
+    while True:
+        gevent.sleep(3)
+        bqueue.broadcast("hi")
+
+def waiter(arg, bqueue):
+    queue = bqueue.register()
+    while True:
+        val = queue.get()
+        print("waiter {} {}".format(arg, val))
+
+def main():
+    bqueue = BroadcastQueue()
+    gevent.joinall([
+        gevent.spawn(setter, bqueue),
+        gevent.spawn(waiter, 1, bqueue),
+        gevent.spawn(waiter, 2, bqueue),
+        gevent.spawn(waiter, 3, bqueue),
+    ])
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>waiter 1 hi
+waiter 2 hi
+waiter 3 hi
+waiter 1 hi
+waiter 2 hi
+waiter 3 hi
+waiter 1 hi
+waiter 2 hi
+waiter 3 hi
+waiter 1 hi
+waiter 2 hi
+waiter 3 hi
+waiter 1 hi
+waiter 2 hi
+waiter 3 hi
+</code></pre>

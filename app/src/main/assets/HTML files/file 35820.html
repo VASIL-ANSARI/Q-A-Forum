@@ -1,0 +1,36 @@
+<p>Working with synchronous events using <code>qtestlib</code> is a bit tricky. If you look into the sources of <code>qtestlib</code>, you can find that event simulation are pretty straightforward. So, <code>qtestlib</code> doesn't provide any methods to handle synchronous events. Anyway, it's possible to handle Qt modal windows which are spawned by your app. </p>
+
+<p>Main note to this question is that GUI objects can't be accessed from others threads except GUI thread. And moreover GUI could be created only in thread where <code>QApplication</code> was created. So some tricks like spawning a new thread to press OK button in <code>QMessageBox</code> will be unsuccessful with error like <code>this object can not be accessed from other thread</code> somewhere in <code>QWidget</code> sources.</p>
+
+<p>To avoid this case async event could be triggered with Qt slots mechanism. First of all you should define a Helper object with some slot, for example</p>
+
+<pre><code>class Helper {
+    Helper() {}
+    public slots:
+        doSmth();
+}
+</code></pre>
+
+<p>Further you should create an instance of this object in the testcase</p>
+
+<pre><code>void BlahblahTest::testCase1() {
+    Helper h;
+...
+</code></pre>
+
+<p>And before you invoke some synchronous event with, for example, <code>QTest::mouseClick</code>, set a delayed action with</p>
+
+<pre><code>QTimer::singleShot(delay, &amp;h, SLOT(doSmth));
+</code></pre>
+
+<p>Depends on your needs the implementation of <code>doSmth</code> could be like that</p>
+
+<pre><code>void Helper::doSmth() {
+    QList&lt;QWidget *&gt; tlw = qApp()-&gt;topLevelWidgets();
+    foreach (QWidget *w, tlw) {
+        if (...) { // w is a messagebox
+            Qt::keyClick(w, Qt::Key_Enter);
+        }
+    }
+}
+</code></pre>

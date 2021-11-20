@@ -1,0 +1,83 @@
+<p>From the manual page for <code>getopt</code>:</p>
+
+<blockquote>
+  <p>In order to use <code>getopt()</code> to evaluate multiple sets of arguments, or
+  to evaluate a single set of arguments multiple times, the variable
+  <code>optreset</code> must be set to <code>1</code> before the second and each additional
+  set of calls to <code>getopt()</code>, and the variable <code>optind</code> must be
+  reinitialized.</p>
+</blockquote>
+
+<p>Modifying your code slightly gives you the desired results:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;getopt.h&gt;
+
+struct input_parameters {
+    char * d; // data set
+};
+
+int solver_help(int argc, char* const argv[], struct input_parameters * p)
+{
+    p-&gt;d = "default name";
+
+    static struct option long_options[] =
+    {
+        {"data",  required_argument,     0, 'd'},
+        {0, 0, 0, 0}
+    };
+
+    int option_index = 0;
+
+    optreset = 1;     /*  ADD THIS  */
+    optind = 1;       /*  ADD THIS  */
+
+    int c = getopt_long(argc, argv, "d:",
+                        long_options, &amp;option_index);
+
+    switch ( c )
+    {
+        case -1:
+            break;
+
+        case 'd':
+            p-&gt;d = optarg;
+            break;
+
+        default:
+            printf("in default case...\n");
+            printf("wrong option specification\n");
+            exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}    
+
+int main(void) {
+
+    int argc_first = 3;
+    char * const argv_first[] = { "getopt_test", "--data", "first" };
+    struct input_parameters first_input;
+    solver_help(argc_first, argv_first, &amp;first_input);
+
+    printf("I think the data is: %s\n", first_input.d);
+
+    int argc_second = 3;
+    char * const argv_second[] = { "getopt_test","--data", "second" };
+    struct input_parameters second_input;
+    solver_help(argc_second, argv_second, &amp;second_input);
+
+    printf("I think the data is: %s\n", second_input.d);
+
+    return 0;
+}
+</code></pre>
+
+<p>with output:</p>
+
+<pre><code>paul@horus:~/src/sandbox$ ./go
+I think the data is: first
+I think the data is: second
+paul@horus:~/src/sandbox$ 
+</code></pre>

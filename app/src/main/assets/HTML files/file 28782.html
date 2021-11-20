@@ -1,0 +1,45 @@
+<p>First, open the file with a <a href="http://msdn.microsoft.com/en-us/library/system.io.filestream.aspx" rel="nofollow"><code>FileStream</code></a>.</p>
+
+<pre><code>var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+</code></pre>
+
+<p>Then instantiate a <a href="http://msdn.microsoft.com/en-us/library/system.io.binaryreader.aspx" rel="nofollow"><code>BinaryReader</code></a> from that stream. This isn't completely required, but makes working with binary data easier.</p>
+
+<pre><code>var reader = new BinaryReader(stream);
+</code></pre>
+
+<p>Next, read in as many bytes as the structure needs, as indicated by <a href="http://msdn.microsoft.com/en-us/library/system.runtime.interopservices.marshal.sizeof.aspx" rel="nofollow"><code>Marshal.SizeOf</code></a>:</p>
+
+<pre><code>var bytes = reader.ReadBytes(Marshal.SizeOf(typeof (MyStruct)));
+</code></pre>
+
+<p>Then, we "pin" that managed memory so the GC doesn't move it, using <a href="http://msdn.microsoft.com/en-us/library/1246yz8f.aspx" rel="nofollow"><code>GCHandle.Alloc</code></a>:</p>
+
+<pre><code>var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+</code></pre>
+
+<p>Finally, we convert that buffer to a managed structure, using <a href="http://msdn.microsoft.com/en-us/library/4ca6d5z7.aspx" rel="nofollow"><code>Marshal.PtrToStructure</code></a>:</p>
+
+<pre><code>var myStruct = (MyStruct)Marshal.PtrToStructure(
+                   handle.AddrOfPinnedObject(), typeof (MyStruct));
+</code></pre>
+
+<p>Don't forget to free the GCHandle:</p>
+
+<pre><code>handle.Free();
+
+    return theStructure;
+}
+</code></pre>
+
+<p><a href="http://code.cheesydesign.com/?p=572" rel="nofollow">Here is</a> an example of part of that wrapped up in a generic function.</p>
+
+<hr>
+
+<p>While I haven't tried it, I'm fairly confident this would also work with a using a <a href="http://msdn.microsoft.com/en-us/library/system.io.memorymappedfiles.memorymappedfile.createfromfile.aspx" rel="nofollow"><code>MemoryMappedFile</code></a> and calling <a href="http://msdn.microsoft.com/en-us/library/dd267538.aspx" rel="nofollow"><code>CreateViewStream</code></a> (which you pass to the <code>BinaryReader</code>.)</p>
+
+<pre><code>var mmfile = MemoryMappedFile.CreateFromFile(path);
+var stream = mmfile.CreateViewStream();
+var reader = new BinaryReader(stream);
+// ...
+</code></pre>

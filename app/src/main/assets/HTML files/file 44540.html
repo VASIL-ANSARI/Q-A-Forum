@@ -1,0 +1,68 @@
+<p>Since the contents of the forEach() method is async, the foreach loop will finish executing before all the ajax request are completed, so your check should go inside the done callback like</p>
+
+<pre><code>DataCollection.prototype._update = function () {
+    var _self = this;
+    var _itemsResponded = 0;
+    var itemData = [];
+
+    if (_self._ready) {
+        _self._ready = false;
+
+        this.collection.forEach(function (item, index) {
+            _self.apiData.id = item.id;
+
+            var ajaxPromise = _self._getData();
+            ajaxPromise.done(function (data) {
+                itemData[index] = data;
+                _self._itemsResponded++;
+
+                if (_self._itemsResponded === _self.collection.length) {
+                    _self._ready = true;
+                    console.log(itemData);
+                    console.log('done');
+                }
+            });
+        })
+    }
+}
+</code></pre>
+
+<hr>
+
+<p>You can use $.when() to simplify this to</p>
+
+<pre><code>DataCollection.prototype._update = function () {
+    var _self = this;
+    var _itemsResponded = 0;
+    var itemData = [];
+
+    if (_self._ready) {
+        _self._ready = false;
+
+        var promises = $.map(this.collection, function (item, index) {
+            _self.apiData.id = item.id;
+            return _self._getData();
+        });
+
+        $.when.apply($, promises).done(function () {
+            var itemData = $.map(arguments, function (arr, idx) {
+                return arr[0];
+            })
+            _self._ready = true;
+            console.log(itemData);
+            console.log('done');
+        })
+    }
+}
+
+DataCollection.prototype._getData = function () {
+    var _self = this;
+
+    var ajaxPromise = $.ajax({
+        url: 'ajax.php',
+        data: _self.apiData,
+        dataType: 'json'
+    });
+    return ajaxPromise;
+}
+</code></pre>

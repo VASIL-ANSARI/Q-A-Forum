@@ -1,0 +1,36 @@
+<p><em>"Just because my method cannot access a constructor parameterâ¦"</em> is thinking about this in the wrong terms. When instantiating your class, is <code>productDto</code> an important state of your instance? Does the data in <code>productDto</code> hold important information that <code>Product</code> needs during its lifetime? Then you're not merely trying to pass it between your constructor and some method, but that data is part of your object's state. And your object methods use and depend on that state. And object state is always implemented by object properties, so saving <code>productDto</code> on <code>this.productDto</code> is perfect fine and the right way to do it.</p>
+
+<blockquote>
+  <p>But this doesn't change the fact that the property is still accessible once the object has been initialized.</p>
+</blockquote>
+
+<p>So what? Using TypeScript and the <code>private</code> declaration, TypeScript will ensure that you're not shooting your own foot by trying to access that property from outside code. That's all you need. There's no point in actually trying to enforce non-accessibility. You're just going to bend over backwards for hardly any gain. Many Javascript objects have internal state which you can poke around in if you so wish. That's no problem at all.</p>
+
+<p>It's only a problem if you're actually writing code against these internal properties which aren't supposed to be part of the official API, and that internal implementation changes down the line. Simply don't do that. Again, TypeScript's <code>private</code> helps you enforce exactly that.</p>
+
+<pre><code>this.id = productDto.id;
+this.productDto = productDto;
+</code></pre>
+
+<p>This is pretty redundant. Quite apparently you need <code>productDto.id</code> <em>and</em> <code>productDto</code> later on in other methods. Simply store the entire <code>productDto</code> as a property and access its <code>.id</code> as needed. If you need to expose the <code>id</code> as property on your class, using a <code>get</code> method which returns <code>this.prodctDto.id</code> is probably a sensible idea:</p>
+
+<pre><code>class Product {
+    private productDto: IProductDto;
+
+    constructor(productDto: IProductDto) {
+        this.productDto = productDto;
+    }
+
+    get id(): string {
+        return this.productDto.id;
+    }
+
+    getProductAttributeByName(name: string): ProductAttribute {
+        return this.productDto.productAttributes.filter(x =&gt; x.name === name)
+    }
+}
+</code></pre>
+
+<hr>
+
+<p>In general, try designing your classes <strong>without writing the constructor first</strong>. Write everything <em>but</em> the constructor. Design which internal and external properties your class needs and which properties your methods will get their data from. Then, as the very last step, write your constructor which needs to ensure that the object state is such that all your methods can work as designed. Then the thinking of "passing from constructor to method" obviates itself.</p>

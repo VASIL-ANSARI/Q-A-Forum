@@ -1,0 +1,87 @@
+<p>I do not think you can alias the global namespace.</p>
+
+<p>The standard defines a namespace alias with :: called out explicitly instead of treating it like just another namespace name:</p>
+
+<pre><code>7.3.2   Namespace alias
+A namespace-alias-definition declares an alternate name for a namespace according to the following grammar:
+namespace-alias:
+    identifier 
+namespace-alias-definition:
+    namespace identifier = qualified-namespace-specifier ;
+qualified-namespace-specifier:
+    ::_opt nested-name-specifier_opt namespace-name
+</code></pre>
+
+<p>Note that :: is opt (optional), but the namespace-name is not.</p>
+
+<p>However, couldn't you just use something other than the global namespace as the start of your namespace stack and still follow the pattern you've outlined?</p>
+
+<p>Also note that your example does in fact need a couple additional lines edited when you remove ObjectiveReality:</p>
+
+<pre><code>namespace current_authority = ObjectiveReality ;
+</code></pre>
+
+<p>and:</p>
+
+<pre><code>&lt;&lt; ObjectiveReality::EntangledObserver::cat_is_alive::value
+</code></pre>
+
+<p>Here's what your example looks like using namespace "something" instead of the global namespace as the root of your namespace stack.</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;iomanip&gt;
+
+
+// ...                                                                                                                                                                                                                                                                                                                                                                    
+namespace something {
+  using cat_is_alive = std::true_type ; // because I like cats                                                                                                                                                                                                                                                                                                            
+}
+using namespace something;
+// ...                                                                                                                                                                                                                                                                                                                                                                    
+
+
+// ASIDE: I originally had `namespace higher_authority = COMPILER ;` as a comment, but changed it for simpler chaining closure                                                                                                                                                                                                                                            
+
+// The next two lines are the crux of my question...                                                                                                                                                                                                                                                                                                                      
+
+namespace higher_authority = something;
+namespace current_authority = something;                                                                                                                                                                                                                                                                                                         
+
+// If the above two lines defined aliases for the (unnamed) global namespace, then the suggested elisions/replacements work...                                                                                                                                                                                                                                            
+
+/* -&gt; */
+namespace ObjectiveReality {
+  /* &lt;- */
+  // Simplest fix: replace with `using ObjectiveReality = current_authority ;`                                                                                                                                                                                                                                                                                            
+  //   (Otherwise, a few other changes are necessary)                                                                                                                                                                                                                                                                                                                     
+
+  namespace higher_authority = current_authority ;
+  namespace current_authority = ObjectiveReality ;
+
+  using cat_is_alive = higher_authority::cat_is_alive ;
+
+  namespace EntangledObserver {
+
+    namespace higher_authority = current_authority ;
+    namespace current_authority = EntangledObserver ;
+
+    using cat_is_alive = higher_authority::cat_is_alive ;
+  } ;
+  /* -&gt; */
+} ;
+/* &lt;- */
+
+
+int main( int argc, char** argv ) {
+
+  std::cout
+    &lt;&lt; "It is "
+    &lt;&lt; ObjectiveReality::EntangledObserver::cat_is_alive::value
+    &lt;&lt; " that the cat is alive." &lt;&lt; std::endl ;
+
+  return 0 ;
+}
+
+
+// EOF
+</code></pre>

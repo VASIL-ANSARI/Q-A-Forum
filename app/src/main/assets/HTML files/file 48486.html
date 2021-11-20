@@ -1,0 +1,48 @@
+<p><code>getValue()</code> is not a method of <a href="http://docs.sencha.com/extjs/4.0.7/#!/api/Ext.panel.Panel" rel="nofollow">ExtJS Panel class</a>.</p>
+
+<p>The change in your code, from <code>sportsGrid</code> (<a href="http://docs.sencha.com/extjs/4.0.7/#!/api/Ext.grid.Panel" rel="nofollow">Ext.grid.Panel</a>) to <code>footbalPanel</code> (<a href="http://docs.sencha.com/extjs/4.0.7/#!/api/Ext.panel.Panel" rel="nofollow">Ext.panel.Panel</a>) won't work, because they are from different classes and therefore have different properties and methods.</p>
+
+<p>If you want this code to work, you'll need to implement <code>getValue()</code> and <code>setValue()</code>. For example, something like:</p>
+
+<p>On FootballPanel class:</p>
+
+<pre><code>getValue: function () {
+    return this.down('grid').store.data.items;
+},
+
+setValue: function (newValue) {
+    if (!newValue)
+        newValue = new Array();
+
+    this.down('grid').store.loadData(newValue);
+},
+</code></pre>
+
+<p>And use your modified code:</p>
+
+<pre><code>sportsContainerHandler: function(radioGroup, newValue, oldValue, options) {
+    var sportsCustomParams = options.sportsCustomParams;
+    var uiPage = this.up('football-ux-sports-ui-page');
+    var SportsDefinition = metamodelsHelper.getSportsDefinition(
+        uiPage, sportsCustomParams.SportsHandlerDefinitionId);
+    var sportsFieldParam = SportsDefinition.params['sportsMultiFieldName'];
+    var sportsGrid = uiPage.queryById(sportsFieldParam.defaultValue).grid;
+    if (newValue[radioGroup.name] == 'sportss') {
+        this.setDisabled(false);
+        this.removeCls("sports-item-disabled");
+        if (sportsGrid.holdValue) {
+            var footballPanel = sportsGrid.up('panel');
+            footballPanel.setValue(sportsGrid.holdValue);
+        }
+    } else {
+        this.setDisabled(true);
+        this.addCls("sports-item-disabled");
+        if (sportsGrid.store.getCount() &gt; 0) {
+            var footballPanel = sportsGrid.up('panel');
+            footballPanel.holdValue = footballPanel.getValue();
+            footballPanel.setValue([]);
+            sportsGrid.addCls("sports-item-disabled");
+        }
+    }
+},
+</code></pre>

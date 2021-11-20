@@ -1,0 +1,90 @@
+<p>Here's how I usually handle this sort of resource stuff (note that <em>whatever</em> you do, you want a <code>stmt != null</code> check before you call <code>stmt.close</code>!):</p>
+
+<pre><code>SomeResource resource = null;
+try {
+    resource = /* ...get the resource... */;
+
+    /* ...use the resource... */
+
+    // Close it    
+    resource.close();
+    resource = null;
+
+    // ...maybe do some post-processing... */
+
+} catch (SomeException se) {
+    // code to handle SomeException
+} catch (SomeOtherException soe) {
+    // code to handle SomeOtherException
+} finally {
+    if (resource != null) {
+        try {
+            resource.close();
+        } catch (IOException e) {
+        }
+    }
+}
+</code></pre>
+
+<p>...although my <code>finally</code> block is usually much simpler than that because I have utility methods to encapsulate it. (Specifically, it would probably look like this:</p>
+
+<pre><code>finally {
+    resource = Utils.silentClose(resource);
+}
+</code></pre>
+
+<p>...where <code>silentClose</code> does the <code>!null</code> check and close call masking any exception and always returns <code>null</code>.)</p>
+
+<p>The key aspects of the above:</p>
+
+<ol>
+<li>The <code>resource</code> is either open, or <code>null</code>, never <code>!null</code> but closed (other than briefly between the <code>close</code> call and the <code>null</code>; I'm assuming you won't be sharing this with other threads).</li>
+<li>In the normal flow, I call <code>close</code> normally, without hiding any exception it may throw.</li>
+<li>In the <code>finally</code> clause, if <code>resource</code> is <code>!null</code>, by definition some exception has occurred. Therefore, I should attempt to close <code>resource</code>, but prevent any exception from being thrown and masking the <em>actual</em> thing that went wrong.</li>
+</ol>
+
+<p>In particular, I keep resource open only as long as I need it in the mainline code, for readability.</p>
+
+<p>There are other idioms for this:</p>
+
+<ul>
+<li>The "rethrow" idiom: Always catch all exceptions, close your resources, and rethrow the exception. Leads to a lot of unnecessary code in my view.</li>
+<li>The "success flag" idiom: Set a flag&nbsp;&mdash; possibly your return value&nbsp;&mdash; that tells you whether things worked, and then always clean up in <code>finally</code>. The thing is, you get the same duplication there that you get with my code, unless you're <em>always</em> going to hide exceptions on <code>close</code>. Which brings us to:</li>
+<li>The "I don't care about exceptions on close" idiom: Always do the "silent" close. Gak. :-)</li>
+</ul>
+
+<p>Applying the above to your code:</p>
+
+<pre><code>public static void viewTable(Connection con) throws SQLException {
+    Statement stmt = null;
+    ResultSet rs   = null; // &lt;== You need this outside the try/catch block
+    String query = "select COF_NAME, SUP_ID, PRICE, SALES, TOTAL from " + dbName + ".COFFEES";
+    try {
+        stmt = con.createStatement();
+        rs = stmt.executeQuery(query);
+        while (rs.next()) {
+            String coffeeName = rs.getString("COF_NAME");
+            int supplierID = rs.getInt("SUP_ID");
+            float price = rs.getFloat("PRICE");
+            int sales = rs.getInt("SALES");
+            int total = rs.getInt("TOTAL");
+            System.out.println(coffeeName + "\t" + supplierID + "\t" + price + "\t" + sales + "\t" + total);
+        }
+
+        // Explicit close, allows for exception since we won't be hiding anything
+        rs.close();
+        rs = null;
+        stmt.close();
+        stmt = null;
+
+        // Possible further processing...
+
+    } catch (SQLException e ) {
+        JDBCTutorialUtilities.printSQLException(e);
+    } finally {
+        // Close the ResultSet first, then the Statement
+        rs   = Utils.silentClose(rs);
+        stmt = Utils.silentClose(stmt);
+    }
+}
+</code></pre>

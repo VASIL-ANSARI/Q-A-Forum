@@ -1,0 +1,84 @@
+<p>Welcome to StackOverflow.</p>
+
+<p>First of all - do you really want to declare the <code>clsNewFields</code> <strong>inside</strong> your <code>clsApp</code> ? Yes, the Fields should be used inside App, but i do not see a need for using <em>class-in-class-declaration</em>.</p>
+
+<p>Second - you are packing the Fields in <code>def fckPackFields(self):</code>. This is not automatically called when you update it.</p>
+
+<p>You are not calling <code>update</code> function by using <code>self.parent.update</code>.</p>
+
+<p>You are using global variable for fields, what does not really suit your needs. Why not having a list inside your App-class like:</p>
+
+<pre><code>    def __init__(self):
+        self.__fields=[]
+    def __set_fields(self, value):
+        self.__fields=value
+    def __get_fields(self):
+        return self.__fields
+    Fields = property(__get_fields, __set_fields)
+
+    def __loadUI(self, event=None):
+        # This function should be called at the end of __init__
+        self.fieldFrame=tk.Frame(self.root)
+        self.fieldFrame.pack(side="top")
+
+    def fckPackFields(self):
+        #First clean area
+        [...]
+        #Then add fields
+        for field in self.__fields:
+            # create the row, etc.
+            # !!! but do it inside self.fieldFrame !!!
+            [...]
+</code></pre>
+
+<p>I would prefer using grid instead of pack over here, because there I think it is easier to place a frame at a certain position, then you could just destroy <code>self.fieldFrame</code> and recreate it at the same position for placing the fields in it. </p>
+
+<p><strong>UPDATE:</strong></p>
+
+<p>Just checked your code again. With some simple tricks your can tweak your GUI to do what you want:</p>
+
+<pre><code>    def __init__(self):    
+        self.fieldFrame=None   #this line has been added
+
+    #completely reworked this function
+    def grid(self):
+        self.rootLabel.grid(row=1, column=0, columnspan=2, sticky=tk.NW+tk.SE)
+        self.fckPackFields()
+        self.BtNewField.grid(row=3, column=0, sticky=tk.NW+tk.SE)
+        self.BtExit.grid(row=3, column=1, sticky=tk.NW+tk.SE)
+
+    #Only one line changed / one added
+    def fckPackFields(self):
+        self.__cleanFields()    #added this line, function beyond
+        if fields:
+            for field in fields:
+                ##create labels##
+                row=tk.Frame(self.fieldFrame)    #add the row to the fieldFrame
+                [...]
+    #In here we destroy and recreate fieldFrame as needed
+    def __cleanFields(self):
+        if self.fieldFrame: 
+                self.fieldFrame.destroy()
+        ##FieldFrame##
+        self.fieldFrame=tk.Frame(self.root)
+        self.fieldFrame.grid(row=2, column=0, columnspan=2)
+</code></pre>
+
+<p>In <code>clsNewFields</code>:</p>
+
+<pre><code>
+    def fckAddField(self, Name, Value):
+        [...]
+        self.parent.fckPackFields() # instead of self.parent.update
+</code></pre>
+
+<p><strong>EDIT:</strong></p>
+
+<p>Have a look at these two questions:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/3222251/python-2-6-class-inside-a-class">Class inside a Class</a></li>
+<li><a href="http://stackoverflow.com/questions/78799/is-there-a-benefit-to-defining-a-class-inside-another-class-in-python">Benefit of nested Classes</a></li>
+</ul>
+
+<p>I did not mean to point out that nested classes are to be avoided in general but I do want to focus you into the thought of <em>"is there a real necessity or benefit of it for my use-case"</em>.</p>

@@ -1,0 +1,34 @@
+<p>I'd build something like the following:</p>
+
+<pre><code># config/initializers/event_tracking.rb
+modlue EventTracking
+
+  attr_accessor :enabled
+
+  def enable
+    @enabled = true
+  end
+
+  def disable
+    @enabled = false
+  end
+
+  module_function
+
+  def Track(event, options)
+    if EventTracking.enabled
+      event.classify.constantize.new(options)
+    end
+  end
+
+end
+
+include EventTracking
+EventTracking.enable unless Rails.env.test?
+</code></pre>
+
+<p>The <code>module_function</code> hack let's us have the <code>Track()</code> function globally, and exports it to the global namespace, you (key thing is that the method is <strong>copied</strong> to the global scope, so it's effectively global, read more here: <a href="http://www.ruby-doc.org/core-1.9.3/Module.html#method-i-module_function" rel="nofollow">http://www.ruby-doc.org/core-1.9.3/Module.html#method-i-module_function</a>)</p>
+
+<p>Then we enable tracking for all modes except production, we call <code>event.classify.constantize</code> in Rails that should turn something like <code>:user_invited_event</code> into <code>UserInvitedEvent</code>, and offers the possibility of namespacing, for example <code>Track(:'users/invited')</code>. The semantics of this are defined by ActiveSupport's inflection module.</p>
+
+<p>I think that should be a decent start to your tracking code I've been using that in a project with a lot of success until now!</p>

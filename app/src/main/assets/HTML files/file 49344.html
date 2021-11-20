@@ -1,0 +1,83 @@
+<p>I tried with unicorn server to launch rails app. The default WEBRrick server seems to be too slow and only for development purposes, so I skipped it. </p>
+
+<p>I used <code>rails new simple</code> to create a skeleton.
+The setting files are as follows.</p>
+
+<h3>config/unicorn.rb</h3>
+
+<pre><code># set path to application
+app_dir = File.expand_path("../..", __FILE__)
+shared_dir = "#{app_dir}/shared"
+working_directory app_dir
+
+# Set unicorn options
+worker_processes 1
+preload_app true
+timeout 30
+
+# Set up socket location
+#listen "#{shared_dir}/sockets/unicorn.sock", :backlog =&gt; 64
+listen "/tmp/unicorn.sock", :backlog =&gt; 64
+
+# Logging
+stderr_path "/var/log/unicorn/stderr.log"
+stdout_path "/var/log/unicorn/stdout.log"
+
+# Set master PID location
+pid "/tmp/unicorn.pid"
+</code></pre>
+
+<h3>/etc/nginx/site-enabled/rails_unicorn.conf</h3>
+
+<pre><code>upstream app {
+    server unix:/tmp/unicorn.sock fail_timeout=0;
+    keepalive 8;
+}
+
+server {
+    listen 80;
+    server_name rails.example.com;
+    passenger_enabled on;
+    passenger_app_env development;
+    root /home/ubuntu/webapp/rails/simple/public;
+
+    location / {
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-NginX-Proxy true;
+
+        proxy_pass http://app/;
+        proxy_redirect off;
+    }
+}
+</code></pre>
+
+<h3>Gemfile</h3>
+
+<p><code>gem "unicorn-rails"</code> added. For Rails 4.2.4, gem "rack-handlers"</p>
+
+<p>Hint from <a href="http://stackoverflow.com/questions/15858887/how-can-i-use-unicorn-as-rails-s">How can I use unicorn as &quot;rails s&quot;?</a></p>
+
+<h3>/etc/init/unicorn_rails.conf</h3>
+
+<pre><code># simple uWSGI script
+# http://uwsgi-docs.readthedocs.org/en/latest/Upstart.html
+
+description "uwsgi tiny instance"
+start on runlevel [2345]
+stop on runlevel [06]
+
+respawn
+
+# http://stackoverflow.com/questions/14823972/upstart-node-js-working-directory
+script
+    chdir /home/ubuntu/webapp/rails/simple
+    #exec /home/ubuntu/.rbenv/shims/rails server unicorn 
+    exec /home/ubuntu/.rbenv/shims/unicorn -c config/unicorn.rb -D
+end script
+</code></pre>
+
+<p>I have smaller memory footprint, but it's interesting to see that ruby still requires larger memory size, compared to the Python/uwsgi.</p>
+
+<p><a href="http://i.stack.imgur.com/zWB4R.png" rel="nofollow"><img src="http://i.stack.imgur.com/zWB4R.png" alt="enter image description here"></a></p>

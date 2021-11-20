@@ -1,0 +1,76 @@
+<p>I recommend you to use ASMX or WCF web service. In the case many things like JSON serialization and deserialization will be made automatically for you. You should just return an object from the web method.</p>
+
+<p>In general WCF RESTfull service has advantages in comparing with ASMX web service, but if you are a beginner you can more easy add ASMX web service to your existing project so that all changes of web.config will made Visual Studio for you.</p>
+
+<p>To add ASMX web service to your existing ASP.NET project you should do following steps. You select your current project in the Solution Explorer (typically on the right side in the Visual Studio) and type <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> (or click right mouse button and choose "Add" and the "New Itemâ¦") you should choose "Web" template on the left side and then "Web Service". You can change the filename on the bottom from default <code>WebService1.asmx</code> to any what you want. For example <code>ProdData.asmx</code>. In the <code>ProdData.asmx.cs</code> file you should uncomment the line with <code>[ScriptService]</code> attribute. You can additionally insert <code>using System.Web.Script.Services;</code> at the beginning of the file. Now you can change the code of "Hello world" web method to what you need. For example to</p>
+
+<pre><code>using System.Collections.Generic;
+using System.Web.Services;
+using System.Web.Script.Services;
+
+namespace TestWebApplicationWithjqGrid
+{
+    public class GridRow {
+        public string id { get; set; }
+        public List&lt;string&gt; cell { get; set; }
+    }
+    public class GridData {
+        public int page { get; set; }
+        public int total { get; set; }
+        public int records { get; set; }
+        public List&lt;GridRow&gt; rows { get; set; }
+    }
+    [WebService (Namespace = "http://tempuri.org/")]
+    [WebServiceBinding (ConformsTo = WsiProfiles.BasicProfile1_1)]
+    [System.ComponentModel.ToolboxItem (false)]
+    [ScriptService]
+    public class ProdData: WebService
+    {
+        [WebMethod]
+        public GridData ProdDetails(string sidx, string sord, int page, int rows,
+                                    string ddlproductstatus, string ddlproducttype, string txtkeywordsearch, int hdnMerchantId) {
+            return new GridData {page = 1, total = 1, records = 2, rows = new List&lt;GridRow&gt; {
+                new GridRow {id = "i1", cell = new List&lt;string&gt; {"Code1", "Title1", "Price1", "Group1", "Edit1", "Status1"}},
+                new GridRow {id = "i2", cell = new List&lt;string&gt; {"Code2", "Title2", "Price2", "Group2", "Edit2", "Status2"}}
+            }};
+        }
+    }
+}
+</code></pre>
+
+<p>You should of course has more complex implementation of the <code>ProdDetails</code> web method. <a href="http://stackoverflow.com/questions/5500805/asp-net-mvc-2-0-implementation-of-searching-in-jqgrid/5501644#5501644">The answer</a> gives you examples. See additionally <a href="http://stackoverflow.com/questions/4029909/load-data-from-webservice-asmx-to-jqgrid-please-help-me/4031603#4031603">this answer</a> for more links with code examples.</p>
+
+<p>To call the web method from the JavaScript you should modify you jqGrid a little. You should include the following additional parameters</p>
+
+<pre><code>datatype: 'json',
+ajaxGridOptions: { contentType: "application/json"},
+serializeGridData: function (postData) {
+    var propertyName, propertyValue, dataToSend = {};
+    for (propertyName in postData) {
+        if (postData.hasOwnProperty(propertyName)) {
+            propertyValue = postData[propertyName];
+            if ($.isFunction(propertyValue)) {
+                dataToSend[propertyName] = propertyValue();
+            } else {
+                dataToSend[propertyName] = propertyValue
+            }
+        }
+    }
+    return JSON.stringify(dataToSend);
+},
+jsonReader: {
+    root: "d.rows",
+    page: "d.page",
+    total: "d.total",
+    records: "d.records"
+}
+</code></pre>
+
+<p>The code of <code>serializeGridData</code> I get from <a href="http://stackoverflow.com/questions/5810885/postdata-not-passing-any-parameters/5811359#5811359">my previous answer</a>. It is more complex as just</p>
+
+<pre><code>serializeGridData: function (postData) { return JSON.stringify(postData); }
+</code></pre>
+
+<p>used in the most cases because you use functions inside of <code>postData</code>.</p>
+
+<p><a href="http://www.ok-soft-gmbh.com/jqGrid/TestWebApplicationWithjqGrid.zip">Here</a> you can download VS2010 .NET 3.5 working project with the corresponding code.</p>

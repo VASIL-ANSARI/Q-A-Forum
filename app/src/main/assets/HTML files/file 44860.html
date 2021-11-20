@@ -1,0 +1,56 @@
+<p>In general <a href="http://docs.python-requests.org/en/latest/" rel="nofollow">requests</a> is the easiest way to get webpages.</p>
+
+<p>If the name of the data files <em>follows the pattern</em> <code>NPPES_Data_Dissemination_&lt;Month&gt;_&lt;year&gt;.zip</code>, which seems logical, you can request that directly;</p>
+
+<pre><code>import requests
+
+url = "http://nppes.viva-it.com/NPPES_Data_Dissemination_{}_{}.zip"
+r = requests.get(url.format("March", 2015))
+</code></pre>
+
+<p>The data is then in <code>r.text</code>.</p>
+
+<p>If the data-file name is less certain, you can get the webpage and use a regular expression to search for links to <code>zip</code> files;</p>
+
+<pre><code>In [1]: import requests
+
+In [2]: r = requests.get('http://nppes.viva-it.com/NPI_Files.html')
+
+In [3]: import re
+
+In [4]: re.findall('http.*NPPES.*\.zip', r.text)
+Out[4]: 
+['http://nppes.viva-it.com/NPPES_Data_Dissemination_March_2015.zip',
+ 'http://nppes.viva-it.com/NPPES_Deactivated_NPI_Report_031015.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_030915_031515_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_031615_032215_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_032315_032915_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_033015_040515_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_100614_101214_Weekly.zip']
+</code></pre>
+
+<p>The regular expression in In[4] basically says to find strings that start with "http", contain "NPPES" and end with ".zip".
+This isn't speficic enough. Let's change the regular expression as shown below;</p>
+
+<pre><code>In [5]: re.findall('http.*NPPES_Data_Dissemination.*\.zip', r.text)
+Out[5]: 
+['http://nppes.viva-it.com/NPPES_Data_Dissemination_March_2015.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_030915_031515_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_031615_032215_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_032315_032915_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_033015_040515_Weekly.zip',
+ 'http://nppes.viva-it.com/NPPES_Data_Dissemination_100614_101214_Weekly.zip']
+</code></pre>
+
+<p>This gives us the URLs of the file we want but also the weekly files.</p>
+
+<pre><code>In [6]: fileURLS = re.findall('http.*NPPES_Data_Dissemination.*\.zip', r.text)
+</code></pre>
+
+<p>Let's filter out the weekly files:</p>
+
+<pre><code>In [7]: [f for f in fileURLS if 'Weekly' not in f]
+Out[7]: ['http://nppes.viva-it.com/NPPES_Data_Dissemination_March_2015.zip']
+</code></pre>
+
+<p>This is the URL you seek. But this whole scheme does depend on how regular the names are. You can add flags to the regular expression searches to discard the case of the letters, that would make it accept more. </p>

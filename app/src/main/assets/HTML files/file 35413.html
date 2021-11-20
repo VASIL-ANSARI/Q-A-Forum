@@ -1,0 +1,50 @@
+<p>The most straightforward approach is to just create a local site with the same folder structure than your live site. I suspect you're doing it that way only because you aren't aware of <a href="https://httpd.apache.org/docs/2.4/vhosts/name-based.html" rel="nofollow">Apache virtual hosts</a>.</p>
+
+<p>In any case, it's always practical to abstract paths as much as possible and constants are always a good choice. I typically define two:</p>
+
+<ul>
+<li><code>WEB_ROOT</code> to be used in URLs (in my case it's often just <code>/</code>)</li>
+<li><code>FS_ROOT</code> to be used in file system paths</li>
+</ul>
+
+<p>You can feed them with hard-coded values in a settings file or dynamically calculating them. <code>FS_ROOT</code> is trivial to populate: you can use <code>__DIR__</code> or <code>dirname(__FILE__)</code> for very old PHP versions.</p>
+
+<p><em>Surprisingly, <code>$_SERVER["DOCUMENT_ROOT"]</code> does not provide accurate info in all hosting services.</em></p>
+
+<hr>
+
+<p><strong>Edit #1:</strong> I've appreciated a little base misconception in some of your comments so I'll try to shed some light on it.</p>
+
+<p>Finding stuff on the Internet is not the same as finding stuff in your hard disc. The former makes use of URLs:</p>
+
+<ul>
+<li><code>http://example.com/blog/latest-news?page=3</code></li>
+</ul>
+
+<p>The latter makes use of file system paths:</p>
+
+<ul>
+<li><code>/home/alice/pictures/kitten.jpg</code></li>
+<li><code>C:\Users\Bob\Desktop\Shopping list.txt</code></li>
+</ul>
+
+<p>In a web based PHP application you normally need to use <strong>both</strong> and you need to know the difference. You cannot use a URL to grab random files from a computer (not even yours) and you cannot use a file system path to grab anything from someone else's computer. This:</p>
+
+<pre><code>&lt;link rel='stylesheet' href='C:\xampp\htdocs\myproject/css/bootstrap/bootstrap.css'/&gt;
+</code></pre>
+
+<p>... is plain wrong because your linking a public resource with a file system path that will only work in your PC.</p>
+
+<p>And one more thing... Most operating systems have adopted the convention to consider <code>.</code> and <code>..</code> <a href="http://stackoverflow.com/questions/3479744/regarding-the-single-and-the-double-dot-within-directories">special directory names</a>. That convention has been extended to URLs. But you must handle them as any other path component: it's <code>backend/..</code> and not <code>backend..</code> for the same reason that <code>foo/bar</code> is not the same as <code>foobar</code>.</p>
+
+<p><strong>Edit #2:</strong> Even if you don't use class auto-loading or the include_path directive, it's trivial to load your application wide settings file, either with absolute paths:</p>
+
+<pre><code>require_once(__DIR__ . '/../conf/configuration.php');
+</code></pre>
+
+<p>... or relative paths:</p>
+
+<pre><code>require_once('../conf/configuration.php');
+</code></pre>
+
+<p>IHMO, doing this once per script, in the top level PHP file, is a huge benefit over calculating all application paths every single time you use them.</p>

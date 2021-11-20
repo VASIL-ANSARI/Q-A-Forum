@@ -1,0 +1,51 @@
+<p>You cannot use a regex to extract JSON from an arbitrary text. Since regexes are usually <a href="http://stackoverflow.com/a/2583491/298479">not powerful enough to validate JSON</a> (unless you can use PCRE) they also cannot match it - if they could, they could also validate JSON.</p>
+
+<p>However, if you know that the top-level element of your JSON is always an object or array, you can go by the following approach:</p>
+
+<ul>
+<li>Find the first opening (<code>{</code> or <code>[</code>) and last closing (<code>}</code> or <code>]</code>) brace in your string.</li>
+<li>Try to parse that block of text (including the braces) using <code>JSON.parse()</code>. If it succeeded, finish and return the parsed result.</li>
+<li>Take the previous closing brace and try parsing that string. If it succeeds, you are done again.</li>
+<li>Repeat this until you got no brace or one that comes before the current opening brace.</li>
+<li>Find the first opening brace after the one from step 1. If you did not find any, the string did not contain a JSON object/array and you can stop.</li>
+<li>Go to step 2.</li>
+</ul>
+
+<p>Here is a function that extracts a JSON object and returns the object and its position. If you really need top-level arrays, too, it should be to extend:</p>
+
+<pre><code>function extractJSON(str) {
+    var firstOpen, firstClose, candidate;
+    firstOpen = str.indexOf('{', firstOpen + 1);
+    do {
+        firstClose = str.lastIndexOf('}');
+        console.log('firstOpen: ' + firstOpen, 'firstClose: ' + firstClose);
+        if(firstClose &lt;= firstOpen) {
+            return null;
+        }
+        do {
+            candidate = str.substring(firstOpen, firstClose + 1);
+            console.log('candidate: ' + candidate);
+            try {
+                var res = JSON.parse(candidate);
+                console.log('...found');
+                return [res, firstOpen, firstClose + 1];
+            }
+            catch(e) {
+                console.log('...failed');
+            }
+            firstClose = str.substr(0, firstClose).lastIndexOf('}');
+        } while(firstClose &gt; firstOpen);
+        firstOpen = str.indexOf('{', firstOpen + 1);
+    } while(firstOpen != -1);
+}
+
+var obj = {'foo': 'bar', xxx: '} me[ow]'};
+var str = 'blah blah { not {json but here is json: ' + JSON.stringify(obj) + ' and here we have stuff that is } really } not ] json }} at all';
+var result = extractJSON(str);
+console.log('extracted object:', result[0]);
+console.log('expected object :', obj);
+console.log('did it work     ?', JSON.stringify(result[0]) == JSON.stringify(obj) ? 'yes!' : 'no');
+console.log('surrounding str :', str.substr(0, result[1]) + '&lt;JSON&gt;' + str.substr(result[2]));
+</code></pre>
+
+<p>Demo (executed in the nodejs environment, but should work in a browser, too): <a href="https://paste.aeum.net/show/81/" rel="nofollow">https://paste.aeum.net/show/81/</a></p>

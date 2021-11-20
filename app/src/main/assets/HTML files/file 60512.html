@@ -1,0 +1,52 @@
+<p>Create a Broadcast Receiver class like below.</p>
+
+<pre><code>public class IncomingCallReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(final Context context, final Intent intent) {
+        final TelephonyManager telephony = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
+        telephony.listen(new PhoneStateListener(){
+            @Override
+            public void onCallStateChanged(int state, String incomingNumber) {
+                super.onCallStateChanged(state, incomingNumber);
+                Log.e("CALL STATE", state + "");
+                if(state == TelephonyManager.CALL_STATE_RINGING)
+                {
+                    Toast.makeText(context, "Incoming Call Number : " + incomingNumber, Toast.LENGTH_LONG).show();
+                    System.out.println("incomingNumber : " + incomingNumber);
+
+                    try {
+                        Class c = Class.forName(telephony.getClass().getName());
+                        Method m = c.getDeclaredMethod("getITelephony");
+                        m.setAccessible(true);
+                        ITelephony telephonyService = (ITelephony) m.invoke(telephony);
+                        Log.e("INCOMING", "CALL");
+                        telephonyService.silenceRinger();
+                        telephonyService.endCall();
+                        Log.e("HANG UP", "REJECTING");
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        },PhoneStateListener.LISTEN_CALL_STATE);
+    }
+}
+</code></pre>
+
+<p>Then in your Manifest file , </p>
+
+<pre><code>&lt;receiver android:name=".IncomingCallReceiver" &gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.PHONE_STATE" /&gt;
+            &lt;/intent-filter&gt;
+</code></pre>
+
+<p></p>
+
+<p>Insert needed permissions too.</p>
+
+<pre><code>&lt;uses-permission android:name="android.permission.READ_PHONE_STATE" /&gt;
+    &lt;uses-permission android:name="android.permission.CALL_PHONE" /&gt;
+    &lt;uses-permission android:name="android.permission.PROCESS_INCOMING_CALLS" /&gt;
+</code></pre>

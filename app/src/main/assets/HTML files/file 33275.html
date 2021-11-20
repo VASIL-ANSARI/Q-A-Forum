@@ -1,0 +1,66 @@
+<p>Your approach seemed to work ok for me - in that it did "enter the loop".
+Nevertheless you could also try something like the following:</p>
+
+<pre><code>void Main()
+{
+    string fileName = @"c:\path\to\my\file.xlsx";
+
+    using (FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+    {
+        using (SpreadsheetDocument doc = SpreadsheetDocument.Open(fs, false))
+        {
+            WorkbookPart workbookPart = doc.WorkbookPart;
+            SharedStringTablePart sstpart = workbookPart.GetPartsOfType&lt;SharedStringTablePart&gt;().First();
+            SharedStringTable sst = sstpart.SharedStringTable;
+
+            WorksheetPart worksheetPart = workbookPart.WorksheetParts.First();
+            Worksheet sheet = worksheetPart.Worksheet;
+
+            var cells = sheet.Descendants&lt;Cell&gt;();
+            var rows = sheet.Descendants&lt;Row&gt;();
+
+            Console.WriteLine("Row count = {0}", rows.LongCount());
+            Console.WriteLine("Cell count = {0}", cells.LongCount());
+
+            // One way: go through each cell in the sheet
+            foreach (Cell cell in cells)
+            {
+                if ((cell.DataType != null) &amp;&amp; (cell.DataType == CellValues.SharedString))
+                {
+                    int ssid = int.Parse(cell.CellValue.Text);
+                    string str = sst.ChildElements[ssid].InnerText;
+                    Console.WriteLine("Shared string {0}: {1}", ssid, str);
+                }
+                else if (cell.CellValue != null)
+                {
+                    Console.WriteLine("Cell contents: {0}", cell.CellValue.Text);
+                }
+             }
+
+             // Or... via each row
+             foreach (Row row in rows)
+             {
+                 foreach (Cell c in row.Elements&lt;Cell&gt;())
+                 {
+                     if ((c.DataType != null) &amp;&amp; (c.DataType ==           CellValues.SharedString))
+                     {
+                         int ssid = int.Parse(c.CellValue.Text);
+                         string str = sst.ChildElements[ssid].InnerText;
+                         Console.WriteLine("Shared string {0}: {1}", ssid, str);
+                     }
+                     else if (c.CellValue != null)
+                     {
+                         Console.WriteLine("Cell contents: {0}", c.CellValue.Text);
+                     }
+                 }
+             }
+         }
+     }
+ }
+</code></pre>
+
+<p>I used the filestream approach to open the workbook because this allows you to open it with shared access - so that you can have the workbook open in Excel at the same time. The Spreadsheet.Open(... method won't work if the workbook is open elsewhere.</p>
+
+<p>Perhaps that is why your code didn't work.</p>
+
+<p>Note, also, the use of the SharedStringTable to get the cell text where appropriate.</p>

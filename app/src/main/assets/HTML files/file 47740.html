@@ -1,0 +1,73 @@
+<p>I can suggest to add filter that you can customize according to any filtering rules. Looking at your flag is a special case usage.
+The explanations in the code comments:</p>
+
+<pre><code>public class Books
+    {
+        public Books()
+        {
+
+        }
+
+        // apply this function each time befor doing serialization
+        public void RunBeforeSerialization(Func&lt;Book, bool&gt; filter)
+        {
+            booksFilter = filter;
+        }
+
+        // this is the filter that you set before serialization
+        Func&lt;Book, bool&gt; booksFilter = null;
+
+        public string Customer { get; set; }
+
+        List&lt;Book&gt; bookList = new List&lt;Book&gt;();
+        public List&lt;Book&gt; BookList
+        {
+            get
+            {
+                if (booksFilter == null) // the regular property usage
+                {
+                    return bookList;
+                }
+                else // used when serialize
+                {
+                    var temp = from book in bookList
+                              where booksFilter(book) // applying the filter
+                              select book;
+
+                    var res = temp.ToList();
+                    booksFilter = null;
+                    return res;
+                }
+            }
+            set
+            {
+                bookList = value;
+            }
+        }
+    }
+</code></pre>
+
+<p>And here is the Main function:</p>
+
+<pre><code>static void Main(string[] args)
+        {
+            Books books = new Books() { Customer = "Allan" };
+            books.BookList.Add(new Book() { Title = "T1", Selected = true });
+            books.BookList.Add(new Book() { Title = "T2", Selected = false });
+            books.BookList.Add(new Book() { Title = "T3", Selected = true });
+
+            // here you add the filter that used when serialized
+            books.RunBeforeSerialization(b =&gt; b.Selected == true);
+
+            XmlSerializer ser = new XmlSerializer(typeof(Books));
+            StringWriter sw = new StringWriter();
+            ser.Serialize(sw, books);
+
+            Console.WriteLine(sw.ToString());
+
+            Console.ReadLine();
+
+        }
+</code></pre>
+
+<p>You can thing about any other way how to set the filtering, but the main idea here is that you give the user the option to control what will be returned during serialization, without harming the regular property usage.</p>

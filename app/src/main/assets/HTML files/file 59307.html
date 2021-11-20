@@ -1,0 +1,64 @@
+<p>You can use <code>printf</code> format strings in your database and pass in values to that.
+<code>printf</code> allows you to specify the position of the argument so only have know what position with the list of parameters "$number" is.</p>
+
+<p>For example</p>
+
+<pre><code>#!/usr/bin/perl
+
+use strict;
+
+my $Details = {
+   'Name' =&gt; 'Mr Satch',
+   'Age'  =&gt; '31',
+   'LocationEn' =&gt; 'England',
+   'LocationFr' =&gt; 'Angleterre',
+   'NewMessages' =&gt; 20,
+   'OldMessages' =&gt; 120,
+};
+
+my $English = q(
+ Hello %1$s, I see you are %2$s years old and from %3$s
+ How are you today?
+ You have %5$i new messages and %6$i old messages
+ Have a nice day
+);
+my $French = q{
+ Bonjour %1$s, je vous vois d'%4$s et Ã¢gÃ©s de %2$s ans.
+ Comment allez-vous aujourd'hui?
+ Vous avez %5$i nouveaux messages et %6$i anciens messages.
+ Bonne journÃ©e.
+};
+printf($English, @$Details{qw/Name Age LocationEn LocationFr NewMessages OldMessages/});
+printf($French,  @$Details{qw/Name Age LocationEn LocationFr NewMessages OldMessages/});
+</code></pre>
+
+<p>This would be a nightmare to maintain so an alternative might be to include an argument list in the database:</p>
+
+<pre><code>#!/usr/bin/perl
+
+use strict;
+
+sub fetch_row {
+   return { 
+      'Format' =&gt; 'You have %i new messages and %i old messages' . "\n",
+      'Arguments'  =&gt; 'NewMessages OldMessages',
+   }
+}
+
+sub PrintMessage {
+    my ($info,$row) = @_;
+    printf($row-&gt;{'Format'},@$info{split(/ +/,$row-&gt;{'Arguments'})});
+}
+
+my $Details = {
+   'Name' =&gt; 'Mr Satch',
+   'Age'  =&gt; '31',
+   'LocationEn' =&gt; 'England',
+   'LocationFr' =&gt; 'Angleterre',
+   'NewMessages' =&gt; 20,
+   'OldMessages' =&gt; 120,
+};
+
+my $row = fetch_row();
+PrintMessage($Details,$row)
+</code></pre>

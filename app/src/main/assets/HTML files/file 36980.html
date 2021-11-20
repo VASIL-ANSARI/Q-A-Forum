@@ -1,0 +1,15 @@
+<blockquote>
+  <p>It stops animating immediately after the first database query begins and starts animating again immediately after the last database query completes</p>
+</blockquote>
+
+<p>It is possible, then, you are not doing the work on a background thread that you think you are. You may be doing the work on the main application thread.</p>
+
+<p>Traceview can help you identify what you are doing on the various threads, and <code>StrictMode</code> can help you with obvious problems (disk I/O and network I/O on the main application thread).</p>
+
+<p>In this case, you may be getting caught by how you are doing your work:</p>
+
+<blockquote>
+  <p>Each page (which are fragments) creates an AsyncTask to query a database and populate itself with the appropriate data.</p>
+</blockquote>
+
+<p>If you are doing your query in <code>doInBackground()</code> but are not touching the resulting <code>Cursor</code> <em>also</em> in <code>doInBackground()</code>, the query actually wasn't done yet. The <code>Cursor</code> is a <code>SQLiteCursor</code>, and it lazy-executes the query when the data is first used. This is another one of those "really cool ideas that just plain suck in how we do things nowadays". A workaround is to call <code>getCount()</code> on the <code>Cursor</code> while you are in <code>doInBackground()</code>, to ensure that the query actually is executed on the background thread.</p>

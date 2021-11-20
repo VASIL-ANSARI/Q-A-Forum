@@ -1,0 +1,63 @@
+<p>Yes, the log statements will still be executed.  This is why it's a good pattern to check the log level first:  something like</p>
+
+<pre><code>if (log.isInfoEnabled()) {
+    log.info("My big long info string: " + someMessage);
+}
+</code></pre>
+
+<p>This is to keep from reallocating space for the info <code>String</code> when the log level does not support <code>INFO</code> statements.</p>
+
+<p>It's not anything like <code>#ifdef</code> - <code>#ifdef</code> is a compiler directive, whereas Log4J configurations are processed at runtime.</p>
+
+<p><strong>Edit</strong>: I hate getting downmodded due to ignorance, so here is one article backing up my answer.</p>
+
+<p>From <a href="http://surguy.net/articles/removing-log-messages.xml">http://surguy.net/articles/removing-log-messages.xml</a>:</p>
+
+<blockquote>
+  <p>In Log4J, if you log a message at
+  DEBUG level, and the current Appender
+  is set to only log messages of INFO
+  level and above, then the message will
+  not be displayed. The performance
+  penalty for calling the log method
+  itself is minimal - a few nanoseconds.
+  However, it may take longer to
+  evaluate the arguments to the log
+  method. For example:</p>
+  
+  <p>logger.debug("The large object is
+  "+largeObject.toString());</p>
+  
+  <p>Evaluating largeObject.toString() may
+  be slow, and it is evaluated before
+  the call to the logger, so the logger
+  cannot prevent it being evaluated,
+  even though it will not be used.</p>
+</blockquote>
+
+<p><strong>Edit 2</strong>: from the log4j manual itself (<a href="http://logging.apache.org/log4j/1.2/manual.html">http://logging.apache.org/log4j/1.2/manual.html</a>):</p>
+
+<p>The user should be aware of the following performance issues.</p>
+
+<ol>
+<li><p>Logging performance when logging is turned off.
+  When logging is turned off entirely or just for a set of levels, the cost of a log request consists of a method invocation plus an integer comparison. On a 233 MHz Pentium II machine this cost is typically in the 5 to 50 nanosecond range.</p>
+
+<p>However, The method invocation involves the "hidden" cost of parameter construction.</p>
+
+<p>For example, for some logger cat, writing,</p>
+
+<pre><code> logger.debug("Entry number: " + i + " is " + String.valueOf(entry[i]));
+</code></pre>
+
+<p>incurs the cost of constructing the message parameter, i.e. converting both integer i and entry[i] to a String, and concatenating intermediate strings, regardless of whether the message will be logged or not. This cost of parameter construction can be quite high and it depends on the size of the parameters involved.</p>
+
+<p>To avoid the parameter construction cost write:</p>
+
+<pre><code>if(logger.isDebugEnabled() {
+  logger.debug("Entry number: " + i + " is " + String.valueOf(entry[i]));
+}
+</code></pre>
+
+<p>This will not incur the cost of parameter construction if debugging is disabled. On the other hand, if the logger is debug-enabled, it will incur twice the cost of evaluating whether the logger is enabled or not: once in debugEnabled and once in debug. This is an insignificant overhead because evaluating a logger takes about 1% of the time it takes to actually log.</p></li>
+</ol>

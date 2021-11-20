@@ -1,0 +1,41 @@
+<p>You have a significant scope-lifetime issue in this code. You're sending a data block to your threads that is created/destroyed with each loop iteration. Leaving out the side-lines:</p>
+
+<pre><code>// thread create
+int tmp_num = 3;
+for(i = 0; i &lt; tmp_num; i++)
+{
+    pthread_t tmp_thread_handler;
+    struct thread_data tmp_thread_info;
+    // --- snip ----
+    rc = pthread_create(&amp;tmp_thread_handler, NULL, test_fun1, (void *)&amp;tmp_thread_info);
+    // --- snip ----
+}
+</code></pre>
+
+<p>Whether the resulting block is copied into the underlying info vectors or not is not relevant. Once the loop slings around, the object is destroyed, and with it the <code>std::string</code> member variable <code>ip</code>. It <em>may</em> reside in the same memory space (the struct), but the reallocation of the string almost certainly will <em>not</em>. In other words, you're invoking <strong>undefined behavior</strong>.</p>
+
+<p>A possible resolution to this is to use a smart pointer for the structure, passing its <code>get()</code> member to the thread, and pushing said-same smart pointer into your info vector ( retooled for smart pointers). I personally prefer a simpler approach, namely allocating both vectors <em>before</em> the threads are kicked off, thereby fixing their "innards" for by-address usage. From there you can send the structure address since the vector holds it for you:</p>
+
+<pre><code>// thread create
+size_t tmp_num = 3;
+m_thread.resize(tmp_num);
+threads.resize(tmp_num);
+for(size_t i = 0; i &lt; tmp_num; i++)
+{
+    m_thread[i].thread_id = i;
+    m_thread[i].ip = "127.0.0.1";
+    m_thread[i].port = 8001;
+    m_thread[i].timeout = 100;
+
+    rc = pthread_create(&amp;threads[i], NULL, test_fun1, &amp;m_thread[i]);
+    if (rc != 0)
+        return -1;
+}
+</code></pre>
+
+<p>Regarding other issues, in your thread proc this doesn't compile:</p>
+
+<pre><code>char tmp_buf[1024] = '\0';
+</code></pre>
+
+<p>But that's pretty minor compared to the undefined behavior you're having.</p>

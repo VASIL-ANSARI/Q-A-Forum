@@ -1,0 +1,46 @@
+<h1>DISCLAIMER</h1>
+
+<p>Since the question is met with positive reaction, I will post an answer explaining what is wrong with your approach, and will show how to match text that is not some specific text.</p>
+
+<p><strong>HOWEVER</strong>, I want to emphasize: <strong><em>Do not use this to parse real, arbitrary HTML code, as regex should only be used on plain text.</em></strong></p>
+
+<h1>What is wrong with your regex</h1>
+
+<p>Your regex contains <code>&lt;div((.+?(?=&lt;\/div&gt;)|.+?(?=&lt;div&gt;))|(?R))*</code> part (same as <code>&lt;div((.+?(?=&lt;\/?div&gt;))|(?R))*</code>) before matching the closing <code>&lt;\/div&gt;</code> part. When you have some delimited text, do not rely on plain lazy/greedy dot matching (unless used in unroll the loop structure - when you know what you are doing). What it does is this:</p>
+
+<ul>
+<li><code>&lt;div</code> - match <code>&lt;div</code> literally (also, in <code>&lt;diverse</code> due to a missing word boundary or a <code>\s</code> after it)</li>
+<li><code>(</code> - Group 1 that matches:
+
+<ul>
+<li><code>(.+?(?=&lt;\/div&gt;)|.+?(?=&lt;div&gt;))</code> - matches either any 1+ chars (as few as possible) up to the first <code>&lt;/div&gt;</code> or to the first <code>&lt;div&gt;</code></li>
+<li><code>|</code> </li>
+<li><code>(?R)</code> - Recurse (i.e. insert and use)</li>
+</ul></li>
+<li><code>)*</code> - repeat Group 1 zero or more times.</li>
+</ul>
+
+<p>The problem is clear: the <code>(.+?(?=&lt;\/?div&gt;))</code> part does not exclude matching <code>&lt;div&gt;</code> or <code>&lt;/div&gt;</code>, <strong>this branch MUST only match the text NOT EQUAL to the leading and trailing delimiters</strong>.</p>
+
+<h1>Solution(s)</h1>
+
+<p>To match text other than some specific text use a <a href="http://stackoverflow.com/a/37343088/3832970"><strong>tempered greedy token</strong></a>.</p>
+
+<pre><code>&lt;div\b[^&lt;]*&gt;((?:(?!&lt;\/?div\b).)+|(?R))*&lt;\/div&gt;\s*
+             ^^^^^^^^^^^^^^^^^^^ 
+</code></pre>
+
+<p>See the <a href="https://regex101.com/r/eR2oH3/1" rel="nofollow">regex demo</a>. Note you must use a DOTALL modifier so as to be able to match text across newlines.  A capturing group is redundant, you can remove it.</p>
+
+<p>What is important here is that <code>(?:(?!&lt;\/?div\b).)+</code> only matches 1 or more characters that are not the starting character of a <code>&lt;div....&gt;</code> or <code>&lt;/div</code> sequences. See my above linked thread on how that works.</p>
+
+<p>As for performance, tempered greedy tokens are resource-consuming. Unroll the loop technique comes to the rescue:</p>
+
+<pre><code>&lt;div\b[^&lt;]*&gt;(?:[^&lt;]+(?:&lt;(?!\/?div\b)[^&lt;]*)*|(?R))*&lt;\/div&gt;\s*
+</code></pre>
+
+<p>See <a href="https://regex101.com/r/iH3lI2/1" rel="nofollow">this regex demo</a></p>
+
+<p>Now, the token looks like <code>[^&lt;]+(?:&lt;(?!\/?div\b)[^&lt;]*)*</code>: 1+ characters other than <code>&lt;</code> followed with 0+ sequences of <code>&lt;</code> that is not followed with <code>/div</code> or <code>div</code> (as a whole word) and then again 0+ non-<code>&lt;</code>s.</p>
+
+<p><code>&lt;div\b</code> might still match in <code>&lt;div-tmp</code>, so perhaps, <code>&lt;div(?:\s|&gt;)</code> is a better way to deal with this via regex. Still, <strong>parsing HTML with <em>DOM</em> is much easier</strong>.</p>

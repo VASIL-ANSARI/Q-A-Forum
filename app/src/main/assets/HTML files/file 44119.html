@@ -1,0 +1,39 @@
+<p>Maybe I was led astray by the posted code.  Lets say the problem is just this: retrieve an object by some criteria.  If it exists, modify and save it.  If it does not exist, create it. Do all that inside a loop.</p>
+
+<p>Lets do it with small, promise-returning functions for each logical bit:</p>
+
+<pre><code>// return a promise for a Score matching level and owner.  return
+// undefined if one doesn't exist
+function scoreWithOwnerLevel(owner, level) {
+    var query = new Parse.Query("Score");
+    query.equalTo("owner", owner);
+    query.equalTo("level", level);
+    return query.first();
+}
+
+// return a promise for either an existing score or a new one matching
+// level and owner criteria.  set its otherValue
+function findOrCreateScore(owner, level, otherValue) {
+    return scoreWithOwnerLevel(owner, level).then(function(score) {
+        if (!score) {
+            var Score = Parse.Object.extend("Score");
+            score = new Score();
+            score.set("owner", owner);
+            score.set("level", level);
+        }
+        score.set("otherValue", param.otherValue);
+        return score;
+    });
+}
+
+// take a list of owners, levels and one other value. find
+// or create scores for these based on score and level.
+// assign each the other values and save.  assume that params 
+// of the form [{ owner:'sam', level:2, otherValue:'foo'}, ... etc.]
+function findOrCreateScoresWith(params) {
+    var scores = _.map(params, function(param) {
+        return findOrCreateScore(param.owner, param.level, param.otherValue);
+    });
+    return Parse.Object.saveAll(scores);
+}
+</code></pre>

@@ -1,0 +1,75 @@
+<p>Try not controlling the pagination in that subquery, instead just use a more conventional query with a composite where clause. HOWEVER, because you are using left joins take care adding filters through the where clause that would override the outer join to produce the effect of an inner join.</p>
+
+<pre><code>SELECT seltable.*, 
+       tbl2.name AS tbl2name, 
+       tbl3.name AS tbl3name, 
+       tbl4.name AS tbl4name 
+FROM selecttable AS seltable
+LEFT JOIN table1 AS tbl1 ON seltable.tbl1_uid = tbl1.uid
+LEFT JOIN table2 AS tbl2 ON tbl1.tbl2_uid = tbl2.uid
+LEFT JOIN table3 AS tbl3 ON tbl2.tbl3_uid = tbl3.uid
+LEFT JOIN table4 AS tbl4 ON tbl3.tbl4_uid = tbl4.uid
+WHERE seltable.value = 99 
+...
+ORDER BY seltable.datetime DESC 
+LIMIT 50 OFFSET 0 
+</code></pre>
+
+<p>Alternatively use more subqueries, like this:</p>
+
+<pre><code>SELECT seltable.*, 
+       tbl2.name AS tbl2name, 
+       tbl3.name AS tbl3name, 
+       tbl4.name AS tbl4name 
+FROM
+       ( SELECT * FROM selecttable 
+         WHERE value = 99 
+         ORDER BY datetime DESC 
+         LIMIT 50 OFFSET 0 ) 
+       AS seltable
+LEFT JOIN ( SELECT uid, name
+            FROM table1
+            WHERE 1=1 -- amend to suit
+            ) AS tbl1 ON seltable.tbl1_uid = tbl1.uid
+LEFT JOIN ( SELECT uid, name
+            FROM table2
+            WHERE 1=1 -- amend to suit
+            ) AS tbl2 ON tbl1.tbl2_uid = tbl2.uid
+LEFT JOIN ( SELECT uid, name
+            FROM table3
+            WHERE 1=1 -- amend to suit
+            ) AS tbl3 ON tbl2.tbl3_uid = tbl3.uid
+LEFT JOIN ( SELECT uid, name
+            FROM table4
+            WHERE 1=1 -- amend to suit
+            ) AS tbl4 ON tbl3.tbl4_uid = tbl4.uid;
+</code></pre>
+
+<p>Here is another attempt, based on your sqlfiddle it appears that INNER JOINS may be used:</p>
+
+<pre><code>SELECT theteam.*, 
+       trnmnt.name AS tournamentname, 
+       cat.name AS categoryname, 
+       sport.name AS sportname 
+FROM ( 
+  SELECT * FROM team 
+  ORDER BY team.name ASC ) 
+AS theteam 
+INNER JOIN tournament_team AS tntm ON tntm.team_uid = theteam.uid 
+INNER JOIN tournament AS trnmnt ON tntm.tournament_uid = trnmnt.uid AND trnmnt.name = 'Tournament2'
+INNER JOIN category AS cat ON trnmnt.category_uid = cat.uid 
+INNER JOIN sport ON cat.sport_uid = sport.uid
+LIMIT 5 OFFSET 0
+;
+</code></pre>
+
+<p>The result of that query is:</p>
+
+<pre><code>| UID |   NAME | TOURNAMENTNAME | CATEGORYNAME | SPORTNAME |
+|-----|--------|----------------|--------------|-----------|
+|   2 | Team02 |    Tournament2 |      Germany |    Soccer |
+|   3 | Team03 |    Tournament2 |      Germany |    Soccer |
+|   4 | Team04 |    Tournament2 |      Germany |    Soccer |
+|   5 | Team05 |    Tournament2 |      Germany |    Soccer |
+|   6 | Team06 |    Tournament2 |      Germany |    Soccer |
+</code></pre>

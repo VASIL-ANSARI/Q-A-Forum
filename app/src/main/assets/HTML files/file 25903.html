@@ -1,0 +1,94 @@
+<p>Loop over the list and test each item against the minimum and maximum found so far. <code>float('inf')</code> and <code>float('-inf')</code> (infinity and negative infinity) are good starting points to simplify the logic:</p>
+
+<pre><code>minimum = float('inf')
+maximum = float('-inf')
+for item in l:
+    if item &lt; minimum:
+        minimum = item
+    if item &gt; maximum:
+        maximum = item
+</code></pre>
+
+<p>Alternatively, start with the first element and only loop over the rest; I use <a href="http://docs.python.org/2/library/itertools.html#itertools.islice" rel="nofollow"><code>itertools.islice()</code></a> here to avoid creating a copy of a potentially large list:</p>
+
+<pre><code>from itertools import islice
+
+minimum = maximum = l[0]
+for item in islice(l, 1, None):
+    if item &lt; minimum:
+        minimum = item
+    if item &gt; maximum:
+        maximum = item
+</code></pre>
+
+<p>or turn the list into an iterable first:</p>
+
+<pre><code>iterl = iter(l)
+minimum = maximum = next(iterl)
+for item in iterl:
+    if item &lt; minimum:
+        minimum = item
+    if item &gt; maximum:
+        maximum = item
+</code></pre>
+
+<p>Timing comparisons with a larger, random list:</p>
+
+<pre><code>&gt;&gt;&gt; from random import shuffle
+&gt;&gt;&gt; l = range(1000)
+&gt;&gt;&gt; shuffle(l)
+&gt;&gt;&gt; from timeit import timeit
+&gt;&gt;&gt; def straight_min_max(l):
+...     return min(l), max(l)
+... 
+&gt;&gt;&gt; def sorted_min_max(l):
+...     s = sorted(l)
+...     return s[0], s[-1]
+... 
+&gt;&gt;&gt; def looping(l):
+...     l = iter(l)
+...     min = max = next(l)
+...     for i in l:
+...         if i &lt; min: min = i
+...         if i &gt; max: max = i
+...     return min, max
+... 
+&gt;&gt;&gt; timeit('f(l)', 'from __main__ import straight_min_max as f, l', number=10000)
+0.5266690254211426
+&gt;&gt;&gt; timeit('f(l)', 'from __main__ import sorted_min_max as f, l', number=10000)
+2.162343978881836
+&gt;&gt;&gt; timeit('f(l)', 'from __main__ import looping as f, l', number=10000)
+1.1799919605255127
+</code></pre>
+
+<p>So even for lists of 1000 elements, the <code>min()</code> and <code>max()</code> functions are fastest. Sorting is slowest here. The sorting version can be faster if you allow for <em>in-place</em> sorting, but then you'd need to generate a new random list for each timed run as well.</p>
+
+<p>Moving to a million items (and only 10 tests per timed run), we see:</p>
+
+<pre><code>&gt;&gt;&gt; timeit('f(l)', 'from __main__ import straight_min_max as f, l', number=10)
+1.6176080703735352
+&gt;&gt;&gt; timeit('f(l)', 'from __main__ import sorted_min_max as f, l', number=10)
+6.310506105422974
+&gt;&gt;&gt; timeit('f(l)', 'from __main__ import looping as f, l', number=10)
+1.7502741813659668
+</code></pre>
+
+<p>Last but not least, using a million items and <code>l.sort()</code> instead of <code>sorted()</code>:</p>
+
+<pre><code>&gt;&gt;&gt; def sorted_min_max(l):
+...     l.sort()
+...     return l[0], l[-1]
+... 
+&gt;&gt;&gt; l = range(1000000)
+&gt;&gt;&gt; shuffle(l)
+&gt;&gt;&gt; timeit('f(l[:])', 'from __main__ import straight_min_max as f, l', number=10)
+1.8858389854431152
+&gt;&gt;&gt; timeit('f(l[:])', 'from __main__ import sorted_min_max as f, l', number=10)
+8.408858060836792
+&gt;&gt;&gt; timeit('f(l[:])', 'from __main__ import looping as f, l', number=10)
+2.003532886505127
+</code></pre>
+
+<p>Note the <code>l[:]</code>; we give each test run a copy of the list.</p>
+
+<p>Conclusion: even for large lists, you are better off using the <code>min()</code> and <code>max()</code> functions anyway. Nothing beats a good C loop. But if you have to forgo those functions, the straight loop is the next better option.</p>

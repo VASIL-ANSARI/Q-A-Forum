@@ -1,0 +1,56 @@
+<p>This is a test-case case that does what you want, maybe you can incorporate this into your class?:</p>
+
+<pre><code>&lt;?php
+class Redirects {
+private static $placeholders = array(
+    ':any' =&gt; '[a-zA-Z0-9\.\-_%=]+',
+    ':num' =&gt; '[0-9]+',
+    ':alpha' =&gt; '[a-z]+', //added
+    ':all' =&gt; '.*',
+);
+
+private static $tmp;
+private static $tmpValue;
+
+public static function handle() {
+    $case = array('Products/(name:any)-(category:any)-(id:num).html' =&gt; 'products/&lt;category&gt;/&lt;id&gt;/&lt;name&gt;/overview');
+    $test = 'Products/productName-categoryName-123.html';       // products/categoryName/123/productName/overview
+
+    $pattern = '/\(\s*?(\w*?)\s*?:\s*?(\w*?)\s*?\)/';
+
+    foreach ($case as $k =&gt; $v) {
+        self::$tmp = array();
+        self::$tmpValue = $v;
+
+        $step1 = preg_replace_callback($pattern, array(self, 'replace_step1'), $k);
+        $step2 = preg_replace_callback('#' . $step1 . '#', array(self, 'replace_step2'), $test);
+
+        print 'case: ' . $k . '&lt;br&gt;';
+        print 'step1: ' . $step1 . '&lt;br&gt;';
+        print 'step2: ' . $step2 . '&lt;br&gt;';
+    }
+}
+
+private static function replace_step1($matches) {
+    self::$tmp[] = $matches[1];
+
+    return '(' . self::$placeholders[':' . $matches[2]] . ')';
+}
+
+private static function replace_step2($matches) {
+    $str = self::$tmpValue;
+
+    for ($i = 1, $n = count($matches); $i &lt; $n; ++$i) {
+        $value = array_shift(self::$tmp);
+
+        $str = str_replace('&lt;' . $value . '&gt;', $matches[$i], $str);
+    }
+
+    return $str;
+}
+}
+
+Redirects::handle();
+</code></pre>
+
+<p>It first replaces your named placeholders with the real PREG placeholders and stores them in an array <code>$tmp</code>. It then checks the test-string <code>$test</code> if it matches that pattern <code>$step1</code> and replaces them according to the <code>$tmp</code> array.</p>

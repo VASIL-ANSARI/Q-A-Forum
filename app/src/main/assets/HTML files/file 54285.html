@@ -1,0 +1,29 @@
+<h1>Problem</h1>
+
+<p><code>TreeTableView</code> uses <code>TreeTableViewArrayListSelectionModel</code>, which extends <code>MultipleSelectionModelBase</code>, which uses <code>ReadOnlyUnbackedObservableList</code>, which uses (and contains) <code>SelectionListIterator</code>, which has a broken implementation for its method <code>nextIndex</code>.</p>
+
+<p>Thanks to <a href="http://stackoverflow.com/questions/35778430/treetableview-selection-contains-null-values-after-source-change/35795113#comment59240083_35778430">fabian</a> for pointing that out.
+He also filed a bug report (<a href="http://bugs.java.com/bugdatabase/view_bug.do?bug_id=8145887" rel="nofollow">http://bugs.java.com/bugdatabase/view_bug.do?bug_id=8145887</a>).</p>
+
+<h1>Workaround</h1>
+
+<p>Using a buffer in between could provide an effective workaround for the problem above. I tried several approaches. <code>setAll</code> on selection invalidation and <code>Bindings.bindContent</code> <strong>do not work</strong>. In both cases I received <code>null</code> values in the list. The straightforward "solution" is to simply filter the <code>null</code>s out. This leads to the inefficient but apparently effective code below.</p>
+
+<pre><code>// [...]
+TreeTableView&lt;Data&gt; listView = createTreeTableView();
+selectionBuffer = FXCollections.observableArrayList();
+listView.getSelectionModel().getSelectedItems().addListener(new InvalidationListener() {
+    @Override
+    public void invalidated(Observable observable) {
+        selectionBuffer.clear();
+        for (TreeItem&lt;Data&gt; t : listView.getSelectionModel().getSelectedItems()) {
+            if (t != null) {
+                selectionBuffer.add(t);
+            }
+        }
+    }
+});
+// [...]
+</code></pre>
+
+<p>Using <code>selectionBuffer</code> instead of <code>listView.getSelectionModel().getSelectedItems()</code> should now compensate the implementation problem in <code>nextIndex</code>.</p>

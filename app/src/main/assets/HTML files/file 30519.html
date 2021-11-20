@@ -1,0 +1,55 @@
+<p>The behavior is undefined.</p>
+
+<pre><code>b = foo(i++) + foo(i++);
+</code></pre>
+
+<p>As you say, there's a sequence point between the evaluation of the first <code>i++</code> and the call to <code>foo</code>, and likewise between the evaluation of the second <code>i++</code> and the call <code>foo</code>. But there isn't (necessarily) a sequence point between the two evaluations of <code>i++</code>, or more specifically between their side effects (modifying <code>i</code>).</p>
+
+<p>Quoting the <a href="http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf">N1570</a> draft of the 2011 ISO C standard, section 6.5.2.2p10:</p>
+
+<blockquote>
+  <p>There is a sequence point after the evaluations of the function
+  designator and the actual arguments but before the actual call. Every
+  evaluation in the calling function (including other function calls)
+  that is not otherwise specifically sequenced before or after the
+  execution of the body of the called function is indeterminately
+  sequenced with respect to the execution of the called function.</p>
+</blockquote>
+
+<p>The second sentence is significant here: the two evaluations of <code>i++</code> are "indeterminately
+sequenced" with respect to the two function calls, meaning that they can occur either before or after the calls to <code>foo</code>. (They're not <em>unsequenced</em>, though; each of them occurs either before or after the calls, but it's unspecified which.)</p>
+
+<p>And 6.5p2 says:</p>
+
+<blockquote>
+  <p>If a side effect on a scalar object is unsequenced relative to either
+  a different side effect on the same scalar object or a value
+  computation using the value of the same scalar object, the behavior is
+  undefined. If there are multiple allowable orderings of the
+  subexpressions of an expression, the behavior is undefined if such an
+  unsequenced side effect occurs in any of the orderings.</p>
+</blockquote>
+
+<p>Putting this together, a conforming implementation could evaluate the expression in this order:</p>
+
+<ol>
+<li>Evaluate the first <code>i++</code> and save the value somewhere.</li>
+<li>Evaluate the second <code>i++</code>and save the value somewhere.</li>
+<li>Call <code>foo</code>, passing the first saved value as an argument.</li>
+<li>Call <code>foo</code>, passing the second saved value as an argument.</li>
+<li>Add the two results.</li>
+<li>Store the sum in <code>b</code>.</li>
+</ol>
+
+<p>There is no sequence point between steps 1 and 2, both of which modify <code>i</code>, so the behavior is undefined.</p>
+
+<p>(That's actually a slight oversimplification; the side effect of modifying <code>i</code> can be separated from the determination of the result of <code>i++</code>.</p>
+
+<p>Bottom line: We know that</p>
+
+<pre><code>b = i++ + i++;
+</code></pre>
+
+<p>has undefined behavior, for reasons that have been explained repeatedly. Wrapping the <code>i++</code> subexpressions in function calls does add some sequence points, but those sequence points don't separate the two evaluations of <code>i++</code> and therefore don't cause the behavior to become well defined.</p>
+
+<p>Even bottommer line: Please don't write code like that. Even if the behavior were well defined, it would be more difficult than it's worth to prove it and to determine what the behavior should be.</p>

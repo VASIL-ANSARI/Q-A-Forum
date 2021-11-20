@@ -1,0 +1,196 @@
+<p>First off a descent parser will always give you better control.<br>
+A whole regex solution might enable you to skip errors or at least let you continue<br>
+and not crap out.</p>
+
+<p>Your format is extremely simple, and an engine that can do internal recursion could at<br>
+least get you an outter match. Using language recursion, you could re-enter that regex<br>
+enabling you to parse the core.</p>
+
+<p>I'm no php expert, but if it supports regex recursion and language level <em>eval()</em> you<br>
+will be able to inject an array construct into the source text.<br>
+Then eval the string to create an nested array image, complete with parameters.  </p>
+
+<p>I actually converted your text to an array in about 12 lines of Perl, but added to<br>
+it when it got interresting.</p>
+
+<p>Here is a Perl sample. Its dumbed down so its readable. It might give you some inspiration to try it in php (if it can do these things). Like I said I'm no php expert.</p>
+
+<pre><code>  use Data::Dumper;
+
+  my $str = '
+    asdf("asg")
+    isNumeric(right(trim(contract_id),1))
+    var = \'aqfbasdn\'
+    isNumeric(right(trim ( ,contract_id,),-1, j( ) ,"  ", bob, george(five(four, two))))
+  ';
+
+  my $func      = '\w+';           # Allowed characters (very watered down)
+  my $const     = '[\w*&amp;^+-]+';
+  my $wspconst  = '[\w*&amp;^+\s-]+';
+
+  my $GetRx = qr~
+    \s*
+    (                       # 1 Recursion group
+       (?:
+           \s* ($func) \s* 
+           [(]
+              (?:  (?&gt; (?: (?!\s*$func\s*[(] | [)] ) . )+ ) 
+                 | (?1)                                         
+              )*                                               
+           [)]
+       )
+     )                                                 
+  ~xs;
+
+  my $ParseRx = qr~
+    (                        # 1 Recursion group
+       (?:
+           \s* ($func) \s*                                    # 2 Function name
+           [(]
+           (                                                  # 3 Function core
+              (?:  (?&gt; (?: (?!\s*$func\s*[(] | [)] ) . )+ ) 
+                 | (?1)                                         
+              )*                                               
+           )                                                   
+           [)]
+                                         # OR..other stuff
+                                         # Note that this block of |'s is where               
+                                         # to put code to parse constants, strings,
+                                         # delimeters, etc ... Not much done, but
+                                         # here is where that goes.
+                                         # -----------------------------------------
+         |  \s*["'] ($wspconst) ["']\s*      # 4,5 Variable constants
+         | \s* ($const) \s* 
+                                         # Lastly, accept empty parameters, if
+         | (?&lt;=,)                        # a comma behind us,
+         | (?&lt;=^)(?!\s*$)                # or beginning of a new 'core' if actually a paramater.
+       )       
+     )                                                 
+  ~xs;
+
+##
+  print "Source string:\n$str\n";
+  print "=======================================\n";
+  print "Searching string for functions ...\n";
+  print "=======================================\n\n";
+
+
+  while ($str =~ /$GetRx/g) {
+      print "------------------\nParsing:\n$1\n\n";
+      my $res = parse_func($1);
+      print "String to be eval()'ed:\n$res\n\n";
+
+      my $hashref = eval $res.";";
+      print "Hash from eval()'ed string:\n", Dumper( $hashref ), "\n\n";
+  }
+
+###
+  sub parse_func
+  {
+      my ($core) = @_;
+      $core =~ s/$ParseRx/ parse_callback($2, $3, "$4$5") /eg;
+      return $core;
+  }
+
+  sub parse_callback
+  {
+      my ($fname, $fbody, $fconst) = @_;
+      if (defined $fbody) {
+          return "{'$fname'=&gt;[" . (parse_func( $fbody )) . "]}";
+      }
+      return "'$fconst'"
+  }
+</code></pre>
+
+<p>Output     </p>
+
+<pre><code>Source string:
+
+    asdf("asg")
+    isNumeric(right(trim(contract_id),1))
+    var = 'aqfbasdn'
+    isNumeric(right(trim ( ,contract_id,),-1, j( ) ,"  ", bob, george(five(four, two))))
+
+=======================================
+Searching string for functions ...
+=======================================
+
+------------------
+Parsing:
+asdf("asg")
+
+String to be eval()'ed:
+{'asdf'=&gt;['asg']}
+
+Hash from eval()'ed string:
+$VAR1 = {
+          'asdf' =&gt; [
+                      'asg'
+                    ]
+        };
+
+
+------------------
+Parsing:
+isNumeric(right(trim(contract_id),1))
+
+String to be eval()'ed:
+{'isNumeric'=&gt;[{'right'=&gt;[{'trim'=&gt;['contract_id']},'1']}]}
+
+Hash from eval()'ed string:
+$VAR1 = {
+          'isNumeric' =&gt; [
+                           {
+                             'right' =&gt; [
+                                          {
+                                            'trim' =&gt; [
+                                                        'contract_id'
+                                                      ]
+                                          },
+                                          '1'
+                                        ]
+                           }
+                         ]
+        };
+
+
+------------------
+Parsing:
+isNumeric(right(trim ( ,contract_id,),-1, j( ) ,"  ", bob, george(five(four, two))))
+
+String to be eval()'ed:
+{'isNumeric'=&gt;[{'right'=&gt;[{'trim'=&gt;['' ,'contract_id','']},'-1',{'j'=&gt;[ ]} ,'  ','bob',{'george'=&gt;[{'five'=&gt;['four','two']}]}]}]}
+
+Hash from eval()'ed string:
+$VAR1 = {
+          'isNumeric' =&gt; [
+                           {
+                             'right' =&gt; [
+                                          {
+                                            'trim' =&gt; [
+                                                        '',
+                                                        'contract_id',
+                                                        ''
+                                                      ]
+                                          },
+                                          '-1',
+                                          {
+                                            'j' =&gt; []
+                                          },
+                                          '  ',
+                                          'bob',
+                                          {
+                                            'george' =&gt; [
+                                                          {
+                                                            'five' =&gt; [
+                                                                        'four',
+                                                                        'two'
+                                                                      ]
+                                                          }
+                                                        ]
+                                          }
+                                        ]
+                           }
+                         ]
+        };
+</code></pre>

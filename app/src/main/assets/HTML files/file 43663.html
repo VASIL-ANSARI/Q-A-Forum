@@ -1,0 +1,93 @@
+<p>[UPDATE]</p>
+
+<p>It turns out what I had earlier was wrong. The method <code>setSiteConfig()</code> is not what you want to use. I checked the db and it looks like Sequelize created two new records instead of associating the existing foo/bar selectors:</p>
+
+<pre><code>test=# select * from "Selectors";
+ id | type | content |         createdAt          |         updatedAt          | SiteConfigId 
+----+------+---------+----------------------------+----------------------------+--------------
+  1 | foo  | foo     | 2015-04-05 20:38:55.282-07 | 2015-04-05 20:38:55.282-07 |             
+  2 | foo  | bar     | 2015-04-05 20:38:55.282-07 | 2015-04-05 20:38:55.282-07 |             
+  3 |      |         | 2015-04-05 20:38:55.282-07 | 2015-04-05 20:38:55.311-07 |            1
+  4 |      |         | 2015-04-05 20:38:55.282-07 | 2015-04-05 20:38:55.31-07  |            1
+</code></pre>
+
+<p>So what is different? You can't use <code>setSiteConfig</code> on the child rows, instead you call <code>addSelectors</code> on siteConfig and pass in the selectors you want to associate. See updated code below.</p>
+
+<p>Changed <code>Promise</code> variable to <code>BPromise</code> because node has a native <code>Promise</code> module now which would cause a conflict. Also I believe Sequelize has bluebird built-in so you can also just use <code>Sequelize.Promise</code>.</p>
+
+<p>Removed the nested promise in your <code>spread</code> call because there is no need for it.</p>
+
+<p>Side note: <code>Promise.all</code> returns a single result array so I don't think you should be using <code>.spread()</code>.</p>
+
+<pre><code>var BPromise = require("bluebird");
+var Sequelize = require("sequelize");
+
+var sequelize = new Sequelize('test', 'root', 'password', {
+  host: "localhost",
+  dialect: "postgres",
+  pool: {
+    max: 5,
+    min: 0,
+    idle: 10000
+  }
+});
+
+var Schedule = sequelize.define("Schedule", {
+  website: {
+    type: Sequelize.STRING
+  }
+});
+
+var SiteConfig = sequelize.define("SiteConfig", {
+  systemType: {
+    type: Sequelize.STRING
+  }
+});
+
+var Selector = sequelize.define("Selector", {
+  type: {
+    type: Sequelize.STRING
+  },
+  content: {
+    type: Sequelize.STRING
+  }
+});
+
+Selector.belongsTo(SiteConfig);
+SiteConfig.hasMany(Selector);
+
+var testSchedule = {
+  website: "google.com"
+};
+var testSiteConfig = {
+  systemType: "one"
+};
+var testSelectors = [
+  {type: "foo", content: "foo"},
+  {type: "foo", content: "bar"}
+];
+
+sequelize.sync({ force: true })
+.then(function(result) {
+  return BPromise.all([
+    Schedule.create(testSchedule),
+    SiteConfig.create(testSiteConfig),
+    Selector.bulkCreate(testSelectors, { returning: true })
+  ]);
+})
+.then(function(result) {
+  var siteConfig = result[1];
+  var selectors = result[2];
+
+return siteConfig.addSelectors(selectors);
+})
+.then(function (result) {
+  return this.siteConfig.getSelectors();
+})
+.each(function(result) {
+  console.log('boomshakalaka:', result.get());
+})
+.catch(function(error) {
+  console.log(error);
+});
+</code></pre>

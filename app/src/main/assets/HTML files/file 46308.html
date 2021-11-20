@@ -1,0 +1,41 @@
+<p>What I usually do is:</p>
+
+<ol>
+<li>Use a standard location for my php "library" files (lets say [project_path]/lib/php/)</li>
+<li><p>Create a helper file "setpath.php" which is going to set the correct PHP path(s). In this file I work with relevant paths which are webroot independent:</p>
+
+<pre><code>function setPath() {
+    // get the path to the root folder of the 
+    // project using our current known location
+    $bn = dirname(dirname(dirname(__FILE__)));
+
+    // Get absolute path
+    $bn=realpath($bn)."/";
+
+    // Extend with all needed paths (few examples)
+    $new_paths = $bn.PATH_SEPARATOR."$bn/db".PATH_SEPARATOR."$bn/templates";
+
+    // Set the environment
+    set_include_path(get_include_path() . PATH_SEPARATOR . $new_paths);
+}
+</code></pre></li>
+<li><p>Now each file needs to know how to include this and call <code>setPath()</code>, so from your index this is <code>include("lib/php/setpath.php")</code> and from your lib/php/db this would be <code>include("../setpath.php")</code>. </p></li>
+<li>You are now good to include any file which is in the registered paths without knowing its excact location</li>
+</ol>
+
+<p>Additionally, I have found out that using <a href="http://php.net/manual/en/language.oop5.autoload.php" rel="nofollow" title="Autoloading">Autoloading</a> can save you lots of effort trying to figure out dependencies manually...</p>
+
+<p>Finally, in some cases knowing the server webroot is needed. In these cases I use something like the following (also in my lib/php/ folder) which provides the file-system path and the webroot of the project as GLOBAL variables (... some may say bad practice ...)</p>
+
+<pre><code>// Fix document root to work with mod_alias (that maybe buggy)
+$_SERVER['DOCUMENT_ROOT'] = str_replace($_SERVER['SCRIPT_NAME'], '', $_SERVER['SCRIPT_FILENAME']);
+
+// The root of the project in the Document 
+$SRV['BASEDIR'] = substr( __FILE__,0, strrpos(__FILE__, "/lib"));
+$SRV['WEBROOT'] = substr( __FILE__,0, strrpos(__FILE__, "/lib"));
+$SRV['WEBROOT'] = str_replace($_SERVER['DOCUMENT_ROOT'],"",$SRV['WEBROOT']);
+</code></pre>
+
+<p>I use the above tools along with some Autoloaders as the base of my projects. Hope that helps you or inspires someone to provide a better solution.</p>
+
+<p>Andreas</p>

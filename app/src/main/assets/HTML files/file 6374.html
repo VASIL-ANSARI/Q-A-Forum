@@ -1,0 +1,50 @@
+<p>the Function constructor creates a global function, not lexically within your function. Therefore, it doesn't have access to your local function called open, so it uses the window's open method.</p>
+
+<p>From my tests, your code should always be referencing the global open method whether run from a bookmarklet or the page itself.</p>
+
+<p>Look at this example:</p>
+
+<pre><code>(function(){
+  function giveme5(x) { return 5;}
+
+  var func = new Function("return giveme5()");
+  // should output 5, but we get an error, giveme5 is not defined
+  console.log( func() );
+})()
+</code></pre>
+
+<p>Here's a possible solution to your problem</p>
+
+<pre><code>(function(){
+    // Binds an argument to a method, this could be much better, but serves our 
+    // purpose here
+    function bindArg(fun, arg) {
+        return function() {
+            fun.call(this, arg);
+        }
+    }
+
+    function toggleTable(table) {
+        var rows = table.rows;
+         for (var j=1; j&lt;rows.length; j++){
+             if(rows[j].style.display == 'none' ){
+                 rows[j].style.display = '';
+             } else if(rows[j].style.display == ''){
+                 rows[j].style.display = 'none';
+             }
+         }
+    }
+
+    var tableList = document.getElementsByTagName("table");
+    for ( var i=0; i&lt;tableList.length; i++){
+        var table = tableList[i];
+        for ( var j=0; j &lt; table.rows.length;j++){
+            if( j != 0){
+                table.rows[j].style.display = 'none';
+            } else {
+                table.rows[j].onclick = bindArg(toggleTable, table);
+            }
+        }
+    }
+})();
+</code></pre>

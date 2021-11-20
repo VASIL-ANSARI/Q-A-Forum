@@ -1,0 +1,77 @@
+<p>Ok, here's an example which I think might show appropriate use of a <code>delegate</code>. We have two methods which do some common things but which have different ways of accomplishing a task in the middle of the common work. The <code>IntConverter&lt;T&gt; delegate</code> allows them to pass in a way of accomplishing the task which is particular to the calling method.</p>
+
+<p>If it's important to your question (I'm not sure) this example demonstrates requiring an actual <code>delegate</code> type (as opposed to a generic <code>Func&lt;&gt;</code> type) because the delegate type itself has a generic parameter.</p>
+
+<pre><code>private delegate int IntConverter&lt;T&gt;(T value);
+
+public void DoSomething&lt;T&gt;(T value)
+{
+    DoCoreStuff(value, v =&gt; ConvertToIntInOneWay(v));
+}
+
+public void DoSomethingElse&lt;T&gt;(T value)
+{
+    DoCoreStuff(value, v =&gt; ConvertToIntInAnotherWay(v));
+}
+
+private void DoCoreStuff&lt;T&gt;(T value, IntConverter&lt;T&gt; intConverter)
+{
+    // Do a bunch of common stuff
+    var intValue = intConverter(value);
+    // Do a bunch of other core stuff, probably with the intValue
+}
+</code></pre>
+
+<p>The same situation could be solved without a delegate like this:</p>
+
+<pre><code>public void DoSomething&lt;T&gt;(T value)
+{
+    DoFirstLotOfCoreStuff(value);
+    DoSecondLotOfCoreStuff(ConvertToIntInOneWay(v));
+}
+
+public void DoSomethingElse&lt;T&gt;(T value)
+{
+    DoFirstLotOfCoreStuff(value);
+    DoSecondLotOfCoreStuff(ConvertToIntInAnotherWay(v));
+}
+
+private void DoFirstLotOfCoreStuff&lt;T&gt;(T value)
+{
+    // Do a bunch of other core stuff, probably with the intValue
+}
+
+private void DoSecondLotOfCoreStuff(int intValue)
+{
+    // Do a bunch of other core stuff, probably with the intValue
+}
+</code></pre>
+
+<p>...but this is a weaker solution because of the <a href="http://en.wikipedia.org/wiki/Don%27t_repeat_yourself" rel="nofollow">duplication</a> in <code>DoSomething</code> and <code>DoSomethingElse</code> and the now-required <a href="http://en.wikipedia.org/wiki/Sequential_coupling" rel="nofollow">Sequential-coupling</a>-type invoking of the two helper methods.</p>
+
+<p>For fun, here's another way of solving the same problem:</p>
+
+<pre><code>public interface IIntConverter&lt;T&gt;
+{
+    int Convert(T value);
+}
+
+public void DoSomething&lt;T&gt;(T value)
+{
+    DoCoreStuff(value, new ConvertToIntInOneWayIntConverter());
+}
+
+public void DoSomethingElse&lt;T&gt;(T value)
+{
+    DoCoreStuff(value, new ConvertToIntInAnotherWayIntConverter());
+}
+
+private void DoCoreStuff&lt;T&gt;(T value, IIntConverter&lt;T&gt; intConverter)
+{
+    // Do a bunch of common stuff
+    var intValue = intConverter.Convert(value);
+    // Do a bunch of other core stuff, probably with the intValue
+}
+</code></pre>
+
+<p>...this is a weaker solution because we've invented an interface and two implementations when what we wanted to do <a href="http://en.wikipedia.org/wiki/KISS_principle" rel="nofollow">was simple enough</a> to do with a delegate.</p>

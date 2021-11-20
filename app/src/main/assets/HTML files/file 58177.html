@@ -1,0 +1,58 @@
+<p>Here are some suggestions for performance improvement.  </p>
+
+<p><strong>Move Vector outside the loop</strong><br>
+Creation of vectors requires time.  Move the declaration before any of the for loops:  </p>
+
+<pre><code>vector&lt;double&gt; vtmp(A.n_r);
+for (int c_b=0;c_b&lt;B.n_c;c_b++)
+{
+    for (int r_a=0;r_a&lt;A.n_r;r_a++)
+    {
+        //...
+    }
+}
+</code></pre>
+
+<p><strong>Dissect the assignment calculation.</strong><br>
+Without any profiling or benchmarking, the assignment statement looks like it takes up the most time.  Break it apart into separate steps to help the compiler and so you can see if the calculation can be performed more optimially.<br>
+<em>Original:</em>  </p>
+
+<pre><code>sum=sum+A.mat[r_a+i*A.n_r]*B.mat[i+c_b*B.n_r];
+</code></pre>
+
+<p>Dissected[1]:  </p>
+
+<pre><code>const int A_Index = r_a + i * A.n_r;
+const int B_Index = i + c_b*B.n_r;
+sum = sum + A.mat[A_Index] * B.mat[B_Index];
+</code></pre>
+
+<p>Dissected[2] (using more variables):  </p>
+
+<pre><code>const int temp1 = i * A.n_r;
+const int temp2 = c_b * B.n_r;
+const int A_Index = r_a + temp1;
+const int B_Index = i + temp2;
+sum = sum + A.mat[A_Index] * B.mat[B_Index];
+</code></pre>
+
+<p>The above may assist the compiler in choosing the optimal processor instructions.  </p>
+
+<p><strong>Using local variables</strong><br>
+Ideally you want to have the processor fetch as many sequential locations from the matrix, <em>while it is in the data cache</em> before it reloads.  Something like this:  </p>
+
+<pre><code>int ATemp1 = A[w];
+int ATemp2 = A[x];
+int ATemp3 = A[y];
+int ATemp4 = A[z];
+
+int BTemp1 = B[e];
+int BTemp2 = B[f];
+int BTemp3 = B[g];
+int BTemp4 = B[h];
+
+sum = sum + ATemp1 * BTemp1;
+sum = sum + ATemp2 * BTemp2;
+sum = sum + ATemp3 * BTemp3;
+sum = sum + ATemp4 * BTemp4;
+</code></pre>

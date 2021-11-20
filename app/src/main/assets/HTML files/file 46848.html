@@ -1,0 +1,18 @@
+<p>ArangoDB is not made of node or gyp. But ArangoDB uses Google's V8 JavaScript engine to execute JavaScript code, the same as node.js does. </p>
+
+<p>That means you can run user-defined JavaScript code inside ArangoDB, and it will be compiled to native code by V8 on the fly. Some of ArangoDB's own modules are written in JavaScript, too. Several third-party JavaScript modules, including a few modules used by or written for node.js and npm, are bundled with ArangoDB, too.</p>
+
+<p>Regarding compatibility with node.js and npm modules:</p>
+
+<p>modules from node.js and npm work in ArangoDB too as long as they do not rely on node.js internals or code from other modules that do. That means all modules that are JavaScript only and do not require any node specific stuff should work in ArangoDB. <code>joi</code> is a good example for this. node.js/npm modules that rely on node.js-specific object or C++ extensions for node.js will not work in ArangoDB.</p>
+
+<p>ArangoDB itself is written in C++, with some its modules being written in JavaScript. ArangoDB's internals are made accessible to user-defined JavaScript code and the bundled ArangoDB JavaScript modules by V8 wrapper objects and functions. These functions are C++ functions that are exposed to JavaScript by telling V8 that they exist. </p>
+
+<p>Here's an example: ArangoDB exposes a JavaScript object named <code>db</code>. This object has some predefined functions, e.g. <code>_collection(&lt;name&gt;)</code>. When this function is called, this will effectively be a call to a C++ function, which can then handle its (JavaScript) arguments, which in this case should be a collection name string. Inside the C++ function there will then be a lookup for the collection of the specified name. If not found, the function will return a JavaScript <code>null</code> object. If found, the function will return a collection object, wrapped in a so-called <em>V8 external</em>. For the JavaScript code, this will look like a regular object, but this object has some C++ bindings again.</p>
+
+<p>In order for all this to work, the server will register the <code>db</code> object in a V8 context at start, and also register the wrapper functions for all the object's methods. It will do so for other objects and functions, so there is a full JavaScript API for the server internals.</p>
+
+<p><a href="https://docs.arangodb.com/Aql/">AQL</a>, ArangoDB's query language, is written in C++ and will be executed as such. Some AQL functions and operators however are implemented in JavaScript. If an AQL query makes use of such function or operator, a query-specific JavaScript snippet will be generated, compiled on the fly using V8 and executed. 
+Additionally, AQL queries can make use of user-defined JavaScript functions for calculations. These functions are regular JavaScript functions, which must be registered with a command before they can be used in a query. Invocation of these functions is as above, with a piece of dynamic JavaScript code being generated and executed to call the user-defined function.</p>
+
+<p>Finally, <a href="https://docs.arangodb.com/Foxx/">ArangoDB's Foxx framework</a> is written in JavaScript and allows defining HTTP routes in the ArangoDB server. The actions behind these routes are user-defined, and can have access to the server internals and database data via the beforementioned way.</p>

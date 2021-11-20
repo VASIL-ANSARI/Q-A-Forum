@@ -1,0 +1,48 @@
+<p>First things first, a relevant extract from the documentation of <a href="http://docs.oracle.com/javase/8/docs/api/java/util/stream/Collectors.html#toList--" rel="nofollow"><code>Collectors.toList()</code></a>:</p>
+
+<blockquote>
+  <p>[...]There are no guarantees on the type, mutability, serializability, or thread-safety of the List returned; if more control over the returned List is required, use toCollection(Supplier)</p>
+</blockquote>
+
+<p>Now, let us look a little more deeply into a collector's <a href="http://docs.oracle.com/javase/8/docs/api/java/util/stream/Collector.Characteristics.html" rel="nofollow">characteristics</a>; we find this:</p>
+
+<blockquote>
+  <p>public static final Collector.Characteristics CONCURRENT</p>
+  
+  <p>Indicates that this collector is concurrent, meaning that the result container can support the accumulator function being called concurrently with the same result container from multiple threads.</p>
+  
+  <p>If a CONCURRENT collector is not also UNORDERED, then it should only be evaluated concurrently if applied to an unordered data source.</p>
+</blockquote>
+
+<p>Now, nothing guarantees that the collector returned by <code>Collectors.toList()</code> is <code>Concurrent</code> at all.</p>
+
+<p>Notwithstanding the time which it may take to initiate a new class of yours, the safe bet here would be to assume that this collector <em>is not</em> concurrent. But fortunately we have a means to use a concurrent collection instead, as mentioned in the javadoc. So, let's try:</p>
+
+<pre><code>.collect(
+        Collector.of(CopyOnWriteArrayList::new,
+            List::add,
+            (o, o2) -&gt; { o.addAll(o2); return o; },
+            Function.&lt;List&lt;String&gt;&gt;identity(),
+            Collector.Characteristics.CONCURRENT,
+            Collector.Characteristics.IDENTITY_FINISH
+        )
+    )
+</code></pre>
+
+<p>This may speed things up.</p>
+
+<p>Now, you have another problem. You do not close you stream.</p>
+
+<p>This is little known but a <code>Stream</code> (whether of any type or an {Int,Double,Long}Stream for that matter) implements <code>AutoCloseable</code>. You want to close streams which are I/O bound and <code>Files.lines()</code> is such a stream.</p>
+
+<p>So, try this:</p>
+
+<pre><code>final List&lt;MyClass&gt; list;
+
+try (
+    final Stream&lt;String&gt; lines = Files.lines(...);
+) {
+    list = lines.parallel().map(MyClass::new)
+        .collect(seeAbove);
+}
+</code></pre>

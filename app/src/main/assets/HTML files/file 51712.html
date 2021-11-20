@@ -1,0 +1,36 @@
+<p>After doing some research, it turns out that using the _ProcessInputRow() method is the correct way to process inputs in an SSIS Script Component.</p>
+
+<p>What I discovered in my research is that _ProcessInput() can be used to manually iterate over the Buffer and send results to _ProcessInputRow() (however it is not necessary to do so unless yo uhave a reason to):</p>
+
+<pre><code>public override void  Input0_ProcessInput(Input0Buffer Buffer)
+{
+    while (Buffer.NextRow())
+    {
+        Input0_ProcessInputRow(Buffer);
+    }
+}
+
+public override void Input0_ProcessInputRow(Input0Buffer Row)
+{
+    //Process one row's worth of data by calling "Row."
+}
+</code></pre>
+
+<p>Additionally, I found that the ProcessInput method is use even further upstream from _ProcessInput and _ProcessinputRow().  ProcessInput() is the method that allows you to manipulate the raw buffer data coming in as an input:</p>
+
+<pre><code>public override void ProcessInput(int InputID, Microsoft.SqlServer.Dts.Pipeline.PipelineBuffer buffer)
+{
+    IDTSInput100 input = ComponentMetaData.InputCollection.GetObjectByID(InputID);
+
+    while (buffer.NextRow())
+    {
+        for (int columnIndex = 0; columnIndex &lt; input.InputColumnCollection.Count; columnIndex++)
+        {
+            IDTSInputColumn100 inputColumn = input.InputColumnCollection[columnIndex];
+            var test = buffer[columnIndex];
+        }
+    }
+}
+</code></pre>
+
+<p>I'm not sure why it would ever be necessary to use ProcessInput(), but it's nice to know it is available. To answer my question, _ProcessInputRow() is the correct method to use in order to process data coming in through an input.</p>

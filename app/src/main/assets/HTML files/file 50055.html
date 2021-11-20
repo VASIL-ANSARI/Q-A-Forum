@@ -1,0 +1,112 @@
+<p>Your question doesn't include a lot of detail to really determine what your issue is, but here area a few suggestions:</p>
+
+<p>Make sure your Placement.info file is up to date for the DisplayType you are trying to use, here is an example from one of mine:</p>
+
+<pre><code>&lt;Placement&gt;
+&lt;Place Parts_McrfProfile_Edit="Content:3"/&gt;
+&lt;Place Parts_McrfProfile_Summary="Content:6"/&gt;
+&lt;Place Parts_McrfProfileList_Edit="Content:3"/&gt;
+&lt;Place Parts_McrfProfileList_Summary="Content:6"/&gt;
+&lt;Place Parts_McfProfile_List="Content:6"/&gt;
+
+&lt;Match DisplayType="Detail"&gt;
+&lt;!-- hide summary, show full content, for Detail --&gt;
+&lt;Place Parts_McrfProfile_Summary="-"
+       Parts_McrfProfileList_Summary="-"
+       Parts_McfProfile_List="-"
+       Parts_McrfProfile="Content:6"
+       Parts_McrfProfileList="Content:6"
+       /&gt;
+&lt;Place Parts_Common_Metadata="-"/&gt;
+&lt;/Match&gt;
+
+&lt;Match DisplayType="Summary"&gt;
+&lt;Place Parts_Common_Metadata_Summary="-"/&gt;
+
+&lt;/Match&gt;
+
+&lt;Match DisplayType="ListView"&gt;
+   &lt;Place Parts_Common_Metadata_Summary="-"
+       Parts_McrfProfile_Summary="-"
+       Parts_McrfProfileList_Summary="-"
+       Parts_McrfProfile="-"
+       Parts_McrfProfileList="-"
+       Parts_McrfProfile_List="Content:6"/&gt;
+  &lt;/Match&gt;
+&lt;/Placement&gt;
+</code></pre>
+
+<p>Then in your display driver, make sure you are building the correct display types, here is an example using a few:</p>
+
+<pre><code>    protected override DriverResult Display(
+    McrfProfilePart part, string displayType, dynamic shapeHelper)
+    {
+        return Combined(
+       ContentShape("Parts_McrfProfile",
+                         () =&gt;
+                         {
+                             part.ProfileDetail = _profileService.GetProfileDetail(part.ProfileId);
+
+                             McrfProfileDetailViewModel profileDetailViewModel = new McrfProfileDetailViewModel();
+
+                             profileDetailViewModel.ProfileDetail = part.ProfileDetail;
+
+                             return shapeHelper.Parts_McrfProfile(ProfileDetail: profileDetailViewModel);
+                          }),
+        ContentShape("Parts_McrfProfile_List",
+                         () =&gt;
+                         {
+                             return shapeHelper.Parts_McrfProfile_List(ProfileRecord: part);
+                         }),
+        ContentShape("Parts_McrfProfile_Summary",
+                         () =&gt;
+                         {
+                             McrfProfileSummaryViewModel profileSummaryViewModel = new McrfProfileSummaryViewModel();
+
+                             List&lt;int&gt; profileID = new List&lt;int&gt;() { part.ProfileId };
+
+                             var summary = _profileService.GetProfileSummaryList(profileID).Where(e =&gt; e.ProfileID == part.ProfileId).First();
+
+                             profileSummaryViewModel.JobTitle = summary.JobTitle;
+                             profileSummaryViewModel.Name = summary.Name;
+                             profileSummaryViewModel.ProfileImage = summary.ProfileImage;
+                             profileSummaryViewModel.ProfileID = summary.ProfileID;
+
+                             return shapeHelper.Parts_McrfProfile_Summary(ProfileRecord: profileSummaryViewModel);
+                         }));
+
+    }
+</code></pre>
+
+<p>Finally, if you have done these correctly and are getting valid data back from your service (or by whatever means you are getting data), you should be able to use your view as follows:</p>
+
+<pre><code>@{
+Mcrf.Profiles.ViewModels.McrfProfileDetailViewModel part =   Model.ProfileDetail;
+Style.Include("profile-styles.css?v=1.0").AtHead();
+Style.Include("bootstrap.css?v=1.0").AtHead();
+}
+
+@if (Model != null &amp;&amp; part.ProfileDetail != null)
+{
+&lt;div&gt;
+    &lt;div &gt;
+        &lt;div class="profileImgDiv"&gt;
+            @if (Model != null &amp;&amp; part != null)
+            {
+                if (part.ProfileDetail.ProfileImage == null)
+                {
+                    &lt;img class="profile-img" src="~/Modules/Mcrf.Profiles/Content/Images/noProfilePictureImage.jpg" /&gt;
+                }
+                else
+                {
+                    &lt;img class="profile-img" src="@Url.Content(part.ProfileDetail.ProfileImage)" /&gt;
+                }
+            }
+        &lt;/div&gt;
+</code></pre>
+
+<p>etc, etc, etc,</p>
+
+<p>I hope this helps,</p>
+
+<p>Roka</p>

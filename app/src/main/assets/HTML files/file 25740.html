@@ -1,0 +1,35 @@
+<p>It's a bad idea for your main thread to end without calling <code>join</code> on all non-daemon threads, or to make any assumptions about what happens if you don't.</p>
+
+<hr>
+
+<p>If you don't do anything very unusual, CPython (at least <a href="http://hg.python.org/cpython/file/2.0/Lib/threading.py#l457" rel="nofollow">2.0</a>-<a href="http://hg.python.org/cpython/file/3.3/Lib/threading.py#l829" rel="nofollow">3.3</a>) will cover for you by automatically calling <code>join</code> on all non-daemon threads as pair of <code>_MainThread._exitfunc</code>. This isn't actually documented, so you shouldn't rely on it, but it's what's happening to you.</p>
+
+<p>Your main thread hasn't actually exited at all; it's blocking inside its <code>_MainThread._exitfunc</code> trying to <code>join</code> some arbitrary non-daemon thread. Its objects won't be finalized until the <code>atexit</code> handler is called, which doesn't happen until after it finishes joining all non-daemon threads.</p>
+
+<hr>
+
+<p>Meanwhile, if you avoid this (e.g., by using <code>thread</code>/<code>_thread</code> directly, or by detaching the main thread from its object or forcing it into a normal <code>Thread</code> instance), what happens? It isn't defined. The <code>threading</code> module makes no reference to it at all, but in CPython 2.0-3.3, and likely in any other reasonable implementation, it falls to the <a href="http://docs.python.org/2/library/thread.html#module-thread" rel="nofollow"><code>thread</code>/<code>_thread</code> module</a> to decide. And, as the docs say:</p>
+
+<blockquote>
+  <p>When the main thread exits, it is system defined whether the other threads survive. On SGI IRIX using the native thread implementation, they survive. On most other systems, they are killed without executing try ... finally clauses or executing object destructors.</p>
+</blockquote>
+
+<p>So, if you manage to avoid <code>join</code>ing all of your non-daemon threads, you have to write code that can handle both having them hard-killed like daemon threads, and having them continue running until exit.</p>
+
+<p>If they do continue running, at least in CPython 2.7 and 3.3 on POSIX systems, that the main thread's OS-level thread handle, and various higher-level Python objects representing it, may be still retained, and not get cleaned up by the GC.</p>
+
+<hr>
+
+<p>On top of that, even if everything were released, you can't rely on the GC ever deleting anything. If your code depends on deterministic GC, there are many cases you can get away with it in CPython (although your code will then break in PyPy, Jython, IronPython, etc.), but at exit time is not one of them. CPython can, and will, leak objects at exit time and let the OS sort 'em out. (This is why writable files that you never close may lose the last few writesâthe <code>__del__</code> method never gets called, and therefore there's nobody to tell them to <code>flush</code>, and at least on POSIX the underlying <code>FILE*</code> doesn't automatically flush either.)</p>
+
+<p>If you want something to be cleaned up when the main thread finishes, you have to use some kind of <code>close</code> function rather than relying on <code>__del__</code>, and you have to make sure it gets triggered via a <code>with</code> block around the main block of code, an <code>atexit</code> function, or some other mechanism.</p>
+
+<hr>
+
+<p>One last thing:</p>
+
+<blockquote>
+  <p>I would have expected that the thread-locals would be deallocated (i.e. garbage collected)...</p>
+</blockquote>
+
+<p>Do you actually have thread locals somewhere? Or do you just mean locals and/or globals that are only accessed in one thread?</p>

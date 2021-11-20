@@ -1,0 +1,54 @@
+<p>One possibility is to convert it to a function that accepts a callback when done:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function foo(x) {
+    document.write('&lt;pre&gt;'+JSON.stringify(x,0,3));
+    return x + 11;
+}
+
+convertToAsyncWithCallback = function(fn) {
+    return function() {
+        var args = [].slice.call(arguments),
+            callback = args.pop(),
+            result = fn.apply(this, args);
+        callback(result)
+    }
+}
+
+
+fooAsync = convertToAsyncWithCallback(foo);
+
+
+fooAsync(31, function(result) {
+  document.write('&lt;pre&gt;'+JSON.stringify(result,0,3));
+});</code></pre>
+</div>
+</div>
+</p>
+
+<p>Of course, this doesn't magically make the function asynchronous, this is impossible. It just makes the function behave so as it were async, to play nicely with other async functions.</p>
+
+<p>Here's another, more elegant, option:</p>
+
+<pre><code>convertToAsyncWithPromise = function(fn) {
+    return function() {
+        var args = [].slice.call(arguments);
+
+        return new Promise(function(resolve) {
+            setTimeout(function() {
+                resolve(fn.apply(this, args));
+            }, 0)
+        });
+    }
+};
+</code></pre>
+
+<p>This schedules the function to run at a later time and returns a Promise which resolves when the function is done. Use like this:</p>
+
+<pre><code>fooAsync = convertToAsyncWithPromise(foo);
+
+fooAsync(31).then(function(result) {
+    console.log(result)
+});
+</code></pre>

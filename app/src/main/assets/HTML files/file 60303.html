@@ -1,0 +1,250 @@
+<p>I achieve this functionality by sending an ajax request via javascript to a java servlet on the server here is an example that I use:</p>
+
+<p>Say you have a link:</p>
+
+<pre><code>&lt;a href="#" onclick = 'shipProduct(1)'&gt;Test&lt;/a&gt;
+</code></pre>
+
+<p>When this link is clicked it will look for the corresponding javscript function, which in my case is:</p>
+
+<pre><code>    /**
+ * 
+ * @param {type} action
+ * @param {type} bundleId
+ * @returns {undefined}
+ */
+function shipProduct(bundleId)
+{
+
+    $.ajax
+            ({
+                url: "/FlcErp-war/ShipmentServlet", //this is the name of the serverlet in your project
+                type: "GET", // the type of your request
+                data: _action + "=addToShipped&amp;bundleId=" + bundleId,
+                success: function (content)
+                {
+                    if (content.substring(0, 1) == '_')
+                    {
+                        alert(content);
+                    }
+                    else
+                    {
+                        //rebuild shipment tables to show updated
+                        //information about the item
+                        buildShipmentQueue();
+                    }
+
+                },
+                error: function (xhr, status, error) {
+                    alert(xhr.responseText);
+                    alert(status);
+                    alert(error);
+                }
+            });
+}
+</code></pre>
+
+<p>What I did was have have an annotated java servlet to serve my request:</p>
+
+<p>your doPost and doGet will handle your post and get requests</p>
+
+<pre><code>/**
+ *
+ * @author samo
+ */
+@WebServlet("/ShipmentServlet")
+public class ShipmentServlet extends HttpServlet {
+
+
+
+    private static final long serialVersionUID = 1L;
+
+    private static final String _addToShipped = "addToShipped";
+
+    private static final String _bundleId = "bundleId";
+
+    private static final String _shipmentId = "shipmentId";
+
+    private static final String _productId = "productId";
+
+    private static final String _updateQueue = "updateQueue";
+
+    private static final String _unship = "unship";
+
+    private static final String _setInSession = "setInSession";
+
+    private static final String _externalBundleId = "externalBundleId";
+
+    private static final String _plywood = "P";
+
+    private static final String _veneer = "V";
+
+    private static final String _lumber = "L";
+
+    private static final String _bundle = "Bundle";
+
+    private static final String _list = "List";
+
+    private boolean multipleActions;
+
+    private String[] actions;
+
+    /**
+     * Processes requests for both HTTP &lt;code&gt;GET&lt;/code&gt; and &lt;code&gt;POST&lt;/code&gt;
+     * methods.
+     *
+     * @param request servlet request
+     * @param response servlet response
+     * @throws ServletException if a servlet-specific error occurs
+     * @throws IOException if an I/O error occurs
+     */
+    protected void processBundleRequest(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException, NamingException, CloneNotSupportedException {
+        response.setContentType("text/html;charset=UTF-8");
+        try (PrintWriter out = response.getWriter()) {
+            this.actions = null;
+
+            //this is where we will get the actions to process
+            //if there is more than one action the string will contain
+            // a comma as a delimiter
+            String action = request.getParameter("_action");
+            InitialContext ctx = new InitialContext();
+
+            LoadShipmentController lsc = (LoadShipmentController) ctx.lookup("loadShipmentController");
+            switch (action) {
+                case _addToShipped:
+                    shipProduct(request, out);
+                    break;
+                case _updateQueue:
+                    Shipment shipment = lsc.getCurrent();
+                    String type = shipment.getShipmentType();
+                    String shipmentQueue = "";
+                    switch (type) {
+                        case _veneer:
+                             shipmentQueue = lsc.getVeneerShipmentQueue();
+                            break;
+                        case _plywood:
+                             shipmentQueue = lsc.getShipmentQueue();
+                            break;
+                        case _lumber:
+                            shipmentQueue = lsc.getShipmentQueue();
+                            break;
+                    }
+
+                    out.println(shipmentQueue);
+                    break;
+                case _unship:
+                    unshipProduct(request, out);
+                    break;
+
+                case _setInSession:
+                    String bundleId = request.getParameter(_bundleId);
+                    lsc.setBundleId(bundleId);
+                    break;
+                case _list:
+                   out.println(lsc.getBundleAndProductListString());
+                    break;
+
+                // setSessionVariable(_externalBundleId, bundleId);
+            }
+        }
+    }
+
+    public void shipProduct(HttpServletRequest request, PrintWriter out) throws NamingException, CloneNotSupportedException {
+        Integer bundleId = Integer.valueOf(request.getParameter(_bundleId));
+        InitialContext ctx = new InitialContext();
+
+        ShipmentController shipmentController = (ShipmentController) ctx.lookup("shipmentController");
+        LoadShipmentController loadShipmentController = (LoadShipmentController) ctx.lookup("loadShipmentController");
+
+        // getting the product from the bundle, because that's all we care about
+
+        Product product = shipmentController.loadBundle(bundleId).getProduct();
+
+        String type = product.getProductType();
+
+        //because the way we ships differs depending on the product type I need to 
+        //check first mainly for veneer shipments because their bundle count is not 
+        //predetermined
+        boolean loaded = false;
+
+        switch (type) {
+            case _veneer:
+                loaded = loadShipmentController.loadVeneerProduct(product, bundleId);
+                break;
+            case _plywood:
+                loaded = loadShipmentController.loadPlywoodProduct(product, bundleId);
+                break;
+            case _lumber:
+                loaded = loadShipmentController.loadLumberProduct(product, bundleId);
+                break;
+        }
+
+        if(!loaded)
+        {
+            out.println("_" + loadShipmentController.getErrors());
+        }
+
+    }
+
+    public void unshipProduct(HttpServletRequest request, PrintWriter out) throws NamingException {
+        Integer bundleId = Integer.valueOf(request.getParameter(_bundle));
+        InitialContext ctx = new InitialContext();
+
+        LoadShipmentController loadShipmentController = (LoadShipmentController) ctx.lookup("loadShipmentController");
+
+
+        boolean unship = loadShipmentController.unshipByBundleId(bundleId);
+
+        if (!unship) {
+            String error = loadShipmentController.getErrors();
+            out.println("Error:" + error);
+        }
+
+    }
+
+    private void setSessionVariable(String name, String value) {
+
+        FacesContext context = FacesContext.getCurrentInstance();
+        ExternalContext externalContext = context.getExternalContext();
+        HttpSession session = (HttpSession) externalContext.getSession(false);
+        session.setAttribute(name, value);
+    }
+
+    // &lt;editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code."&gt;
+    /**
+     * Handles the HTTP &lt;code&gt;GET&lt;/code&gt; method.
+     *
+     * @param request servlet request
+     * @param response servlet response
+     * @throws ServletException if a servlet-specific error occurs
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            processBundleRequest(request, response);
+        } catch (NamingException ex) {
+            Logger.getLogger(ShipmentServlet.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (CloneNotSupportedException ex) {
+            Logger.getLogger(ShipmentServlet.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    /**
+     * Handles the HTTP &lt;code&gt;POST&lt;/code&gt; method.
+     *
+     * @param request servlet request
+     * @param response servlet response
+     * @throws ServletException if a servlet-specific error occurs
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+    }
+
+
+}
+</code></pre>

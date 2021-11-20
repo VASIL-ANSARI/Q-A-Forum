@@ -1,0 +1,47 @@
+<blockquote>
+  <p>here error I get: <code>undefined method 'status=' for #&lt;Rsvp::ActiveRecord_AssociationRelation:0x007fabb403b8f0&gt;</code>. it works if you do it directly like <code>Rsvp.find(:id).status</code></p>
+</blockquote>
+
+<p>Odd. <code>status=</code> means you're trying to set a value on the status... but that shouldn't be the case if you're just trying to look at the status... </p>
+
+<p>also AHA! <code>Rsvp::ActiveRecord_AssociationRelation</code> means that you've got a set of RSVPs, instead of a single one. What you probably want to do is add a <code>.first</code> on the end of your <code>where</code> - to make sure you've just got a single, actual rsvp, rather than a whole set of them (with just one in the set).</p>
+
+<p>So that would mean the code would look a bit like this:</p>
+
+<pre><code>class User
+  def rsvp_for_event(event)
+    rsvps.where(:event_id =&gt; event.id).first
+  end
+end
+</code></pre>
+
+<p>and in your template:</p>
+
+<pre><code>&lt;% @user.future_events.each do |event| %&gt;
+  &lt;% rsvp_status = @user.rsvp_for_event(event).status %&gt;
+  &lt;% unless rsvp_status = "not_interested" %&gt;
+    &lt;%= link_to event.title, event_path(event) %&gt;
+    &lt;%= rsvp_status %&gt;
+  &lt;% end %&gt;
+&lt;% end %&gt;
+</code></pre>
+
+<p>or something different, but giving the same end result :)</p>
+
+<p>Thinking about it, an rsvp-scope might be prettier</p>
+
+<pre><code>class Event
+  scope :for_event, -&gt;(event) { where(:event_id =&gt; event.id) }
+end
+</code></pre>
+
+<p>and in your template:</p>
+
+<pre><code>&lt;% @user.future_events.each do |event| %&gt;
+  &lt;% rsvp_status = @user.rsvp_for_event(event).status %&gt;
+  &lt;% unless rsvp_status = "not_interested" %&gt;
+    &lt;%= link_to event.title, event_path(event) %&gt;
+    &lt;%= rsvp_status %&gt;
+  &lt;% end %&gt;
+&lt;% end %&gt;
+</code></pre>

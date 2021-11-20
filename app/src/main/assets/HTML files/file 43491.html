@@ -1,0 +1,35 @@
+<p>With Paulo Madeira's generous help, I was able to solve this by searching  KB280512 which led me to a project called GPSCom written by PJ Naughter.  Link is here <a href="http://www.naughter.com/gpscom2.html" rel="nofollow">http://www.naughter.com/gpscom2.html</a>.  I downloaded his code and he offers a freeware file named "ATLCPImplMT.h" for use in any form as long as it is unmodified.  Based on his example, I modified the code as follows:</p>
+
+<pre><code>HRESULT Fire_Msg(BSTR Msg)
+{
+    CComCritSecLock&lt;CComAutoCriticalSection&gt; lock(m_CPMTCritSec);
+
+    ATL::CComVariant varResult;
+    int nConnections = m_Clients.GetSize();
+
+    int nConnectionIndex;
+    ATL::CComVariant* pvars = new ATL::CComVariant[1];
+
+    for (nConnectionIndex = 0; nConnectionIndex &lt; nConnections; nConnectionIndex++)
+    {
+        ATL::CComPtr&lt;IDispatch&gt; sp;
+        if (SUCCEEDED(GetInterfaceAt(nConnectionIndex, sp)))
+        {
+            VariantClear(&amp;varResult);
+            pvars[0] = Msg;
+            DISPPARAMS disp = { pvars, NULL, 1, 0 };
+            sp-&gt;Invoke(0x1, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &amp;disp, &amp;varResult, NULL, NULL);
+            if (varResult.scode != S_OK)
+            {
+                // Do some error handling...  (later)
+                return varResult.scode;
+            }
+        }
+    }
+    delete [] pvars;
+    return varResult.scode;
+}
+</code></pre>
+
+<p>This question is a possible duplicate of the one asked here:  <a href="http://stackoverflow.com/questions/16552418/atl-com-access-event-methods-from-other-thread/16559945#16559945">ATL COM: Access Event Methods From Other Thread</a>.  But to be fair, when I started my searching - I wasn't aware of the right words to search.
+Thanks.</p>

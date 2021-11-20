@@ -1,0 +1,59 @@
+<p>The problem was with a global pointer to native data in the C++/CLI DLL. 
+Since the WinForms get their data through several C++/CLI interfaces, it was initially easier to just have them access native data through a global pointer. </p>
+
+<pre><code>NativeLayer::NativeLayerData* native_data;
+
+
+public ref class Test1Implementer : ITest1
+{
+     virtual bool TestConnect()
+     {
+        bool success = native_data-&gt;Connect();
+        return success;
+     }
+};
+
+public ref class Test2Implementer : ITest2
+{
+     virtual bool TestDisconnect()
+     {
+        bool success = native_data-&gt;Disconnect();
+        return success;
+     }
+};
+</code></pre>
+
+<p>Eventually, such an implementation would come back to haunt me, but those are the perils of attempting to use globals in industrial applications. </p>
+
+<p>Once I got rid of the managed global pointer to native data, everything works as intended. Here's a possible solution that allows for multithreading using nested interfaces:</p>
+
+<pre><code>public ref class TestsImplementer : ITests 
+{
+private:
+    NativeLayer::NativeLayerData* native_data;
+
+public:
+      TestsImplementer()
+      {
+         native_data = new NativeLayer::NativeLayerData();
+      }
+
+      ref class Test1Implementer : ITest1
+      {
+         virtual bool TestConnect(TestsImplementer^ tests)
+         {
+            bool success = tests-&gt;native_data-&gt;Connect();
+            return success;
+         }
+      };
+
+      ref class Test2Implementer : ITest2
+      {
+         virtual bool TestDisconnect(TestsImplementer^ tests)
+         {
+            bool success = tests-&gt;native_data-&gt;Disconnect();
+            return success;
+         }
+      };
+};
+</code></pre>

@@ -1,0 +1,85 @@
+<p>Here's your original query with some notes describing what I think is the problem:</p>
+
+<pre><code> SELECT xp.productid, xp.product, xc.classid, xco.optionid, xco.option_name, xiW.id, xiW.image_path, t1.dCount
+ FROM xcart_products xp
+ INNER JOIN xcart_variants xv ON xp.productid = xv.productid
+ INNER JOIN xcart_variant_items xvi ON xv.variantid = xvi.variantid
+ INNER JOIN xcart_class_options xco ON xvi.optionid = xco.optionid
+ INNER JOIN xcart_classes xc ON xco.classid = xc.classid AND xc.class = 'COLOR'
+ LEFT JOIN xcart_images_W xiW ON xiW.id = xvi.variantid
+ -- all of the above is pretty standard.
+
+ -- but this part is a little wonky!
+ LEFT JOIN (
+ SELECT COUNT(xiD.optionid) as dCount 
+    FROM xcart_products xp2
+    INNER JOIN xcart_classes xc2 ON xp2.productid = xc2.productid AND xc2.class = 'Color'
+    INNER JOIN xcart_class_options xco2 ON xc2.classid = xco2.classid
+    LEFT JOIN xcart_images_D xiD ON xiD.optionid = xco2.optionid
+ ) as t1 ON xiW.id = xvi.variantid
+ -- The inner query here only returns one column, which means it's
+ -- *not related* to anything.  That's why, outside, you're using an
+ -- ON query that has nothing to do with the data inside the table 
+ -- you're joining!  You need to group by in the inner select.
+
+ GROUP BY xco.optionid
+ ORDER by xp.product DESC
+</code></pre>
+
+<p>Try something like:</p>
+
+<pre><code>SELECT xp.productid, xp.product, xc.classid, xco.optionid, xco.option_name, xiW.id, xiW.image_path, t1.dCount
+ FROM xcart_products xp
+ INNER JOIN xcart_variants xv ON xp.productid = xv.productid
+ INNER JOIN xcart_variant_items xvi ON xv.variantid = xvi.variantid
+ INNER JOIN xcart_class_options xco ON xvi.optionid = xco.optionid
+ INNER JOIN xcart_classes xc ON xco.classid = xc.classid AND xc.class = 'COLOR'
+ LEFT JOIN xcart_images_W xiW ON xiW.id = xvi.variantid
+ -- Keep the above
+
+ -- but change this one to add a group by.
+ LEFT JOIN (
+ SELECT xco2.optionId as optionid, count(*) as dCount 
+    -- this could be cleaned up if the products and class aren't
+    -- really relevant- as it is, it serves only to narrow the set
+    -- of xcart_class_options you'll be looking at/counting for.
+    FROM xcart_products xp2
+    INNER JOIN xcart_classes xc2 ON xp2.productid = xc2.productid AND xc2.class = 'Color'
+    INNER JOIN xcart_class_options xco2 ON xc2.classid = xco2.classid
+
+    -- bring in the image_ds that match the class_option we are looking
+    -- at
+    LEFT JOIN xcart_images_D xiD ON xiD.optionid = xco2.optionid
+
+    -- And group by those option_ids.
+    group by xid.optionid
+ ) as t1 ON xco.optionid = t1.optionid
+ -- we join the inner select based on the optionid we were looking at.
+
+ GROUP BY xco.optionid
+ ORDER by xp.product DESC
+</code></pre>
+
+<p>To make it faster, this will <em>probably</em> work, depending on the results you're looking for:</p>
+
+<pre><code>SELECT xp.productid, xp.product, xc.classid, xco.optionid, xco.option_name, xiW.id, xiW.image_path, t1.dCount
+ FROM xcart_products xp
+ INNER JOIN xcart_variants xv ON xp.productid = xv.productid
+ INNER JOIN xcart_variant_items xvi ON xv.variantid = xvi.variantid
+ INNER JOIN xcart_class_options xco ON xvi.optionid = xco.optionid
+ INNER JOIN xcart_classes xc ON xco.classid = xc.classid AND xc.class = 'COLOR'
+ LEFT JOIN xcart_images_W xiW ON xiW.id = xvi.variantid
+
+ -- since the optionId is on the thing you're counting,
+ -- don't bother with any joins in the nested query and just 
+ -- count and group.
+ LEFT JOIN (
+ SELECT xiD.optionId as optionid, count(*) as dCount 
+    FROM xcart_images_D xiD
+    GROUP BY xiD.optionId
+ ) as t1 ON xco.optionid = t1.optionid
+ -- still join the inner select based on the optionid
+
+ GROUP BY xco.optionid
+ ORDER by xp.product DESC
+</code></pre>

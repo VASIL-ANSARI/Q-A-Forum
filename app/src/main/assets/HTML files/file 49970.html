@@ -1,0 +1,50 @@
+<p>The only thing that works is this one:</p>
+
+<pre><code>&lt;div data-bind="html: '&lt;!--' + WeightInGramms() + '--&gt;'"&gt;&lt;/div&gt;
+</code></pre>
+
+<p>But it has an obvious side effect: there is also a div rendered.</p>
+
+<p>The solution would be using a virtual element like this:</p>
+
+<pre><code>&lt;!-- ko html: "&lt;!--" + WeightInGramms() + '--' + '&gt;' --&gt; 
+&lt;!-- /ko --&gt;
+</code></pre>
+
+<p>It nearly works, but there is a big problem: you cannot use <code>html</code> binding in a virtual element (apart from the hack of converting <code>'--&gt;'</code> into <code>'--' + '&gt;'</code> so that it's not confused with the virtual element comment closing).</p>
+
+<p>So, the only possible solution is to create your own <a href="http://knockoutjs.com/documentation/custom-bindings.html" rel="nofollow">custom binding</a>, but making it <a href="http://knockoutjs.com/documentation/custom-bindings-for-virtual-elements.html" rel="nofollow">valid to be used as a virtual element binding</a>.</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>ko.bindingHandlers['comment'] = {
+    'init': function(elem, valueAccessor) {
+        var value = ko.unwrap(valueAccessor());
+        var comment = $('&lt;!--'+value+'--&gt;')[0];
+        ko.virtualElements.setDomNodeChildren(elem, [comment]);
+    },
+    'update': function (elem, valueAccessor) {
+        var value = ko.unwrap(valueAccessor());
+        var comment = $('&lt;!--'+value+'--&gt;')[0];
+        ko.virtualElements.setDomNodeChildren(elem, [comment]);
+    }
+};
+
+ko.virtualElements.allowedBindings.comment = true;
+
+var vm = {
+    aComment: ko.observable("This is a comment")
+}
+
+ko.applyBindings(vm);</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.2.0/knockout-min.js"&gt;&lt;/script&gt;
+&lt;script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;
+
+&lt;input type="text" data-bind="value: aComment"&gt;&lt;/div&gt;
+
+&lt;!--ko comment: aComment --&gt;&lt;!-- /ko --&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<p>It's still no perfect because you cannot delete the virtual binding tags, but it's much cleaner than adding a real tag to include the comment. Note that the custom binding implementation uses the special <code>ko.virtualElements</code> API to support virtual elements.</p>

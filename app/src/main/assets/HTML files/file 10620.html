@@ -1,0 +1,73 @@
+<p>Your problem is not about the chain of <code>&lt;&lt;</code> , a single <code>log &lt;&lt; endl</code> would also cause the problem. It is because <code>std::endl</code> is a template function:</p>
+
+<pre><code>template &lt;class charT, class traits&gt;
+basic_ostream&lt;charT,traits&gt;&amp; endl(basic_ostream&lt;charT,traits&gt;&amp; os);
+</code></pre>
+
+<p>One of the overload of <code>operator&lt;&lt;</code> in <code>basic_ostream</code> is:</p>
+
+<pre><code>template &lt;class charT, class traits = char_traits&lt;charT&gt; &gt;
+class basic_ostream : virtual public basic_ios&lt;charT,traits&gt; {
+public:
+    basic_ostream&lt;charT,traits&gt;&amp; operator&lt;&lt;(
+    basic_ostream&lt;charT,traits&gt;&amp; (*pf)(basic_ostream&lt;charT,traits&gt;&amp;));
+//...
+};
+</code></pre>
+
+<p>So the template parameters can be deduced when <code>std::cout&lt;&lt;std::endl</code> is used. However, when the left side is the <code>class Logger</code>, the compile cannot deduce the template parameters of <code>endl</code>. Explicitly give the template parameters can let program compile and work:</p>
+
+<pre><code>#include &lt;iostream&gt;
+class Logger
+{
+public:
+    std::ostream &amp;m_file;
+    Logger(std::ostream &amp;o = std::cout):m_file(o){};
+
+    template &lt;typename T&gt;
+    Logger &amp;operator&lt;&lt;(const T &amp;a) {
+        m_file&lt;&lt;a;
+        return *this;
+    }
+};
+
+int main()
+{
+    Logger log;
+    log&lt;&lt;std::endl&lt;char, std::char_traits&lt;char&gt; &gt;;
+    log&lt;&lt;"hi"&lt;&lt;" stackoverflow"&lt;&lt;std::endl&lt;char, std::char_traits&lt;char&gt; &gt;;
+    return 0;
+}
+</code></pre>
+
+<p>Or you can add a new overload of <code>operator&lt;&lt;</code> in <code>class Logger</code> to let compiler deduce the template parameters of <code>std::endl</code>:</p>
+
+<pre><code>#include &lt;iostream&gt;
+class Logger
+{
+public:
+    std::ostream &amp;m_file;
+    Logger(std::ostream &amp;o = std::cout):m_file(o){};
+
+    template &lt;typename T&gt;
+    Logger &amp;operator&lt;&lt;(const T &amp;a) {
+        m_file&lt;&lt;a;
+        return *this;
+    }
+
+    Logger &amp;operator&lt;&lt;(std::ostream&amp; (*pf) (std::ostream&amp;)){
+        m_file&lt;&lt;pf;
+        return *this;
+    }
+};
+
+int main()
+{
+    Logger log;
+    log&lt;&lt;std::endl;
+    log&lt;&lt;"hi"&lt;&lt;" stackoverflow"&lt;&lt;std::endl;
+    return 0;
+}
+</code></pre>
+
+<p>Also, if you don't need the output to be flushed immediately, you can use '\n' instead of <code>endl</code>.</p>

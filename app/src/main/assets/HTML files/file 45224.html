@@ -1,0 +1,142 @@
+<p><strong>What is happening</strong></p>
+
+<p>Creating a <code>Thread</code> with your task, and then calling <code>start()</code> on the thread causes <code>task.run()</code> to be executed <em>asynchronously</em> in the thread you created.</p>
+
+<p>Just calling <code>task.run()</code> executes the <code>run()</code> method in the current thread.</p>
+
+<p>The code you have with the thread is non-deterministic in its behavior. In other words, you cannot predict from the code alone what the result will be. The issue is that you are accessing the shared <code>list</code> instance from two different threads, with no control over the order of access. Here is what happens:</p>
+
+<p><code>list</code> is initially <code>null</code>.</p>
+
+<p>You call <code>getSelectList()</code>.
+In <code>getSelectList()</code>:</p>
+
+<ol>
+<li>You create a task.</li>
+<li>You configure the task to set the value of <code>list</code> to the result of the query when the task completes. (This will happen on the FX Application Thread.)</li>
+<li>You create a new thread which will execute the task.</li>
+<li>You launch the thread, causing the task to be executed asynchronously</li>
+<li>You return the value of <code>list</code></li>
+</ol>
+
+<p>Because the task is executing asynchronously, you have no control over whether or not the task completes before the <code>getSelectList()</code> reaches its <code>return</code> statement. </p>
+
+<p>So if <code>getSelectList()</code> reaches its <code>return</code> statement before the task completes (and before the <code>onSucceeded</code> handler for the task is invoked), <code>getSelectList()</code> will return the value of <code>list</code> before the task updates it, i.e. it will return <code>null</code>. This is almost certainly more likely to happen (because the task is accessing a database, which is slow), and I expect this is why you get the null pointer exception.</p>
+
+<p>If the task happens to complete <em>and</em> complete the invocation of its <code>onSucceeded</code> handler before the <code>getSelectList()</code> reaches its <code>return</code> statement, then by the time <code>getSelectList()</code> reaches the <code>return</code> statement, <code>list</code> will have been updated and it returns the value set by the task. This is highly unlikely, and even if it happens, there's still no actual guarantee you get the "live" value of <code>list</code> (due to some complexities in the Java Language Specification about the relationship between threads and memory).</p>
+
+<p>Note that if you invoke <code>getSelectList()</code> from the FX Application Thread, then you are <strong>guaranteed</strong> that it will return <code>null</code>, because the <code>onSucceeded</code> handler cannot possibly be invoked before <code>getSelectList()</code> completes (because those two method invocations are both running on the same thread - the FX Application Thread).</p>
+
+<p><strong>How to fix it</strong></p>
+
+<p>First, you should avoid accessing a shared variable (<code>list</code>) from different threads, unless you have proper synchronization. Synchronizing yourself is difficult and you should typically use a high-level API to manage that for you. The <code>Task</code> API is designed for this (along with the general <code>java.util.concurrent</code> API).</p>
+
+<p>I generally avoid managing threading (or exception handling) in a Data Access Object class, and just let the client code wrap the calls to the DAO in threading code if they need.</p>
+
+<p>So (I am not going to make this method <code>static</code> as that is generally horrible):</p>
+
+<pre><code>public List getSelectList(String query) throws Exception {
+
+    Session session = sessionFactory.createSession();
+
+    try {
+        session.beginTransaction();
+        List list = session.createQuery(query).list();
+        session.getTransaction().commit();
+        return list ;
+    } catch (Exception e) {
+        Transaction tx = session.getTransaction();
+        if (tx != null) {
+            tx.rollback();
+        }
+        throw e ;
+    }
+}
+</code></pre>
+
+<p>Then, from your JavaFX UI code, you can do</p>
+
+<pre><code>DAO myDAO = ... ;
+
+Task&lt;List&gt; task = new Task&lt;List&gt;() {
+    @Override
+    public void call() throws Exception {
+        return myDAO.getSelectList(...);
+    }
+});
+
+task.setOnSucceeded(event -&gt; {
+    List list = task.getValue();
+    // use list to update UI...
+});
+
+task.setOnFailed(event -&gt; {
+    Exception exc = task.getException();
+    // handle exception...
+});
+
+Thread thread = new Thread(task);
+thread.setDaemon(true);
+thread.start();
+</code></pre>
+
+<p>If you really want the DAO method to run asynchronously, you need to supply callbacks to it to be executed when it succeeds or fails. So:</p>
+
+<pre><code>public void getSelectList(String query, 
+    Consumer&lt;List&gt; succeededHandler, 
+    Consumer&lt;Exception&gt; errorHandler) {
+
+    FutureTask&lt;List&gt; futureTask = new FutureTask&lt;&gt;(() -&gt; {
+
+        Session session = sessionFactory.getSession();
+        try {
+            session.beginTransaction();
+            List list = session.createQuery(query).list();
+            session.getTransaction().commit();
+            return list ;
+       } catch (Exception e) {
+            Transaction tx = session.getTransaction();
+            if (tx != null) {
+                tx.rollback();
+            }
+            throw e ;
+       }
+    });
+
+    Thread thread = new Thread(futureTask);
+    thread.setDaemon(true);
+    thread.start();
+
+    try {
+        List list = futureTask.get();
+        succeededHandler.accept(list);
+    } catch (Exception e) {
+        errorHandler.accept(e);
+    }
+}
+</code></pre>
+
+<p>Now from your UI you do something like:</p>
+
+<pre><code>DAO myDAO = ... ;
+String query =  ... ;
+
+myDAO.getSelectList(query, 
+    list -&gt; Platform.runLater(() -&gt; {
+        // update UI with list ...
+    }),
+    exc -&gt; Platform.runLater(() -&gt; {
+        // handle exception...
+    })
+);
+</code></pre>
+
+<p><strong>Further improvements</strong></p>
+
+<ol>
+<li>You should use a properly generically-typed <code>List</code>, rather than a
+raw type, for type safety.</li>
+<li>Use an <a href="http://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Executor.html" rel="nofollow"><code>Executor</code></a> instead of managing the thread creation yourself.</li>
+</ol>
+
+<p><strong>Caveat</strong> All code was just typed in here as-is, without testing, so there may be typos. It should give you the idea though.</p>

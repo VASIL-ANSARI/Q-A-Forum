@@ -1,0 +1,63 @@
+<p>You might employ <a href="http://msdn.microsoft.com/en-us/library/ms181765%28v=sql.105%29.aspx" rel="nofollow">case statement</a> to get counts of exclusive ranges:</p>
+
+<pre><code>select case when [vendor experience] &lt;= 6 then '0-6'
+            when [vendor experience] &lt;= 12 then '0-12'
+            when [vendor experience] &lt;= 18 then '0-18'
+            else 'more'
+        end [vendor_experience(months)],
+       count (*) [count]
+  from experiences
+ group by
+       case when [vendor experience] &lt;= 6 then '0-6'
+            when [vendor experience] &lt;= 12 then '0-12'
+            when [vendor experience] &lt;= 18 then '0-18'
+            else 'more'
+        end
+</code></pre>
+
+<p>This produces the same result as yours (inclusive ranges):</p>
+
+<pre><code>; with ranges as 
+  (
+    select 6 as val, 0 as count_all
+    union all
+    select 12, 0
+    union all
+    select 18, 0
+    union all
+    select 0, 1
+  )
+select case when ranges.count_all = 1
+            then 'more'
+            else '0-' + convert (varchar(10), ranges.val) 
+        end [vendor_experience(months)],
+       sum (case when ranges.count_all = 1 
+                   or experiences.[vendor experience] &lt;= ranges.val 
+                 then 1 end) [count]
+  from experiences
+ cross join ranges
+ group by ranges.val, ranges.count_all
+</code></pre>
+
+<p><code>count_all</code> is set to 1 to mark open-ending range.</p>
+
+<p><a href="http://sqlfiddle.com/#!3/ec65c/10" rel="nofollow">Sql Fiddle is here</a>.</p>
+
+<p><strong>UPDATE:</strong> an attempt at explanation.</p>
+
+<p>The first part starting with <code>with</code> and ending with closing bracket is called <a href="http://msdn.microsoft.com/en-us/library/ms175972%28v=sql.105%29.aspx" rel="nofollow">CTE</a>. Sometimes it is referred to as <code>inline view</code> because it can be used multiple times in the same query and under some circumstances is updateable. Here it is used to prepare data for ranges and is appropriately named <code>ranges</code>. This name one uses in main query. <code>Val</code> is maximum value of a range, <code>count_all</code> is 1 if range has no upper end (18+, more, or however you wish to call it). Data rows are combined by means of <a href="http://msdn.microsoft.com/en-us/library/ms180026%28v=sql.105%29.aspx" rel="nofollow">union all</a>. You might copy/paste section between parenthesis only and run it just to see the results.</p>
+
+<p>Main body joins <code>experiences</code> table with ranges using <a href="http://msdn.microsoft.com/en-us/library/ms190690%28v=sql.105%29.aspx" rel="nofollow">cross join</a>. This creates combinations of all rows from <code>experiences</code> and <code>ranges</code>. For row <code>d 11</code> there will be 4 rows,</p>
+
+<pre><code>empname vendor experience val count_all
+d       11                  6 0
+d       11                 12 0
+d       11                 18 0
+d       11                  0 1
+</code></pre>
+
+<p>First case statement in select list produces caption by checking count_all - if it is one, outputs <code>more</code>, else constructs caption using upper range value. Second case statement counts using sum(1). As aggregate functions ignore nulls, and case having no else evaluates to null if match was not found, it is sufficient to check if count_all is true (meaning that this row from experiences is counted in this range) or if <code>vendor experience</code> is less or equal to upper range value of current range. In example above 11 will not be counted for first range but will be counted for all the rest.</p>
+
+<p>Results are then grouped by val and count_all. To better see how it works you might remove group by and sum() and look at numbers before aggregation. Order by empname, val will help to see how values of [count] change depending on different val per an employee.</p>
+
+<p>Note: I did my best with my current level of english language. Please don't hesitate to ask for clarification if you need one (or two, or as many as you need). </p>

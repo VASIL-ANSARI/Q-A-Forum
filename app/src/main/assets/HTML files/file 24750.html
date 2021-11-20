@@ -1,0 +1,38 @@
+<p>I don't understand why this question is receiving down-votes. That page doesn't quite answer the question Claudia is asking. Plus that given answer can lead to some unexpected results, especially if the user doesn't care about the time, just the date. When a time isn't given, a SQL datetime defaults to "&lt; date > 00:00:00.000" (and date rounding gets wonky in the thousandths of a second ranges). So &lt;= 5/29/2013 would exclude all of May 29 after midnight (technically everything that happened after 5/29/2013 00:00:00.001). And >= 5/24/2013 would pick up orders that happened on 5/23/2013 23:59:59.998. Same thing when you use a BETWEEN startDate and endDate (which I personally hate). </p>
+
+<p>It all depends on the level of precision you want/need. For most situations, .003 seconds isn't going to be a big deal. Something like below would work:</p>
+
+<pre><code>DECLARE @StartDate datetime
+DECLARE @EndDate datetime
+DECLARE @CustomerID int
+
+SET @StartDate = '05/24/2013' /* FORM.StartDate */
+SET @EndDate = '05/29/2013'   /* FORM.EndDate */
+SET @CustomerID = 2           /* FORM.CustomerID */
+
+/* Get the TotalOrderValue for Specific CustomerID */
+SELECT sum(OrderValue) AS TotalOrderValue
+FROM Orders
+WHERE CustomerID = @CustomerID
+  AND OrderDate &gt;= @StartDate
+  AND OrderDate &lt; dateAdd(d,1,@EndDate)
+
+/* Get the TotalOrderValue for All CustomerIDs */
+SELECT CustomerID, sum(OrderValue) AS TotalOrderValue
+FROM Orders
+WHERE OrderDate &gt;= @StartDate
+  AND OrderDate &lt; dateAdd(d,1,@EndDate)
+GROUP BY CustomerID
+ORDER BY CustomerID
+</code></pre>
+
+<p>First SELECT will allow you to return the TotalOrderValue for the specific CustomerID you pass in. Second SELECT will return for all CustomerIDs. </p>
+
+<p>Again, this solution isn't perfect if you need a high degree of date precision, because you'd still pick up orders that happened on the millisecond edges of your timeframe. You'd have to change up your query a little bit to check the individual pieces of the date and time. I think the best solution is to just be careful how you store dates on the front end. Decide early how much you care about the precision of the datetimes and format them when you insert/update them. If you don't need the precision, switch down to a smalldatetime. That gets rid of the seconds, altogether. And it uses less data storage. </p>
+
+<p>Dates in SQL can easily be a pain. You just have to know what it is you're actually getting back in a query. </p>
+
+<p><a href="http://sqlfiddle.com/#!3/0947e/9/0" rel="nofollow">http://sqlfiddle.com/#!3/0947e/9/0</a>
+<a href="http://sqlfiddle.com/#!3/0947e/6" rel="nofollow">http://sqlfiddle.com/#!3/0947e/6</a></p>
+
+<p>Date Rounding: <a href="http://sqlfiddle.com/#!3/d41d8/14821/0" rel="nofollow">http://sqlfiddle.com/#!3/d41d8/14821/0</a></p>

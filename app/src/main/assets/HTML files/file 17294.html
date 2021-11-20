@@ -1,0 +1,34 @@
+<p>This is off the top of my head, but firstly I would suggest you create a user defined function in sql to create the city comma separated list string that accepts @mainid, then does the following:</p>
+
+<pre><code>DECLARE @listStr VARCHAR(MAX)
+SELECT @listStr = COALESCE(@listStr+',' , '') + city
+FROM submain
+WHERE mainid = @mainid
+</code></pre>
+
+<p>... and then return @listStr which will now be a comma separated list of cities. Let's say you call your function MainIDCityStringGet()</p>
+
+<p>Then for your final result you can simply execute the following</p>
+
+<pre><code>select cts.mainid,
+       cts.cities,
+       sts.minstartdate,
+       sts.maxenddate
+  from ( select distinct mainid,
+                         dbo.MainIDCityStringGet(mainid) as 'cities'
+           from submain) as cts
+         join
+       ( select mainid,
+                min(startdate) as 'minstartdate',
+                max(enddate)   as 'maxenddate'
+           from submain
+          group by mainid ) as sts on sts.mainid = cts.mainid
+ where startdate &lt;is what you want it to be&gt;
+   and enddate   &lt;is what you want it to be&gt;
+</code></pre>
+
+<p>Depending on how exactly you would like to filter by startdate and enddate you may need to put the where filter within each subquery and in the second subquery in the join you may then need to use the HAVING grouped filter. You did not clearly state the nature of your filter.</p>
+
+<p>I hope that helps.</p>
+
+<p>This will of course be in stored procedure. May need some debugging. </p>

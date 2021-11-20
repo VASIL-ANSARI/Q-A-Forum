@@ -1,0 +1,33 @@
+<p><strong>Overview</strong></p>
+
+<p>There were two errors in my code:</p>
+
+<ol>
+<li>The initialization code for a step should be in the step's initializer</li>
+<li>By default EMR uses Python 2.6 which precludes dictionary comprehensions among other things</li>
+</ol>
+
+<p><strong>Step Initialization</strong></p>
+
+<p>Every step has a corresponding initializer method. For example, <code>mapper</code> has <code>mapper_init</code> which can be used to initialize data used in the mapper. The functions <code>reducer</code> and <code>combiner</code> have similar initialization methods. If you use the <code>steps</code> function to define your own steps then you can also define which initialization function you use. Read more about initializers <a href="http://mrjob.readthedocs.org/en/latest/guides/writing-mrjobs.html#setup-and-teardown-of-tasks" rel="nofollow">here</a>.</p>
+
+<p><strong>Beware the Python Version</strong></p>
+
+<p>As of today, EMR uses Python version 2.6.6 by default. So any dependencies on later versions may run locally but have problems on EMR.</p>
+
+<p><strong>The Fix</strong></p>
+
+<p>To repair the code above, it is necessary to remove the line defining <code>zip_codes</code> in <code>MR_zip.py</code></p>
+
+<pre><code>zip_codes = {int(zip_code): (float(latitude), float(longitude)) for zip_code, latitude, longitude in csv.reader(open("zip_codes.txt", "r"))}
+</code></pre>
+
+<p>and instead define it inside of <code>mapper_init</code> without using dictionary comprehensions.</p>
+
+<pre><code>def mapper_init(self):
+    self.zip_codes = {}
+    for zip_code, latitude, longitude in csv.reader(open("zip_codes.txt", "r")):
+        self.zip_codes[int(zip_code)] = (float(latitude), float(longitude))
+</code></pre>
+
+<p>The other files and the command-line stay the same.</p>

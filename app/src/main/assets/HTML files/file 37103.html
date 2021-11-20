@@ -1,0 +1,64 @@
+<p>I cant tell you why your code doesn't work I have never tried using <code>setAuthConfigFile</code> This is the code i use </p>
+
+<pre><code>&lt;?php         
+require_once 'Google/Client.php';     
+require_once 'Google/Service/Analytics.php';       
+session_start();      
+$client = new Google_Client();
+    $client-&gt;setApplicationName("Client_Library_Examples");
+    $client-&gt;setDeveloperKey("{devkey}");  
+    $client-&gt;setClientId('{clientid}.apps.googleusercontent.com');
+    $client-&gt;setClientSecret('{clientsecret}');
+    $client-&gt;setRedirectUri('http://www.daimto.com/Tutorials/PHP/Oauth2.php');
+    $client-&gt;setScopes(array('https://www.googleapis.com/auth/analytics.readonly'));
+
+    //For loging out.
+    if ($_GET['logout'] == "1") {
+    unset($_SESSION['token']);
+       }   
+
+    // Step 2: The user accepted your access now you need to exchange it.
+    if (isset($_GET['code'])) {
+
+        $client-&gt;authenticate($_GET['code']);  
+        $_SESSION['token'] = $client-&gt;getAccessToken();
+        $redirect = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];
+        header('Location: ' . filter_var($redirect, FILTER_SANITIZE_URL));
+    }
+
+    // Step 1:  The user has not authenticated we give them a link to login    
+    if (!$client-&gt;getAccessToken() &amp;&amp; !isset($_SESSION['token'])) {
+        $authUrl = $client-&gt;createAuthUrl();
+        print "&lt;a class='login' href='$authUrl'&gt;Connect Me!&lt;/a&gt;";
+        }        
+
+    // Step 3: We have access we can now create our service
+    if (isset($_SESSION['token'])) {
+        print "&lt;a class='logout' href='".$_SERVER['PHP_SELF']."?logout=1'&gt;LogOut&lt;/a&gt;&lt;br&gt;";
+        $client-&gt;setAccessToken($_SESSION['token']);
+        $service = new Google_Service_Analytics($client);    
+
+        // request user accounts
+        $accounts = $service-&gt;management_accountSummaries-&gt;listManagementAccountSummaries();
+
+       foreach ($accounts-&gt;getItems() as $item) {
+        echo "Account: ",$item['name'], "  " , $item['id'], "&lt;br /&gt; \n";        
+        foreach($item-&gt;getWebProperties() as $wp) {
+            echo '&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;WebProperty: ' ,$wp['name'], "  " , $wp['id'], "&lt;br /&gt; \n";    
+
+            $views = $wp-&gt;getProfiles();
+            if (!is_null($views)) {
+                foreach($wp-&gt;getProfiles() as $view) {
+                //  echo '&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;View: ' ,$view['name'], "  " , $view['id'], "&lt;br /&gt; \n";    
+                }
+            }
+        }
+    } // closes account summaries
+
+    }
+ print "&lt;br&gt;&lt;br&gt;&lt;br&gt;";
+ print "Access from google: " . $_SESSION['token']; 
+?&gt;
+</code></pre>
+
+<p>My tutorial can be found at <a href="http://www.daimto.com/google-oauth2-php/" rel="nofollow">Google Oauth2 php</a></p>

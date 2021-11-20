@@ -1,0 +1,76 @@
+<p><em>My</em> recommended way to remove a large number of items from a MemoryCache instance is to use <a href="http://msdn.microsoft.com/en-us/library/system.runtime.caching.changemonitor%28v=vs.110%29.aspx" rel="nofollow">ChangeMonitor</a>, and especially <a href="http://msdn.microsoft.com/en-us/library/system.runtime.caching.cacheentrychangemonitor%28v=vs.100%29.aspx" rel="nofollow">CacheEntryChangeMonitor</a>.</p>
+
+<blockquote>
+  <p>Provides a base class that represents a ChangeMonitor type that can be
+  implemented in order to monitor changes to cache entries.</p>
+</blockquote>
+
+<p>So, it allows us to handle dependencies between cache items.</p>
+
+<p>A vey basic example is </p>
+
+<pre><code>    var cache = MemoryCache.Default;
+    cache.Add("mycachebreakerkey", "mycachebreakerkey", DateTime.Now.AddSeconds(15));
+
+    CacheItemPolicy policy = new CacheItemPolicy();
+    policy.ChangeMonitors.Add(cache.CreateCacheEntryChangeMonitor(new string[] { "mycachebreakerkey" }));
+    // just to debug removal
+    policy.RemovedCallback = args =&gt; { Debug.WriteLine(args.CacheItem.Key + "--&gt;" + args.RemovedReason); };
+    cache.Add("cacheKey", "cacheKey", policy);
+
+    // after 15 seconds mycachebreakerkey will expire
+    // dependent item "cacheKey" will also be removed
+</code></pre>
+
+<p>As for most of the things, you can also create a custom cache implementation or a derived change monitor type.</p>
+
+<p>Not tested, but the CreateCacheEntryChangeMonitor suggests that you can create dependencies between MemoryCache.</p>
+
+<p><strong>Edit</strong></p>
+
+<p>ChangeMonitor is the .net way to invalidate content in the runtime cache. Invalidate means here = remove from the cache. It's used by SqlDependency or by a few asp.net components to monitor file change. So, I suppose this solution is scalable.</p>
+
+<p>Here is a very simple benchmark, run on my laptop.      </p>
+
+<pre><code>        const int NbItems = 300000;
+
+        var watcher = Stopwatch.StartNew();
+        var cache = MemoryCache.Default;
+
+        var breakerticks = 0L;
+        var allticks = new List&lt;long&gt;();
+
+        cache.Add("mycachebreakerkey", "mycachebreakerkey", new CacheItemPolicy() { RemovedCallback = args =&gt; { breakerticks = watcher.ElapsedTicks; } });
+
+        foreach (var i in Enumerable.Range(1, NbItems))
+        {
+            CacheItemPolicy policy = new CacheItemPolicy();
+            if (i % 4 == 0)
+                policy.ChangeMonitors.Add(cache.CreateCacheEntryChangeMonitor(new string[] { "mycachebreakerkeyone" }));
+            policy.RemovedCallback = args =&gt; { allticks.Add(watcher.ElapsedTicks); };// just to debug removal
+            cache.Add("cacheKey" + i.ToString(), "cacheKey", policy);
+        }
+
+        cache.Remove("mycachebreakerkey");
+        Trace.WriteLine("Breaker removal=&gt;" + TimeSpan.FromTicks(breakerticks).TotalMilliseconds);
+        Trace.WriteLine("Start removal=&gt;" + TimeSpan.FromTicks(allticks.Min()).TotalMilliseconds);
+        Trace.WriteLine("End removal=&gt;" + TimeSpan.FromTicks(allticks.Max()).TotalMilliseconds);
+        Trace.WriteLine(cache.GetCount());
+
+        // Trace
+        // Breaker removal: 225,8062 ms
+        // Start removal: 0,251 ms
+        // End removal: 225,7688 ms
+        // 225000 items
+</code></pre>
+
+<p>So, it takes 225 ms to remove 25% of my 300 000 items (again on my laptop, 3 year's old). Do you really need something faster ? Note, that the parent is remove at the end. Advantage of this solution : </p>
+
+<ul>
+<li>invalidated items are removed from the cache</li>
+<li>you are close to the cache (less callstack, less cast, less indirection)</li>
+<li>the remove callback allow you to auto-reload cache item if needed</li>
+<li>if the cachebreaker expire, then the callback is on another thread which will not impact asp.net requests. </li>
+</ul>
+
+<p>I find your implementation pertinent and will keep it in mind for later. Your choice should be based upon your scenario : number of items, size of cache item, hit ratio, number of dependencies, ... also keeping too much data is the cache is generally slow and can increase probability of eviction.</p>

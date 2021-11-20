@@ -1,0 +1,25 @@
+<p>Getting a random number depends on the database.  But the basic idea is to have a table called <code>UserArticles</code> with one row per user and per article already read (and perhaps other information such as the time).</p>
+
+<p>Then, you can do:</p>
+
+<pre><code>select a.*
+from articles a
+where not exists (select 1
+                  from userarticles ua
+                  where a.article_id = ua.article_id and ua.user_id = $user_id
+                 ) 
+order by rand()
+limit 1;
+</code></pre>
+
+<p>The <code>order by rand() limit 1</code> is definitely database-dependent.  But, it gives you the idea of how to approach the problem.</p>
+
+<p>Once you have selected the article, then you insert this information into <code>UserArticles</code>:</p>
+
+<pre><code>insert into UserArticles(user_id, article_id)
+    values ($user_id, $article_id);
+</code></pre>
+
+<p>where <code>$article_id</code> refers to the article retrieved in the previous step.</p>
+
+<p>Note:  this should be fine with respect to race conditions, unless a single user can have multiple simultaneous connections to the database asking for the same information.  Handling that case requires more knowledge about the database being used.</p>

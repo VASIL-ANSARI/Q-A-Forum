@@ -1,0 +1,42 @@
+<p>After a lot of digging, here's what I figured out.</p>
+
+<ol>
+<li>Calling <code>self.class.define_method</code> actually defines an <em>instance</em> method of <code>Object</code>. That meant that <em>everything</em> received that new method, which is the reason for the apparent context shift (<code>Child.foo</code> was actually calling <code>Child.foo</code> and not <code>Parent.foo</code>). Whoops.</li>
+<li>In order to define a class method, you have to grab the actual class object, which, for some reason, isn't <code>self</code>, it's <code>class &lt;&lt; self; self; end</code> (yeah, I didn't get that either). The code is briefly mentioned here: <a href="http://blog.jayfields.com/2007/10/ruby-defining-class-methods.html" rel="nofollow">http://blog.jayfields.com/2007/10/ruby-defining-class-methods.html</a></li>
+</ol>
+
+<p>Ruby makes my brain hurt sometimes. This code should return the expected results.</p>
+
+<pre><code>class Parent
+  @foo = 'foo'
+
+  def self.existing_method
+    puts "Calling existing_method, @foo is #{@foo}"
+  end
+
+  def self.define_new_method
+    inst = class &lt;&lt; self; self; end # Do not understand this...
+    inst.send :define_method, :foo do
+      context = methods.include?(:bar) ? 'child' : 'parent'
+      puts "Context is #{context}, @foo is #{@foo.inspect}"
+    end
+  end
+end
+
+class Child
+  @foo = 'childfoo'
+
+  def self.method_missing(*args, &amp;block)
+    return unless args.length &gt; 0
+    Parent.send args.shift, *args, &amp;block
+  end
+
+  def self.bar
+  end
+end
+
+Child.existing_method     # Calling existing_method, @foo is foo
+Child.define_new_method
+Child.foo                 # Context is parent, @foo is "foo"
+Parent.foo                # Context is parent, @foo is "foo"
+</code></pre>

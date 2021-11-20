@@ -1,0 +1,144 @@
+<p>Apple's implementation of <code>arp</code> is open source.  Take a look at <a href="http://www.opensource.apple.com/source/bootp/bootp-133.8/bootplib/arp.c" rel="nofollow">the file</a> for an idea of its implementation... it's not terribly convoluted.  It is pure ANSI C, though.</p>
+
+<p>You should be able to simply copy-paste the majority of the functionality... and instead of printing the results, just store the raw address.</p>
+
+<p><strong>Edit:</strong> Here's a stripped down version of the source that just runs the equivalent of <code>arp -a</code>.  This should compile without any special directives.</p>
+
+<pre><code>/*
+ * Copyright (c) 1999 Apple Computer, Inc. All rights reserved.
+ *
+ * @APPLE_LICENSE_HEADER_START@
+ * 
+ * This file contains Original Code and/or Modifications of Original Code
+ * as defined in and that are subject to the Apple Public Source License
+ * Version 2.0 (the 'License'). You may not use this file except in
+ * compliance with the License. Please obtain a copy of the License at
+ * http://www.opensource.apple.com/apsl/ and read it before using this
+ * file.
+ * 
+ * The Original Code and all software distributed under the License are
+ * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+ * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+ * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
+ * Please see the License for the specific language governing rights and
+ * limitations under the License.
+ * 
+ * @APPLE_LICENSE_HEADER_END@
+ */
+
+
+#include &lt;sys/param.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;sys/sysctl.h&gt;
+
+#include &lt;net/if.h&gt;
+#include &lt;net/if_dl.h&gt;
+#include &lt;net/if_types.h&gt;
+#include &lt;net/route.h&gt;
+
+#include &lt;netinet/in.h&gt;
+#include &lt;netinet/if_ether.h&gt;
+
+#include &lt;arpa/inet.h&gt;
+
+#include &lt;err.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;netdb.h&gt;
+#include &lt;nlist.h&gt;
+#include &lt;paths.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+
+static int nflag;
+
+void
+ether_print(cp)
+    u_char *cp;
+{
+    printf("%x:%x:%x:%x:%x:%x", cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
+}
+
+
+/*
+ * Dump the entire arp table
+ */
+int
+dump(addr)
+    u_long addr;
+{
+    int mib[6];
+    size_t needed;
+    char *host, *lim, *buf, *next;
+    struct rt_msghdr *rtm;
+    struct sockaddr_inarp *sin;
+    struct sockaddr_dl *sdl;
+    extern int h_errno;
+    struct hostent *hp;
+    int found_entry = 0;
+
+    mib[0] = CTL_NET;
+    mib[1] = PF_ROUTE;
+    mib[2] = 0;
+    mib[3] = AF_INET;
+    mib[4] = NET_RT_FLAGS;
+    mib[5] = RTF_LLINFO;
+    if (sysctl(mib, 6, NULL, &amp;needed, NULL, 0) &lt; 0)
+        err(1, "route-sysctl-estimate");
+    if ((buf = malloc(needed)) == NULL)
+        err(1, "malloc");
+    if (sysctl(mib, 6, buf, &amp;needed, NULL, 0) &lt; 0)
+        err(1, "actual retrieval of routing table");
+    lim = buf + needed;
+    for (next = buf; next &lt; lim; next += rtm-&gt;rtm_msglen) {
+        rtm = (struct rt_msghdr *)next;
+        sin = (struct sockaddr_inarp *)(rtm + 1);
+        sdl = (struct sockaddr_dl *)(sin + 1);
+        if (addr) {
+            if (addr != sin-&gt;sin_addr.s_addr)
+                continue;
+            found_entry = 1;
+        }
+        if (nflag == 0)
+            hp = gethostbyaddr((caddr_t)&amp;(sin-&gt;sin_addr),
+                sizeof sin-&gt;sin_addr, AF_INET);
+        else
+            hp = 0;
+        if (hp)
+            host = hp-&gt;h_name;
+        else {
+            host = "?";
+            if (h_errno == TRY_AGAIN)
+                nflag = 1;
+        }
+        printf("%s (%s) at ", host, inet_ntoa(sin-&gt;sin_addr));
+        if (sdl-&gt;sdl_alen)
+            ether_print((u_char *)LLADDR(sdl));
+        else
+            printf("(incomplete)");
+        if (rtm-&gt;rtm_rmx.rmx_expire == 0)
+            printf(" permanent");
+        if (sin-&gt;sin_other &amp; SIN_PROXY)
+            printf(" published (proxy only)");
+        if (rtm-&gt;rtm_addrs &amp; RTA_NETMASK) {
+            sin = (struct sockaddr_inarp *)
+                (sdl-&gt;sdl_len + (char *)sdl);
+            if (sin-&gt;sin_addr.s_addr == 0xffffffff)
+                printf(" published");
+            if (sin-&gt;sin_len != 8)
+                printf("(weird)");
+        }
+        printf("\n");
+    }
+    return (found_entry);
+}
+
+int main (int argc, char const *argv[])
+{
+    dump(0);
+    return 0;
+}
+</code></pre>

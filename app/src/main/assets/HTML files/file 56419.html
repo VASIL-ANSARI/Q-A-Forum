@@ -1,0 +1,16 @@
+<p>That's just not the way .NET events work. They don't interrupt a thread; they'll be run in a context determined by the type of timer it is. In this case (<code>System.Timers.Timer</code>), the <code>Timer.Elapsed</code> event handler will be invoked on a thread pool thread. So, it's running on a completely different thread than the <code>try</code>/<code>catch</code>, and that's why it won't work.</p>
+
+<p>It looks like you're trying to force a timeout on an API that doesn't natively support timeouts. There's no clean way to do this. So, the first thing to do is to ask whoever maintains <code>readBytes</code> for timeout support.</p>
+
+<p>There <em>is</em> a way to do "fake timeouts" like this:</p>
+
+<pre><code>var timeoutTask = Task.Delay(dcaika);
+var readTask = Task.Run(() =&gt; dc.readBytes(libnodave.daveFlags, 0, 180, 1, memoryBuffer));
+var completedTask = await Task.WhenAny(timeoutTask, readTask);
+if (completedTask == timeoutTask)
+  ...
+else
+  ...
+</code></pre>
+
+<p>But this approach <em>will not stop the <code>readBytes</code> call</em>, so it will probably continue reading bytes and mess up your other communications. So I don't think it will work for your scenario.</p>

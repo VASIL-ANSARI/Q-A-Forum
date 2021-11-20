@@ -1,0 +1,37 @@
+<p>The Jeff Prosise version from MSDN magazine works pretty well, but it has a few flaws:</p>
+
+<p><code>AddNode</code> freaks out with links to external sites on your menu (www.google.com, etc.)</p>
+
+<p>Here's my fix in <code>BuildSiteMap()</code>:</p>
+
+<pre><code>SiteMapNode node = GetSiteMapNodeFromReader(reader);
+string url = node.Url;
+if (url.Contains(":"))
+{
+    string garbage = Guid.NewGuid().ToString();  // SiteMapNode needs unique URLs
+    node.Url = "~/dummy_" + garbage + ".aspx";
+    AddNode(node, _root);
+    node.Url = url;
+}
+else
+{
+    AddNode(node, _root);
+}
+</code></pre>
+
+<p><code>SQLDependency</code> caching is cool, but if you don't want to make a trip to the DB everytime your menu loads (to check to see if the dependency has changed) and your menus don't change very often, then why not use <code>HttpRuntime.Cache</code> instead?</p>
+
+<pre><code>public override SiteMapNode RootNode
+{
+    get
+    {
+        SiteMapNode temp = (SiteMapNode)HttpRuntime.Cache["SomeKeyName"];
+        if (temp == null)
+        {
+            temp = BuildSiteMap();
+            HttpRuntime.Cache.Insert("SomeKeyName", temp, null, DateTime.Now.AddHours(1), Cache.NoSlidingExpiration);
+        }
+        return temp;
+    }
+}
+</code></pre>

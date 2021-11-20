@@ -1,0 +1,44 @@
+<p>You need to use capture groups and replace:</p>
+
+<pre><code>"!!hello! my! !!name!!! is !!bob!!".replace(/([a-zA-Z]+)(!+)/g, '$1');
+</code></pre>
+
+<p>Which works for your test string. To work for any generic character or group of characters:</p>
+
+<pre><code>var stripTrailing = trail =&gt; {
+  let regex = new RegExp(`([a-zA-Z0-9]+)(${trail}+)`, 'g');
+  return str =&gt; str.replace(regex, '$1');
+};
+</code></pre>
+
+<p>Note that this fails on any characters that have meaning in a regular expression: []{}+*^$. etc. Escaping those programmatically is left as an exercise for the reader.</p>
+
+<h2>UPDATE</h2>
+
+<p>Per your comment I thought an explanation might help you, so:</p>
+
+<p>First, there's no way in this case to replace only part of a match, you have to replace the <strong>entire</strong> match. So we need to find a pattern that matches, split it into the part we want to keep and the part we don't, and replace the whole match with the part of it we want to keep. So let's break up my regex above into multiple lines to see what's going on:</p>
+
+<p>First we want to match any number of sequential alphanumeric characters, that would be the 'word' to strip the trailing symbol from:</p>
+
+<pre><code>(       // denotes capturing group for the 'word'
+  [     // [] means 'match any character listed inside brackets'
+    a-z // list of alpha character a-z
+    A-Z // same as above but capitalized
+    0-9 // list of digits 0 to 9
+  ]+    // plus means one or more times
+)
+</code></pre>
+
+<p>The capturing group means we want to have access to <em>just</em> that part of the match.
+Then we have another group</p>
+
+<pre><code>(
+  ! // I used ES6's string interpolation to insert the arg here
+  + // match that exclamation (or whatever) one or more times
+)
+</code></pre>
+
+<p>Then we add the <code>g</code> flag so the replace will happen for <em>every</em> match in the target string, without the flag it returns after the first match. JavaScript provides a convenient shorthand for accessing the capturing groups in the form of automatically interpolated symbols, the '$1' above means 'insert contents of the first capture group here in this string'.</p>
+
+<p>So, in the above, if you replaced '$1' with '$1$2' you'd see the same string you started with, if you did 'foo$2' you'd see foo in place of every word trailed by one or more !, etc.</p>

@@ -1,0 +1,12 @@
+<p>Since the buffer you have in your C# application is not written to disk for performance reasons, the only other place left for it is memory (RAM). Since you don't know how Windows manages your memory at the moment of the crash, we have to consider two cases: a) the log is really in RAM and b) that RAM has been swapped to disk (page file). To get access to all RAM of a BSoD, you have to configure Windows to create a full memory dump instead of a kernel minidump.</p>
+
+<p>At the time of a blue screen, the operating system stops relying on almost anything, even most kernel drivers. The only attempt it makes is to write the contents of the physical RAM onto disk. Furthermore, since it cannot even rely on valid NTFS data structures, it writes to the only place of contiguous disk space it knows: the page file. That's also the reason why your page file needs to be at least as large as physical RAM plus some metadata, otherwise it won't be able to hold the information.</p>
+
+<p>At this point we can already give an answer to case b): if your log was actually swapped to the page file, it will likely be overwritten by the dump.</p>
+
+<p>If the buffer was really part of the working set (RAM), that part will be included in the kernel dump. Debugging .NET applications from a kernel dump is almost impossible, because the SOS commands to analyze the .NET heaps only work for a user mode full memory dump. If you can identify your log entries by some other means (e.g. a certain substring), you may of course do a simple string search on the kernel dump.</p>
+
+<p>All in all, what you're trying to achieve sounds like a XY-problem. If you want to test your service, why don't you remove or replace the unrelated problematic PCI cards or test on a different PC?
+If blue screen logging is an explicit feature of your logging service, you should have considered this as a risk and evaluated before writing the service. That's a project management issue and off-topic for StackOverflow.</p>
+
+<p>Unfortunately I have to confirm what @MobyDisk said: it's (almost) impossible and at least unreliable.</p>

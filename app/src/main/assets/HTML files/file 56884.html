@@ -1,0 +1,33 @@
+<p>This requires rather tricky machinery (see this <a href="http://stackoverflow.com/a/5048661/586873">answer</a> for more details), since you cannot normally have recursive macros in C:</p>
+
+<pre><code>#define _NUM_ARGS2(X,X5,X4,X3,X2,X1,N,...) N
+#define NUM_ARGS(...) _NUM_ARGS2(0,__VA_ARGS__,5,4,3,2,1,0)
+// be sure to add X6,X7,... and 6,7,... to support more arguments
+
+#define GCD_OF_1(a)         (a)         
+#define GCD_OF_2(a,b)       GCD(a, b)
+#define GCD_OF_3(a,b,...)   GCD_OF_2(GCD_OF_2(a,b),__VA_ARGS__)
+#define GCD_OF_4(a,b,...)   GCD_OF_3(GCD_OF_2(a,b),__VA_ARGS__)
+#define GCD_OF_5(a,b,...)   GCD_OF_4(GCD_OF_2(a,b),__VA_ARGS__)
+// in general:
+// #define GCD_OF_N(a,b,...)   GCD_OF_N-1(GCD_OF_2(a,b),__VA_ARGS__)
+
+#define _GCD_OF_N3(N, ...)  GCD_OF_ ## N(__VA_ARGS__)
+#define _GCD_OF_N2(N, ...) _GCD_OF_N3(N, __VA_ARGS__) // helper macro to expand N
+#define GCD_all(...)       _GCD_OF_N2(NUM_ARGS(__VA_ARGS__), __VA_ARGS__)
+
+int main(void)
+{
+    GCD_all(a, b, c, d, e);
+}
+</code></pre>
+
+<p>The <code>gcc -E</code> produces output as:</p>
+
+<pre><code>int main(void)
+{
+  GCD(GCD(GCD(GCD(a, b), c), d), e);
+}
+</code></pre>
+
+<p>The <code>NUM_ARGS</code> automagically finds the number of arguments. This way you obtain the "starting point" macro <code>GCD_OF_N</code> for futher expanding.</p>

@@ -1,0 +1,92 @@
+<p>There are several ways to archive this, first and and most important is that you need a field on your database table where you can identify the record you want to delete, for example a primary key in form of an ID or a unique key.</p>
+
+<p>You can do this by creating a link with a text to a <code>delete.php</code> page or you can use JQuery and AJAX or you can use a inner form.</p>
+
+<p><strong>You will also want to have only authorized users to use those pages so you will need a login page with session as well.</strong></p>
+
+<p><a href="http://stackoverflow.com/questions/18971570/simple-php-sql-login-troubleshooting">You can see here an example of login page with sessions.</a></p>
+
+<p>The simplest one is a link to the delete page, see example here:</p>
+
+<pre><code>&lt;?php
+$con = mysqli_connect("localhost","table","password","database");
+// Check connection
+if (mysqli_connect_errno())
+{
+    die("Failed to connect to MySQL: " . mysqli_connect_error());
+}
+
+if (!$result = mysqli_query($con,"SELECT * FROM recetas_galletas"))
+{
+    die("Error: " . mysqli_error($con));
+}
+?&gt;
+&lt;table border='1'&gt;
+&lt;tr&gt;
+&lt;th&gt;Title&lt;/th&gt;
+&lt;th&gt;Description&lt;/th&gt;
+&lt;/tr&gt;
+&lt;?php
+while($row = mysqli_fetch_array($result))
+{
+?&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;?php echo $row['title']; ?&gt;&lt;/td&gt;
+&lt;td&gt;&lt;?php echo $row['description']; ?&gt;&lt;/td&gt;
+&lt;td&gt;&lt;a href="delete.php?id=&lt;?php echo $row['id']; ?&gt;"&gt;Delete&lt;/a&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;?php
+}
+mysqli_close($con);
+?&gt;
+&lt;/table&gt;
+</code></pre>
+
+<p>Then on your delete page you would have something like this:</p>
+
+<pre><code>&lt;?php
+// Your database info
+$db_host = '';
+$db_user = '';
+$db_pass = '';
+$db_name = '';
+
+if (!isset($_GET['id']))
+{
+    echo 'No ID was given...';
+    exit;
+}
+
+$con = new mysqli($db_host, $db_user, $db_pass, $db_name);
+if ($con-&gt;connect_error)
+{
+    die('Connect Error (' . $con-&gt;connect_errno . ') ' . $con-&gt;connect_error);
+}
+
+$sql = "DELETE FROM recetas_galletas WHERE id = ?";
+if (!$result = $con-&gt;prepare($sql))
+{
+    die('Query failed: (' . $con-&gt;errno . ') ' . $con-&gt;error);
+}
+
+if (!$result-&gt;bind_param('i', $_GET['id']))
+{
+    die('Binding parameters failed: (' . $result-&gt;errno . ') ' . $result-&gt;error);
+}
+
+if (!$result-&gt;execute())
+{
+    die('Execute failed: (' . $result-&gt;errno . ') ' . $result-&gt;error);
+}
+
+if ($result-&gt;affected_rows &gt; 0)
+{
+    echo "The ID was deleted with success.";
+}
+else
+{
+    echo "Couldn't delete the ID.";
+}
+$result-&gt;close();
+$con-&gt;close();
+</code></pre>

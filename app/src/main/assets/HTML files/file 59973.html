@@ -1,0 +1,47 @@
+<p>When trying to run the same query across multiple databases, cursors actually will be a good option.     </p>
+
+<pre><code>DECLARE @Databases Table (DBName varchar(256))
+DECLARE @Name varchar(256)
+DECLARE @SQL Nvarchar(max) 
+DECLARE @userlogin varchar(50)
+SET @userlogin = 'dmarch'
+
+INSERT @Databases
+select name from sys.databases where  name NOT LIKE ('%storage_0%')
+AND NAME NOT LIKE ('%WSR%')
+AND name NOT LIKE ('Z%')
+AND name NOT LIKE ('master')
+AND name NOT LIKE ('model')
+AND name NOT LIKE ('msdb')
+AND name NOT LIKE ('tempdb')
+AND name NOT LIKE ('_Placeholder')
+
+
+
+
+DECLARE DBCursor Cursor For
+Select DBName
+from @Databases
+
+OPEN DBCursor
+FETCH NEXT
+FROM DBCursor
+INTO @Name
+
+WHILE @@FETCH_STATUS = 0  
+BEGIN
+
+SET @SQL = N'USE ['+@Name+'] 
+select ''['+@Name+']'',  ro.user_login, ro.activated from rev_operator ro where ro.user_login = @userlogin and ro.activated != ''0'''
+
+EXEC sp_executesql @SQL
+
+
+FETCH NEXT
+      FROM DBCursor
+      INTO @Name
+END
+
+CLOSE DBCursor
+DEALLOCATE DBCursor
+</code></pre>

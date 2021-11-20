@@ -1,0 +1,52 @@
+<p>Here's my take on it:</p>
+
+<pre><code>if (isset($_POST["submit"])) {
+    $name = !empty( $_POST['name'] ) ? $_POST['name'] : false;
+    $email = !empty( $_POST['email'] ) ? filter_var($_POST['email'],FILTER_VALIDATE_EMAIL) : false;
+
+    if( $name &amp;&amp; $email ){
+
+        $from = 'Demo Contact Form';
+        $to = 'email@example.com';
+        $subject = 'Message from Contact Demo ';
+
+        $body = "From: $name\n E-Mail: $email";
+
+        if (mail ($to, $subject, $body, $from)) {
+            $result='&lt;div class="alert alert-success"&gt;Thank You! I will be in touch&lt;/div&gt;';
+        } else {
+            $result='&lt;div class="alert alert-danger"&gt;Sorry there was an error sending your message. Please try again later&lt;/div&gt;';
+        }
+    }else{
+        $errors = [];
+        if( !$name ) $errors [] ='Invalid Name entered';
+
+        if( !$email ) $errors [] ='Invalid Email entered';
+
+        $result= '&lt;div class="alert alert-danger"&gt;'.implode('&lt;br&gt;', $errors ).'&lt;/div&gt;';
+    }
+}
+</code></pre>
+
+<p><code>filter_var()</code> returns the filtered var or false on failure, so with that and the ternary <code>{if} ? true : false;</code> we can normalize your input and simply everything after that.</p>
+
+<p>We check the inputs as soon as possible, that way we run as little code as needed to get to the end result.  We know right away if they are good and can skip the majority of the email code, and output our error message.</p>
+
+<p>Logically we can dump the error flag, an in the else we know one or both inputs are false.  The array and implode is just a simpler way of putting in a line break.  It's also easier to extend by just adding another input in with minimal code changes.  As you can see it would be very easy to add another ternary statement, an and condition and an error message.  ( only 2.5 ish lines )</p>
+
+<p>One thing I would do on top of that is this</p>
+
+<pre><code> $post = array_map('trim', $_POST);
+</code></pre>
+
+<p>And then change all the <code>$_POST</code> to <code>$post</code>, this will account for names added in as spaces or extra white space from Copy and Pasting, a common occurrence.</p>
+
+<p>Further you may be able to minimize the errors like this </p>
+
+<pre><code>}else{
+    $result= '&lt;div class="alert alert-danger"&gt;'.implode('&lt;br&gt;', array_filter([
+        $name ? false : 'Invalid Name entered',
+        $email ? false : 'Invalid Email entered',
+    ])).'&lt;/div&gt;;
+}
+</code></pre>

@@ -1,0 +1,56 @@
+<p>You want to use <code>stream_socket_client</code><br></p>
+
+<p>This is about as close to multi-treading as PHP can get.  It can handle 30 connection and be able to return the results on each socket.<br> </p>
+
+<p><strong>Create the bids</strong></p>
+
+<pre><code>$bids[] = 'makebid/item8349/?bid=1.00';
+$bids[] = 'makebid/item8350/?bid=1.50';
+</code></pre>
+
+<p><strong>Create the "processes":</strong></p>
+
+<pre><code>$timeout = 20; 
+$result = array(); 
+$sockets = array(); 
+$buffer_size = 8192;
+$id = 0;
+foreach($bids as $bid){
+  $stream = stream_socket_client("auction.com:80", $errno,$errstr, $timeout,
+      STREAM_CLIENT_ASYNC_CONNECT|STREAM_CLIENT_CONNECT); 
+  if ($stream) {
+    $sockets[$id++] = $stream;  // supports multiple sockets
+    $http = "GET /$bid HTTP/1.0\r\nHost: auction.com\r\n\r\n"; 
+    fwrite($stream, $http);
+  } 
+  else { 
+    echo "$id Failed\n";
+  } 
+}
+</code></pre>
+
+<p><strong>Monitor the bids:</strong></p>
+
+<pre><code>while (count($sockets)) {
+  $read = $sockets; 
+  stream_select($read, $write = NULL, $except = NULL, $timeout); 
+  if (count($read)) {
+    foreach ($read as $r) { 
+      $id = array_search($r, $sockets); 
+      $data = fread($r, $buffer_size); 
+      if (strlen($data) == 0) { 
+        echo "$id Closed: " . date('h:i:s') . "\n\n\n";
+        fclose($r); 
+        unset($sockets[$id]);
+      } 
+      else {
+        $result[$id] .= $data; 
+      }
+    }
+  }
+  else { 
+    echo 'Timeout: ' . date('h:i:s') . "\n\n\n";
+    break;
+  }
+}
+</code></pre>

@@ -1,0 +1,83 @@
+<p>I just don't understand you... you come to this site and ask for helpful advice and when that helpful advice is given to you, you ignore it and ask your (practically same) question again and again. You've already been told by several different users that in WPF, we work with <em>data</em>, not <em>UI controls</em>. So rather than save the <code>TextBox</code>es with all their extra properties that are meaningless to you, you should save the just text in the collections data bound to the <code>TextBox</code>es.</p>
+
+<p>Now I hope that you don't take this personally again, but at some point, you have to start listening to the people that know what they're talking about. However, if your heart is set on doing this in your own stubborn way, rather than the correct way, then may I draw your attention to the <a href="http://msdn.microsoft.com/en-us/library/system.windows.markup.xamlwriter%28v=vs.110%29.aspx" rel="nofollow">XamlWriter Class</a> page on MSDN:</p>
+
+<blockquote>
+  <p>The serialization enabled by this method has a series of limitations. This is because the serialization enabled is explicitly run-time, and does not have access to possible design-time information in the original XAML (if any). For details, see <a href="http://msdn.microsoft.com/en-us/library/ms754193%28v=vs.110%29.aspx" rel="nofollow">Serialization Limitations of XamlWriter.Save</a>.</p>
+</blockquote>
+
+<p>And from the linked page on MSDN:</p>
+
+<blockquote>
+  <p>Common references to objects made by various markup extension formats, such as StaticResource or Binding, will be dereferenced by the serialization process. These were already dereferenced at the time that in-memory objects were created by the application runtime, and the Save logic does not revisit the original XAML to restore such references to the serialized output. <strong>This potentially freezes any databound or resource obtained value to be the value last used by the run-time representation</strong>, with only limited or indirect ability to distinguish such a value from any other value set locally.</p>
+</blockquote>
+
+<p>I've highlighted a section that basically says that yes, you <em>can</em> save the property values of the controls using the <code>XamlWriter.Save</code> method. However, I can't tell you why your values aren't being saved. </p>
+
+<p>Now when you said that you had searched everywhere, you seem to have missed the most obvious search terms for your problem: <code>XamlWriter Class</code>. For future reference, had you searched with these words, then you'd have found all this out in the top result.</p>
+
+<p>However, it just makes far more sense to save the data and not the UI controls. Think about it... you already have the mechanism to generate/display these <code>TextBox</code>es from your collections, so why wouldn't you just use that? Save the data in a database, or a text file and when you reload it, use your existing code to re-populate the <code>TextBox</code>es from the collections. It really is as simple as populating a collection in your view model with the loaded data. You could even save the data collection with almost the same code that you're using already, or less even.</p>
+
+<p>That is how it is done properly. Now you can either accept that and move on with your project in the correct manner, or you can continue to ignore this advise and to ask more virtually identical questions. Right now, I think that this is at least your 3rd question asking how to store XAML in a file or database. You could have saved everyone including yourself a lot of time if you had just accepted the good advise that was given to you previously, or even done a proper search. </p>
+
+<p>Apart from anything else, it's just so much easier persisting the data instead of the UI controls. </p>
+
+<p>Finally, did you notice how your (very similar) question had not been answered until now? Have you seen how most questions are normally answered immediately here? I'm not the only person to notice all of your very similar questions and this shows you that the StackOverflow community as a whole do not like it when users abuse this website by expecting others to do all of their work for them.</p>
+
+<p>Now you probably won't believe this as we've 'clashed' before, but all of this advice is meant to help you. Apologies if any of my comments have offended you, but if you use this site according to <a href="http://stackoverflow.com/help/asking">the rules</a>, then you'll get much more out of it. For example, rather than asking the same question again and again, just edit your original question <a href="http://stackoverflow.com/help/no-one-answers">if you didn't get a satisfactory answer</a>. An edited question gets posted back to the top of the unanswered queue again to attract more attention.</p>
+
+<p>I hope you'll accept my advice this time and wish you luck with your project.</p>
+
+<hr>
+
+<p>UPDATE >>></p>
+
+<p>The linked pages from MSDN show us that the XamlWriter <em>can</em> save data bound data, but unfortunately, I can't tell you why yours is not working.</p>
+
+<p>To be honest, saving <code>string</code>s is not really enough. You need to save <em>all</em> of the relevant data. The simplest way to display, edit <em>and</em> save this data is to create custom classes that implement the <code>INotifyPropertyChanged</code> interface. For example, for you scenario, I would create a <code>Question</code> class something like this:</p>
+
+<pre><code>[Serializable]
+public class Question // Implement INotifyPropertyChanged correctly here
+{
+    public string Title { get; set; }
+    public string Text { get; set; }
+    public string Answer { get; set; }
+}
+</code></pre>
+
+<p>If your questions are multiple choice, then you could do something like this:</p>
+
+<pre><code>[Serializable]
+public class Question // Implement INotifyPropertyChanged correctly here
+{
+    public string Title { get; set; }
+    public string Text { get; set; }
+    public List&lt;Answer&gt; Answers { get; set; }
+    public Answer CorrectAnswer { get; set; }
+}
+</code></pre>
+
+<p>Of course, you should have <code>private</code> fields backing those public properties... this is just a simplified example. Note the use of the <code>SerializableAttribute</code>... this will enable you to save the data with just a few lines of code.</p>
+
+<p>You can structure the properties however you want, but the idea is that you encapsulate all of the related data into one class. Then you can provide a <code>DataTemplate</code> for that class type, let's call it <code>Template</code>, and define a collection of controls that will display the relevant property values.</p>
+
+<p>Now here's the good part... you can create a collection of that type in a view model...:</p>
+
+<pre><code>public ObservableCollection&lt;Question&gt; Questions { get; set; }
+</code></pre>
+
+<p>... and set the <code>ItemTemplate</code> property of any collection control to your <code>DataTemplate</code>:</p>
+
+<pre><code>&lt;ListBox ItemsSource="{Binding Questions}" ItemTemplate="{StaticResource Template}" /&gt;
+</code></pre>
+
+<p>and then every <code>Question</code> item in the collection will magically be rendered exactly as you defined in the <code>DataTemplate</code>. So to answer your question about how do you reload the data, you just re-populate the <code>Questions</code> collection in the view model and the WPF templating system will correctly re-populate the UI for us in exactly the same way as it did before that data was saved.</p>
+
+<p>Now as you can see... I've spent a great deal of time explaining this all to you. I trust that you can answer any further questions that you may have with your new found search skills.</p>
+
+<p>To start you off, here are some useful articles:</p>
+
+<p><a href="http://msdn.microsoft.com/en-us/library/ms233843.aspx" rel="nofollow">Serialization (C# and Visual Basic)</a><br>
+<a href="http://msdn.microsoft.com/en-us/library/et91as27.aspx" rel="nofollow">Walkthrough: Persisting an Object (C# and Visual Basic)</a><br>
+<a href="http://msdn.microsoft.com/en-us/library/ms742521%28v=vs.110%29.aspx" rel="nofollow">Data Templating Overview</a><br>
+<a href="http://msdn.microsoft.com/en-us/library/system.componentmodel.inotifypropertychanged%28v=vs.110%29.aspx" rel="nofollow">INotifyPropertyChanged Interface</a>  </p>

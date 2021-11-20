@@ -1,0 +1,54 @@
+<p>Since you have <code>ember-rails</code> in your <code>Gemfile</code> you're probably getting the version of Ember that it provides, not the one that lives in <code>app/assets/javascripts/lib/development</code>.  You can load <code>/assets/ember.js</code> in your browser to verify.  If you want to make sure you get your custom version you should use this in <code>application.js</code></p>
+
+<pre><code>//= require lib/development/ember
+</code></pre>
+
+<p>Alternatively to be extra sure, you could remove ember from <code>application.js</code> completely and include the latest canary ember directly in your layout.</p>
+
+<pre><code>&lt;script type='text/javascript' src="http://builds.emberjs.com/canary/ember.js"&gt;&lt;/script&gt;
+</code></pre>
+
+<p>[UPDATE] : OK, the problem is that you're including ember.js multiple times (and possibly with multiple versions).  I missed it when you first posted your bit list of script tags, but if you look at that closely you'll see that Ember and Ember Data are included at the top (lines 4 and 5 of the scripts), and then they're each included two mored times at the bottom.  </p>
+
+<pre><code>...
+&lt;script src="/assets/ember.js?body=1"&gt;&lt;/script&gt;
+&lt;script src="/assets/ember-data.js?body=1"&gt;&lt;/script&gt;
+...
+&lt;script src="/assets/lib/development/ember-data.js?body=1"&gt;&lt;/script&gt;
+&lt;script src="/assets/lib/development/ember.js?body=1"&gt;&lt;/script&gt;
+&lt;script src="/assets/lib/production/ember-data.js?body=1"&gt;&lt;/script&gt;
+&lt;script src="/assets/lib/production/ember.js?body=1"&gt;&lt;/script&gt;
+...
+</code></pre>
+
+<p>My guess is that <code>application.js</code> is requiring ember once on purpose with</p>
+
+<pre><code>//= require ember
+</code></pre>
+
+<p>And then it's getting picked up again with a <code>require_tree</code></p>
+
+<pre><code>//= require_tree .
+</code></pre>
+
+<p>Usually you want to store external libraries (code that you do not personally maintain) in the <code>vendor</code> directory of your app.  This would allow to still use <code>require_tree</code> to get all of your own javascript included in one shot.  In my project that uses <code>ember-rails</code> my structure looks like this:</p>
+
+<pre><code>app
+  assets
+    javascripts
+      # All my own stuff goes here
+vendor
+  assets
+    ember
+      development
+        ember.js
+        ember-data.js
+      production
+        ember.js
+        ember-data.js
+</code></pre>
+
+<p><code>ember-rails</code> will find the versions in <code>vendor</code> if you just use <code>require ember</code> in <code>application.js</code>.  You'll want to make sure that you set <code>config.ember.variant</code> in each of your <code>config/environments/*.rb</code> files.  For instance in <code>config/environments/development.rb</code> you'll need to add this :</p>
+
+<pre><code>config.ember.variant = :development
+</code></pre>

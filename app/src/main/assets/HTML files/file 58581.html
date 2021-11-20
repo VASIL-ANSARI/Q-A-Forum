@@ -1,0 +1,45 @@
+<p>Least obvious question first:</p>
+
+<blockquote>
+  <p>once I've done all my vector processing, how the heck do I extract the modified bytes from the <code>__m128i</code></p>
+</blockquote>
+
+<p>Extract the low 64 bits to an integer with  <code>int64_t _mm_cvtsi128_si64x(__m128i)</code>, or <a href="https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=int%2520_mm_cvt&amp;techs=SSE2&amp;expand=1786,1784" rel="nofollow">the low 32 bits with <code>int _mm_cvtsi128_si32 (__m128i a)</code></a>.  If you want other parts of the vector, your options are:</p>
+
+<ul>
+<li>shuffle the vector to create a new <code>__m128i</code> with the data you want in the low element, and use the cvt intrinsics (MOVD or MOVQ in asm).</li>
+<li>use SSE2 <a href="https://software.intel.com/sites/landingpage/IntrinsicsGuide/#text=pextrw&amp;techs=SSE2&amp;expand=1786,1784,2254" rel="nofollow"><code>int _mm_extract_epi16 (__m128i a, int imm8)</code></a>, or the SSE4.1 similar instructions for other element sizes.  PEXTRB/W/D/Q are not the fastest instructions, but if you only need one high element, they're better than a separate shuffle and MOVD.</li>
+<li>Store to a temporary array, or use <code>union { __m128i v; int64_t i64[2]; }</code> or something.  Union-based type punning is legal in C99, but only as an extension in C++.  An alternative to the union that would also work in C++ would be <code>memcpy(&amp;my_int64_local,  8 + (char*)my_vector, 8);</code> to extract the high half.  Hopefully that won't compile to a store + an actual memcpy library function call.  Compilers are usually pretty good about optimizing away small fixed-size memcpy because of use-cases like this, but you will probably get a store/reload instead of a PEXTRQ, even if you compile with <code>-msse4.1</code> to let the compiler use it if it wants.  If the result can go directly into memory unmodified (instead of being needed in an integer register), a smart compiler might use MOVHPS to store the high half of a <a href="http://www.felixcloutier.com/x86/MOVHPS.html" rel="nofollow"><code>__m128i</code></a></li>
+</ul>
+
+<hr>
+
+<blockquote>
+  <p>Does this turn into a linear, unbroken block in memory?</p>
+</blockquote>
+
+<p>No, it's an array of pointers to separate blocks of memory, introducing an extra level of indirection vs. a proper 2D array.  Don't do that.</p>
+
+<p>Make one large allocation, and do the index calculation yourself (using <code>array[x*yres + y]</code>).</p>
+
+<p>And yes, load data from it with <code>_mm_load_si128</code>, or loadu if you need to load from an offset.</p>
+
+<hr>
+
+<blockquote>
+  <p>assumed <code>_mm_load_si128</code> only loads signed bytes</p>
+</blockquote>
+
+<p>Signed or unsigned isn't an inherent property of a byte, it's only how you interpret the bits.  You use the same load intrinsic for loading two 64-bit elements, or a 128-bit bitmap.</p>
+
+<p>Use intrinsics that are appropriate for your data.  It's a little bit like assembly language: everything is just bytes, and the machine will do what you tell it with your bytes.  It's up to you to choose a sequence of instructions / intrinsics that produces meaningful results.</p>
+
+<p>The integer load intrinsics take <code>__m128i*</code> pointer args, so you have to use <code>_mm_load_si128( (const __m128i*) my_int_pointer )</code> or similar.  This looks like pointer aliasing (e.g. reading an array of <code>int</code> through a <code>short *</code>), which is Undefined Behaviour in C and C++.  However, this is how Intel says you're supposed to do it, so any compiler that implements Intel's intrinsics is required to make this work correctly.  gcc does so by defining <code>__m128i</code> with <code>__attribute__((may_alias))</code>.</p>
+
+<p>See also <a href="http://stackoverflow.com/questions/9318115/loading-data-for-gccs-vector-extensions/39608561#39608561">Loading data for GCC&#39;s vector extensions</a> which points out that you can use Intel intrinsics for GNU C native vector extensions, and shows how to load/store.</p>
+
+<hr>
+
+<p>To learn more about SIMD with SSE, there are some links in the <a href="/questions/tagged/sse" class="post-tag" title="show questions tagged &#39;sse&#39;" rel="tag">sse</a> tag wiki, including some intro / tutorial links.</p>
+
+<p>The <a href="/questions/tagged/x86" class="post-tag" title="show questions tagged &#39;x86&#39;" rel="tag">x86</a> tag wiki has some good x86 asm / performance links.</p>

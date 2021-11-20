@@ -1,0 +1,35 @@
+<p>Use <a href="http://man7.org/linux/man-pages/man3/getline.3.html" rel="nofollow">getline(3)</a>, assuming your OS &amp; libc is Posix2008 compliant (eg. on Linux):</p>
+
+<pre><code>FILE *fp = fopen("specification.txt", "r");
+if (!fp) { perror("specification.txt"); exit(EXIT_FAILURE); };
+size_t sizelist = 6; // initial guess of number of lines
+size_t nblines = 0;
+char ** listofdetails = calloc(sizelist, sizeof(char*));
+if (!listofdetails) { perror("initial calloc"); exit(EXIT_FAILURE); };
+char*curline = NULL;
+size_t cursize = 0;
+do {
+   ssize_t curlen = getline(&amp;curline, &amp;cursize, fp);
+   if (curlen &lt; 0) break;
+   if (nblines &gt;= sizelist) {
+      size_t newsizelist = 3*sizelist/2+5;
+      char**newlist = calloc(newsizelist, sizeof(char*));
+      if (!newlist) { perror("growing calloc"); exit(EXIT_FAILURE); };
+      memcpy (newlist, sizelist, nbline*sizeof(char*));
+      sizelist = newsizelist;
+   };
+   if (!(sizelist[nblines++] = strdup(curline))) 
+     { perror("strdup"); exit(EXIT_FAILURE); };
+} while (!feof(fp));
+</code></pre>
+
+<p>The above code can accept as much lines, and as large lines, as the system resources allow. On my powerful laptop (16Gbytes RAM), i might be able to read a file of more than a million lines, each of nearly a thousand chars (or a file of a single line of many millions chars).</p>
+
+<p>At the end (of your program) you should better free memory:</p>
+
+<pre><code>for (size_t ix=0; ix&lt;nblines; ix++) {
+   free(sizelist[ix]), sizelist[ix] = NULL;
+}
+free(sizelist), sizelist = NULL;
+free(curline), curline = NULL; cursize = 0;
+</code></pre>

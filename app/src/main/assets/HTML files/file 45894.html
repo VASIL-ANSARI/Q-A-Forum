@@ -1,0 +1,83 @@
+<p>Why don't you just try to do it?</p>
+
+<p>The example below presents a way in which you could create an <code>Interface</code> (your abstract base class) and two derived classes implementing that interface (<code>Foo</code> and <code>Bar</code> in this case).</p>
+
+<p>You can then create a container of <code>std::unique_ptr&lt;Interface&gt;</code> (unique pointers to the abstract base class) and populate it using various methods and helper functions: <code>emplace_back</code> with <code>std::make_unique</code>, <code>push_back</code> with <code>std::move</code>, and so on.</p>
+
+<p>After you run the example you will notice that the destructor gets called automatically --- that's the beauty of <code>std::unique_ptr</code>.</p>
+
+<pre><code>#include &lt;cassert&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include &lt;iostream&gt;
+
+class Interface {
+ public:
+  virtual ~Interface() {
+    std::cout &lt;&lt; "Destroying object" &lt;&lt; std::endl;
+  }
+  virtual void Method() const = 0;
+};
+
+class Foo // Foo "implements" or "offers access to" the Interface
+    : public Interface {
+ public:
+  void Method() const override { // here we override Interface::Method
+    std::cout &lt;&lt; "Foo::Method" &lt;&lt; std::endl;
+  }
+};
+
+class Bar // Bar "implements" or "offers access to" the Interface
+    : public Interface {
+ public:
+  void Method() const override { // here we override Interface::Method
+    std::cout &lt;&lt; "Bar::Method" &lt;&lt; std::endl;
+  }
+};
+
+
+int main() {
+  // declare
+  std::vector&lt;std::unique_ptr&lt;Interface&gt;&gt; objects;
+
+  // populate
+  objects.emplace_back(std::make_unique&lt;Foo&gt;());
+  objects.emplace_back(std::make_unique&lt;Bar&gt;());
+  objects.emplace_back(std::make_unique&lt;Foo&gt;());
+
+  // another way to populate
+  std::unique_ptr&lt;Foo&gt; pfoo(new Foo);
+  objects.push_back(std::move(pfoo));
+
+  // but be careful... pfoo now points to nullptr because you
+  // moved ("transfered control of") the pointer to the
+  // vector; pfoo no longer owns it (so it owns nothing; it is a
+  // nullptr)
+  assert(pfoo == nullptr);
+
+  // you can iterate over all members by REFERENCE (otherwise you
+  // would need to make copies, and you cannot copy a unique_ptr)
+  for(const auto &amp; pobject : objects) {
+    pobject-&gt;Method();
+  }
+
+  // at exit you should see the calls to the destructor
+
+  return 0;
+
+}
+</code></pre>
+
+<p>Compile and run:</p>
+
+<pre><code>$ g++ example.com -std=c++14 -Wall -Wextra
+$ ./a.out
+Foo::Method
+Bar::Method
+Foo::Method
+Foo::Method
+Destroying object
+Destroying object
+Destroying object
+Destroying object
+</code></pre>

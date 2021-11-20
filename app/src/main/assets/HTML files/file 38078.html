@@ -1,0 +1,46 @@
+<p>No, I am sorry, your approach is not fine. Because it does not test a single line of our code. The only thing your spec is testing is that the <code>User.login</code> stub returns what you told it to return.</p>
+
+<p>If you want to speed up your specs by stubbing methods, than you should look for calls in your method that touch the database. Something like <code>User.find_by_email</code> in the following example (And I guess you do something similar in your <code>login</code> method). </p>
+
+<p>Furthermore you may want to spec want happens if the <code>email</code> or the <code>password</code> does not match.</p>
+
+<pre><code>describe User do 
+  describe 'login' do
+    let(:username)  { "test@test.com" }
+    let(:password)  { "password" }
+    subject(:login) { User.login(email: username, password: password) }
+
+    context 'when user do not exists' do
+      before { allow(User).to receive(:find_by_email).and_return(nil) }
+
+      it 'returns nil' do
+        expect(login).to be_nil
+      end
+    end
+
+    context 'when user exists' do
+      before do
+        allow(User).to receive(:find_by_email).with(username).and_return(user)
+      end
+
+      context 'when password does not match' do
+        let(:user) { User.new(:password =&gt; 'wrong password') }
+
+        it 'returns nil' do
+          expect(login).to be_nil
+        end
+      end
+
+      context 'when password matches' do
+        let(:user) { User.new(:password =&gt; password, :generate_token =&gt; 123) }
+
+        it 'returns a json containing the signin token' do
+          expect(login).to eq "{'token':'123'}"
+        end
+      end
+    end
+  end
+end
+</code></pre>
+
+<p>Since I have no idea what your <code>login</code> method really does, all specs above are just based on assumptions and will very like not pass with your implementation. But I hope you get the point.</p>

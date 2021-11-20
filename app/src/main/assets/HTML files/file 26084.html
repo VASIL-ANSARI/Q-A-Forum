@@ -1,0 +1,49 @@
+<p>You need to use the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ms644990%28v=vs.85%29.aspx" rel="nofollow">SetWindowsHookEx</a> function and specify the hook type as *WH_MOUSE_LL* (14). Have the following declaration.</p>
+
+<pre><code>Public Structure Point
+    Public X As Integer
+    Public Y As Integer
+End Structure
+
+Public Structure Msllhookstruct
+    Public Location As Point
+    Public MouseData As Integer
+    Public Flags As Integer
+    Public Time As Integer
+    Public ExtraInfo As Integer
+End Structure
+
+Private Delegate Function HookProc(nCode As Integer, wParam As Integer, ByRef lParam As Msllhookstruct) As Integer
+
+&lt;DllImport("user32.dll", SetLastError:=True)&gt; _
+Private Function SetWindowsHookEx(ByVal hookType As Integer, ByVal lpfn As HookProc, ByVal hMod As IntPtr, ByVal dwThreadId As UInteger) As IntPtr
+End Function
+
+&lt;DllImport("user32.dll")&gt; _
+Private Function CallNextHookEx(ByVal hhk As IntPtr, ByVal nCode As Integer, ByVal wParam As IntPtr, ByRef lParam As Msllhookstruct) As IntPtr
+End Function
+
+Private Hook As IntPtr
+</code></pre>
+
+<p>In your initialising routine, use it as follow</p>
+
+<pre><code>Hook = SetWindowsHookEx(14, AddressOf Proc, Process.GetCurrentProcess().MainModule.BaseAddress.ToInt32(), 0)
+</code></pre>
+
+<p>Where <code>Proc</code> is a function callback like so:</p>
+
+<pre><code>Private Function Proc(nCode As Integer, wParam As Integer, ByRef lParam As Msllhookstruct) As IntPtr
+    If wParam = 522 Then
+        Dim Delta = CShort(lParam.MouseData &gt;&gt; 16)
+
+        If Delta &gt; 0 Then
+            ' Up
+        ElseIf Delta &lt; 0 Then
+            ' Down
+        End If
+    End If
+
+    Return CallNextHookEx(Hook, nCode, wParam, lParam)
+End Function
+</code></pre>

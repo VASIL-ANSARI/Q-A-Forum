@@ -1,0 +1,40 @@
+<p>You simply can't serialize a <code>Task</code>, also what you really want is serialize the result.</p>
+
+<p>The asynchronous approach in <em>ASP.NET MVC</em> controllers provides a better use of the thread pool. When a request comes in, ASP.NET takes one of its thread pool threads and assigns it to that request. When an external I/O operations is needed, the request thread is returned to the thread pool until the call to the external resource returns.</p>
+
+<p>The important difference is that the request thread has been returned to the thread pool while the asynchronous call is in progress. While the thread is in the thread pool, itâs no longer associated with that request. </p>
+
+<p>Asynchronous requests allow a smaller number of threads to handle a larger number of requests.</p>
+
+<p>Using this code:</p>
+
+<pre><code>public async Task&lt;ActionResult&gt; Index()
+{
+    List&lt;Speaker&gt; speakersAll1 = await _context.Speakers
+                                                .Include(a =&gt; a.Sessions.Select(b =&gt; b.Tenant))
+                                                .ToListAsync();
+
+    foreach (var speaker in speakersAll1)
+    {
+        speaker.ImageUrl = "#";
+    }
+
+    byte[] objectDataAsStream;
+    BinaryFormatter binaryFormatter = new BinaryFormatter();
+    using (MemoryStream memoryStream = new MemoryStream())
+    {
+        binaryFormatter.Serialize(memoryStream, speakersAll1);
+        objectDataAsStream = memoryStream.ToArray();
+    }
+
+    return View("Index", "_Layout", objectDataAsStream.Length);
+}
+</code></pre>
+
+<p>When <code>await ... ToListAsync()</code> is executed, the thread is released rather than blocking, allowing it to process another request.</p>
+
+<p>This code made the same as your code since you are calling <code>await</code> in <code>foreach</code> loop but it is a bit clearer. </p>
+
+<p>Also, after the <code>await</code> you can use <code>Result</code> property, since at this point the task is already complete.</p>
+
+<p>Perhaps you can move streams part of your code to an <code>async</code> method, but I pretty sure the bottleneck in this code is the database access.</p>

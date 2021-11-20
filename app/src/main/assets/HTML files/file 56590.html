@@ -1,0 +1,32 @@
+<p>You are modifying John but printing Lizz.  Lizz hasn't changed (in that the club for Lizz has been loaded and it is not refreshed).</p>
+
+<p>The reason is because the fetch of John and Lizz are in 2 different transactions and as such have 2 different persistence contexts.</p>
+
+<p>If there was a transaction spanning the fetch of BOTH John and Lizz then the Club would have been the  same/single instance for both as the underlying persistence context is scoped to the transaction and ensures they use the same instance for the Club.</p>
+
+<p>As a side point you should look at turning on SQL and Transaction logging such that you confirm it does what you think it should:</p>
+
+<pre><code>&lt;!-- LOGBACK configuration --&gt;
+
+&lt;!-- SQL and bind values --&gt;
+&lt;logger name="org.avaje.ebean.SQL" level="TRACE"/&gt;
+
+&lt;!-- Transaction Commit and Rollback events --&gt;
+&lt;logger name="org.avaje.ebean.TXN" level="TRACE"/&gt; 
+</code></pre>
+
+<p>For logging configuration refer to <a href="http://ebean-orm.github.io/docs/setup/logging" rel="nofollow">http://ebean-orm.github.io/docs/setup/logging</a></p>
+
+<p>Do:</p>
+
+<pre><code>server.beginTransaction();
+try {
+   // persistence context scoped to transaction so 
+   // .. now spans both fetches giving John and Lizz
+   // .. the same shared Club instance
+   john = server.find(Student.class).where().ieq("name", "john").findUnique();
+  lizz = server.find(Student.class).where().ieq("name", "lizz").findUnique();
+} finally {
+  server.endTransaction();
+}
+</code></pre>

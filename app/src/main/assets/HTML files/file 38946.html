@@ -1,0 +1,69 @@
+<p>Your solution can be found here at SO: <a href="http://stackoverflow.com/questions/202912/hierarchical-data-in-linq-options-and-performance">Hierarchical data in Linq - options and performance</a>.</p>
+
+<p>I won't abstract the code for there are so many answers there that can solve your problem, by I specially like the <code>AsHierarchy()</code> linq extension method as shown on <a href="http://stackoverflow.com/a/1110685/1046610">Kyle</a>'s answer to that question. </p>
+
+<pre><code>var hierachy = dc.Employees.ToList().AsHierarchy(e =&gt; e.EmployeeID, e =&gt; e.ReportsTo);
+</code></pre>
+
+<p>The <a href="http://www.scip.be/index.php?Page=ArticlesNET18" rel="nofollow">code for the extension by Stefan Cruysberghs</a> is:</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace ScipBe.Common.LinqExtensions
+{
+  // Stefan Cruysberghs, http://www.scip.be, March 2008
+
+  /// &lt;summary&gt;
+  /// Hierarchy node class which contains a nested collection of hierarchy nodes
+  /// &lt;/summary&gt;
+  /// &lt;typeparam name="T"&gt;Entity&lt;/typeparam&gt;
+  public class HierarchyNode&lt;T&gt; where T : class
+  {
+    public T Entity { get; set; }
+    public IEnumerable&lt;HierarchyNode&lt;T&gt;&gt; ChildNodes { get; set; }
+    public int Depth { get; set; }
+  }
+
+  public static class LinqExtensionMethods
+  {
+    private static System.Collections.Generic.IEnumerable&lt;HierarchyNode&lt;TEntity&gt;&gt; CreateHierarchy&lt;TEntity, TProperty&gt;
+      (IEnumerable&lt;TEntity&gt; allItems, TEntity parentItem, 
+      Func&lt;TEntity, TProperty&gt; idProperty, Func&lt;TEntity, TProperty&gt; parentIdProperty, int depth) where TEntity : class
+    { 
+      IEnumerable&lt;TEntity&gt; childs;
+
+      if (parentItem == null)
+        childs = allItems.Where(i =&gt; parentIdProperty(i).Equals(default(TProperty)));
+      else
+        childs = allItems.Where(i =&gt; parentIdProperty(i).Equals(idProperty(parentItem)));
+
+      if (childs.Count() &gt; 0)
+      {
+        depth++;
+
+        foreach (var item in childs)
+          yield return new HierarchyNode&lt;TEntity&gt;() { Entity = item, ChildNodes = CreateHierarchy&lt;TEntity, TProperty&gt;
+            (allItems, item, idProperty, parentIdProperty, depth), Depth = depth };
+      }
+    }
+
+    /// &lt;summary&gt;
+    /// LINQ IEnumerable AsHierachy() extension method
+    /// &lt;/summary&gt;
+    /// &lt;typeparam name="TEntity"&gt;Entity class&lt;/typeparam&gt;
+    /// &lt;typeparam name="TProperty"&gt;Property of entity class&lt;/typeparam&gt;
+    /// &lt;param name="allItems"&gt;Flat collection of entities&lt;/param&gt;
+    /// &lt;param name="idProperty"&gt;Reference to Id/Key of entity&lt;/param&gt;
+    /// &lt;param name="parentIdProperty"&gt;Reference to parent Id/Key&lt;/param&gt;
+    /// &lt;returns&gt;Hierarchical structure of entities&lt;/returns&gt;
+    public static System.Collections.Generic.IEnumerable&lt;HierarchyNode&lt;TEntity&gt;&gt; AsHierarchy&lt;TEntity, TProperty&gt;
+      (this IEnumerable&lt;TEntity&gt; allItems, Func&lt;TEntity, TProperty&gt; idProperty, Func&lt;TEntity, TProperty&gt; parentIdProperty)
+      where TEntity : class
+    {
+      return CreateHierarchy(allItems, default(TEntity), idProperty, parentIdProperty, 0);
+    }
+  }
+}
+</code></pre>

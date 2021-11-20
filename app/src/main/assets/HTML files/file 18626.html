@@ -1,0 +1,57 @@
+<p>There are a number of ways to go about implementing this. It really depends on what kinds of notifications you want to cover and what information you need to collect about the notification to show it to the right user(s). If you are looking for a simple design that just covers notifications about posted comments, you could use a combination of <a href="http://guides.rubyonrails.org/association_basics.html#polymorphic-associations" rel="nofollow">polymorphic associations</a> and <a href="http://guides.rubyonrails.org/active_record_validations_callbacks.html#observers" rel="nofollow">observer callbacks</a>:</p>
+
+<pre><code>class Photo &lt; ActiveRecord::Base
+# or Status or Event
+    has_many :comments, :as =&gt; :commentable
+end
+
+class Comment &lt; ActiveRecord::Base
+    belongs_to :commenter
+    belongs_to :commentable, :polymorphic =&gt; true # the photo, status or event
+end
+
+class CommentNotification &lt; ActiveRecord::Base
+    belongs_to :comment
+    belongs_to :target_user
+end
+
+class CommentObserver &lt; ActiveRecord::Observer
+    observe :comment
+
+    def after_create(comment)
+        ...
+        CommentNotification.create!(comment_id: comment.id,
+          target_user_id: comment.commentable.owner.id)
+        ...
+    end
+end
+</code></pre>
+
+<p>What's happening here is that each photo, status, event etc. has many comments. A <code>Comment</code> obviously belongs to a <code>:commenter</code> but also to a <code>:commentable</code>, which is either a photo, status, event or any other model that you want to allow comments for. You then have a <code>CommentObserver</code> that will observe your <code>Comment</code> model and do something whenever something happens with the <code>Comment</code> table. In this case, after a <code>Comment</code> is created, the observer will create a <code>CommentNotification</code> with the id of the comment and the id of the user who owns the thing that the comment is about (<code>comment.commentable.owner.id</code>). This would require that you implement a simple method <code>:owner</code> for each model you want to have comments for. So, for example, if the commentable is a photo, the owner would be the user who posted the photo.</p>
+
+<p>This basic design should be enough to get you started, but note that if you want to create notifications for things other than comments, you could extend this design by using a polymorphic association in a more general <code>Notification</code> model.</p>
+
+<pre><code>class Notification &lt; ActiveRecord::Base
+    belongs_to :notifiable, :polymorphic =&gt; true
+    belongs_to :target_user
+end
+</code></pre>
+
+<p>With this design, you would then 'observe' all your <code>notifiables</code> (models that you want to create notifications for) and do something like the following in your <code>after_create</code> callback:</p>
+
+<pre><code>class GenericObserver &lt; ActiveRecord::Observer
+    observe :comment, :like, :wall_post
+
+    def after_create(notifiable)
+        ...
+        Notification.create!(notifiable_id: notifiable.id, 
+                           notifiable_type: notifiable.class.name,
+                            target_user_id: notifiable.user_to_notify.id)
+        ...
+    end
+end
+</code></pre>
+
+<p>The only tricky part here is the <code>user_to_notify</code> method. All models that are <code>notifiable</code> would have to implement it in some way depending on what the model is. For example, <code>wall_post.user_to_notify</code> would just be the owner of the wall, or <code>like.user_to_notify</code> would be the owner of the thing that was 'liked'. You might even have multiple people to notify, like when notifying all the people tagged in a photo when someone comments on it.</p>
+
+<p>Hope this helps.</p>

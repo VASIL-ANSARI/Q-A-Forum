@@ -1,0 +1,34 @@
+<p>Im not sure why you are using resulttransformer when the return type is the same as the query type</p>
+
+<pre><code>return NHibernateSession.QueryOver&lt;Tree&gt;()
+    .Where(t =&gt; t.Id.IsIn(ListOfTreeId))
+    .JoinQueryOver&lt;Apple&gt;(t =&gt; t.Apples)
+        .Where(a =&gt; !a.IsRotten)
+    .List();
+</code></pre>
+
+<p>Update: the Compiler chooses <code>ICollection&lt;Apple&gt;</code> while it really should choose <code>Apple</code> therefor specify the generic argument in JoinQueryOver explicitly</p>
+
+<p>Update2: to get them unique</p>
+
+<p>opt 1)</p>
+
+<pre><code>...
+    .SetResultTransformer(Transformers.DistinctRootEntity());
+    .List();
+</code></pre>
+
+<p>opt 2)</p>
+
+<pre><code>Tree treeAlias = null;
+
+var nonRottenApples = QueryOver.Of&lt;Apple&gt;()
+    .Where(a =&gt; !a.IsRotten)
+    .Where(a =&gt; a.Tree.Id == treeAlias.Id)
+    .Select(x =&gt; x.Id);   &lt;- optional
+
+return NHibernateSession.QueryOver(() =&gt; treeAlias)
+    .Where(t =&gt; t.Id.IsIn(ListOfTreeId))
+    .WithSubquery.WhereExists(nonRottenApples)
+    .List();
+</code></pre>

@@ -1,0 +1,47 @@
+<p><strong>UPDATE:</strong></p>
+
+<p>I recently were facing a similar problem. Sometimes when a web application is not well programmed, it may not clean up network (TCP) sockets correctly... for example the database connection classes. Leading to too many open filedescriptors on the host (Tomcat JVM) process. And that may lead to the same in-responsibility you are facing.</p>
+
+<p>So, in my case i solved the problem by designing the database connection in a per thread basis using ThreadLocal generic. This is managed in my Web-Apps service managed bean.:</p>
+
+<pre><code>private static ThreadLocal&lt;YourConnectionClass&gt; connection = new ThreadLocal&lt;YourConnectionClass&gt;();
+
+public static YourConnectionClass getConnection(){
+    if (connection.get() == null) connection.set(driver.getConnection());
+    return connection.get();
+}
+</code></pre>
+
+<p>This will ensure that per tomcat executor thread only one TCP socket will be opend. If that problem applies to you an you add a similar fix to the one i mentioned, your problems will dissapear. well, but its still just a "guess". Tou can verify if that applies to you by simply entering this into the servers unix/linux console:</p>
+
+<pre><code>netstat | grep &lt;YOUR_TCP_PORT&gt;
+</code></pre>
+
+<p>or by using lsof (list open files). Because TCP sockets handled like open file handles.</p>
+
+<pre><code>lsof &lt;YOUR_JVM_PID&gt;
+</code></pre>
+
+<p>If the number of open sockets after tomcat start is less or little and on the other hand is devastating high when your in-responsibility problem occurs, then you may have an open socket file descriptor leak. </p>
+
+<p>As a second guess you may also have a HashTable memory leak that can be caused even in Java when not cleaning up a HashTable of Java objects correctly (somewhere in the web-apps server code). But as i can read in the above comments, thats probably not the case.</p>
+
+<p>cheers,</p>
+
+<p>will</p>
+
+<p><hr />
+<strong>My older Answer:</strong></p>
+
+<p>I bet its the Garbage Collection Strategy. </p>
+
+<p>Try using another one by setting the correct JVM OPTS:</p>
+
+<pre><code>-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:SurvivorRatio=2 -XX:NewRatio=8
+</code></pre>
+
+<p>Check this links:</p>
+
+<p><a href="http://www.petefreitag.com/articles/gctuning/" rel="nofollow">http://www.petefreitag.com/articles/gctuning/</a></p>
+
+<p><a href="http://www.idevelopment.info/data/Programming/java/miscellaneous_java/Java_Options_For_Garbage_Collection.html" rel="nofollow">http://www.idevelopment.info/data/Programming/java/miscellaneous_java/Java_Options_For_Garbage_Collection.html</a></p>

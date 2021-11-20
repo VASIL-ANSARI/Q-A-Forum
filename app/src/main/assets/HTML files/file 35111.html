@@ -1,0 +1,43 @@
+<p>The DataGrid does not show data, because the binding does not work. Let's take a look at your existing binding:</p>
+
+<pre><code>&lt;DataGrid Grid.Row="4" ItemsSource="{Binding Points}" /&gt;
+</code></pre>
+
+<p>The binding tries to access the points property of the DataContext of NTab. Whatever the NTab's DataContext, it does not seem to be your point list.</p>
+
+<p>You should be able to fix the problem bei either setting the DataContext to the NTab instance with the <em>Points</em> property:</p>
+
+<pre><code>public NTab()
+{
+    ...
+    Points = CollectionViewSource.GetDefaultView(_Points);
+    DataContext = this;
+}
+</code></pre>
+
+<p>or (preferably) you do a binding by element name in XAML:</p>
+
+<pre><code>&lt;UserControl x:Class="WPF.NTab" x:Name="thisNTab" ...&gt;
+    ...
+    &lt;DataGrid Grid.Row="4" ItemsSource="{Binding Points, ElementName=thisNTab}" /&gt;
+&lt;/UserControl&gt;
+</code></pre>
+
+<p>This alone will not yet give you the result, since the binding will not be aware if and when the <em>Points</em> property changes. Either implement the <em>INotifyPropertyChanged</em> mechanism, or turn <em>Points</em> into a DependencyProperty. Below the code for the using a read-only DependencyProperty:</p>
+
+<pre><code>private static readonly DependencyPropertyKey PointsPropertyKey =
+    DependencyProperty.RegisterReadOnly(
+        "Points",
+        typeof(ICollectionView),
+        typeof(NTab),
+        new PropertyMetadata(null)
+    );
+public static DependencyProperty PointsProperty = PointsPropertyKey.DependencyProperty;
+
+public ICollectionView Points
+{
+    get { return (ICollectionView) GetValue(PointsProperty ); }
+    private set { SetValue(PointsPropertyKey, value); }
+
+}
+</code></pre>

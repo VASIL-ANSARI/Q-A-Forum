@@ -1,0 +1,24 @@
+<p>This isn't a direct answer; but in lieu of your comment, I have a function in my GL library:</p>
+
+<pre><code>GLenum
+G0::glFlushError () // noexcept
+{
+    GLenum ret = glGetError();
+
+    if (ret != GL_NO_ERROR)
+    {
+        GLuint finite = 255; // (watchdog count)
+        GLenum gl_err = ret;
+
+        while (gl_err != GL_NO_ERROR &amp;&amp; finite--)
+            gl_err = glGetError();
+
+        if (gl_err != GL_NO_ERROR)
+            G0::terminate("glGetError: reset failed\n");
+    }
+
+    return ret;
+}
+</code></pre>
+
+<p>Where <code>G0</code> is my library's namespace. When you want to test the most recent GL error - and clear it - <code>glGetError</code> needs to be called in a <a href="https://www.opengl.org/sdk/docs/man/html/glGetError.xhtml" rel="nofollow">loop</a>. It's an 'expensive' call, as it stalls the pipeline, and therefore should only be used in 'setup' code, or during debugging.</p>

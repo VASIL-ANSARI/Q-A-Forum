@@ -1,0 +1,80 @@
+<p>You have multiple problems with the domain design, first remove the user from comment ,as the user already have a comment from feedback. if you still wish to keep that design, then define <code>belongsTo</code> to <code>User</code>,in both <code>Comment</code> and <code>Feedback</code>.</p>
+
+<p>Try this...</p>
+
+<p>Add <code>hasOne</code> <code>Feedback</code> to <code>User</code> </p>
+
+<pre><code>class User {
+String name
+String email
+String webpage
+
+hasOne = [feedback:Feedback ]
+static constraints = {
+    name (blank:false, nullable:false, size:3..30, matches:"[a-zA-Z1-9_]+")
+    email (email:true)
+    webpage (url:true)
+}
+
+String toString(){
+    return name;
+}
+}
+</code></pre>
+
+<p>Add <code>Feedback</code> belongsTo <code>User</code> and cascade on delete for <code>Comment</code></p>
+
+<pre><code>class Feedback {
+String title
+String feedback
+Date dateCreated // Predefined names by Grails will be filled automatically
+Date lastUpdated // Predefined names by Grails will be filled automatically
+
+// relationship to the other classes
+User user
+static belongsTo = [User]
+
+static hasMany=[comments:Comment]
+
+static mapping = {
+    comments cascade: 'all-delete-orphan',column: 'FEEDBACK_COMMENT_ID', joinTable: false
+}
+
+// constrains are defined as static
+static constraints ={
+    title(blank:false, nullable: false, size:3..80)
+    feedback(blank:false, nullable:false, size:3..500)
+    user(nullable:false)
+}}
+</code></pre>
+
+<p>Simply remove <code>User</code> from <code>Comment</code> </p>
+
+<pre><code>class Comment {
+String comment
+Date dateCreated // Predefined names by Grails will be filled automatically
+Date lastUpdated // Predefined names by Grails will be filled automatically
+
+//User user
+
+// delete a comment for a feedback if the feedback item is deleted
+ /static belongsTo=[User,feedback:Feedback]
+static belongsTo=[feedback:Feedback]
+
+static mapping = {
+    feedback column: 'COMMENT_FEEDBACK_ID', joinTable: false
+}
+
+static constraints = {
+    comment (blank:false, nullable: false, size:5..500)
+    //user (nullable: true) // Comments are allowed without a user
+}
+
+
+String toString(){
+    if (comment?.size()&gt;20){
+        return comment.substring(0,19);
+    } else
+        return comment;
+}}
+</code></pre>

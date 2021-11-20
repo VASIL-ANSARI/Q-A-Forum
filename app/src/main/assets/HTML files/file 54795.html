@@ -1,0 +1,21 @@
+<p>I believe this is happening as you are instructing the ParseSDK to <em>become</em> that other user, which looks like it doesn't work if it's the same as the current user (i.e. your session is valid).</p>
+
+<p>I handle the session check a little bit differently. Instead, I refresh the user, then trap any errors and check for an invalid session. This works well :)</p>
+
+<pre><code>[[PFUser currentUser] fetchInBackgroundWithBlock:^(PFObject *object, NSError *error) {
+    if (error) {
+        NSLog(@"Error refreshing user %@", error.localizedDescription);
+
+        // check if the session token is invalid... force a logout!
+        if ([error.domain isEqualToString:PFParseErrorDomain] &amp;&amp; error.code == kPFErrorInvalidSessionToken) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [PFUser logOut];
+
+                // Show your login screen or whatever here
+            });
+        }
+
+        return;
+    }
+}];
+</code></pre>

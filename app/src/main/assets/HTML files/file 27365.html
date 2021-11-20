@@ -1,0 +1,33 @@
+<p>You can either do this in the controller or the model. I like to do this kind of thing in the model for convenience. One other thing you'll have to worry about is what happens if a bid is removed? You'll need to update the parent as well.</p>
+
+<p><em>This code is completely untested</em></p>
+
+<pre><code>class Item &lt; ActiveRecord::Base    
+
+  def check_highest_bid
+    highest_bid = self.bids.order("amount DESC").first.amount rescue 0
+    self.price = highest_bid
+    save
+  end
+
+end
+
+class Bid &lt; ActiveRecord::Base   
+
+  validate :check_if_highest_bid
+
+  after_save :update_item
+  after_destroy :update_item
+
+  def update_item
+    self.item.check_highest_bid
+  end     
+
+  def check_if_highest_bid
+     errors.add(:amount, "must be higher than current bid") unless self.item.price &lt; self.amount
+  end
+end
+</code></pre>
+
+<p>docs:
+<a href="http://edgeguides.rubyonrails.org/active_record_validations.html#custom-methods" rel="nofollow">http://edgeguides.rubyonrails.org/active_record_validations.html#custom-methods</a></p>

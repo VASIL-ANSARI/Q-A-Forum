@@ -1,0 +1,107 @@
+<p>Basically, MingW doesn't have the symbols loaded for those libraries.</p>
+
+<p>MSVC might have them already... but even MSVC doesn't include all the libraries at times, especially uncommon ones.  But you can get around it by explicitly loading the libraries yourself.  I've done this a number of times using <code>QLibrary</code> and the MSDN documentation.</p>
+
+<p>You need to copy the header file information for the functions you are using, and load the symbol and typecast it as the function you are using.  <strike>I'll post a code sample shortly.</strike></p>
+
+<p>So for the first one: <code>GetWindowRect</code>, you can find it under:</p>
+
+<p><a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633519(v=vs.85).aspx" rel="nofollow">https://msdn.microsoft.com/en-us/library/windows/desktop/ms633519(v=vs.85).aspx</a></p>
+
+<pre><code>BOOL WINAPI GetWindowRect(
+  _In_  HWND   hWnd,
+  _Out_ LPRECT lpRect
+);
+</code></pre>
+
+<p>Note that on the bottom of the page it mentions which header file it is in an which dll/lib it is a part of.  Also note which versions of windows it will apply for.  You can query the version of windows and switch how you behave for specific versions of windows in some cases.</p>
+
+<p>To add this with an explicit declaration, here is a nice little wrapper class:</p>
+
+<p>winlibs.h</p>
+
+<pre><code>#ifndef WINLIBS_H
+#define WINLIBS_H
+
+#define WIN32_LEAN_AND_MEAN
+#include &lt;windows.h&gt;
+#include &lt;QLibrary&gt;
+
+typedef HWND (WINAPI * GetShellWindow_Ptr)(void);
+typedef BOOL (WINAPI * GetWindowRect_Ptr)(
+    /*_In_*/  HWND   hWnd,
+    /*_Out_*/ LPRECT lpRect
+);
+
+class WinLibs
+{
+public:
+     WinLibs();
+     static GetShellWindow_Ptr GetShellWindow;
+     static GetWindowRect_Ptr GetWindowRect;
+     static void cleanUp();
+     static QLibrary * myLib;
+};
+
+#endif // WINLIBS_H
+</code></pre>
+
+<p>winlibs.cpp</p>
+
+<pre><code>#include "winlibs.h"
+#include &lt;QDebug&gt;
+
+GetShellWindow_Ptr WinLibs::GetShellWindow = 0;
+GetWindowRect_Ptr WinLibs::GetWindowRect = 0;
+
+QLibrary * WinLibs::myLib = 0;
+
+bool WinLibs::hasInitialized = false;
+
+WinLibs::WinLibs()
+{
+     if(hasInitialized)
+          return;
+
+     myLib = new QLibrary("User32.dll");
+     GetShellWindow = (GetShellWindow_Ptr) myLib-&gt;resolve("GetShellWindow");
+     GetWindowRect = (GetWindowRect_Ptr) myLib-&gt;resolve("GetWindowRect");
+     if(GetShellWindow == 0 || GetWindowRect == 0)
+          qCritical() &lt;&lt; "Failed to load User32.dll properly!";
+
+     hasInitialized = true;
+}
+
+void WinLibs::cleanUp()
+{
+     hasInitialized = false;
+     myLib-&gt;unload();
+     delete myLib;
+     myLib = 0;
+}
+</code></pre>
+
+<p>example usage:</p>
+
+<pre><code>WinLibs w;
+if(w.GetShellWindow)
+{
+    // use w.GetShellWindow here
+}
+
+if(w.GetWindowRect)
+{
+    // use w.GetWindowRect here
+
+    RECT rect;//Rect System Tray
+    HWND taskBar = FindWindow(L"Shell_traywnd", NULL);
+    if(taskBar &amp;&amp; w.GetWindowRect(taskBar, &amp;rect))
+    {
+        // .. more code
+    }
+}
+</code></pre>
+
+<p>Be sure to handle errors and return values properly from Windows functions when trying to debug them, too.  And note that you will get errors if you are building a 64 bit program and you try to access a 32 bit dll and vice versa.  Usually you don't have to worry about this for windows libraries because the system will add the correct one to the path when they are getting resolved.</p>
+
+<p>Hope that helps.  </p>

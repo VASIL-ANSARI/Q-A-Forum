@@ -1,0 +1,91 @@
+<p>I don't quite understand why you want to use CRTP here in this way. </p>
+
+<p>CRTP is the natural way to implement the actual details of the <code>=</code> and <code>+=</code> operations, when only the memory management is done via the derived methods. Such design clearly separates the two task of arithmetic and memory management to different classes. The <code>+</code> (binary) operator is then best implemented as stand-alone function template.</p>
+
+<p>Something like this:</p>
+
+<pre><code>namespace biginteger_details {
+  template&lt;typename UInteger&gt;
+  class UIntegerBase      // CRTP base, implementing the arithmetics
+  {
+    using uint32_t = std::uint32_t;
+    using size_t = std::size_t;
+    // access to data: all functionality is implemented through these methods
+    uint32_t&amp;block(size_t i)       { return static_cast&lt;      UInteger*&gt;(this)-&gt;m_data[i]; }
+    uint32_t block(size_t i) const { return static_cast&lt;const UInteger*&gt;(this)-&gt;m_data[i]; }
+    size_t size() const    { return static_cast&lt;const UInteger*&gt;(this)-&gt;size(); }
+    void resize(size_t n)  { static_cast&lt;UInteger*&gt;(this)-&gt;resize(n); }
+  public:
+    // assignment operator: allow assignment from any UInteger type
+    template&lt;typename UI&gt;
+    UInteger&amp;operator=(UIntegerBase&lt;UI&gt; const&amp;other)
+    {
+      resize(other.size());
+      for(size_t i=0; i!=size(); ++i)
+        block(i) = other.block(i);
+      return static_cast&lt;UInteger&amp;&gt;(*this);
+    }
+    // add and assign: allow adding any UInteger type
+    template&lt;typename UI&gt;
+    UInteger&amp;operator+=(UIntegerBase&lt;UI&gt; const&amp;other)
+    {
+      // your code here using block(), size(), and resize()
+      return static_cast&lt;UInteger&amp;&gt;(*this);
+    }
+  };
+
+  template&lt;std::size_t nblock=8&gt;
+  struct UIntegerFP
+  : UIntegerBase&lt;UIntegerFP&lt;nblock&gt;&gt;
+  {
+    static constexpr std::size_t max_blocks=nblock;
+    // 1 data
+    std::array&lt;std::uint32_t,nblock&gt; m_data;
+    std::size_t m_size=0;
+    // 2 interface to base
+    std::size_t size() const { return m_size; }
+    void resize(std::size_t n)
+    {
+      if(n&gt;nblock) throw std::out_of_range("exceeding capacity");
+      m_size = n;
+    }
+    // 3 constructors
+    //   copy constructor from any UInteger type
+    template&lt;typename UI&gt;
+    UIntegerFP(UIntegerBase&lt;UI&gt; const&amp;other)
+    { this-&gt;operator=(other); }
+  };
+
+  struct UIntegerAP
+  : UIntegerBase&lt;UIntegerAP&gt;
+  {
+    static constexpr std::size_t max_blocks=~(std::size_t(0));
+    // 1 data,
+    std::vector&lt;std::uint32_t&gt; m_data;
+    // 2 interface to base
+    std::size_t size() const { return m_data.size(); }
+    void resize(std::size_t n)
+    { m_data.resize(n); }
+    // 3 constructors
+    //   copy constructor from any UInteger type
+    template&lt;typename UI&gt;
+    UIntegerAP(UIntegerBase&lt;UI&gt; const&amp;other)
+    { this-&gt;operator=(other); }
+  };
+
+  // functions best take UIntegerBase&lt;UI&gt; arguments, for example:
+
+  // operator + as stand alone function template
+  template&lt;typename Ulhs, typename Urhs&gt;
+  inline std::conditional_t&lt;(Ulhs::max_blocks &gt; Urhs::max_blocks), Ulhs, Urhs&gt;
+  operator+(UIntegerBase&lt;Ulhs&gt; const&amp;lhs, UIntegerBase&lt;Urhs&gt; const&amp;rhs)
+  {
+    std::conditional_t&lt;(Ulhs::max_blocks &gt; Urhs::max_blocks), Ulhs, Urhs&gt;
+    result=lhs;
+    return result+=rhs;
+  }
+} // namespace biginteger_details;
+using biginteger_details::UIntegerFP; 
+using biginteger_details::UIntegerAP;
+// note: biginteger_details::operator+ will be found by ADL (argument dependent look-up)
+</code></pre>

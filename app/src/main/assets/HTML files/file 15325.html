@@ -1,0 +1,43 @@
+<p>There are two main problems with this, use of open arrays and use of Delphi <code>string</code>.</p>
+
+<p><strong>Open arrays</strong></p>
+
+<p>Delphi open arrays are implemented by passing a pointer to the first element of the array and an extra parameter specifying the index of the last item, <code>high</code> in Delphi terminology. For more information see <a href="http://stackoverflow.com/questions/7944447/how-do-i-use-c-sharp-to-call-a-function-that-receives-a-delphi-open-array-parame#7944655">this answer</a>.</p>
+
+<p><strong>Delphi strings</strong></p>
+
+<p>The C# marshaller cannot interop with a Delphi string. Delphi strings are private types, only to be used internally to a Delphi module. Instead you should use a null-terminated string, <code>PAnsiChar</code>.</p>
+
+<hr>
+
+<p>Putting it all together you can write it like this:</p>
+
+<p><strong>Delphi</strong></p>
+
+<pre><code>type 
+  TParams = record
+    _Type: Integer;//Type is a reserved word in Delphi
+    Name: PAnsiChar;
+    Amount: Double;
+  end;
+
+function Func(const arrParams: array of TParams): Integer; stdcall;
+</code></pre>
+
+<p><strong>C#</strong></p>
+
+<pre><code>[StructLayoutAttribute(LayoutKind.Sequential)]
+public struct TParams
+{
+  public int Type;
+  public string Name;
+  public double Amount;
+}
+
+[DllImport("some.dll")]
+public static extern int Func(TParams[] arrParams, int high);
+
+TParams[] params = new TParams[len];
+...populate params
+int retval = Func(params, params.Length-1);
+</code></pre>

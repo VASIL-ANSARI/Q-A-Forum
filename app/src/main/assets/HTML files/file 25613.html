@@ -1,0 +1,168 @@
+<p>perhaps it can be starting point. Handling pause/resume  depends from your needs and can be tweaked.</p>
+
+<pre><code>var cancellationTokenSource = new CancellationTokenSource();
+var cancellation = cancellationTokenSource.Token;
+
+void UpdateDatabases(IEnumerable&lt;...&gt; databases, CancellationToken cancellation)
+{
+   foreach(db in databases)
+   {
+
+
+   //create as many ProgressBar instances as databases you want to update
+   //check if ProgressBar exist, then return it and reuse, otherwise create new
+   ProgressBar pb = new ProgressBar();   
+   pb.Maximum = iterations;   
+   pb.Dock = DockStyle.Fill;   
+
+   Controls.Add(pb);  
+
+
+
+  //start thread for every database/progress bar
+
+  Task.Factory.StartNew(progressBar =&gt; 
+  {   
+      var start = (ProgressBar)progressBar).Value; //use last value in case of pause
+      Parallel.For(start, iterations, 
+          new ParallelOptions(){CancellationToken =  cancellation}
+      (i, loopState) =&gt;  
+      {   
+          if (loopState.ShouldExitCurrentIteration)
+                return;
+          //perhaps check loopState.ShouldExitCurrentIteration inside worker method
+          Thread.SpinWait(50000000); // do work here   
+
+          BeginInvoke((Action)delegate { ((ProgressBar)progressBar).Value++; });   
+      });   
+   }, 
+   pb, cancellation)
+
+   .ContinueWith(task =&gt; 
+  {
+      //to handle exceptions use task.Exception member
+
+      var progressBar = (ProgressBar)task.AsyncState;
+      if (!task.IsCancelled)
+      {
+          //hide progress bar here and reset pb.Value = 0
+      }
+  }, 
+  TaskScheduler.FromCurrentSynchronizationContext() //update UI from UI thread
+  ); 
+
+   }
+}
+
+ //.........
+
+ //Call
+ UpdateDatabases(databases, cancellation)  
+
+ //To suspend, call 
+ cancellationTokenSource.Cancel();
+
+ //To resume - simply call UpdateDatabases  again
+ cancellationTokenSource = new CancellationTokenSource();
+ cancellation = cancellationTokenSource.Token;
+ UpdateDatabases(databases, cancellation)  
+</code></pre>
+
+<p><strong>Update</strong></p>
+
+<p>I've reviewed your code. Take a look at the revisited code and adapt it to your needs. Main mistakes -  mess with <code>closures</code> and creating the Progress from non-ui thread. To enable parallel processing you can use Parallel.ForEach (see MSND for possible overloads). Also the design looks little bit strange for me(you're mixing data and logic in the <code>Progress</code> ). From UI perspective it's also strange that  progress bars will appear in order of processing but not in original order as they are in list (it will be a problem if you decide to sort the list alphabetically)</p>
+
+<p>I hope it help.</p>
+
+<p><strong>main for code</strong></p>
+
+<pre><code>   private void btnStart_Click(object sender, EventArgs e)
+    {
+        Progress ucProgress = null;
+        Dictionary&lt;string, string&gt; dicList = new Dictionary&lt;string, string&gt;();
+        dicList.Add("GB", "conn1");
+        dicList.Add("US", "conn2");
+        dicList.Add("DE", "conn3");
+        fpPanel.Controls.Clear();
+
+        Func&lt;KeyValuePair&lt;string, string&gt;, object&gt; createProgress = entry =&gt;
+        {
+
+            var tmp = new Progress {Country = entry.Key, DBConnection = entry.Value};
+            fpPanel.Controls.Add(tmp);
+            return tmp;
+        };
+
+        Task.Factory.StartNew(() =&gt;
+        {
+            //foreach (KeyValuePair&lt;string, string&gt; entry in dicList)
+
+            Parallel.ForEach(dicList,
+                entry =&gt;
+                {
+
+                    //create and add the Progress in UI thread
+                    var ucProgress = (Progress)fpPanel.Invoke(createProgress, entry);
+
+                    //execute ucProgress.Process(); in non-UI thread in parallel. 
+                    //the .Process(); must update UI by using *Invoke
+                    ucProgress.Process();
+
+                    System.Threading.Thread.SpinWait(5000000);
+                });
+        });
+
+    }
+</code></pre>
+
+<p><strong>user control code</strong></p>
+
+<pre><code>public void Process()
+    {
+        //uiScheduler - Not used
+        //var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        //The Task is not necessary because the Process() called from Parallel.ForEach 
+        //Task.Factory.StartNew(() =&gt;
+        //{
+
+            //BeginInvoke or Invoke required
+            lblMsg.BeginInvoke((MethodInvoker)delegate
+            {
+                lblMsg.Text = "Connecting country " + Country;
+            });
+
+            pbStatus.BeginInvoke((MethodInvoker)delegate
+            {
+                pbStatus.Value = 30;
+            });
+            System.Threading.Thread.SpinWait(50000000);
+
+            //***********
+            lblMsg.BeginInvoke((MethodInvoker)delegate
+            {
+                lblMsg.Text = "executing sql for country " + Country;
+            });
+
+            pbStatus.BeginInvoke((MethodInvoker)delegate
+            {
+                pbStatus.Value = 60;
+            });
+            System.Threading.Thread.SpinWait(50000000);
+
+            //***********
+
+            lblMsg.BeginInvoke((MethodInvoker)delegate
+            {
+                lblMsg.Text = "sql executed successfully for country " + Country;
+            });
+
+            pbStatus.BeginInvoke((MethodInvoker)delegate
+            {
+                pbStatus.Value = 100;
+            });
+            System.Threading.Thread.SpinWait(50000000);
+
+        //});
+        //System.Threading.Thread.SpinWait(50000000); // do work here   
+    }
+</code></pre>

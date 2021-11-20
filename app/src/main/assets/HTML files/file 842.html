@@ -1,0 +1,172 @@
+<p>I've used the standard control in the past, and just added a simple <a href="http://msdn.microsoft.com/en-us/library/system.web.ui.adapters.controladapter.aspx" rel="nofollow">ControlAdapter</a> for it that would override the default behavior so it could render &lt;optgroup>s in certain places. This works great even if you have controls that don't need the special behavior, because the additional feature doesn't get in the way.</p>
+
+<p>Note that this was for a specific purpose and written in .Net 2.0, so it may not suit you as well, but it should at least give you a starting point. Also, you have to hook it up using a .browserfile in your project (see the end of the post for an example).</p>
+
+<pre class="lang-vb prettyprint-override"><code>'This codes makes the dropdownlist control recognize items with "--"
+'for the label or items with an OptionGroup attribute and render them
+'as &lt;optgroup&gt; instead of &lt;option&gt;.
+Public Class DropDownListAdapter
+    Inherits System.Web.UI.WebControls.Adapters.WebControlAdapter
+
+    Protected Overrides Sub RenderContents(ByVal writer As HtmlTextWriter)
+        Dim list As DropDownList = Me.Control
+        Dim currentOptionGroup As String
+        Dim renderedOptionGroups As New Generic.List(Of String)
+
+        For Each item As ListItem In list.Items
+            Page.ClientScript.RegisterForEventValidation(list.UniqueID, item.Value)
+            If item.Attributes("OptionGroup") IsNot Nothing Then
+                'The item is part of an option group
+                currentOptionGroup = item.Attributes("OptionGroup")
+                If Not renderedOptionGroups.Contains(currentOptionGroup) Then
+                    'the header was not written- do that first
+                    'TODO: make this stack-based, so the same option group can be used more than once in longer select element (check the most-recent stack item instead of anything in the list)
+                    If (renderedOptionGroups.Count &gt; 0) Then
+                        RenderOptionGroupEndTag(writer) 'need to close previous group
+                    End If
+                    RenderOptionGroupBeginTag(currentOptionGroup, writer)
+                    renderedOptionGroups.Add(currentOptionGroup)
+                End If
+                RenderListItem(item, writer)
+            ElseIf item.Text = "--" Then 'simple separator
+                RenderOptionGroupBeginTag("--", writer)
+                RenderOptionGroupEndTag(writer)
+            Else
+                'default behavior: render the list item as normal
+                RenderListItem(item, writer)
+            End If
+        Next item
+
+        If renderedOptionGroups.Count &gt; 0 Then
+            RenderOptionGroupEndTag(writer)
+        End If
+    End Sub
+
+    Private Sub RenderOptionGroupBeginTag(ByVal name As String, ByVal writer As HtmlTextWriter)
+        writer.WriteBeginTag("optgroup")
+        writer.WriteAttribute("label", name)
+        writer.Write(HtmlTextWriter.TagRightChar)
+        writer.WriteLine()
+    End Sub
+
+    Private Sub RenderOptionGroupEndTag(ByVal writer As HtmlTextWriter)
+        writer.WriteEndTag("optgroup")
+        writer.WriteLine()
+    End Sub
+
+    Private Sub RenderListItem(ByVal item As ListItem, ByVal writer As HtmlTextWriter)
+        writer.WriteBeginTag("option")
+        writer.WriteAttribute("value", item.Value, True)
+        If item.Selected Then
+            writer.WriteAttribute("selected", "selected", False)
+        End If
+
+        For Each key As String In item.Attributes.Keys
+            writer.WriteAttribute(key, item.Attributes(key))
+        Next key
+
+        writer.Write(HtmlTextWriter.TagRightChar)
+        HttpUtility.HtmlEncode(item.Text, writer)
+        writer.WriteEndTag("option")
+        writer.WriteLine()
+    End Sub
+End Class
+</code></pre>
+
+<p>Here's a C# implementation of the same Class:</p>
+
+<pre><code>/* This codes makes the dropdownlist control recognize items with "--"
+ * for the label or items with an OptionGroup attribute and render them
+ * as &lt;optgroup&gt; instead of &lt;option&gt;.
+ */
+public class DropDownListAdapter : WebControlAdapter
+{
+    protected override void RenderContents(HtmlTextWriter writer)
+    {
+        //System.Web.HttpContext.Current.Response.Write("here");
+        var list = (DropDownList)this.Control;
+        string currentOptionGroup;
+        var renderedOptionGroups = new List&lt;string&gt;();
+
+        foreach (ListItem item in list.Items)
+        {
+            Page.ClientScript.RegisterForEventValidation(list.UniqueID, item.Value);
+            //Is the item part of an option group?
+            if (item.Attributes["OptionGroup"] != null)
+            {
+                currentOptionGroup = item.Attributes["OptionGroup"];
+                //Was the option header already written, then just render the list item
+                if (renderedOptionGroups.Contains(currentOptionGroup))
+                    RenderListItem(item, writer);
+                //The header was not written,do that first
+                else
+                {
+                    //Close previous group
+                    if (renderedOptionGroups.Count &gt; 0)
+                        RenderOptionGroupEndTag(writer);
+
+                    RenderOptionGroupBeginTag(currentOptionGroup, writer);
+                    renderedOptionGroups.Add(currentOptionGroup);
+                    RenderListItem(item, writer);
+                }
+            }
+            //Simple separator
+            else if (item.Text == "--")
+            {
+                RenderOptionGroupBeginTag("--", writer);
+                RenderOptionGroupEndTag(writer);
+            }
+            //Default behavior, render the list item as normal
+            else
+                RenderListItem(item, writer);
+        }
+
+        if (renderedOptionGroups.Count &gt; 0)
+            RenderOptionGroupEndTag(writer);
+    }
+
+    private void RenderOptionGroupBeginTag(string name, HtmlTextWriter writer)
+    {
+        writer.WriteBeginTag("optgroup");
+        writer.WriteAttribute("label", name);
+        writer.Write(HtmlTextWriter.TagRightChar);
+        writer.WriteLine();
+    }
+    private void RenderOptionGroupEndTag(HtmlTextWriter writer)
+    {
+        writer.WriteEndTag("optgroup");
+        writer.WriteLine();
+    }
+    private void RenderListItem(ListItem item, HtmlTextWriter writer)
+    {
+        writer.WriteBeginTag("option");
+        writer.WriteAttribute("value", item.Value, true);
+        if (item.Selected)
+            writer.WriteAttribute("selected", "selected", false);
+
+        foreach (string key in item.Attributes.Keys)
+            writer.WriteAttribute(key, item.Attributes[key]);
+
+        writer.Write(HtmlTextWriter.TagRightChar);
+        HttpUtility.HtmlEncode(item.Text, writer);
+        writer.WriteEndTag("option");
+        writer.WriteLine();
+    }
+}
+</code></pre>
+
+<p>My browser file was named "App_Browsers\BrowserFile.browser" and looked like this:</p>
+
+<pre><code>&lt;!--
+    You can find existing browser definitions at
+    &lt;windir&gt;\Microsoft.NET\Framework\&lt;ver&gt;\CONFIG\Browsers
+--&gt;
+&lt;browsers&gt;
+   &lt;browser refID="Default"&gt;
+      &lt;controlAdapters&gt;
+        &lt;adapter controlType="System.Web.UI.WebControls.DropDownList" 
+               adapterType="DropDownListAdapter" /&gt;
+      &lt;/controlAdapters&gt;
+   &lt;/browser&gt;
+&lt;/browsers&gt;
+</code></pre>

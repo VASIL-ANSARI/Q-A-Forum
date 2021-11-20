@@ -1,0 +1,23 @@
+<p><code>ServiceRegistry</code> interface is related to concept of services (that is new for Hibernate 4). Services are classes that provide Hibernate with various functionality and for which user can plug in alternate implementations. See <a href="http://sourceforge.net/apps/mediawiki/hibernate/index.php?title=Category%3aServices">this wiki page</a> for details.</p>
+
+<p>You are right that method <code>buildSessionFactory()</code> is deprecated in Hibernate's <code>Configuration</code> class in favor of method <code>buildSessionFactory(ServiceRegistry serviceRegistry)</code>. In a pure Hibernate's environment (without Spring) it is supposed that you will initialize instance of <code>ServiceRegistry</code> in such a way:</p>
+
+<pre><code>private static SessionFactory sessionFactory;
+private static ServiceRegistry serviceRegistry;
+
+private static SessionFactory configureSessionFactory() throws HibernateException {
+    Configuration configuration = new Configuration();
+    configuration.configure();
+
+    serviceRegistry = new ServiceRegistryBuilder()
+             .applySettings(configuration.getProperties())
+             .buildServiceRegistry();
+
+    sessionFactory = configuration.buildSessionFactory(serviceRegistry);
+    return sessionFactory;
+}
+</code></pre>
+
+<p>But by now the deprecated method <code>buildSessionFactory()</code> also does the same initialization of <code>ServiceRegistry</code> for you.</p>
+
+<p>Spring's <code>LocalSessionFactoryBuilder</code> class is just the extension of Hibernate's <code>Configuration</code> class. But since all the specific work of Spring is done in overriden method <code>LocalSessionFactoryBuilder.buildSessionFactory()</code> you can't use method <code>buildSessionFactory(ServiceRegistry serviceRegistry)</code> in Spring's environment. Nothing much 'cause it's ok to use <code>buildSessionFactory()</code> that does exactly the same work. So let's just annotate the method in <code>AppConfig</code> with <code>@SuppressWarnings("deprecation")</code> and patiently wait for Spring to provide better integration with Hibernate 4.</p>

@@ -1,0 +1,25 @@
+<p>If this is something you need often, consider using <a href="http://docs.sqlalchemy.org/en/rel_1_0/orm/extensions/hybrid.html" rel="nofollow"><code>hybrid_property</code></a>. In your code it could look like this:</p>
+
+<pre><code>class Node(Base):
+    # ...
+
+    @hybrid_property
+    def children_count(self):
+        return len(self.children)
+
+    @children_count.expression
+    def children_count(cls):
+        Child = aliased(Node)
+        return (select([func.count(Child.id)])
+                .where(Child.parent_id == cls.id).
+                label('children_count')
+                )
+</code></pre>
+
+<p>And the query is as simple as:</p>
+
+<pre><code>q = (session.query(Node, Node.children_count)
+     .filter(Node.children_count &gt; 4)
+     ).all()
+print(q)
+</code></pre>

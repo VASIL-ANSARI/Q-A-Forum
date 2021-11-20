@@ -1,0 +1,50 @@
+<h1>First: Remove references in the code</h1>
+
+<ul>
+<li>remove <code>app_to_remove</code> from <code>settings.INSTALLED_APPS</code></li>
+<li>remove other references in <code>urls.py</code> or other places</li>
+</ul>
+
+<h1>Second: Clean the database</h1>
+
+<p>Create an empty migration for your django-project:</p>
+
+<pre><code>manage.py makemigrations your_django_project --empty
+</code></pre>
+
+<p>Edit the file. Here is a template: </p>
+
+<pre><code># -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('your_django_project', '0001_initial'),
+    ]
+
+    operations = [
+        migrations.RunSQL('''
+        drop if exists table app_to_remove_table1;
+        drop if exists table app_to_remove_table2;
+        ....
+        delete from auth_permission where content_type_id in (select id from django_content_type where app_label = '{app_label}');
+        delete from django_admin_log where content_type_id in (select id from django_content_type where app_label = '{app_label}');
+        delete from reversion_version where content_type_id in (select id from django_content_type where app_label = '{app_label}');
+        delete from django_content_type where app_label = '{app_label}';
+        delete from django_migrations where app='{app_label}';
+        '''.format(app_label='app_to_remove'))
+    ]
+</code></pre>
+
+<p>Run the migration, run tests.</p>
+
+<p>About "drop if exists": You have two cases:</p>
+
+<ol>
+<li>The production system: You want to drop the tables.</li>
+<li>New development systems: These systems never had this app, and they don't have this table :-)</li>
+</ol>

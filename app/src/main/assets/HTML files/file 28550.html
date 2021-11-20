@@ -1,0 +1,73 @@
+<p>A regex with capture groups should work for you (<code>/%APP:(.*?)\|ID:([0-9]+)%/</code>):</p>
+
+<pre><code>$string = "This is my string but it also has %APP:name_of_the_app|ID:123123123% a bunch of other stuff in it";
+
+$apps = array();
+if (preg_match_all("/%APP:(.*?)\|ID:([0-9]+)%/", $string, $matches)) {
+    for ($i = 0; $i &lt; count($matches[0]); $i++) {
+        $apps[] = array(
+            "name" =&gt; $matches[1][$i],
+            "id"   =&gt; $matches[2][$i]
+        );
+    }
+}
+print_r($apps);
+</code></pre>
+
+<p>Which gives:</p>
+
+<pre><code>Array
+(
+    [0] =&gt; Array
+        (
+            [name] =&gt; name_of_the_app
+            [id] =&gt; 123123123
+        )
+
+)
+</code></pre>
+
+<p>Alternately, you can use <code>strpos</code> and <code>substr</code> to do the same thing without specifying what the tokens are called (this would bug up if you used a percentage sign in the middle of the string, though):</p>
+
+<pre><code>&lt;?php
+    $string = "This is my string but it also has %APP:name_of_the_app|ID:123123123|whatevertoken:whatevervalue% a bunch of other stuff in it";
+
+    $inTag = false;
+    $lastOffset = 0;
+
+    $tags = array();
+    while ($position = strpos($string, "%", $offset)) {
+        $offset = $position + 1;
+        if ($inTag) {
+            $tag = substr($string, $lastOffset, $position - $lastOffset);
+            $tagsSingle = array();
+            $tagExplode = explode("|", $tag);
+            foreach ($tagExplode as $tagVariable) {
+                $colonPosition = strpos($tagVariable, ":");
+                $tagsSingle[substr($tagVariable, 0, $colonPosition)] = substr($tagVariable, $colonPosition + 1);
+            }
+            $tags[] = $tagsSingle;
+        }
+        $inTag = !$inTag;
+        $lastOffset = $offset;
+    }
+
+    print_r($tags);
+?&gt;
+</code></pre>
+
+<p>Which gives:</p>
+
+<pre><code>Array
+(
+    [0] =&gt; Array
+        (
+            [APP] =&gt; name_of_the_app
+            [ID] =&gt; 123123123
+            [whatevertoken] =&gt; whatevervalue
+        )
+
+)
+</code></pre>
+
+<p><a href="http://codepad.org/y1NC7wxg" rel="nofollow"><strong>DEMO</strong></a></p>

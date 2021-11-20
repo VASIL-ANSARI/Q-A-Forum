@@ -1,0 +1,57 @@
+<p>For <code>http://127.0.0.1:8080/a:4522,b:846</code> the request URI equals to <code>/a:4522,b:846</code>. And the <code>.htaccess</code> directives put the request URI into <code>path</code> GET parameter. So you can simply parse <code>$_GET['path']</code> in PHP:</p>
+
+<pre><code>&lt;?php
+$vars = [];
+if ($path = isset($_GET['path']) ? $_GET['path'] : null) {
+  foreach (explode(',', $path) as $part) {
+    $tmp = explode(':', $part);
+    if (count($tmp) == 2) {
+      $vars[$tmp[0]] = $tmp[1];
+    }
+  }
+}
+var_dump($vars);
+</code></pre>
+
+<p><em>Output</em></p>
+
+<pre><code>array(2) {
+  ["a"]=&gt;
+  string(4) "4522"
+  ["b"]=&gt;
+  string(3) "846"
+}
+</code></pre>
+
+<h2>Sample configuration</h2>
+
+<p><strong>/etc/apache2/vhosts.d/01_test_vhost.conf</strong></p>
+
+<pre><code>&lt;VirtualHost 127.0.0.12:80&gt;
+  ServerName apache-test.local
+  ServerAdmin root@localhost
+  DocumentRoot "/var/www/apache-test.local/public"
+
+  ErrorLog "/var/www/apache-test.local/logs/error.log"
+  CustomLog "/var/www/apache-test.local/logs/access.log" common
+
+  &lt;Directory "/var/www/apache-test.local/public"&gt;
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule . index.php [L]
+    SetHandler application/x-httpd-php
+  &lt;/Directory&gt;
+&lt;/VirtualHost&gt;
+</code></pre>
+
+<p><strong>/var/www/apache-test.local/public/.htaccess</strong></p>
+
+<p>Just as in your question.</p>
+
+<p><strong>/var/www/apache-test.local/public/index.php</strong></p>
+
+<p>The PHP code above.</p>

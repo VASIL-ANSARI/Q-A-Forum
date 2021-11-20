@@ -1,0 +1,55 @@
+<p>I believe Na7coldwater is correct. The <code>event.clipboardData</code> is being utilised. Please see the following proof of concept:</p>
+
+<pre><code>&lt;html&gt;
+&lt;body&gt;
+    &lt;div id="rte" contenteditable="true" style="height: 100%; width: 100%; outline: 0; overflow: auto"&gt;&lt;/div&gt;
+    &lt;script type="text/javascript"&gt;
+        document.getElementById("rte").focus();
+        document.body.addEventListener("paste", function(e) {
+            for (var i = 0; i &lt; e.clipboardData.items.length; i++) {
+                if (e.clipboardData.items[i].kind == "file" &amp;&amp; e.clipboardData.items[i].type == "image/png") {
+                    // get the blob
+                    var imageFile = e.clipboardData.items[i].getAsFile();
+
+                    // read the blob as a data URL
+                    var fileReader = new FileReader();
+                    fileReader.onloadend = function(e) {
+                        // create an image
+                        var image = document.createElement("IMG");
+                        image.src = this.result;
+
+                        // insert the image
+                        var range = window.getSelection().getRangeAt(0);
+                        range.insertNode(image);
+                        range.collapse(false);
+
+                        // set the selection to after the image
+                        var selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    };
+
+                    // TODO: Error Handling!
+                    // fileReader.onerror = ...
+
+                    fileReader.readAsDataURL(imageFile);
+
+                    // prevent the default paste action
+                    e.preventDefault();
+
+                    // only paste 1 image at a time
+                    break;
+                }
+            }
+        });         
+    &lt;/script&gt;
+&lt;/body&gt;
+</code></pre>
+
+<p></p>
+
+<p>Gmail uploads the image via <code>XMLHttpRequest</code> instead of embedding it directly as a data URL. A search on Google or SO for drag &amp; drop file uploads should reveal how this can be achieved.</p>
+
+<p>Please bare in mind that this is just a proof of concept. Error handling and browser/feature detection code is not included.</p>
+
+<p>Hope this helps!</p>

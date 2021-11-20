@@ -1,0 +1,68 @@
+<p>You still can (and have to) use the Interceptor.<br>
+All you need is a little Architecture.</p>
+
+<p>First create a helper that provides the necessary headers.</p>
+
+<pre><code>public class AnalyticsHeader {
+ private String analyticsHeaderName;
+ private String analyticsHeaderValue;
+
+ public void setHeaderValue(String header) {
+   this.analyticsHeaderValue = header;
+ } 
+
+ public void setHeaderName(String header) {
+   this.analyticsHeaderName = header;
+ } 
+
+ public String getHeaderName() { 
+  return analyticsHeaderName;
+ }
+ public String getHeaderValue() { 
+  return analyticsHeaderValue;
+ }
+}
+</code></pre>
+
+<p>Keep an instance of this class in a accessible place inside your app, for example the MainActivity our the Application (or even better, use Dependency Injection)</p>
+
+<p>Now, upon creation of the Interceptor just pass the instance of the AnalyticsHeader into the Interceptor:</p>
+
+<pre><code>public static final class AnalyticsInterceptor implements Interceptor {
+        private final AnalyticsHeader header;
+
+        public AnalyticsInterceptor(AnalyticsHeader header) {
+            this.header = header;
+        }
+
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            final Request original = chain.request();
+            Response response;
+            if (header.getHeader() != null) {
+                 Request request = original.newBuilder()
+                        .header(header.getHeaderName(), header.getHeaderValue())
+                        .method(original.method(), original.body())
+                        .build();
+                 response = chain.proceed(request);
+            } else {
+                response = chain.proceed(original);
+            }
+
+         return response;
+       }
+ }
+</code></pre>
+
+<p>And then...</p>
+
+<pre><code>OkHttpClient.Builder builder = new OkHttpClient.Builder();
+builder.addInterceptor(new AnalyticsInterceptor(CentralPlaceInApp.getAnalyticsHeader());
+...
+retrofit = new Retrofit.Builder()
+                .baseUrl(config.getRestUrl())
+                .client(builder.build())
+                .build();
+</code></pre>
+
+<p>Now, you can change the value of the header anytime during your app runtime using <code>CentralPlaceInApp.getAnalyticsHeader().setHeaderValue(CurrentActivity.class.getSimpleName());</code></p>

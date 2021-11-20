@@ -1,0 +1,80 @@
+<p>There is only thing I know of that would explain why code that properly produces the expected lines outside Behave suddenly produces an output that lacks the last line if run <em>in</em> Behave: the output is getting overwritten with Behave's output. By default just before Behave runs a step, it prints out to the screen the step's name in a neutral color, after the step is run Behave <em>overwrites last line of output</em> with the step's name in a color indicating whether the step failed, succeeded, is undefined, etc. </p>
+
+<p>My remedy is to just add more newlines in my printouts. You can also use <code>--no-color</code>. I prefer having colors so I add newlines.</p>
+
+<p>Here's an illustration. Consider this feature file:</p>
+
+<pre><code>Feature: foo
+
+Scenario: foo
+  When something
+  And something else
+  And and another thing
+</code></pre>
+
+<p>And these steps:</p>
+
+<pre><code>@when("something")
+def step_impl(context):
+    for i in (1, 2, 3):
+        print("%d" % i)
+
+@when("something else")
+def step_impl(context):
+    for i in (1, 2, 3):
+        print("%d" % i)
+    print()
+
+@when("and another thing")
+def step_impl(context):
+    pass
+</code></pre>
+
+<p>If you run <code>behave --no-capture</code>:</p>
+
+<pre><code>behave --no-capture
+Feature: foo # features/foo.feature:1
+
+  Scenario: foo           # features/foo.feature:3
+    When something        # features/steps/steps.py:1
+1
+2
+    When something        # features/steps/steps.py:1 0.000s
+    And something else    # features/steps/steps.py:6
+1
+2
+3
+    And something else    # features/steps/steps.py:6 0.000s
+    And and another thing # features/steps/steps.py:12 0.000s
+
+1 feature passed, 0 failed, 0 skipped
+1 scenario passed, 0 failed, 0 skipped
+3 steps passed, 0 failed, 0 skipped, 0 undefined
+Took 0m0.000s
+</code></pre>
+
+<p>(The output above would be colored but copy-and-paste does not preserve the colors.)</p>
+
+<p>The step "When something" lacks the last line of output whereas "When something else" has all expected lines, only because it has an extra <code>print</code> at the end. However, note how for both step, the step name appears twice in the output. Accounting for colors, in both cases the first time the step name appears, it is grey, and the second time, it is green. If you run it with <code>--no-color</code> too, you get:</p>
+
+<pre><code>Feature: foo # features/foo.feature:1
+
+  Scenario: foo           # features/foo.feature:3
+    When something        # features/steps/steps.py:1
+1
+2
+3
+    And something else    # features/steps/steps.py:6
+1
+2
+3
+
+    And and another thing # features/steps/steps.py:12
+
+1 feature passed, 0 failed, 0 skipped
+1 scenario passed, 0 failed, 0 skipped
+3 steps passed, 0 failed, 0 skipped, 0 undefined
+Took 0m0.000s
+</code></pre>
+
+<p>Both loops output the expected lines and the steps' names do not appear more than once.</p>

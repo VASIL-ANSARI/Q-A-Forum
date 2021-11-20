@@ -1,0 +1,54 @@
+<p>When you add foreign key to some table ,SQL uses specific operators to  verify conistency</p>
+
+<p><strong>Demo:</strong>   </p>
+
+<p><strong>Table Creation scripts:</strong>   </p>
+
+<pre><code>create table pktest
+(
+pk int not null primary key
+)
+
+create table FKtest
+(
+fk int
+CONSTRAINT fkconstarint FOREIGN KEY (fk)     
+REFERENCES pktest(pk)  
+)
+</code></pre>
+
+<p>--Now insert some data into primary key table</p>
+
+<pre><code>insert into pktest
+    select 2
+</code></pre>
+
+<p>Now insert some valid data into Foreign key table</p>
+
+<pre><code>insert into fktest
+    select 2
+</code></pre>
+
+<p>Lets look at execution plan,using showplan_text on</p>
+
+<pre><code> &gt; |--Assert(WHERE:(CASE WHEN NOT [Pass1008] AND [Expr1007] IS NULL THEN (0) ELSE NULL END))
+       |--Nested Loops(Left Semi Join, PASSTHRU:([test].[dbo].[FKtest].[fk] IS NULL), OUTER REFERENCES:([test].[dbo].[FKtest].[fk]), DEFINE:([Expr1007] = [PROBE VALUE]))
+            |--Table Insert(OBJECT:([test].[dbo].[FKtest]), SET:([test].[dbo].[FKtest].[fk] = [@1]))
+            |--Clustered Index Seek(OBJECT:([test].[dbo].[pktest].[PK__pktest__0425A276]), SEEK:([test].[dbo].[pktest].[pk]=[test].[dbo].[FKtest].[fk]) ORDERED FORWARD)
+</code></pre>
+
+<p><strong>Decoding the above plan:</strong>  </p>
+
+<p>1.seek into fktest and return inserted value as <code>Expr1007</code><br>
+2.Then probe into pktest using <code>Expr1007</code> and return if the value found as <code>Pass1008</code>    </p>
+
+<p>Then Assert checks ,if <code>Expr1007</code> or <code>Pass1008</code> is not null then return <code>0</code> and continue executing </p>
+
+<p>What is <code>Expr1007</code> is null ,the nested loops will return null,so we can continue executing</p>
+
+<p>This is the Way Constraints are kept intact</p>
+
+<p>when we create primary key with out unique key word,SQL internally adds uniquifier to make this unique and checks whether a duplicate is inserted</p>
+
+<p><strong>References:</strong><br>
+<a href="https://www.simple-talk.com/sql/learn-sql-server/showplan-operator-of-the-week---assert/" rel="nofollow">https://www.simple-talk.com/sql/learn-sql-server/showplan-operator-of-the-week---assert/</a></p>

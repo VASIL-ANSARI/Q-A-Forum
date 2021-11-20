@@ -1,0 +1,38 @@
+<p>Change all <code>% 255</code> to <code>&amp; 0xff</code>, much faster:</p>
+
+<pre><code>i = (i + 1) % 256;
+</code></pre>
+
+<p>To:</p>
+
+<pre><code>i = (i + 1) &amp; 0xFF;
+</code></pre>
+
+<p><strong>Edit:</strong></p>
+
+<p>You're wasting a lot of time initializing <code>sbox</code>. You should pass <code>sbox</code> as a parameter to the transform function so the original copy is updated between calls. What you're doing now is initializing it again and again and every time it will take longer since startPosition grows.</p>
+
+<pre><code>void transform(char *in, char *out,
+           long length,
+           unsigned char* sbox)
+</code></pre>
+
+<p>The temporary <code>sbox</code> should be a member of the <code>MyStream</code> class. The read function should be:</p>
+
+<pre><code>MyStream&amp;
+MyStream::read(char * const buf, std::streamsize const n)
+{
+    std::ios_base::streamoff start = m_stream.tellg();
+    std::vector&lt;char&gt; in;
+    in.resize(n);
+    (void)m_stream.read(&amp;in.front(), n);
+
+    // init m_TempSbox on first call
+    if (m_FirstCall) {
+        initTempSbox();
+    }
+
+    m_byteTransformer-&gt;transform(&amp;in.front(), buf, n, m_TempSbox);
+    return *this;
+}    
+</code></pre>

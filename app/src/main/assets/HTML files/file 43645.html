@@ -1,0 +1,47 @@
+<p>You have two problems. </p>
+
+<p>First, you're returning <code>object</code> from your method, so you can't access <a href="https://msdn.microsoft.com/en-us/library/system.object%28v=vs.110%29.aspx" rel="nofollow">any members that <code>object</code> doesn't have</a>. That's why you should return a more specialized type <a href="http://stackoverflow.com/questions/29414196/c-sharp-how-to-access-returned-object-from-different-function-class">like I already advised</a>, so in this case:</p>
+
+<pre><code>public RootObject GetApi(string url)
+{
+    // ...
+    return serializer.Deserialize&lt;RootObject&gt;(jsonReader);
+}
+</code></pre>
+
+<p>However, you want this method to be able to do more. You want to return two types from it and also add error handling. </p>
+
+<p>Generics (see <code>T</code>) could help here, where you specifiy the type when <em>calling</em> the method:</p>
+
+<pre><code>public T GetObjectFromApi&lt;T&gt;(string url)
+{
+    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+
+    try
+    {
+        WebResponse response = request.GetResponse();
+        using (Stream responseStream = response.GetResponseStream())
+        {
+            StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
+            var jsonReader = new JsonTextReader(reader);
+            var serializer = new JsonSerializer();
+            return serializer.Deserialize&lt;T&gt;(jsonReader);
+        }
+    }
+    catch (WebException)
+    {       
+        return null;
+    }
+}
+</code></pre>
+
+<p>Then call it like this:</p>
+
+<pre><code>var spidyApi_searchIdByName_result = api_Handler.GetObjectFromApi&lt;spidyApiResult&gt;(spidyApi_searchIdByName);
+if (spidyApi_searchIdByName_result != null)
+{
+    var Gw2Api_isItemIdinListing_result = api_Handler.GetApi&lt;RootObject&gt;(Gw2Api_allListings + spidyApi_searchIdByName_result.someProperty);
+}
+</code></pre>
+
+<p>Of course this swallows the WebException. </p>

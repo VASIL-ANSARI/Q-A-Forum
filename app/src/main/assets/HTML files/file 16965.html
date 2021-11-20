@@ -1,0 +1,75 @@
+<p>Since you are trying to create a custom UITabBarController, you should use a container view controller. To do that:</p>
+
+<ol>
+<li>Open your storyboard and add a custom UIVIewController (let's call it ContainerViewController).</li>
+<li>Insert the UIVIews that represent your tabs into that controller and then insert another UIVIew (*currentView in the code below) that will take the rest of the screen. That's what the child controllers will use to display their scene.</li>
+<li>Create a UIVIewController for each scene (child controller) you need, as you would normally, and give each of them a unique identifier (Identity Inspector -> Storyboard ID)</li>
+</ol>
+
+<p>Now you have to add the following code your ContainerViewController:</p>
+
+<pre><code>@interface ContainerViewController ()
+    @property (strong, nonatomic) IBOutlet UIView *currentView; // Connect the UIView to this outlet
+    @property (strong, nonatomic) UIViewController *currentViewController;
+    @property (nonatomic) NSInteger index;
+@end
+
+@implementation ContainerViewController
+
+// This is the method that will change the active view controller and the view that is shown
+ - (void)changeToControllerWithIndex:(NSInteger)index
+{
+    if (self.index != index){
+        self.index = index;
+        [self setupTabForIndex:index];
+
+        // The code below will properly remove the the child view controller that is
+        // currently being shown to the user and insert the new child view controller.
+        UIViewController *vc = [self setupViewControllerForIndex:index];
+        [self addChildViewController:vc];
+        [vc didMoveToParentViewController:self];
+
+        if (self.currentViewController){
+            [self.currentViewController willMoveToParentViewController:nil];
+
+            [self transitionFromViewController:self.currentViewController toViewController:vc duration:0 options:UIViewAnimationOptionTransitionNone animations:^{
+                [self.currentViewController.view removeFromSuperview];
+                [self.currentView addSubview:vc.view];
+            } completion:^(BOOL finished) {
+                [self.currentViewController removeFromParentViewController];
+                self.currentViewController = vc;
+            }];
+        } else {
+            [self.currentView addSubview:vc.view];
+            self.currentViewController = vc;
+        }
+    }
+}
+
+// This is where you instantiate each child controller and setup anything you need  on them, like delegates and public properties.
+- (UIViewController *)setupViewControllerForIndex:(NSInteger)index {
+
+    // Replace UIVIewController with your custom classes
+    if (index == 0){
+        UIViewController *child = [self.storyboard instantiateViewControllerWithIdentifier:@"STORYBOARD_ID_1"];
+        return child;
+    } else {
+        UIViewController *child = [self.storyboard instantiateViewControllerWithIdentifier:@"STORYBOARD_ID_2"];
+        return child;
+    }
+}
+
+// Use this method to change anything you need on the tabs, like making the active tab a different colour
+- (void)setupTabForIndex:(NSInteger)index{
+
+}
+
+// This will recognize taps on the tabs so the change can be done
+- (IBAction)tapDetected:(UITapGestureRecognizer *)gestureRecognizer {
+    [self changeToControllerWithIndex:gestureRecognizer.view.tag];
+}
+</code></pre>
+
+<p>Finally, each view you create that represents a tab should have it's own TapGestureRecognizer and a number for its tag.</p>
+
+<p>By doing all this you will have a single controller with the buttons you need (they don't have to be reusable), you can add as much functionality you want in them (that's what the setupTabBarForIndex: method will be used) and you won't violate DRY.</p>

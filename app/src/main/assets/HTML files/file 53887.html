@@ -1,0 +1,26 @@
+<p>The  <code>cudaMallocPitch</code> call you have written looks ok, but this:</p>
+
+<pre><code>  cudaMemcpy2D(d_arr, pitch, h_arr, 256, 256, 1024, cudaMemcpyHostToDevice);
+</code></pre>
+
+<p>is incorrect. Quoting from the <a href="http://docs.nvidia.com/cuda/cuda-runtime-api/index.html#ixzz41qAbIC7L" rel="nofollow">documentation</a></p>
+
+<blockquote>
+  <p>Copies a matrix (height rows of width bytes each) from the memory area
+  pointed to by src to the memory area pointed to by dst, where kind is
+  one of cudaMemcpyHostToHost, cudaMemcpyHostToDevice,
+  cudaMemcpyDeviceToHost, or cudaMemcpyDeviceToDevice, and specifies the
+  direction of the copy. dpitch and spitch are the widths in memory in
+  bytes of the 2D arrays pointed to by dst and src, including any
+  padding added to the end of each row. The memory areas may not
+  overlap. width must not exceed either dpitch or spitch. Calling
+  cudaMemcpy2D() with dst and src pointers that do not match the
+  direction of the copy results in an undefined behavior. cudaMemcpy2D()
+  returns an error if dpitch or spitch exceeds the maximum allowed.</p>
+</blockquote>
+
+<p>So the source pitch and width to copy must be specified in <em>bytes</em>. Your host matrix has a pitch or <code>sizeof(float) * 256</code> bytes, and because the source pitch and the width of the source you will copy are the same, this means your <code>cudaMemcpy2D</code>call should look like:</p>
+
+<pre><code> cudaMemcpy2D(d_arr, pitch, h_arr, 256*sizeof(float), 
+                256*sizeof(float), 1024, cudaMemcpyHostToDevice);
+</code></pre>

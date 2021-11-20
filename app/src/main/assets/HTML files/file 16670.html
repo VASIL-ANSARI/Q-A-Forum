@@ -1,0 +1,65 @@
+<p>on api 14, TextView use this class;</p>
+
+<pre><code>private static class ErrorPopup extends PopupWindow {
+    private boolean mAbove = false;
+    private final TextView mView;
+    private int mPopupInlineErrorBackgroundId = 0;
+    private int mPopupInlineErrorAboveBackgroundId = 0;
+
+    ErrorPopup(TextView v, int width, int height) {
+        super(v, width, height);
+        mView = v;
+        // Make sure the TextView has a background set as it will be used the first time it is
+        // shown and positionned. Initialized with below background, which should have
+        // dimensions identical to the above version for this to work (and is more likely).
+        mPopupInlineErrorBackgroundId = getResourceId(mPopupInlineErrorBackgroundId,
+                com.android.internal.R.styleable.Theme_errorMessageBackground);
+        mView.setBackgroundResource(mPopupInlineErrorBackgroundId);
+    }
+
+    void fixDirection(boolean above) {
+        mAbove = above;
+
+        if (above) {
+            mPopupInlineErrorAboveBackgroundId =
+                getResourceId(mPopupInlineErrorAboveBackgroundId,
+                        com.android.internal.R.styleable.Theme_errorMessageAboveBackground);
+        } else {
+            mPopupInlineErrorBackgroundId = getResourceId(mPopupInlineErrorBackgroundId,
+                    com.android.internal.R.styleable.Theme_errorMessageBackground);
+        }
+
+        mView.setBackgroundResource(above ? mPopupInlineErrorAboveBackgroundId :
+            mPopupInlineErrorBackgroundId);
+    }
+
+    private int getResourceId(int currentId, int index) {
+        if (currentId == 0) {
+            TypedArray styledAttributes = mView.getContext().obtainStyledAttributes(
+                    R.styleable.Theme);
+            currentId = styledAttributes.getResourceId(index, 0);
+            styledAttributes.recycle();
+        }
+        return currentId;
+    }
+
+    @Override
+    public void update(int x, int y, int w, int h, boolean force) {
+        super.update(x, y, w, h, force);
+
+        boolean above = isAboveAnchor();
+        if (above != mAbove) {
+            fixDirection(above);
+        }
+    }
+}
+</code></pre>
+
+<p>And call like this;</p>
+
+<pre><code>final float scale = getResources().getDisplayMetrics().density;
+            mPopup = new ErrorPopup(err, (int) (200 * scale + 0.5f), (int) (50 * scale + 0.5f));
+            mPopup.setFocusable(false);
+</code></pre>
+
+<p>So Android TextView use your phone density. I tried for change density but i couldn't work because it need root. If you can this, maybe its work. But i guess it is not possible.</p>

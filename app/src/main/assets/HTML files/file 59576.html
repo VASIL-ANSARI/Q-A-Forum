@@ -1,0 +1,58 @@
+<p>You are right that loop needs to be stopped before it can register a new handle. It cannot be achieved by calling <code>uv_stop</code> function right after <code>uv_run</code>, because <code>uv_run</code> needs to return first. It can be achieved for example by stopping it using a handle callback. Here is quite silly example of how it can be done using the existing Timer1 handle. It stops the loop exactly one time on the first run.</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;uv.h&gt;
+
+int main() {
+  uv_loop_t loop;
+  uv_loop_init(&amp;loop);
+
+  std::cout &lt;&lt; "Libuv version: " &lt;&lt; UV_VERSION_MAJOR &lt;&lt; "." &lt;&lt; UV_VERSION_MINOR
+            &lt;&lt; std::endl;
+
+  int r = 0;
+
+  uv_timer_t t1_handle;
+  r = uv_timer_init(&amp;loop, &amp;t1_handle);
+  *(bool *)t1_handle.data = true; // need to stop the loop
+  uv_timer_start(&amp;t1_handle,
+                 [](uv_timer_t *t) {
+                   std::cout &lt;&lt; "Timer1 called\n";
+                   bool to_stop = *(bool *)t-&gt;data;
+                   if (to_stop) {
+                     std::cout &lt;&lt; "Stopping loop and resetting the flag\n";
+                     uv_stop(t-&gt;loop);
+                     *(bool *)t-&gt;data = false; // do not stop the loop again
+                   }
+                 },
+                 0, 2000);
+  uv_run(&amp;loop, UV_RUN_DEFAULT);
+  std::cout &lt;&lt; "After uv_run\n";
+
+  // second timer
+  uv_timer_t t2_handle;
+  r = uv_timer_init(&amp;loop, &amp;t2_handle);
+  uv_timer_start(&amp;t2_handle,
+                 [](uv_timer_t *t) { std::cout &lt;&lt; "Timer2 called\n"; }, 0,
+                 1000);
+  std::cout &lt;&lt; "Start loop again\n";
+  uv_run(&amp;loop, UV_RUN_DEFAULT);
+
+  uv_loop_close(&amp;loop);
+}
+</code></pre>
+
+<p>So the output is</p>
+
+<pre><code>Libuv version: 1.9
+Timer1 called
+Stopping loop and resetting the flag
+After uv_run
+Start loop again
+Timer2 called
+Timer2 called
+Timer1 called
+Timer2 called
+Timer2 called
+Timer1 called
+</code></pre>

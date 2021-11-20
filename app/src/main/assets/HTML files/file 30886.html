@@ -1,0 +1,23 @@
+<p>Python is a garbage-collected language. If a value isn't "reachable" from your code anymore, it will eventually get deleted.</p>
+
+<p>The <code>del</code> statement, as you saw, removes the binding of your variable. Variables aren't values, they're just names for values.</p>
+
+<p>If that variable was the only reference to the value anywhere, the value will eventually get deleted. In CPython in particular, the garbage collector is built on top of reference counting. So, that "eventually" means "immediately".* In other implementations, it's usually "pretty soon".</p>
+
+<p>If there were other references to the same value, however, just removing one of those references (whether by <code>del x</code>, <code>x = None</code>, exiting the scope where <code>x</code> existed, etc.) doesn't clean anything up.** </p>
+
+<hr>
+
+<p>There's another issue here. I don't know what the <code>memory_profiler</code> module (presumably <a href="https://pypi.python.org/pypi/memory_profiler">this one</a>) actually measures, but the description (talking about use of <code>psutil</code>) sounds like it's measuring your memory usage from "outside".</p>
+
+<p>When Python frees up storage, it doesn't alwaysâor even usuallyâreturn it to the operating system. It keeps "free lists" around at multiple levels so it can re-use the memory more quickly than if it had to go all the way back to the OS to ask for more. On modern systems, this is rarely a problemâif you need the storage again, it's good that you had it; if you don't, it'll get paged out as soon as someone else needs it and never get paged back in, so there's little harm.</p>
+
+<p>(On top of that, which I referred to as "the OS" above is really an abstraction made up of multiple levels, from the <code>malloc</code> library through the core C library to the kernel/pager, and at least one of those levels usually has its own free lists.)</p>
+
+<p>If you want to trace memory use from the inside perspectiveâ¦ well, that's pretty hard. It gets a lot easier in Python 3.4 thanks to the new <a href="http://docs.python.org/3.4/library/tracemalloc.html#module-tracemalloc"><code>tracemalloc</code></a> module. There are various third-party modules (e.g., <code>heapy</code>/<a href="https://pypi.python.org/pypi/guppy"><code>guppy</code></a>, <a href="https://pypi.python.org/pypi/Pympler/0.3.1"><code>Pympler</code></a>, <a href="https://pypi.python.org/pypi/meliae/0.4.0.final.0"><code>meliae</code></a>) that try to get the same kind of information with earlier versions, but it's difficult, because getting information from the various allocators, and tying that information to the garbage collector, was very hard before <a href="http://www.python.org/dev/peps/pep-0445/">PEP 445</a>.</p>
+
+<hr>
+
+<p>* In some cases, there <em>are</em> references to the valueâ¦ but only from other references that are themselves unreachable, possibly in a cycle. That still counts as "unreachable" as far as the garbage collector is concerned, but not as far as reference counts are concerned. So, CPython also has a "cycle detector" that runs every so often and finds cycles of mutually-reachable but not-reachable-from-anyone-else values and cleans them up.</p>
+
+<p>** If you're testing in the interactive console, there may be hidden references to your values that are hard to track, so you might <em>think</em> you've gotten rid of the last reference when you haven't. In a script, it should always be <em>possible</em>, if not <em>easy</em>, to figure things out. The <a href="http://docs.python.org/2/library/gc.html"><code>gc</code></a> module can help, as can the debugger. But of course both of them <em>also</em> give you new ways to add additional hidden references.</p>

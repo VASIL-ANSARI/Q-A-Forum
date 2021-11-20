@@ -1,0 +1,17 @@
+<p>Your code is not using <code>InterlockedIncrement</code> correctly.</p>
+
+<pre><code>InterlockedIncrement(&amp;(thread.threadCount)); 
+DWORD tid = (thread.threadCount-1)%thread.size(); 
+</code></pre>
+
+<p>This performs an atomic increment of <code>thread.threadCount</code>, but instead of saving the atomically-incremented value, you ignore it and go back to the <code>thread.threadCount</code> variable (which may have been incremented by another thread in the meantime).</p>
+
+<p>In your case, what happens is that two threads did an <code>InterlockedIncrement</code> nearly simultaneously, incrementing it from 1 to 2, then 2 to 3. Both threads then read <code>thread.threadCount</code> and got 3 back (then subtracted 1 to get a final result of 2).</p>
+
+<p>The correct code is</p>
+
+<pre><code>LONG tidUnique = InterlockedIncrement(&amp;(thread.threadCount));
+DWORD tid = (tidUnique-1)%thread.size(); 
+</code></pre>
+
+<p>The unique incremented value is returned by <code>InterlockedIncrement</code>. You need to use that value in your computations if you want to see the unique value.</p>

@@ -1,0 +1,27 @@
+<p>I think you're misunderstanding something about how variables work in Python. Variables in Python do not contain values; they refer to them - like in Java, except there are no "primitives" (not even <code>int</code>). Assignment to a variable doesn't overwrite the old value; it simply causes the variable to refer to the new value and cease referring to the old one (which may then be garbage-collected if nothing else refers to it).</p>
+
+<p>Why not just actually return (and use) a value (since Python functions always return something anyway, even if it's just the implicit return of <code>None</code>)?</p>
+
+<hr>
+
+<p>Edit: Working through an example, because it's too long for a comment reply.</p>
+
+<p>From C, we call PyObject_CallFunction, which hands a PyObject* over to the Python function. In Python, the function parameter (we'll call it <code>spam</code>) now refers to the pointed-at PyObject. </p>
+
+<p>When we write <code>spam += 6</code> in the function, that is the same as <code>spam = spam + 6</code>. The bytecode interpreter gets the PyObject that represents the value 6, runs a special bytecode that inspects the value represented by the two objects, adds them, and creates a new PyObject (or fetches one from a cache) that represents the sum.</p>
+
+<p>Then <code>spam</code> is rebound to the new object; but the <code>spam</code> variable-reference is on the Python side of the memory fence, and is not the same thing as the PyObject* on the C side of the fence.</p>
+
+<p>Thus, <code>resumeInt</code> does <strong>not</strong> get pointed at the newly created/fetched PyObject.</p>
+
+<p>It is actually behaving the exact same way as it would calling the Python function from Python. Try it:</p>
+
+<pre><code>def fry(spam):
+  spam += 1
+
+eggs = 3
+fry(eggs)
+eggs # still 3!
+</code></pre>
+
+<p>This happens because rebinding <code>spam</code> does not affect <code>eggs</code>, which is a separate variable. We are not passing by reference; we are passing <strong>a</strong> reference <strong>by value</strong>. Just like in Java.</p>

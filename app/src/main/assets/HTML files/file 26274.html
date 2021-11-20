@@ -1,0 +1,61 @@
+<p>This may be a special case, but you should be able to use numpy <a href="http://docs.scipy.org/doc/numpy/reference/generated/numpy.digitize.html" rel="nofollow">digitize</a>. The caveat here is the bins must be monotonically decreasing or increasing.</p>
+
+<pre><code>&gt;&gt;&gt; import numpy
+&gt;&gt;&gt; a = numpy.array([10,7,2,0])
+&gt;&gt;&gt; b = numpy.array([10,9,8,7,6,5,4,3,2,1])
+
+&gt;&gt;&gt; indices = [numpy.where(a&lt;=x)[0][0] for x in b]
+[0, 1, 1, 1, 2, 2, 2, 2, 2, 3]
+
+&gt;&gt;&gt; numpy.digitize(b,a)
+array([0, 1, 1, 1, 2, 2, 2, 2, 2, 3])
+</code></pre>
+
+<hr>
+
+<p>Setup for the timing test:</p>
+
+<pre><code>a = np.arange(50)[::-1]
+
+b = np.random.randint(0,50,1E3)
+
+np.allclose([np.where(a&lt;=x)[0][0] for x in b],np.digitize(b,a))
+Out[55]: True
+</code></pre>
+
+<p>Some timings:</p>
+
+<pre><code>%timeit [np.where(a&lt;=x)[0][0] for x in b]
+100 loops, best of 3: 4.97 ms per loop
+
+%timeit np.digitize(b,a)
+10000 loops, best of 3: 48.1 Âµs per loop
+</code></pre>
+
+<p>Looks like two orders of magnitude speed up, this will depend heavily on the number of bins however. Your timings will vary.</p>
+
+<hr>
+
+<p>To compare to Jamie's answer I have timed the two following pieces of code. As I mainly wanted to focus on the speed of <code>searchsorted</code> vs <code>digitize</code> I pared down Jamie's code a bit. The relevant chunk is here:</p>
+
+<pre><code>a = np.arange(size_a)[::-1]
+b = np.random.randint(0, size_a, size_b)
+
+ja = np.take(a, np.searchsorted(a, b, side='right', sorter=a)-1)
+
+#Compare to digitize
+if ~np.allclose(ja,np.digitize(b,a)):
+    print 'Comparison failed'
+
+timing_digitize[num_a,num_b] = timeit.timeit('np.digitize(b,a)',
+                      'import numpy as np; from __main__ import a, b',
+                      number=3)
+timing_searchsorted[num_a,num_b] = timeit.timeit('np.take(a, np.searchsorted(a, b, side="right", sorter=a)-1)',
+                      'import numpy as np; from __main__ import a, b',
+                      number=3)
+</code></pre>
+
+<p>This is a bit beyond my limited matplotlib ability so this is done in DataGraph. I have plotted the logarithmic ratio of <code>timing_digitize/timing_searchsorted</code> so values greater then zero <code>searchsorted</code> is faster and values less then zero <code>digitize</code> is faster. The colors also give relative speeds. For example is shows that in the top right (a = 1E6, b=1E6) <code>digitize</code> is ~300 times slower then <code>searchsorted</code> while for smaller sizes <code>digitize</code> can be up to 10x faster. The black line is roughly the break even point:</p>
+
+<p><img src="http://i.stack.imgur.com/onQkf.png" alt="enter image description here">
+Looks like for raw speed <code>searchsorted</code> is almost always faster for large cases, but the simple syntax of <code>digitize</code> is nearly as good if the number of bins is small.</p>

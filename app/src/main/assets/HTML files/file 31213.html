@@ -1,0 +1,98 @@
+<p>I've done something very similar with T4 templates.  The trick is to know which dlls are needed, finding them, etc (for example, in Visual Studio 2013, EnvDET is referenced as "import namespace="EnvDTE" instead of EvnDTE.dll</p>
+
+<p>Basically you need to play with them to try and get your desired result.  Create a T4 item in your solution, then start filling it in.</p>
+
+<p>I use command objects (and am using MySQL libraries for the following code), but it should give you an idea of how I'm running it.</p>
+
+<pre><code>&lt;#@ template debug="true" hostSpecific="true" #&gt;
+&lt;#@ output extension=".generated.cs" #&gt;
+&lt;#@ Assembly Name="EnvDTE" #&gt;
+&lt;#@ Assembly Name="System.Data" #&gt;
+&lt;#@ Assembly Name="$(SolutionDir)Services.Entities\bin\DevTest\Libraries.DB.dll" #&gt; **// * custom location for custom libraries**
+&lt;#@ Assembly Name="$(SolutionDir)Services.Entities\bin\DevTest\MySql.Data.dll" #&gt; **// custom location for custom libraries**
+&lt;#@ import namespace="EnvDTE" #&gt;
+&lt;#@ import namespace="System.Data" #&gt;
+&lt;#@ import namespace="System.Data.SqlClient" #&gt;
+&lt;#@ import namespace="System.IO" #&gt;
+&lt;#@ import namespace="System.Text.RegularExpressions" #&gt;
+
+&lt;#
+        string tableName = "";
+        //string path = Path.GetDirectoryName(Host.TemplateFile);
+        string connectionString = "mysqlConnectionString"; **// replaced with regular value, could pull from web.config but it's only updated rarely**
+
+        // Get containing project
+        IServiceProvider serviceProvider = (IServiceProvider)Host;
+        DTE dte = (DTE)serviceProvider.GetService(typeof(DTE));
+        //Project project = dte.Solution.FindProjectItem(Host.TemplateFile).ContainingProject;
+#&gt;
+using System;
+using System.CodeDom.Compiler;
+
+namespace Services.Entities
+{
+    [GeneratedCode("TextTemplatingFileGenerator", "10")]
+    public enum Store
+    {
+&lt;#
+
+    using (var cmd = new Libraries.DB.Mysql.Command(connectionString)) **//Custom libraries to open a disposable command object**
+    {
+      cmd.Clear();
+      cmd.AppendCmd("select id, storecode, StoreName \n");
+      cmd.AppendCmd("from stores \n");
+
+      var reader = cmd.ExecuteReader();
+          while(reader.Read())
+          {
+          int storeId = Convert.ToInt32(reader["id"]);
+          string storecode = reader["storecode"].ToString();
+          string description = reader["StoreName"].ToString();
+#&gt; //We now have the data, let's use it!  The code in &lt;#= gets populated #&gt;**
+    [Libraries.Utils.Enums.Info(Code = "&lt;#= storecode #&gt;", Name = "&lt;#= description #&gt;")] &lt;#= Sanitize(description) #&gt; = &lt;#= storeId #&gt;,
+&lt;#
+          }
+    }
+#&gt;  
+  }
+}
+//This is a method which takes a name like "Some Descripton" and Sanitizes it to Some_Description so it can be usable as an enum**
+&lt;#+
+        static string Sanitize(string token) 
+        {
+                // Replace all invalid chars by underscores
+                token = Regex.Replace(token, @"[\W\b]", "_", RegexOptions.IgnoreCase);
+
+                // If it starts with a digit, prefix it with an underscore
+                token = Regex.Replace(token, @"^\d", @"_$0");
+
+                // Check for reserved words
+                // TODO: Clean this up and add other reserved words (keywords, etc)
+                if (token == "Url") token = "_Url";
+
+                return token;
+        }
+#&gt;
+</code></pre>
+
+<p>The key thing to note about these files is that everything between &lt;# #> is code that is run, and you can create variables within that code.  To display, much like ASP, &lt;#= variable #>.</p>
+
+<p>I'm not certain if these files are automatically built every time you build your solution, but that seems like it'd be an easy build script.  To build them though, as you are editing, save.  You can right click the file and click "Run Custom Tool" from the context menu.  You'll see an error by the file with the related generated file to inspect it.</p>
+
+<p>By the way, the above could would generate something like this:</p>
+
+<pre><code>using System;
+using System.CodeDom.Compiler;
+
+namespace Services.Entities
+{
+  [GeneratedCode("TextTemplatingFileGenerator", "10")]
+  public enum Store
+  {
+    [Libraries.Utils.Enums.Info(Code = "ST1", Name = "Store 1")] Store1 = 1,
+    [Libraries.Utils.Enums.Info(Code = "ST2", Name = "Store 2")] Store2 = 2,
+  }
+}
+</code></pre>
+
+<p>By the way, everything that is OUTSIDE of a tag (&lt;#, &lt;#=, &lt;#+) will be sent as output to the class.  You need to be sure your template is set up correctly when running or you could get compile errors for class with missing brackets, etc.</p>

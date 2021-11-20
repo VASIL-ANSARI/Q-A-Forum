@@ -1,0 +1,34 @@
+<p>In <a href="http://doc.qt.digia.com/stable/qpluginloader.html" rel="nofollow">QPluginLoader</a> you have two functions you may take a look:</p>
+
+<p>a) <code>QObjectList QPluginLoader::staticInstances ()</code></p>
+
+<blockquote>
+  <p>Returns a list of static plugin instances (root components) held by the plugin loader.</p>
+</blockquote>
+
+<p>b) <code>QString fileName () const</code></p>
+
+<blockquote>
+  <p>This property holds the file name of the plugin.
+  To be loadable, the file's suffix must be a valid suffix for a loadable library in accordance with the platform, e.g. .so on Unix, .dylib on Mac OS X, and .dll on Windows. The suffix can be verified with QLibrary::isLibrary().</p>
+</blockquote>
+
+<p>Unfortunately, if you don't have plugin loader for specific plugin there is not a lot you can do. Plugins don't require any special interface, and they can be derived directly from <code>QObject</code>. Exporting plugin with <code>Q_EXPORT_PLUGIN2</code> will only declare <code>QObject</code> pointer to plugin instance with <code>qt_plugin_instance</code> prefix. </p>
+
+<p>Loading the plugin will not call any specific function, so I don't see a way to provide it to the plugin itself.</p>
+
+<p>However, you can do something, if you are willing to lost portability: On Windows, plugins are just dlls, which are accessed <a href="http://qt.gitorious.org/qt/qt/blobs/2f4093332db6c9057b82f9c5fababc9bc6cbeb32/src/corelib/plugin/qlibrary_win.cpp" rel="nofollow">internally by Qt via standard Windows system calls</a> (for example, they are loaded using <code>LoadLibrary</code> function, pointers to procedures are found using <code>GetProcAddress</code>, and they are released with <code>FreeLibrary</code> calls), so you could try <a href="http://www.codeproject.com/Articles/16598/Get-Your-DLL-s-Path-Name" rel="nofollow">this approach</a> (I haven't tested it, it is an ugly hack, but it may work).</p>
+
+<pre><code>// near the top of your CPP file
+EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+
+// and then, anywhere you need it:
+LPTSTR  strDLLPath1 = new TCHAR[_MAX_PATH];
+::GetModuleFileName((HINSTANCE)&amp;__ImageBase, strDLLPath1, _MAX_PATH);
+</code></pre>
+
+<blockquote>
+  <p>It seems that any EXE or DLL compiled with the VS2002 (and higher) linkers provides a psuedo-variable called __ImageBase that represents the DOS header of the module (all 32 bit binaries have this). Simply cast this variable to a HINSTANCE, and you can pass it as the first parameter to GetModuleFileName().</p>
+</blockquote>
+
+<p>On Unix systems, <a href="http://qt.gitorious.org/qt/qt/blobs/2f4093332db6c9057b82f9c5fababc9bc6cbeb32/src/corelib/plugin/qlibrary_unix.cpp" rel="nofollow">plugins are loaded via standard dlopen() system call</a>, so you could use solution from <a href="http://stackoverflow.com/questions/1681060/library-path-when-dynamically-loaded">here</a>.</p>

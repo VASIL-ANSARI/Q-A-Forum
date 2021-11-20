@@ -1,0 +1,29 @@
+<p>If I understand correctly, to create your <code>CommunicationClient</code> class, you need to pass information that are retrieved by calling a method on an instance of your <code>ISettingsManager</code>, but you don't want to pass the <code>ISettingsManager</code> as a dependency to your <code>CommunicationClient</code>?</p>
+
+<p>One solution for that would be to create, and register, a factory that would have a dependency on <code>ISettingsManager</code> and that would have a <code>CreateClient</code> method that would return the configured client.</p>
+
+<pre><code>public class CommunicationClientFactory : ICommunicationClientFactory
+{
+   public CommunicationClientFactory(ISettingsManager settingsManager) {...}
+
+   public CreateClient() {...}
+}
+</code></pre>
+
+<p>This way your <code>CommunicationClient</code> is not dependent on the <code>ISettingsManager</code> and you have just this factory that does the work of creating your instance.</p>
+
+<p>Edit:
+An alternative, if you don't want to create a factory for this, would be to have your <code>CommunicationClient</code> object be created in an "invalid" state, and have a method that would set the settings and make its state valid.</p>
+
+<p>Something like:</p>
+
+<pre><code>public class CommunicationClient : IClient
+{
+    public CommunicationClient() { ... }
+    // Code
+
+    CommunicationClient WithSettings(IServerSettings settings) { ... }
+}
+</code></pre>
+
+<p>Of course, then you'd have to make sure that the user don't use it when the settings have not been passed yet, potentially sending an exception if that would be the case. I like this solution less, because it's less explicit that you NEED those settings to have your object in a correct state.</p>

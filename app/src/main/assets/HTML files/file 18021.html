@@ -1,0 +1,50 @@
+<ol>
+<li>The HTML is flawed; There are more than one element with the same <code>id</code> attribute: <code>&lt;tr onclick="colorize(this);" id="item_2" tcolor=""&gt;   &lt;td class="firmname" id="item_2"&gt;</code>.</li>
+<li>The <code>id</code> of the <code>table</code> element in the HTML is "<code>gvResult</code>" while in the Ruby code you are asking Nokogiri to look for a table where "<code>id=gvResultTable</code>".</li>
+<li>Nokogiri uses UTF-8 encoding to store strings internally, so you shouldn't have any problem with Russian characters.</li>
+</ol>
+
+<p>Provided the HTML can be fixed, this works fine:</p>
+
+<p>HTML:</p>
+
+<pre><code>&lt;table id="gvResult"&gt;
+  &lt;tbody&gt;
+    &lt;tr id="item_1"&gt;
+        &lt;td class="firmname"&gt;Example1&lt;/td&gt;
+        &lt;td class="price"&gt;42.00&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr id="item_2"&gt;
+       &lt;td class="firmname"&gt;Example2&lt;/td&gt;
+       &lt;td class="price"&gt;24.00&lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+</code></pre>
+
+<p>Ruby:</p>
+
+<pre><code>require 'rubygems'
+require 'nokogiri'
+require 'pp'
+
+html = open('http://www.example.com/page')
+
+doc = Nokogiri::HTML(html)
+doc.encoding = 'utf-8'
+
+rows = doc.search('//tr[starts-with(@id, "item_")]')
+  @details = rows.collect do |row|
+      detail = {}
+      [
+        [:firmname, 'td[1]/text()'],
+        [:price, 'td[2]/text()'],
+      ].each do |name, xpath|
+        detail[name] = row.at_xpath(xpath).to_s.strip
+      end
+      detail
+  end
+pp @details
+</code></pre>
+
+<p>I presumed that you want to get the data from all the <code>tr</code> elements with an <code>id</code> like "<code>item_\d+</code>" hence I used <code>doc.search('//tr[starts-with(@id, "item_")]')</code>. Change it to suit your needs.</p>

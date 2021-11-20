@@ -1,0 +1,59 @@
+<p>Here is a solution for the problem..with code below I am totally able to save any file locally or on server. 
+<br/><br/><strong>client side</strong></p>
+
+<p><code>scope.c.model</code> is the type of <code>Javascript FILE API</code>. behind the scene is the <code>model</code> which is like this <code>ng-model = model</code> , <code>c</code> is controller and becasue this code is in link function of my directive I can access the model trough <code>scope.c.model</code> . <code>model</code> here could be any name. 
+as I want to read the <code>File</code> I should use <code>FileReader</code>.</p>
+
+<pre><code>            scope.$watch('c.model', () =&gt; {
+            if (scope.c.model != null) {
+
+                var reader = new FileReader();
+                reader.onload = () =&gt; {
+                    var base64 = reader.result.split("base64,")[1];
+                    var file =
+                    {
+                        content: base64,
+                        name: scope.c.model.name,
+                        type: scope.c.model.type,
+                        size: scope.c.model.size
+                        };
+                    var t = file.content;
+                    $http({
+                        method: "POST",
+                        url: "/api/fileupload",//web-api contorller
+                        data: file,// scope.c.model is javascript File
+                        contentType: "application/octet-stream"
+
+                    }).then(successResponse =&gt; {
+                        this.scope["text"] = "Succes...";
+                    }, errorResponse=&gt; {
+                        this.scope["text"] = "Error...";
+                    });
+                };
+                reader.readAsDataURL(scope.c.model);             
+            }
+        });
+</code></pre>
+
+<p><br/> <strong>server side</strong></p>
+
+<pre><code>public class File
+{
+    public string Content;
+    public string Name;
+    public string Type;
+    public string Size;
+}
+public class FileUploadController : ApiController
+{
+    public void Post(File file)
+    {
+        var bytes = Convert.FromBase64String(file.Content);
+        using (var imageFile = new FileStream(@"C:\fileupload\"+file.Name + ".jpg", FileMode.Create))
+        {
+            imageFile.Write(bytes, 0, bytes.Length);
+            imageFile.Flush();
+        }
+    }
+}
+</code></pre>

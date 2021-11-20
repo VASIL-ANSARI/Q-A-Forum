@@ -1,0 +1,43 @@
+<p>The simplest solution is to create another thread.</p>
+
+<pre><code>if (Test1.isEnabled()) {
+    errorLabel.setText("");
+    new Thread(()-&gt;{
+        Result result = JUnitCore.runClasses(Test1.class);
+        EventQueue.invokeLater(()-&gt;errorMessageDisplay(result));
+    }).start();
+}
+</code></pre>
+
+<p>That is not a very good solution, look into using a <a href="https://docs.oracle.com/javase/tutorial/uiswing/concurrency/worker.html" rel="nofollow">SwingWorker</a> or an ExecutorService.</p>
+
+<p>A quick example of using an executor service would be to create an executor when you start.</p>
+
+<pre><code>ExecutorService service = Executors.newSingleThreadExecutor();
+</code></pre>
+
+<p>Then submit jobs to it.</p>
+
+<pre><code>if (Test1.isEnabled()) {
+    errorLabel.setText("");
+    service.submit(()-&gt;{
+        Result result = JUnitCore.runClasses(Test1.class);
+        EventQueue.invokeLater(()-&gt;errorMessageDisplay(result));
+    });
+}
+</code></pre>
+
+<p>This would allow you to submit more than one job, but they would be run serially. You can control the job flow through the gui too.</p>
+
+<pre><code>if (Test1.isEnabled()) {
+    test1.setEnabled(false);
+    errorLabel.setText("");
+    service.submit(()-&gt;{
+        Result result = JUnitCore.runClasses(Test1.class);
+        EventQueue.invokeLater(()-&gt;{
+            errorMessageDisplay(result);
+            test1.setEnabled(true);
+        });
+    });
+}
+</code></pre>

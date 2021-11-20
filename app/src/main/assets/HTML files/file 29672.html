@@ -1,0 +1,56 @@
+<p>If you've already played around with onInterceptTouchEvent, try overriding onTouchEvent(MotionEvent e).  Here's an example implementation that you can adapt to your needs, that integrates a SimpleOnGestureListener detector and a custom interface viewListener that can be used for callbacks to a parent class.  You probably don't need all of this if you just want to detect clicks; you might be able to just get away with the gesture detector.  Also, here's a <a href="http://im-dexter.blogspot.com/2013/01/handling-touch-events-in-viewgroup.html?showComment=1379455694571" rel="nofollow">link</a> I found helpful when I was researching touch event handling.  </p>
+
+<pre><code>@Override public boolean onTouchEvent(MotionEvent ev) {
+    //See if the gesture detector has detected an event.
+    boolean eventConsumed = detector.onTouchEvent(ev);
+    if (!eventConsumed) {
+
+        //If no gesture detected, and the motion is finished, do something
+        if (ev.getAction() == MotionEvent.ACTION_UP) {
+            //DO SOMETHING, such as scroll
+
+            //Send event to listener.
+            if (viewListener != null) {
+                this.viewListener.onUp(ev.getX());
+            }
+            return true; //Consume the event, so nothing else fires.
+        } else {
+            //If no event is detected, and the action hasn't finished, do the default behavior
+            return super.onTouchEvent(ev);
+        }
+    } else {
+        return true; //Consume the event, so nothing else fires.  You can change this to false if you'd like to not consume the event.  
+    }
+
+}
+</code></pre>
+
+<p>and, a custom vertical scroll view class that captures downward swipes, but passes all other gestures to the children.  </p>
+
+<pre><code>public class VerticalScrollView extends ScrollView {
+private GestureDetector mGestureDetector;
+View.OnTouchListener mGestureListener;
+
+public VerticalScrollView(Context context, AttributeSet attrs) {
+    super(context, attrs);
+    mGestureDetector = new GestureDetector(context, new YScrollDetector());
+    setFadingEdgeLength(0);
+}
+
+@Override
+public boolean onInterceptTouchEvent(MotionEvent ev) {
+    boolean superBool = super.onInterceptTouchEvent(ev);
+    boolean intercept =  mGestureDetector.onTouchEvent(ev);
+    return superBool &amp;&amp; intercept ;
+}
+
+// Return false if we're scrolling more in the x direction than in the y direction, so we don't claim the action.
+class YScrollDetector extends SimpleOnGestureListener {
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        return Math.abs(distanceY) &gt; Math.abs(distanceX);
+    }
+}
+</code></pre>
+
+<p>}</p>

@@ -1,0 +1,45 @@
+<p>I see just this way</p>
+
+<pre><code>import numpy as np
+import pandas as pd
+from sklearn import linear_model, metrics, pipeline, preprocessing
+df = pd.DataFrame({'a':range(12), 'b':[1,2,3,1,2,3,1,2,3,3,1,2], 'c':['a', 'b', 'c']*4, 'd': ['m', 'f']*6})
+y = df.a
+num = df[['b']]
+cat = df[['c', 'd']]
+from sklearn.feature_extraction import DictVectorizer
+enc = DictVectorizer(sparse = False)
+enc_data = enc.fit_transform(cat .T.to_dict().values())
+crat = pd.DataFrame(enc_data,  columns=enc.get_feature_names())
+X = pd.concat([crat, num], axis=1)
+cat_columns = ['c=a', 'c=b', 'c=c', 'd=f', 'd=m'] 
+cat_indices = np.array([(column in cat_columns) for column in X.columns], dtype = bool)
+numeric_col = ['b']
+num_indices = np.array([(column in numeric_col) for column in X.columns], dtype = bool)
+reg = linear_model.SGDRegressor()
+estimator = pipeline.Pipeline(steps = [       
+    ('feature_processing', pipeline.FeatureUnion(transformer_list = [        
+            ('categorical', preprocessing.FunctionTransformer(lambda data: data[:, cat_indices])), 
+
+            #numeric
+            ('numeric', pipeline.Pipeline(steps = [
+                ('select', preprocessing.FunctionTransformer(lambda data: data[:, num_indices])),
+                ('scale', preprocessing.StandardScaler())            
+                        ]))
+        ])),
+    ('model', reg)
+    ]
+)
+estimator.fit(X, y)
+</code></pre>
+
+<p>and now we work witn a new dataset</p>
+
+<pre><code>test = pd.DataFrame({ 'b':[1], 'c':['a'], 'd': ['f']})
+cat = test[['c', 'd']]
+num = test[['b']]
+enc_data = enc.transform(cat.T.to_dict().values())
+crat = pd.DataFrame(enc_data,  columns=enc.get_feature_names())
+test = pd.concat([crat, num], axis=1)
+estimator.predict(test)
+</code></pre>

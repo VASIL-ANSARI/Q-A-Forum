@@ -1,0 +1,14 @@
+<p>This is caused by you storing a floating-point value in a normalized <em>integer</em>, then reading it back and converting it into a floating-point value.</p>
+
+<p>Unless you're using a <a href="http://www.opengl.org/wiki/Framebuffer_Object" rel="nofollow">framebuffer object</a>, odds are pretty good that your current framebuffer is just what you got from the OpenGL context. Which probably uses <code>GL_RGBA8</code> as an <a href="http://www.opengl.org/wiki/Image_Format" rel="nofollow">image format</a>. That's 8-bits per channel, unsigned and normalized, stored as an integer. So the floating point value you write is clamped to the [0, 1] range, then converted into an integer by multiplying by 255 and rounding, and then stored.</p>
+
+<p>When you read it back as a float, the conversion is done in reverse: the integer value is converted into a float, divided by 255, and returned.</p>
+
+<pre><code>0.02 * 255 = 5.1 ~= 5
+
+5 / 255 = 0.0196
+</code></pre>
+
+<p>So that's what you get back.</p>
+
+<p>If you want to write a floating-point value from your fragment shader and actually get more than 2-3 digits of precision from what you read back, then you need to be rendering to an FBO that contains images with a reasonable image format. Such as floating-point images (<code>GL_R16F</code> or <code>GL_R32F</code>, since you're only writing one channel of data).</p>

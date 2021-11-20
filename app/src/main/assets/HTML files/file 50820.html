@@ -1,0 +1,51 @@
+<p>You can't really keep the each loop iterations from running immediately after each other. It sounds more like you want a callback to trigger the next item. I haven't tested this code myself but it should give you a hint of how to do it. For every completed syncData it will sync the next item.</p>
+
+<pre><code>$(document).on( "click", '#sync',function(e) {
+    e.preventDefault();
+    $('#sync').prop('disabled', true);
+    $.ajax({
+            type: "POST",
+            url:"./post/dataUrl",    
+            data: {},
+            dataType: 'json',
+            success: function(data){
+                if(data.status == 'success'){
+                    console.log('Success, lets start the sync !');
+                    function syncItem(i) {
+                        var percentage = Math.ceil((i/data.total)*1000)/10;
+                        $('#test').html('&lt;div class="note note-success"&gt;&lt;p&gt;The sync is working... '+percentage+'% '+i+'/'+data.total+' &lt;code&gt;'+item.product_id+'&lt;/code&gt;&lt;/p&gt;&lt;/div&gt;')
+                        if (i == data.total) {
+                            $('#sync').prop('disabled', false);
+                            $('#test').empty();
+                        } else {
+                            var item = data.data[i];
+                            syncData(item.product_id, function () {
+                                // Here we make the next item sync
+                                syncItem(i + 1);
+                            }
+                        }
+                    }
+                    if (data.total &gt; 0) {
+                        syncItem(0);
+                    } else {
+                        // handle empty data case
+                    }
+                }
+            }
+    });
+});
+
+function syncData(product_id, callback){
+    $.ajax({
+            type: "POST",
+            url:"./post/dataSave",    
+            data: {product_id: product_id},
+            dataType: 'json',
+            success: function(data){
+                if(data.status == 'success'){
+                    callback();
+                }
+            }
+    });
+}
+</code></pre>

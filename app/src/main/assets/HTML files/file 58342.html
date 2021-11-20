@@ -1,0 +1,38 @@
+<p>At first glance, the <code>JUnitCore.runClasses(Run.class);</code> call is suspicous. Also, it would be good to know what does the <code>errorMessageDisplay()</code> do. I believe, the problem is with one of these methods.</p>
+
+<p>You can verify this with the following experimental code. Just be careful not to push it into production.</p>
+
+<pre><code>JButton run = new JButton("Run");
+run.addActionListener(new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (Run.isEnabled()) {
+                errorLabel.setText("");
+                System.out.println("Run action peformed.");
+
+            }
+        }
+</code></pre>
+
+<p><strong>Update</strong> Since the <code>errorMessageDisplay()</code> looks okay, it's probably a Threading problem with <code>JUniCore</code>. Thus I'd try the following code:</p>
+
+<pre><code>final ExecutorService executor = Executors.newFixedThreadPool(5); // this runs stuff in background
+JButton run = new JButton("Run");
+// ..
+run.addActionListener(new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (Run.isEnabled()) {
+                executor.execute(new Runnable() { // This is how we run stuff in background. You can use lambdas instead of Runnables.
+                    public void run() {
+                        final Result result = JUnitCore.runClasses(Run.class); // Run.class is different from the current JButton run.
+                        SwingUtilities.invokeLater(new Runnable() { // Now we go back to the GUI thread
+                            public void run() {
+                                errorMessageDisplay(result);
+                            }
+                        });
+                    }
+                });
+        }
+    });
+</code></pre>

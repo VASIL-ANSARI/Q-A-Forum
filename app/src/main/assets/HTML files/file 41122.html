@@ -1,0 +1,31 @@
+<p>Your code is incorrect. By sending an async lambda to the ForEach extension method you're forcing it to be <code>async void</code> which is never a good idea outside UI event handlers.</p>
+
+<p>To actually be asynchronous your calls need to be async all the way:</p>
+
+<pre><code>public async Task&lt;ActionResult&gt; GetPlan(MemberViewModel request)
+{
+    DocService ds = new DocService();
+
+    List&lt;DocType&gt; docTypes = ds.GetDocTypesForPlan(request.PlanId);
+
+    List&lt;CoverageDocument&gt; coverageDocuments = await ds.GetDocumentsForDocTypesAsync(docTypes);
+
+    return View(coverageDocuments);
+}
+
+public async Task&lt;List&lt;CoverageDocument&gt;&gt; GetDocumentsForDocTypesAsync(List&lt;DocType&gt; planDocTypes)
+{
+    DocumentUtility documentUtility = new DocumentUtility();
+    int lastYear = DateTime.Now.Year - 1;
+
+    var planDocuments = await Task.WhenAll(planDocTypes.Select(async (docType) =&gt;
+    {
+        DocumentUtility.SearchCriteria sc = new DocumentUtility.SearchCriteria();
+        sc.documentType = docType;
+
+        return await documentUtility.FindDocuments(sc).Select((document) =&gt; this.coverageDocumentConstructor(document))
+    }));
+
+    return planDocuments.SelectMany(doc =&gt; doc);;
+}
+</code></pre>

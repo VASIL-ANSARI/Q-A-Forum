@@ -1,0 +1,24 @@
+<p>Have you tried this fluent API <code>modelBuilder.Entity&lt;Report&gt;().ToTable("Reporting");</code> ?  You may need to write this so it conditionally does this based on which database you are connecting to.   You may need to have your configuration allow you to say "DatabaseA uses this mapping and connection string", and "DatabaseB uses this other mapping and conenctions string", and rather than changing the connection string, you specify which database by some name/key, and your app looks up that name to determine which mapping code to run.</p>
+
+<pre><code>if(dbMappingconfig == DbMapping.A)//some enum you create
+{
+    modelBuilder.Entity&lt;Report&gt;().ToTable("Reporting");
+}
+</code></pre>
+
+<p>If your goal is to be able to pass these entities to other methods like DisplayReport(Report r) so that you don't have to duplicate code, you could have both Reporting and Report classes implement a IReport interface.</p>
+
+<p>EF also supports inheritance hierarchies, so you could have them inherit from the same class, <strong>BUT</strong> I havfe a strong feeling that will <strong>not</strong> work across databases.</p>
+
+<p>If the OnModelCreating doesn't rerun, it's probably already cached.  Put <code>modelBuilder.CacheForContextType = false;</code> in there so it doesn't cache it in future, and to clear the current cache I think you can just do a Clean+Rebuild.  This will come at the price of rebuilding the model everytime instead of reusing a cache.  What you'd really want is use the cache up until the connection string changes. I don't know of anyway to manually clear the cache, but there might be a way.  You can manage the model building yourself:</p>
+
+<pre><code>DbModelBuilder builder = new DbModelBuilder();
+// Setup configurations
+DbModel model = builder.Build(connection);
+DbCompiledModel compiledModel = model.Compile();
+DbContext context = new DbContext(connection, compiledModel);
+</code></pre>
+
+<p>But that will introduce additional complexities since you will need to manage the caching yourself.</p>
+
+<p>While searching on this, I came across this that looks like they are trying to accomplish the same thing, as well as having gone down the same page, see Final section in question: <strong><a href="http://stackoverflow.com/questions/3428069/how-to-map-an-entity-framework-model-to-a-table-name-dynamically">How to map an Entity framework model to a table name dynamically</a></strong></p>

@@ -1,0 +1,114 @@
+<p>There are two problems with your code: typing and clicking.</p>
+
+<p>When you set the value of an input field directly, none of the input event handlers are called. You could use the native <a href="http://phantomjs.org/api/webpage/method/send-event.html" rel="nofollow"><code>page.sendEvent("keypress", keys)</code></a> which types keys as if a user would type them, so all event handlers will be triggered. Since the function doesn't know where to type to, you need to focus on the element first:</p>
+
+<pre><code>page.evaluate(function(selector){
+    document.querySelector(selector).focus();
+}, selector);
+page.sendEvent("keypress", query);
+</code></pre>
+
+<p>You can solve the clicking also with <code>page.sendEvent("click", posx, posy)</code>. Now the challenge becomes to find out the position of the elements on the page. <a href="http://stackoverflow.com/a/24026636/1816580">This answer</a> provides a jQuery way of solving this:</p>
+
+<pre><code>page.injectJs("jquery.min.js");
+
+var rect = page.evaluate(function(selector) {
+    return $(selector)[0].getBoundingClientRect();
+}, selector);
+
+page.sendEvent('click', rect.left + rect.width / 2, rect.top + rect.height / 2);
+</code></pre>
+
+<hr>
+
+<p>This is your full script that works as expected:</p>
+
+<pre><code>var page = require('webpage').create();
+
+var load, contoroller;
+var numOfActions = 1;
+var clicked = false;
+
+var initialURL = "https://www.google.com/alerts";
+
+page.open(initialURL, function(status) {
+    load = true;
+});
+
+
+page.onLoadFinished = function(status) 
+{
+
+    clearInterval(contoroller);
+    if (clicked)
+    {
+        console.log("1| The status of loading the page is " + status + "\n");
+        page.render("SCREENSHOT/page_" + numOfActions + ".png");
+        numOfActions += 1;
+
+        phantom.exit();
+    }
+    else
+    {
+        contoroller = setInterval(function () {
+
+            if (load)
+            {
+                console.log("2| The status of loading the page is " + status + "\n");
+                page.render("SCREENSHOT/page_" + numOfActions + ".png");
+                numOfActions += 1;
+
+                load = false;
+
+                enter("input", "test"); // very first input
+            }
+            else
+            {
+                console.log("3| The status of loading the page is " + status + "\n");
+                page.render("SCREENSHOT/page_" + numOfActions + ".png");
+                numOfActions += 1;
+
+                enter("input.email_input", "test@test.com");
+
+                setTimeout(function(){
+                    click("#create_alert");
+                }, 500);
+            }
+        }, 5000);
+    }
+}
+
+
+function enter(selector, query)
+{
+    page.evaluate(function(selector){
+        document.querySelector(selector).focus();
+    }, selector);
+    page.sendEvent("keypress", query);
+}
+
+
+function click(selector)
+{
+    clicked = true;
+    clearInterval(contoroller);
+
+    page.injectJs("functions/jquery.js");
+
+    var rect = page.evaluate(function(selector) {
+        return $(selector)[0].getBoundingClientRect();
+    }, selector);
+
+    page.sendEvent('click', rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    window.setTimeout(function () { 
+
+        console.log("4| The status of loading the page is " + status + "\n");
+        page.render("SCREENSHOT/page_" + numOfActions + ".png");
+        numOfActions += 1;
+
+        phantom.exit();
+
+    }, 5000);
+}
+</code></pre>

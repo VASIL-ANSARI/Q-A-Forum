@@ -1,0 +1,76 @@
+<p>Try the following method: </p>
+
+<pre><code>        /// &lt;summary&gt;
+        /// Add a blank worksheet to the workbook
+        /// &lt;/summary&gt;
+        /// &lt;param name="workbookPart"&gt;Wookbook part&lt;/param&gt;
+        public static void InsertBlankWorksheet(WorkbookPart workbookPart)
+        {
+            // Add a blank WorksheetPart.
+            WorksheetPart newWorksheetPart = workbookPart.AddNewPart&lt;WorksheetPart&gt;();
+
+            // Create the new worksheet
+            Worksheet worksheet = new Worksheet();
+            worksheet.AddNamespaceDeclaration("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+            SheetDimension sheetDimension1 = new SheetDimension() { Reference = "A1" };
+
+            SheetViews sheetViews1 = new SheetViews();
+            SheetView sheetView1 = new SheetView() { TabSelected = true, WorkbookViewId = (UInt32Value)0U };
+
+            sheetViews1.Append(sheetView1);
+            SheetFormatProperties sheetFormatProperties1 = new SheetFormatProperties() { DefaultRowHeight = 15D };
+            SheetData sheetData1 = new SheetData();
+            PageMargins pageMargins1 = new PageMargins() { Left = 0.7D, Right = 0.7D, Top = 0.75D, Bottom = 0.75D, Header = 0.3D, Footer = 0.3D };
+            PageSetup pageSetup1 = new PageSetup() { Orientation = OrientationValues.Portrait, Id = "rId1" };
+
+            worksheet.Append(sheetDimension1);
+            worksheet.Append(sheetViews1);
+            worksheet.Append(sheetFormatProperties1);
+            worksheet.Append(sheetData1);
+            worksheet.Append(pageMargins1);
+            worksheet.Append(pageSetup1);
+
+            newWorksheetPart.Worksheet = worksheet;
+            newWorksheetPart.Worksheet.Save();
+
+            Sheets sheets = workbookPart.Workbook.GetFirstChild&lt;Sheets&gt;();
+            string relationshipId = workbookPart.GetIdOfPart(newWorksheetPart);
+
+            // Get a unique ID for the new worksheet.
+            uint sheetId = 1;
+            if (sheets.Elements&lt;Sheet&gt;().Count() &gt; 0)
+            {
+                sheetId = sheets.Elements&lt;Sheet&gt;().Select(s =&gt; s.SheetId.Value).Max() + 1;
+            }
+
+            // Give the new worksheet a name.
+            string sheetName = "Sheet" + sheetId;
+
+            // Append the new worksheet and associate it with the workbook.
+            Sheet sheet = new Sheet() { Id = relationshipId, SheetId = sheetId, Name = sheetName };
+            sheets.Append(sheet);
+            workbookPart.Workbook.Save();
+        }
+</code></pre>
+
+<p><strong>EDIT</strong></p>
+
+<p>Here is the class that contains the method:</p>
+
+<pre><code>public static class ExcelHelpers
+{
+    public static void InsertBlankWorksheet(WorkbookPart workbookPart)
+    {...}
+}
+</code></pre>
+
+<p>Open up your excel document like this and call the method:</p>
+
+<pre><code>public static void Export(string document)
+{
+    using (SpreadsheetDocument doc = SpreadsheetDocument.Open(document, true))
+    {
+        ExcelHelpers.InsertBlankWorksheet(doc.WorkbookPart);
+    }
+}
+</code></pre>

@@ -1,0 +1,61 @@
+<p>This question is probably too advanced for a C++ beginner, but here's some explanation of how to implement a solution....</p>
+
+<p>First, you need to have a container that mimicks the logic used by each level of cache: the simplest (and likely adequate) such container is an Least Recently Used (LRU) data structure.  What that does is record a fixed maximum number of in-cache elements, and when an element is accessed it searches for it in the list: if it's found it's moved to the top/front of the list, displacing the 1st and subsequent list elements until the gap it left behind is again filled.  If it's not in the list, then it's also added at the top, with all other elements shifted down to make room, and the last element removed if the list is at its maximum size.  To implement an LRU nicely, you need to be able to find elements quickly by value, while inserting and removing elements quickly mid-list.  This is best done with a combination of an <code>unordered_map</code> and a <code>list</code>, but implementation of that alone is more than you can reasonably be expected to do as a C++ beginner.  You could start by using only a list - the searching will be slow (O(n) or linear / brute force), but you can get it working functionally.</p>
+
+<p>Given such an LRU class, you can set the sizes of two instances to represent pages in L1 and L2 cache, then for each address in the input file, you seek that page (say for 4k pages you could divide it by 4096, or bitwise-and it with the bitwise negation of 4095, or bitwise-or it with 4095, or bitshift it right 12 times etc.) in L1, falling back on L2 if necessary.  The "is it already in the cache" code can keep hit/miss counters.</p>
+
+<p>Here's some example code to get you started:</p>
+
+<pre><code>template &lt;typename T&gt;
+class Dumb_LRU
+{
+    Dumb_LRU(size_t max_size) : n_(max_size) { }
+    bool operator()(const T&amp; t)
+    {
+        std::list&lt;T&gt;::iterator i = std::find(l_.begin(), l_.end(), t);
+        if (i == l_.end())
+        {
+            l_.push_front(t);
+            if (l_.size() &gt; n_)
+                l_.pop_back();
+            return false;
+        }
+        if (i != l_.begin()) // not already the first element...
+        {
+            l_.erase(i);
+            l_.push_front(t);
+        }
+        return true;
+    }
+  private:
+    std::list&lt;T&gt; l_;
+    size_t n_;
+};
+</code></pre>
+
+<p>You can then do your simulation like this:</p>
+
+<pre><code>static const size_t l1_cache_pages = 256;
+static const size_t l2_cache_pages = 2048;
+static const size_t page_size = 4096;
+
+Dumb_LRU&lt;size_t&gt; l1(l1_cache_pages);
+Dumb_LRU&lt;size_t&gt; l2(l2_cache_pages);
+
+size_t address;
+std::string doing_what;
+int l1_hits = 0, l1_misses = 0, l2_hits = 0, l2_misses = 0;
+while (std::cin &gt;&gt; address &gt;&gt; doing_what)
+{
+    if (l1(address / page_size))
+        ++l1_hits;
+    else
+    {
+        ++l1_misses;
+        if (l2(address / page_size))
+            ++l2_hits;
+        else
+            ++l2_misses;
+}
+// ...print out hits/misses...
+</code></pre>

@@ -1,0 +1,48 @@
+<p>Nested sets are similar to <a href="http://en.wikipedia.org/wiki/Adjacency_list_model" rel="nofollow">adjacency lists</a>, but offer additional operations that can't easily be performed if parents and children only know about their immediate joins via <strong>parent</strong> column.</p>
+
+<p>For instance, if we were given the following data model:</p>
+
+<pre><code>  Graph                 Table
+
+     A                  node, parent
+    / \                  A,
+   B   E                 B,   A
+  / \                    C,   B
+ C   D                   D,   B
+                         E,   A
+</code></pre>
+
+<p>We could easily retrieve node A's immediate children, but where it gets tricky is if we wanted to determine if node C is in node A's hierarchy, or if we want to retrieve node A's entire tree and not just it's immediate children. It's tricky because node C is not an an immediate child of node A, and without knowing the depth of the tree, or a recursive query (isn't an option for some databases), or some kind of SQL voodoo we're pretty much out of luck. Another example that might become problematic is if we wanted to destroy or update every record in the node A tree.</p>
+
+<p>Nested sets introduce "left" and "right" attributes in addition to our initial parent attribute. Now nodes are numbered twice in relation to when they get visited via tree traversal as the record is inserted or modified. Using the previous example with a nested set would look something like this:</p>
+
+<pre><code>  +---------------------------+          id, text, lft, rgt
+  |             A             |           1, A,    1,   10
+  |                           |           2, B,    2,   7
+  | +----------------+ +----+ |           3, C,    3,   4
+  | |       B        | | E  | |           4, D,    5,   6
+  | |                | |    | |           5, E,    8,   9
+  | | +----+  +----+ | +----+ |
+  | | | C  |  | D  | |        |
+  | | |    |  |    | |        |
+  | | +----+  +----+ |        |
+  | +----------------+        |
+  +---------------------------+
+  1 2 3    4  5    6 7 8   9  10
+</code></pre>
+
+<p>With the above example we can determine that node A has a left and right depth of 1 &amp; 10 respectively, so anything within it's hierarchy will have a left and right depth somewhere between those two values. With that said, querying for node A's entire tree now becomes trivial:</p>
+
+<pre><code>SELECT c.id, c.text, c.lft, c.rgt FROM nodes c, nodes p WHERE p.lft &lt; c.lft AND p.rgt &gt; c.rgt AND p.id = 1;
+</code></pre>
+
+<p>Gives us:</p>
+
+<pre><code>  id, text, lft, rgt
+   2, B,    2,   7
+   3, C,    3,   4
+   4, D,    5,   6
+   5, E,    8,   9
+</code></pre>
+
+<p>See <a href="http://gmarik.info/blog/2012/10/14/recursive-data-structures-with-rails" rel="nofollow">Recursive data structures with rails</a> for source. As discussed in the question's comments, there might be better/more efficient solutions depending on your requirements - the linked article covers this in more detail.</p>

@@ -1,0 +1,23 @@
+<p>The first return value of <a href="http://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.io.wavfile.read.html" rel="nofollow"><code>scipy.io.wavfile.read</code></a> is the samplerate and it is taken from the header of the audio file. If you want to change the sample rate, you have to do some <a href="https://en.wikipedia.org/wiki/Sample_rate_conversion" rel="nofollow">samplerate rate conversion</a>.</p>
+
+<p>Here some basic code to change the samplerate by interpolation. Note that this is only harmless, if the original sample rate is lower than the new one. The other way around, you could introduce aliasing if the audio file contains frequencies higher than the <a href="https://en.wikipedia.org/wiki/Nyquist_frequency" rel="nofollow">Nyquist frequency</a>. If this is the case you should apply a filter before interpolating.</p>
+
+<pre><code>import numpy as np
+from scipy.io import wavfile
+from scipy import interpolate
+
+NEW_SAMPLERATE = 48000
+
+old_samplerate, old_audio = wavfile.read("test.wav")
+
+if old_samplerate != NEW_SAMPLERATE:
+    duration = old_audio.shape[0] / old_samplerate
+
+    time_old  = np.linspace(0, duration, old_audio.shape[0])
+    time_new  = np.linspace(0, duration, int(old_audio.shape[0] * NEW_SAMPLERATE / old_samplerate))
+
+    interpolator = interpolate.interp1d(time_old, old_audio.T)
+    new_audio = interpolator(time_new).T
+
+    wavfile.write("out.wav", NEW_SAMPLERATE, np.round(new_audio).astype(old_audio.dtype))
+</code></pre>

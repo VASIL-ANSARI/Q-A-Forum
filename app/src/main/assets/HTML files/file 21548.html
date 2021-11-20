@@ -1,0 +1,46 @@
+<p>First of all, you need to register the specialized type to use it with Jackson using the factory method <code>TypeFactory.constructSpecializedType</code>. Then, the specialized type should be a bean (it should have a default constructor, getters and setters) to deserialize it.</p>
+
+<p>Take a look at these tests clarifiers.</p>
+
+<pre><code>@Test
+public void canSerializeParametricInterface() throws IOException {
+    final ObjectMapper mapper = new ObjectMapper().enableDefaultTyping();
+    final JavaType baseInterface = TypeFactory.defaultInstance().constructParametricType(Result.class, String.class);
+    final JavaType subType = TypeFactory.defaultInstance().constructSpecializedType(baseInterface, Success.class);
+    final ObjectWriter writer = mapper.writerWithType(subType);
+    final String json = writer.writeValueAsString(Success.create("test"));
+    Assert.assertEquals("{\"value\":\"test\"}", json);
+}
+
+@Test
+public void canDeserializeParametricInterface() throws IOException {
+    final ObjectMapper mapper = new ObjectMapper().enableDefaultTyping();
+    final JavaType baseInterface = TypeFactory.defaultInstance().constructParametricType(Result.class, String.class);
+    final JavaType subType = TypeFactory.defaultInstance().constructSpecializedType(baseInterface, Success.class);
+    final ObjectReader reader = mapper.reader(subType);
+    final Success&lt;String&gt; success = reader.readValue("{\"value\":\"test\"}");
+    Assert.assertEquals("test", success.getValue());
+}
+
+public static interface Result&lt;T&gt; {
+}
+
+public static class Success&lt;T&gt; implements Result&lt;T&gt; {
+
+    private T value;
+
+    public static &lt;T&gt; Success&lt;T&gt; create(T value) {
+        final Success&lt;T&gt; success = new Success&lt;T&gt;();
+        success.value = value;
+        return success;
+    }
+
+    public T getValue() {
+        return value;
+    }
+
+    public void setValue(T value) {
+        this.value = value;
+    }
+}
+</code></pre>

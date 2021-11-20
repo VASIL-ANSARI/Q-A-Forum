@@ -1,0 +1,30 @@
+<p>At the risk of being obvious, you basically want to just drop the else clause. The logic you're looking for is something like:</p>
+
+<pre><code>int max_active = 3; // or whatever
+int number_active = 0;
+bool done = false;
+
+for (; !done; ++number_active) {
+  // wait for something to do;
+  GetSomeWork();
+  // wait for something to finish, if necessary.
+  for (; number_active &gt;= max_active; --number_active)
+    wait(&amp;status);
+  pid = fork();
+  if (pid &lt; 0)
+    ReportErrorAndDie();
+  if (pid == 0)
+    DoTheWorkAndExit();
+}
+</code></pre>
+
+<p>This actually lets you change the value of max_active without restarting, which is the only justification for the for loop around the wait() call.</p>
+
+<p>The obvious complaint is that number_active in my version doesn't actually tell you how many processes are active, which is true. It tells you how many processes you haven't wait()'ed for, which means that you might keep some zombies (but the number is limited). If you're constantly running at or close to the maximum number of tasks, this doesn't matter, and unless your maximum is huge, it doesn't matter anyway, since the only Design Requirement was that you don't use more than the maximum number of tasks, and consequently you only have to know that the number active is not more than the maximum.</p>
+
+<p>If this really bothers you and you want to clean the tasks up, you can put:</p>
+
+<pre><code>for (; waitpid(-1, &amp;status, WNOHANG) &gt; 0; --number_active) {}
+</code></pre>
+
+<p>before the other for loop, which will reap the zombies before checking if you need to block. (I can't remember if waitpid(-1, &amp;status WNOHANG) returns an error if there are no processes at all, but in any event there's no point continuing the loop on an error.)</p>

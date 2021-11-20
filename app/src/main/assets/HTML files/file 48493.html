@@ -1,0 +1,90 @@
+<p>You can write to the console input buffer for the child process using a handle to the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms682075%28v=vs.85%29.aspx" rel="nofollow"><code>CONIN$</code></a> device with the WriteConsoleInput API.</p>
+
+<p>Two Fortran programs below to demonstrate.   The program for the child process:</p>
+
+<pre><code>PROGRAM peek_a_boo
+  USE IFCORE
+  IMPLICIT NONE
+
+  CHARACTER(*), PARAMETER :: fmt = "('Press any key!')"
+
+  PRINT fmt
+  DO WHILE (.NOT. PEEKCHARQQ())
+    CALL SLEEPQQ(2000)
+    PRINT fmt
+  END DO
+END PROGRAM peek_a_boo
+</code></pre>
+
+<p>The program that shows the Windows API calls.  You can translate this to whichever language floats your boat.</p>
+
+<pre><code>PROGRAM peek_parent
+  USE IFWIN
+  IMPLICIT NONE
+
+  INTEGER(BOOL) :: api_result
+  INTEGER(HANDLE) :: console_input
+  TYPE(T_STARTUPINFO) :: startup_info
+  TYPE(T_PROCESS_INFORMATION) :: process_info
+  TYPE(T_INPUT_RECORD) :: input_record
+  INTEGER(DWORD) :: events_written
+  INTEGER(DWORD) :: wait_event
+
+  ! Create the child process.
+  CALL ZeroMemory(LOC(startup_info), SIZEOF(startup_info))
+  startup_info%cb = SIZEOF(startup_info)
+
+  api_result = CreateProcess( &amp;
+      'peek_a_boo.exe',  &amp;
+      NULL,  &amp;      ! command line.
+      NULL,  &amp;      ! process security attributes.
+      NULL,  &amp;      ! thread security attributes.
+      .FALSE.,  &amp;   ! inherit handles.
+      0_DWORD,  &amp;
+      NULL,  &amp;      ! environment.
+      NULL,  &amp;      ! current directory.
+      startup_info,  &amp;
+      process_info )
+
+  IF (api_result == 0) THEN
+    ERROR STOP 'Couldn''t start it :('
+  END IF
+
+  api_result = CloseHandle(process_info%hThread)
+
+  ! Let the child run for a bit.
+  CALL SLEEPQQ(5000)
+
+  ! Get a handle to our console input buffer.
+  console_input = CreateFile(  &amp;
+      'CONIN$',  &amp;
+      GENERIC_WRITE,  &amp;
+      IANY([FILE_SHARE_READ, FILE_SHARE_WRITE]),  &amp;
+      NULL,  &amp;       ! security attrs
+      OPEN_EXISTING,  &amp;
+      0_DWORD,  &amp;    ! attributes
+      NULL )         ! template file
+  IF (console_input == 0) THEN
+    ERROR STOP 'Couldn''t open it :('
+  END IF
+
+  ! Poke something into the buffer.
+  input_record%EventType = KEY_EVENT
+  input_record%KeyEvent%bKeyDown = .TRUE.
+  input_record%KeyEvent%wRepeatCount = 1
+  input_record%KeyEvent%wVirtualKeyCode = INT(Z'51', WORD)
+  input_record%KeyEvent%wVirtualScanCode = INT(Z'51', WORD)
+  input_record%KeyEvent%AsciiChar = 'Q'
+  input_record%KeyEvent%dwControlKeyState = 0
+  api_result = WriteConsoleInput(  &amp;
+      console_input,  &amp;
+      input_record,  &amp;
+      1,  &amp;
+      LOC(events_written) )
+
+  ! Wait for the child to terminate.
+  wait_event = WaitForSingleObject(process_info%hProcess, INFINITE)
+  api_result = CloseHandle(console_input)
+  api_result = CloseHandle(process_info%hProcess)
+END PROGRAM peek_parent
+</code></pre>

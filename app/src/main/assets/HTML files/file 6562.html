@@ -1,0 +1,58 @@
+<p>In order for using a route to make sense you would need to be doing something like this:</p>
+
+<pre><code>public function executeDownload(sfWebRequest $request)
+{
+    // assume this method holds the logic for generating or getting a path to the pdf
+    $pdfPath = $this-&gt;getOrCreatePdf();
+
+    // disbale the layout
+    $this-&gt;setLayout(false);
+
+    $response = $this-&gt;getResponse();
+
+    // return the binary pdf dat directly int he response as if serving a static pdf file
+    $response-&gt;setHttpHeader('Content-Disposition', 'attachment; filename="'. basename($pdfPath));
+    $response-&gt;setContentType('application/pdf');
+    $response-&gt;setContent(file_get_contents($pdfPath));
+
+    return sfView::NONE;
+}
+</code></pre>
+
+<p>That action would actually read the file and send the content. But unless you have a good reason for doing this its not advisable because youre going to incur unnecessary overhead from php.</p>
+
+<p>If you do have a good reason for doin this (restricted access, dynamic file names, etc.) then you would simply determine what paramters you need to use in that action to determine the path to the pdf on the file system and set up a normal route. For example lets say your using a human recognizeable slug to refernece the file. Then you have a db record that holds a mapping of slug to file path. In that case the preceding action might look like this:</p>
+
+<pre><code>public function executeDownload(sfWebRequest $request)
+{
+
+   $q = Doctrine_Core::getTable('PdfAsset')
+     -&gt;createQuery('p')
+     -&gt;where('slug = ?', $request-&gt;getSlug());
+
+    $this-&gt;forward404Unless($asset = $q-&gt;fetchOne());
+
+    $pdfPath = $asset-&gt;getPath();
+
+    // disbale the layout
+    $this-&gt;setLayout(false);
+
+    $response = $this-&gt;getResponse();
+
+    // return the binary pdf dat directly in the response as if serving a static pdf file
+    $response-&gt;setHttpHeader('Content-Disposition', 'attachment; filename="'. basename($pdfPath));
+    $response-&gt;setContentType('application/pdf');
+    $response-&gt;setContent(file_get_contents($pdfPath));
+
+    return sfView::NONE;
+}
+</code></pre>
+
+<p>With the corresponding route looking something like:</p>
+
+<pre><code>pdf_asset:
+  url: /download/pdf/:slug
+  params: {module: yourModule, action: 'download'}
+</code></pre>
+
+<p>Note if the files are large you might want to use <code>fopen</code> instead of <code>file_get_contents</code> and then read the data out as a stream so that you dont have to put it all in memory. This would require you to use a view though (but you would still set layout to false to prevent the layout from wrapping your streamed data).</p>

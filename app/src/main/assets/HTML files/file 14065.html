@@ -1,0 +1,35 @@
+<p>It's not entirely clear from your question how groups interact with each for spotting.  In the following, I'm going to assume that Group A "spots" Group B if any member a of A is within some specified range of any member b of B.</p>
+
+<p>The simplest way to do this would be to just iterate over all (a,b) pairs.  To do this, you can use the itertools library, something like...</p>
+
+<pre><code>spotted = False
+for a, b in itertools.product(A.sprites( ), B.sprites( )):
+    if is_in_range(a, b):
+        spotted = True
+        break
+</code></pre>
+
+<p>The problem with this approach is that the computational cost is rather high.  (It's n**2 in complexity.)  Furthermore, without some kind of pruning and optimization, you have to run this block of code for each pair of friendly/enemy group, too.  Now, if each group is guaranteed to have some constant geometry, then we can make the cost of computing MUCH cheaper.  However, assuming that groups have no fixed geometry, then I'd recommend looking into using a geometry package to do a lot of the work for you.  These packages are very powerful and very efficient...and a lot of them are also surprisingly easy to use.  There may be geometry packages specific to PyGame...I can't think of any at the moment.  </p>
+
+<p>I often use the <a href="http://pypi.python.org/pypi/Shapely" rel="nofollow">shapely package</a>.  If we use shapely, then the problem of determining groups that are within detection range is something more like... </p>
+
+<pre><code>import shapely
+import shapely.geometry
+
+#-- Build a polygon envelope around the members of the group.
+pointsA = shapely.geometry.MultiPoint(map(lambda r: r.center, A.sprites( )))
+pointsB = shapely.geometry.MultiPoint(map(lambda r: r.center, B.sprites( )))
+
+#-- Ask shapely to give the minimum distance between the hulls that
+#-- encompass the two groups.
+distance = pointsA.convex_hull.distance(pointsB.convex_hull)
+
+if distance &lt; RANGE_OF_DETECTION:
+   detected = True
+else:
+   detected = False
+</code></pre>
+
+<p>NOTE that I haven't tested the code above...it's only to demonstrate the general idea of using the shapely library to help with the geometry computations.</p>
+
+<p>If you're new to game programming, you might also want to look into using quadtrees as a means of pruning how much geometry computation needs to be done.</p>

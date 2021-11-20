@@ -1,0 +1,30 @@
+<p>Per the comment by mkl, I updated to version 2.0.3 and the Chinese characters printed correctly. Here is my new code in comparison to my old to see what was necessary to update:</p>
+
+<pre><code>PrinterJob job = PrinterJob.getPrinterJob();
+job.setPrintService(printer);
+
+PageFormat pageFormat = job.defaultPage();
+Paper paper = pageFormat.getPaper();
+Book pBook = new Book();
+
+PDDocument document = PDDocument.load(new URL(fileUrl).openStream()); // Needs to be a stream now
+
+PDPageTree allPages = document.getPages(); // no getDocumentCatalog
+for (Object pdPage : allPages)
+{
+    PDPage page = (PDPage) pdPage;
+    double width = page.getMediaBox().getWidth();   // getMediaBox instead of find
+    double height = page.getMediaBox().getHeight(); // getMediaBox instead of find
+    double margin = 0.0d;
+    paper.setSize(width, height);
+    paper.setImageableArea(margin, margin, width - (margin * 2), height - (margin * 2));
+    pageFormat.setOrientation(PageFormat.PORTRAIT);
+    pageFormat.setPaper(paper);
+    PageFormat validatePage = job.validatePage(pageFormat);
+    pBook.append(new PDFPrintable(document), validatePage, document.getNumberOfPages()); // Completely different
+}
+
+job.setPageable(pBook); // Moved this out of the loop, just cause it only needs to be called once
+job.setJobName(jobName);
+job.print();
+</code></pre>

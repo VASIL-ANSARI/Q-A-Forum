@@ -1,0 +1,16 @@
+<p>You have fallen victim to modifying the value of a closed-over variable.</p>
+
+<p>Change the code to this:</p>
+
+<pre><code>foreach (string criterion in criteria)
+{
+    var crit = criterion;
+    allResults = allResults.Where(/* use crit here, not criterion */);
+}
+</code></pre>
+
+<p>The problem here is that while you are building up the query your filtering expressions close over the variable <code>criterion</code>, in effect pulling it in scope at the point where the query is evaluated. However, at that time <code>criterion</code> will only have <em>one</em> value (the last one it happened to loop over) so all but the last of your filters will in fact be turned into duplicates of the last one.</p>
+
+<p>Creating a local copy of <code>criterion</code> and referencing that inside the expressions corrects the problem because <code>crit</code> is a <em>different</em> local variable each time, with lifetime that does not extend from one iteration of the loop to the next one.</p>
+
+<p>For more details you might want to read <a href="http://stackoverflow.com/q/8898925/50079">Is there a reason for C#&#39;s reuse of the variable in a foreach?</a>, where it is also mentioned that C# 5.0 will take a breaking change that applies to this scenario: the lifetime of the loop variable <code>criterion</code> is going to change, making this code work correctly without an extra local.</p>

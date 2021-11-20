@@ -1,0 +1,97 @@
+<p>You are using the <code>size_t</code> located just before the allocated area as the length available. However, it <em>includes</em> the <code>size_t</code> itself. Therefore, here:</p>
+
+<pre><code>    if (p != NULL) {
+        size_t *q = p;
+        q--;
+        size_t s = *q &amp; ~(SIZE_BITS); // get allocated bytes subtracting info bits
+        char *z = p;
+        memset(z, 0, s); // zero memory
+        z[s - 1] = '@'; // place guard char
+    }
+</code></pre>
+
+<p>you end up overwriting the length of the <em>next</em> region, partially, by your guard char. The solution is to substract the length of the length field in bytes, i.e. use <code>const s = (((size_t *)p)[-1] &amp; (~(size_t)SIZE_BITS)) - sizeof (size_t);</code> instead.</p>
+
+<p>(I verified this works on Embedded GNU C Library 2.15-0ubuntu10.15 on x86-64, for both 64 and 32-bit code (with different <code>size_t</code> sizes).)</p>
+
+<p>I recommend you add at least minimal abstraction, so that porting your code to a different C library or a newer version of GNU C library in the future is not futile. (Version checking would be good, but I was too lazy to find out which versions of GNU C library actually use this layout.)</p>
+
+<pre><code>#include &lt;string.h&gt;
+#include &lt;limits.h&gt;
+#ifdef __GLIBC__
+
+/* GLIBC stuffs the length just prior to the returned pointer,
+ * with flags in the least significant three bits. It includes
+ * the length field itself. */
+#define   USER_LEN(ptr) ( ( ((size_t *)(ptr))[-1] &amp; (~((size_t)7)) ) - sizeof (size_t))
+
+#else
+#error This C library is not supported (yet).
+#endif
+
+extern void  abort(void);
+extern void *__libc_malloc(size_t);
+extern void *__libc_realloc(void *, size_t);
+extern void  __libc_free(void *);
+
+
+#define CANARY_LEN 1
+
+static void canary_set(void *const ptr, const size_t len)
+{
+    ((unsigned char *)ptr)[len - CANARY_LEN] = '@';
+}
+
+static int canary_ok(const void *const ptr, const size_t len)
+{
+    return ((const unsigned char *)ptr)[len - CANARY_LEN] == '@';
+}
+
+
+void *malloc(size_t size)
+{
+    void *ptr;
+    ptr = __libc_malloc(size + CANARY_LEN);
+    if (ptr) {
+        const size_t len = USER_LEN(ptr);
+        memset(ptr, 0, len);
+        canary_set(ptr, len);
+    }
+    return ptr;
+}
+
+void *realloc(void *ptr, size_t size)
+{
+    void *newptr;
+
+    if (!ptr)
+        return malloc(size);
+
+    if (!canary_ok(ptr, USER_LEN(ptr)))
+        abort();
+
+    newptr = __libc_realloc(ptr, size + CANARY_LEN);
+    if (!newptr)
+        return newptr;
+
+    canary_set(newptr, USER_LEN(ptr));
+
+    return newptr;
+}
+
+void free(void *ptr)
+{
+    if (ptr) {
+        const size_t len = USER_LEN(ptr);
+
+        if (!canary_ok(ptr, len))
+            abort();
+
+        memset(ptr, 0, len);
+
+        __libc_free(ptr);
+    }
+}
+</code></pre>
+
+<p>Hope this helps.</p>

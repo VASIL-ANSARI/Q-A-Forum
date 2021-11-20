@@ -1,0 +1,22 @@
+<p>As Neil already noted in the newsgroup, the data expected for an image is an <code>nsIContainer</code> instance rather than a stream. I couldn't find any examples of doing that on the web so I modified your code:</p>
+
+<pre><code>var image = "data:image/png;base64,...";
+
+var io         = Components.classes["@mozilla.org/network/io-service;1"].getService(Components.interfaces.nsIIOService);
+var channel    = io.newChannel(image, null, null);
+var input      = channel.open();
+var imgTools   = Components.classes["@mozilla.org/image/tools;1"].getService(Components.interfaces.imgITools);
+
+var container  = {};
+imgTools.decodeImageData(input, channel.contentType, container);
+
+var trans = Components.classes["@mozilla.org/widget/transferable;1"].createInstance(Components.interfaces.nsITransferable);
+trans.addDataFlavor("image/png");
+trans.setTransferData("image/png", container.value, -1);
+
+var clipid = Components.interfaces.nsIClipboard;
+var clip   = Components.classes["@mozilla.org/widget/clipboard;1"].getService(clipid);
+clip.setData(trans, null, clipid.kGlobalClipboard);
+</code></pre>
+
+<p>For me this copies the image to clipboard correctly.</p>

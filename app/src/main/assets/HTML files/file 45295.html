@@ -1,0 +1,27 @@
+<p>In your outer query, you reference <code>ProdcueMonAvg.Average_CPI</code> etc. In your inner query, you alias it as <code>AS ProduceMonAvg</code>. note the typo - <code>Prodcue</code> vs <code>Produce</code>. Are you sure your error doesn't say <code>Table xxx.ProdcueMonAvg doesn't exist</code>?</p>
+
+<p>For that matter, there are a couple of other things that seem wrong with your query. Your join to the AVGTEMP_X query is using a subquery where one isn't necessary, it's also performing a cross join and THEN an inner join. I doubt that is what you wanted. Try this one out:</p>
+
+<pre><code>    SELECT AVGTEMP_X.Average_Temp,
+    ProduceMonAvg.Average_CPI,
+    SUM(AVGTEMP_X.Average_Temp) AS AVGTEMPSUM,
+    SUM(ProduceMonAvg.Average_CPI) AS PROCPISUM,
+     SUM(AVGTEMP_X.Average_Temp * AVGTEMP_X.Average_Temp) AS AVGTEMPSQ,
+    SUM(ProduceMonAvg.Average_CPI * ProduceMonAvg.Average_CPI) PROCPISQ,
+    SUM(AVGTEMP_X.Average_Temp * ProduceMonAvg.Average_CPI) AS PowerSum,
+    COUNT(*) AS TOTAL,
+     (COUNT(*) * (SUM(AVGTEMP_X.Average_Temp * ProduceMonAvg.Average_CPI)) - (SUM(AVGTEMP_X.Average_Temp))) / (sqrt(COUNT(*)* (SUM(AVGTEMP_X.Average_Temp * AVGTEMP_X.Average_Temp)) - pow(SUM(AVGTEMP_X.Average_Temp), 2) * (COUNT(*)* (SUM(ProduceMonAvg.Average_CPI * ProduceMonAvg.Average_CPI)) - pow(SUM(ProduceMonAvg.Average_CPI), 2)))) AS Correlation
+FROM (
+    SELECT series_id,
+        FORMAT(AVG(value), 2) AS Average_CPI,
+        period
+    FROM CURRENT
+    WHERE series_id = 'CUSR0000SEFK'
+        AND theYear &gt;= (1997)
+        AND theYear &lt;= (2010)
+    GROUP BY period
+    ) AS ProduceMonAvg
+INNER JOIN AVGTEMP_X ON AVGTEMP_X.period = ProduceMonAvg.period
+</code></pre>
+
+<p>I've also created some mock tables and data and finally tested the query. It returns results. You can see it here: <a href="http://sqlfiddle.com/#!9/47523/14" rel="nofollow">http://sqlfiddle.com/#!9/47523/14</a></p>

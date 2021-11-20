@@ -1,0 +1,107 @@
+<p>Here's the solution:</p>
+
+<ol>
+<li><p>Change <code>NSString</code> to <code>NSArray</code> of these <code>properties</code>:</p>
+
+<pre><code>@property (strong, nonatomic) NSString* job_longitude;
+@property (strong, nonatomic) NSString* job_latitude;
+</code></pre></li>
+</ol>
+
+<hr>
+
+<ol start="2">
+<li><p>Add a new <code>property</code> to hold the geocode results:</p>
+
+<pre><code>@property (strong, nonatomic) NSMutableDictionary* reversedGeocodes;
+</code></pre></li>
+</ol>
+
+<hr>
+
+<ol start="3">
+<li><p>Set <code>reversedGeocodes</code> in <code>viewDidLoad:</code> method:</p>
+
+<pre><code>self.reversedGeocodes = [NSMutableDictionary dictionary];
+</code></pre></li>
+</ol>
+
+<hr>
+
+<ol start="4">
+<li><p>Add this method to get the reversed geoCode (and save it for the future):</p>
+
+<pre><code>- (void)locationNameWithLat:(float)lat
+                        lng:(float)lng
+          completionHandler:(void (^)(NSString *locationName, NSError *error))completion
+{
+    if (!lat || !lng)
+        completion(@"Unknown location", nil);
+
+    if (!completion || !lat || !lng)
+        return;
+
+    NSString *latStr = @(lat).description;
+    NSString *lngStr = @(lng).description;
+
+    // For each pair of lat and lng creating a unique key and saving the result
+    // so we don't have to process the same pair multiple times.
+    // Example:
+    // lat = 23.039567; lng = 72.566004;
+    // key = @"23.03956772.566004"; value would be whatever CoreLocation returns
+    NSString *key = [latStr stringByAppendingString:lngStr];
+
+    if (key.length) {
+        if ([self.reversedGeocodes[key] length]) {
+            completion (self.reversedGeocodes[key], nil);
+        } else {
+            self.reversedGeocodes[key] = @"Loading...";
+            CLGeocoder *geocoder = [[CLGeocoder alloc] init];
+            CLLocation *location = [[CLLocation alloc] initWithLatitude:lat longitude:lng];
+
+            [geocoder reverseGeocodeLocation:location
+                           completionHandler:^(NSArray *placemarks, NSError *error) {
+                               if (error) {
+                                   completion(@"Unknown location", error);
+                               } else {
+                                   CLPlacemark *placemark = placemarks.firstObject;
+                                   NSString *locationName = placemark.country; // Default = country
+
+                                   if (placemark.locality.length) // add city if available
+                                       locationName = [NSString stringWithFormat:@"%@, %@", placemark.locality, placemark.country];
+
+                                   self.reversedGeocodes[key] = locationName.length ? locationName : @"Unknown location";
+
+                                   completion(self.reversedGeocodes[key], nil);
+                               }
+                           }
+             ];
+        }
+    } else {
+        completion(@"Unknown location", nil);
+    }
+}
+</code></pre></li>
+</ol>
+
+<hr>
+
+<ol start="5">
+<li><p>Call the above method from <code>cellForRowAtIndexPat:</code> method before your return the <code>cell</code>:</p>
+
+<pre><code>float lat = self.job_latitude[indexPath.row];
+float lng = self.job_longitude[indexPath.row];
+
+[self locationNameWithLat:lat
+                      lng:lng
+        completionHandler:^(NSString *locationName, NSError *error) {
+            cell.locationName.text = locationName;
+        }];
+
+return cell;
+</code></pre></li>
+</ol>
+
+<hr>
+
+<p>P.S. Let me know if I missed anything or misspelled because I typed some of the code on here...</p>

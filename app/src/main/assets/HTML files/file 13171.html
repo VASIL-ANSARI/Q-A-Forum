@@ -1,0 +1,45 @@
+<p><s>It's very hard to tell exactly what's going on in that code, because there's lots of code quoted which is unrelated to the problem, and (conversely) it's quoted in somewhat disconnected bits.</s> <em>(You've fixed that, nice one.)</em></p>
+
+<p>But if I understand you correctly, this call from your first code block:</p>
+
+<pre><code>$("#stage_choice_holder").load(...);
+</code></pre>
+
+<p>...is loading HTML with embedded <code>script</code> elements from a PHP page, and in a <code>script</code> element on that page you have:</p>
+
+<pre><code>var controls_setup = $.parseJSON('&lt;?php echo json_encode($setup);?&gt;');
+</code></pre>
+
+<p>First off, you don't want that <code>parseJSON</code> call, simply this:</p>
+
+<pre><code>var controls_setup = &lt;?php echo json_encode($setup);?&gt;;
+</code></pre>
+
+<p><code>json_encode</code> will return valid JSON, which conveniently (and intentionally) is a subset of JavaScript object literal notation, so the end result there is that <code>controls_setup</code> will receive a reference to an object. This may actually be the problem, because throwing single quotes around the output of <code>json_encode</code> may well result in a syntax error (if there are any single quotes in the material output by <code>json_encode</code>, or line breaks).</p>
+
+<p>Then in code later, you're trying to access <code>controls_setup</code> and not seeing it.</p>
+
+<p>Although not best practice, that should work because of the way jQuery ensures things get loaded. Here's a very simple example of it (<a href="http://jsbin.com/afihiz" rel="nofollow">live copy</a>):</p>
+
+<pre><code>jQuery(function($) {
+
+  display("Before: " + typeof foo);
+  $("#target").load("http://jsbin.com/uwigok", function() {
+    display("After: " + typeof foo);
+  });
+
+  function display(msg) {
+    $("&lt;p&gt;").html(msg).appendTo(document.body);
+  }
+});
+</code></pre>
+
+<p>...which loads</p>
+
+<pre><code>&lt;div&gt;Snippet&lt;/div&gt;
+&lt;script&gt;
+  var foo = "bar";
+&lt;/script&gt;
+</code></pre>
+
+<p>So it could be as simple as removing the <code>parseJSON</code> call per the above.</p>

@@ -1,0 +1,92 @@
+<p>Fun problem. You can do this by placing a rectangular "mat" the size of the canvas behind all of your other objects and attaching a drag event to it for selecting other elements. (Note this solution uses the newer version of Raphael, 2.1.0:</p>
+
+<pre><code>var paper = Raphael(0, 0, '100%', '100%');
+
+//make an object in the background on which to attach drag events
+var mat = paper.rect(0, 0, paper.width, paper.height).attr("fill", "#FFF");
+
+var circle = paper.circle(75, 75, 50);
+var rect = paper.rect(150, 150, 50, 50);
+var set = paper.set();
+
+set.push(circle, rect);
+set.attr({
+    fill: 'red',
+    stroke: 0
+});
+//the box we're going to draw to track the selection
+var box;
+//set that will receive the selected items
+var selections = paper.set();
+</code></pre>
+
+<p>Now, we add a drag event -- similar to the mouseover events but with three functions (<a href="http://raphaeljs.com/reference.html#Element.drag">see documentation</a>), and draw a box to track the selection space:</p>
+
+<pre><code>//DRAG FUNCTIONS
+//when mouse goes down over background, start drawing selection box
+function dragstart (x, y, event) {
+    box = paper.rect(x, y, 0, 0).attr("stroke", "#9999FF");    
+}
+
+// When mouse moves during drag, adjust box.
+// If the drag is to the left or above original point,
+// you have to translate the whole box and invert the dx 
+// or dy values since .rect() doesn't take negative width or height
+function dragmove (dx, dy, x, y, event) {
+    var xoffset = 0,
+        yoffset = 0;
+    if (dx &lt; 0) {
+        xoffset = dx;
+        dx = -1 * dx;
+    }
+    if (dy &lt; 0) {
+        yoffset = dy;
+        dy = -1 * dy;
+    }
+    box.transform("T" + xoffset + "," + yoffset);
+    box.attr("width", dx);    
+    box.attr("height", dy);    
+}
+
+function dragend (event) {
+    //get the bounds of the selections
+    var bounds = box.getBBox();
+    box.remove();
+    reset();
+    console.log(bounds);
+    for (var c in set.items) {
+        // Here, we want to get the x,y vales of each object
+        // regardless of what sort of shape it is.
+        // But rect uses rx and ry, circle uses cx and cy, etc
+        // So we'll see if the bounding boxes intercept instead
+
+        var mybounds = set[c].getBBox();
+        //do bounding boxes overlap?
+        //is one of this object's x extremes between the selection's xe xtremes?
+        if (mybounds.x &gt;= bounds.x &amp;&amp; mybounds.x &lt;= bounds.x2 || mybounds.x2 &gt;= bounds.x &amp;&amp; mybounds.x2 &lt;= bounds.x2) {
+            //same for y
+            if (mybounds.y &gt;= bounds.y &amp;&amp; mybounds.y &lt;= bounds.y2 || mybounds.y2 &gt;= bounds.y &amp;&amp; mybounds.y2 &lt;= bounds.y2) {
+                selections.push(set[c]);       
+            }
+        }
+        selections.attr("opacity", 0.5);
+    }
+}
+
+function reset () {
+    //empty selections and reset opacity;
+    selections = paper.set();
+    set.attr("opacity", 1);    
+}
+
+mat.drag(dragmove, dragstart, dragend);
+mat.click(function(e) {
+   reset(); 
+});
+</code></pre>
+
+<p>Just like that, you have a new set (selections) that contains every object that was selected by the mouse drag. You can then apply your mouseover events from the original to that set. </p>
+
+<p>Note that this will select circle objects if you nick the corner of their bounding box with your selection box, even if it doesn't overlap with the area of the circle. You could make a special case for circles if this is a problem. </p>
+
+<p><a href="http://jsfiddle.net/Wrajf/348/">jsFiddle</a></p>

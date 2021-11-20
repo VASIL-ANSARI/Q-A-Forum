@@ -1,0 +1,101 @@
+<p>My answer has two parts: Part 1 is a fairly direct answer to your question, and Part 2 is a recommendation for a better way to do this that's maybe more robust and reliable.</p>
+
+<p><strong>Part 1 - Fairly Direct Answer</strong></p>
+
+<p>Instead of a second <code>if</code> to check for the <code>text</code> inputs, you can use a <code>switch</code>, like so:</p>
+
+<pre><code>var boxWasChecked = false;
+
+// loop through all collected objects
+for (i = 0; i &lt; input_obj.length; i++) {
+
+    // if input object is checkbox and checkbox is checked then ...
+    switch(input_obj[i].type) {
+
+      case 'checkbox':
+        if (input_obj[i].checked) {
+          // ... increase counter and concatenate checkbox value to the url string
+          counter++;
+          boxWasChecked = true;
+          url = url + input_obj[i].value + ',qty=';
+        } else {
+          boxWasChecked = false;
+        }
+
+        break;
+
+      case 'text':
+        if (boxWasChecked) {
+          url = url + input_obj[i].value + '|';
+          boxWasChecked = false;
+        }
+
+        break;
+    }
+}
+</code></pre>
+
+<p><a href="https://jsfiddle.net/qnys4Lwg/" rel="nofollow">Here's a fiddle</a> showing it working that way.</p>
+
+<p>Note that I added variable <code>boxWasChecked</code> so you know whether a Qty textbox's corresponding checkbox has been checked.</p>
+
+<p>Also, I wasn't sure exactly how you wanted the final query string formatted, so I set it up as one parameter named <code>product</code> whose value is a pipe- and comma-separated string that you can parse to extract the values. So the url will look like this:</p>
+
+<pre><code>urlcheckout/add?product=321,qty=10|98,qty=5
+</code></pre>
+
+<p>That seemed better than having a bunch of parameters with the same names, although you can tweak the string building code as you see fit, obviously.</p>
+
+<p><strong>Part 2 - Recommendation for Better Way</strong></p>
+
+<p>All of that isn't a great way to do this, though, as it's highly dependent on the element positions in the DOM, so adding elements or moving them around could break things. A more robust way would be to establish a definitive link between each checkbox and its corresponding Qty textbox--for example, adding an attribute like <code>data-product-id</code> to each Qty textbox and setting its value to the corresponding checkbox's <code>value</code>.</p>
+
+<p><a href="https://jsfiddle.net/1buojf7c/1/" rel="nofollow">Here's a fiddle</a> showing that more robust way.</p>
+
+<p>You'll see in there that I used <a href="https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByName" rel="nofollow">getElementsByName()</a> rather than <code>getElementsByTagName()</code>, using the <code>name</code> attributes that you had already included on the <code>input</code>s:</p>
+
+<pre><code>checkboxes = document.getElementsByName('checked-product'),
+qtyBoxes = document.getElementsByName('qty'),
+</code></pre>
+
+<p>First, I gather the checkboxes and use an object to keep track of which ones have been checked:</p>
+
+<pre><code>var checkedBoxes = {};
+
+// loop through the checkboxes and find the checked ones
+for (i = 0; i &lt; checkboxes.length; i++) {
+    if (checkboxes[i].checked) {
+      counter++;
+      checkedBoxes[checkboxes[i].value] = 1; // update later w/ real qty
+    }
+}
+</code></pre>
+
+<p>Then I gather the Qty textboxes and, using the value of each one's <code>data-product-id</code> attribute (which I had to add to the markup), determine if its checkbox is checked:</p>
+
+<pre><code>// now get the entered Qtys for each checked box
+for (i = 0; i &lt; qtyBoxes.length; i++) {
+  pid = qtyBoxes[i].getAttribute('data-product-id');
+
+  if (checkedBoxes.hasOwnProperty(pid)) {
+    checkedBoxes[pid] = qtyBoxes[i].value;
+  }
+}
+</code></pre>
+
+<p>Finally, I build the url using the <code>checkedBoxes</code> object:</p>
+
+<pre><code>// now build our url
+Object.keys(checkedBoxes).forEach(function(k) {
+  url += [
+    k,
+    ',qty=',
+    checkedBoxes[k],
+    '|'
+  ].join('');
+});
+</code></pre>
+
+<p>(Note that this way does not preserve the order of the items, though, so if your query string needs to list the items in the order in which they're displayed on the page, you'll need to use an array rather than an object.)</p>
+
+<p>There are lots of ways to achieve what you're trying to do. Your original way will work, but hopefully this alternative way gives you an idea of how you might be able to achieve it more cleanly and reliably.</p>

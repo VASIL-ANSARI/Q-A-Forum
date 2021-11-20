@@ -1,0 +1,37 @@
+<p>Several remarks: a) don't use the Spirit V2 beta version distributed with Boost V1.39 and V1.40. Use at least Spirit V2.1 (as released with Boost V1.41) instead, as it contains a <em>lot</em> of bug fixes and performance enhancements (both, compile time and runtime performance). If you can't switch Boost versions, read <a href="http://boost-spirit.com/home/articles/spirit2-1-release/using-spirit-v2-1-with-older-versions-of-boost-pre-v1-41/">here</a> for how to proceed. b) Try to avoid using boost::lambda or boost::bind with Spirit V2.x. Yes, I know, the docs say it works, but you have to know what you're doing. Use boost::phoenix expressions instead. Spirit 'knows' about Phoenix, which makes writing semantic actions easier. If you use Phoenix, your code will look like:</p>
+
+<pre><code>#include &lt;boost/spirit/include/qi.hpp&gt;
+#include &lt;boost/spirit/include/phoenix.hpp&gt;
+
+namespace qi = boost::spirit::qi;
+namespace phoenix = boost::phoenix;
+
+std::string physical, archived;  
+auto expr 
+    =   ( +char_(physicalPermitted) ) [phoenix::ref(physical) = qi::_1] 
+    &gt;&gt; -( 
+            ':' 
+            &gt;&gt; ( +char_(archivedPermitted) )[phoenix::ref(archived) = qi::_1] 
+        ) 
+    ; 
+</code></pre>
+
+<p>But your overall parser will get even simpler if you utilize Spirit's built-in attribute propagation rules:</p>
+
+<pre><code>std::string physical;
+boost::optional&lt;std::string&gt; archived;  
+
+qi::parse(begin, end, 
+    +qi::char_(physicalPermitted) &gt;&gt; -(':' &gt;&gt; +qi::char_(archivedPermitted)),
+    physical, archived);
+</code></pre>
+
+<p>i.e. no need to have semantic actions at all. If you need more information about the attribute handling, see the article series about the Magic of Attributes on Spirit's web site.</p>
+
+<p>Edit: </p>
+
+<p>Regarding your static_assert question: yes static_assert, can improve error messages as it can be used to trigger compiler errors as early as possible. In fact, Spirit uses this technique extensively already. But it is not possible to protect the user from getting those huge error messages in all cases, but only for those user errors the programmer did expect. Only concepts (which unfortunately didn't make it into the new C++ Standard) could have been used to generally reduce teh size of the error messages.</p>
+
+<p>Regarding your Boost's String Algorithms question: certainly it's possible to utilize this library for simple tasks as yours. You might even be better off using Boost.Tokenizer (if all you need is to split the input string at the ':'). The performance of Spirit should be comparable to the corresponding performance of the string algorithms, but this certainly depends on the code you will write. If you assume that the utilized string algorithm will require one pass over the input string data, then Spirit won't be faster (as it's doing one pass as well).</p>
+
+<p>Neither the Boost String algorithms nor the Boost Tokenizer can give you the verification of the characters matched. Your Spirit grammar matches only the characters you specified in the character classes. So if you need this matching/verification, you should use either Spirit or Boost Regex.</p>

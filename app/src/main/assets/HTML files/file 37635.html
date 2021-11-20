@@ -1,0 +1,31 @@
+<p>The characteristic part of a perspective projection is the division by the distance from the eye point. This is what makes geometry closer to they eye appear bigger.</p>
+
+<p>You could potentially apply an additional transformation without switching over to a full perspective matrix. But particularly when using the fixed pipeline, it's probably easier to modify the coordinates before drawing.</p>
+
+<p>For a given rectangle corner with coordinates <code>(x0, y0, 0.0f)</code> relative to the rectangle center, a simple rotation by angle 'alpha` around the xaxis puts the corner at:</p>
+
+<pre><code>(x0, y0, 0.0f) --&gt; (x0, y0 * cos(alpha), y0 * sin(alpha))
+</code></pre>
+
+<p>To apply a fake perspective to this, choose an eye distance <code>d</code>, which controls the amount of perspective generated, with smaller values of <code>d</code> resulting in a stronger perspective. Dividing by the relative distance of the rotated point then produces:</p>
+
+<pre><code>s = d / (d - y0 * sin(alpha))
+(x0, y0, 0.0f) --&gt;  s * (x0, y0 * cos(alpha), y0 * sin(alpha))
+</code></pre>
+
+<p>If you apply this to all 4 corners of the rectangle before rendering, you should get the perspective effect. To completely flip the rectangle, you can then increment <code>alpha</code> step by step from 0.0 to pi.</p>
+
+<p>As long as <code>y0</code> is much smaller than <code>d</code>, the calculation of <code>s</code> can also be approximated by:</p>
+
+<pre><code>s = d / (d - y0 * sin(alpha))
+  = 1.0f / (1.0f - (y0 / d) * sin(alpha))
+  ~ 1.0f + (y0 / d) * sin(alpha)
+</code></pre>
+
+<p>Substituting a control parameter <code>c</code> for <code>1.0 / d</code>, where a larger value for <code>c</code> now produces a stronger perspective, the whole thing becomes:</p>
+
+<pre><code>s = 1.0f + c * y0 * sin(alpha))
+(x0, y0, 0.0f) --&gt;  s * (x0, y0 * cos(alpha), y0 * sin(alpha))
+</code></pre>
+
+<p>Both of these options should produce very similar results. You may want to try both, and see which one looks better.</p>

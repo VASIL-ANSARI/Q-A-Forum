@@ -1,0 +1,66 @@
+<p>One way to do this is to use a custom <code>IContractResolver</code> that basically tells Json.Net to ignore your property name annotations.  On deserialization, you let Json.Net work as normal, so the annotations are used.  On serialization, you add the resolver to the serializer settings, which causes Json.Net to use your class property names instead of the annotated names.</p>
+
+<p>Here is the code you would need for the resolver:</p>
+
+<pre><code>class OriginalNameContractResolver : DefaultContractResolver
+{
+    protected override IList&lt;JsonProperty&gt; CreateProperties(Type type, MemberSerialization memberSerialization)
+    {
+        // Get the JsonProperties (with annotated names) from the base class
+        IList&lt;JsonProperty&gt; list = base.CreateProperties(type, memberSerialization);
+
+        // For each property, replace the annotated name with the real name
+        foreach (JsonProperty prop in list)
+        {
+            prop.PropertyName = prop.UnderlyingName;
+        }
+
+        return list;
+    }
+}
+</code></pre>
+
+<p>Here is a demo showing how it works:</p>
+
+<pre><code>class Program
+{
+    static void Main(string[] args)
+    {
+        string json = @"{ ""$"" : { ""$moniker"" : ""blob sprocket"" } }";
+
+        Foo foo = JsonConvert.DeserializeObject&lt;Foo&gt;(json);
+        Console.WriteLine("name from JSON = " + foo.Info.Name);
+        Console.WriteLine();
+
+        JsonSerializerSettings settings = new JsonSerializerSettings();
+        settings.ContractResolver = new OriginalNameContractResolver();
+        settings.Formatting = Formatting.Indented;
+
+        json = JsonConvert.SerializeObject(foo, settings);
+        Console.WriteLine(json);
+    }
+}
+
+class Foo
+{
+    [JsonProperty("$")]
+    public Item Info { get; set; }
+}
+
+class Item
+{
+    [JsonProperty("$moniker")]
+    public string Name { get; set; }
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>name from JSON = blob sprocket
+
+{
+  "Info": {
+    "Name": "blob sprocket"
+  }
+}
+</code></pre>

@@ -1,0 +1,51 @@
+<p>For unique and random IDs, when you <em>don't need</em> sequential IDs:</p>
+
+<pre><code>$numIds = 20000; // how many ids do you want to generate and insert?
+
+// db setup
+$conn = mysqli_connect('localhost', 'root', '', 'dbtest');
+$insertstmt = mysqli_prepare($conn, 'INSERT INTO ids (id) VALUES (?)');
+
+// generate ids array
+$ids = [];
+for ($ii = 0; $ii &lt; $numIds; $ii++) {
+  do { // execute loop at least once
+
+    // inspired by @chris85 's comment
+    $id = randChr() . rand(0, 9) . randChr() . rand(0, 9) . randChr() . rand(0, 9);
+
+  } while ( // try again if found in either db or array
+    idInDb($conn, $id) || // not actually needed on first run
+    (0 &lt; count($ids) &amp;&amp; in_array($id, $ids, true))
+  );
+  $ids[] = $id; // is unique, add to array
+}
+
+// insert ids
+mysqli_stmt_bind_param($insertstmt, 's', $id);    
+mysqli_autocommit($conn, false);
+foreach ( $ids as $id ) {
+  mysqli_stmt_execute($insertstmt);
+}
+mysqli_commit($conn);
+mysqli_close($conn);
+
+
+// helper functions
+
+function randChr () { // generate random alpha character
+  return chr(rand(65, 90)); // upper case only
+  //return chr(rand(0, 1) ? rand(65, 90) : rand(97, 122));
+  // use alternative return for upper AND lower case
+}
+
+function idInDB ($conn, $testid) { // check for id in db
+  $query = "SELECT id FROM ids WHERE id = '$testid'";
+  $result = mysqli_query($conn, $query);
+  $found = 0 &lt; mysqli_num_rows($result);
+  mysqli_free_result($result);
+  return $found;
+}
+</code></pre>
+
+<p><a href="http://sandbox.onlinephpfunctions.com/code/dbd8a2cb67dc82e3e5fba691cd52c04daff70b32" rel="nofollow">PHP Sandbox demo</a></p>

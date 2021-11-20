@@ -1,0 +1,92 @@
+<p>I've attached an example of a QLineEdit with a progress bar behind it. It was heavily influenced by this post: <a href="http://www.qtcentre.org/threads/54758-Progress-bar-form-QLineEdit-issue" rel="nofollow">http://www.qtcentre.org/threads/54758-Progress-bar-form-QLineEdit-issue</a></p>
+
+<p>Basically you have to manage painting yourself. Unfortunately it didn't seem to work when I tried to do the same thing with a QComboBox. I would suggest posting a new question specifically about painting a progress bar on a QComboBox once you get up to it! </p>
+
+<pre><code>import sys
+from PyQt4.QtGui import *
+from PyQt4.QtCore import *
+
+class MyLineEdit(QLineEdit):
+    def __init__(self, parent=None):
+        QLineEdit.__init__(self, parent)
+        self.timer = QBasicTimer()
+        self.step = 0
+        self.doAction()
+
+    def timerEvent(self, e):
+        if self.step &gt;= 100:
+            self.timer.stop()
+            return
+
+        self.step = self.step + 10
+        self.repaint()        
+
+    def doAction(self):
+        if self.timer.isActive():
+            self.timer.stop()
+        else:
+            self.timer.start(1000, self)
+
+    def generateGradient(self, color):
+        gradient = QLinearGradient(0, 0, 0, self.height());
+        m_defaultBaseColor = self.palette().color(QPalette.Base)
+        gradient.setColorAt(0, m_defaultBaseColor)
+        gradient.setColorAt(0.15, color.lighter(120))
+        gradient.setColorAt(0.5, color)
+        gradient.setColorAt(0.85, color.lighter(120))
+        gradient.setColorAt(1, m_defaultBaseColor)
+        return gradient
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        panel = QStyleOptionFrameV2()
+        self.initStyleOption(panel)
+        self.style().drawPrimitive(QStyle.PE_PanelLineEdit, panel, p, self)
+
+        # an alternative to painting the QLineEdit is to do it only when the widget has focus and the progress bar is finished
+        #if self.hasFocus() or self.step &gt;= 100: QLineEdit.paintEvent(self, event)
+
+        # however I've chosen to paint it always
+        QLineEdit.paintEvent(self, event)
+
+        painter = QPainter(self)
+        lenap = QStyleOptionFrameV2()
+        self.initStyleOption(lenap)
+        backgroundRect = self.style().subElementRect(QStyle.SE_LineEditContents, lenap, self)
+
+        # some alternative if statements you might like to use instead...
+        #
+        # if not self.hasFocus() and self.step &lt; 100:
+        # if self.step &lt; 100:
+        if True:
+            loadingColor = QColor(116,192,250)
+            painter.setBrush(self.generateGradient(loadingColor))
+            painter.setPen(Qt.transparent)
+            mid = int(backgroundRect.width()/100.0*self.step)
+            progressRect = QRect(backgroundRect.x(), backgroundRect.y(), mid, backgroundRect.height())
+            painter.drawRect(progressRect)
+
+            painter.setPen(Qt.SolidLine)
+            painter.drawText(backgroundRect, Qt.AlignLeft|Qt.AlignVCenter, " " + self.text())
+
+
+class Window(QMainWindow):
+    def __init__(self):
+        QMainWindow.__init__(self)
+
+        self._control = QWidget()
+        self.setCentralWidget(self._control)
+
+        l = QVBoxLayout(self._control)
+        e = MyLineEdit()
+        l.addWidget(e)
+        b = QPushButton('a')
+        l.addWidget(b)
+
+        self.show()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    ex = Window()
+    sys.exit(app.exec_())
+</code></pre>

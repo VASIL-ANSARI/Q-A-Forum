@@ -1,0 +1,52 @@
+<p>Like @John Story stated the best way to handle this is by making an average.
+Sun spots accelarometers are very unstable and aren't suited for precise velocity prevision.</p>
+
+<p>Anyway this is the best code i could make</p>
+
+<pre><code>double v=0;
+    double anterior=0;
+
+    while (true) {
+        double time=System.currentTimeMillis()+200;
+        double currentTime=System.currentTimeMillis();
+        double offset=0;
+        int tries=0;
+        double maximo=0;
+        double minimo=0;
+        while(time&gt;currentTime){ //lets run for 0.2seconds :)
+
+            try {
+                double temp=-accel.getAccelY(); //front shouln't be negative
+                tries++;
+                if(temp&lt;0.1201 &amp;&amp; temp&gt;-0.1201){
+                    tries--; //oops threadshould sample
+                }else{
+                    if(temp&gt;maximo)
+                        maximo=temp;
+                    if(temp&lt;minimo)
+                        minimo=temp;
+                    offset+=temp;
+                }   
+            }catch (Exception e) {
+                System.err.println("Caught " + e + " while collecting/sending sensor samples.");
+            }
+            Utils.sleep(10); //sleep 10milisecs
+            currentTime=System.currentTimeMillis();
+        }
+        if(tries&gt;2)
+            offset=(offset-minimo-maximo)/(tries-2); //remove max value and min value from sample and makes average
+        else if(tries&gt;0)
+            offset/=2; //you wont take max or min from a two value sample
+        try {
+            dg.reset();         //clears
+            v=anterior+offset*0.2; //vf=vi+at
+            dg.writeDouble(Math.abs(v*100)); // sends in cm
+            anterior=offset;    //vi=vf
+            rCon.send(dg);     //sends radiogram
+            Utils.sleep(200); //sleep 0.2s
+        }catch (Exception e) {
+            System.err.println("Caught " + e + " while sending velocity.");
+        }
+    }
+}
+</code></pre>

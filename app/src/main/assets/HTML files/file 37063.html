@@ -1,0 +1,24 @@
+<p>A ctrl-O is just a character, same as any other. You can send it by writing <code>'\x0f'</code> (or, in Python 3, <code>b'\x0f'</code>).</p>
+
+<p>However, that probably isn't going to do you any good. Most programs that provide an interactive GUI in the terminal, like <code>nano</code>, cannot be driven by stdin. They need to take control of the terminal, and to do that, they will either check that stdin <code>isatty</code> and then <code>tcsetattr</code> it, or just open <code>/dev/tty</code>, </p>
+
+<p>You can deal with this by creating a pseudo-terminal with <code>os.openpty</code>, <code>os.forkpty</code>, or <code>pty</code>.</p>
+
+<p>But it's often easier to use a library like <code>pexpect</code> to deal with interactive programs, GUI or otherwise.</p>
+
+<p>And it's even easier to not try to drive an interactive program in the first place. For example, unlike <code>nano</code>, <code>ed</code> is designed to be driven in "batch mode" by a script, and <code>sed</code> even more so.</p>
+
+<p>And it's even easier to not try to drive a program at all when you're trying to do something that can be just as easily done directly in Python. The easiest way to append something to a file is to <code>open</code> it in <code>'a'</code> mode and <code>write</code> to it. No need for an external program at all. For example:</p>
+
+<pre><code>new_line = input('What do you want to add?')
+with open(fname, 'a') as f:
+    f.write(new_line)
+</code></pre>
+
+<hr>
+
+<p>If the only reason you were using <code>nano</code> is because you needed something to <code>sudo</code>â¦ there's really no reason for that. You can <code>sudo</code> anything elseâlike <code>sed</code>, or another Python scriptâjust as easily. Using <code>nano</code> is just making things harder for yourself for absolutely no reason.</p>
+
+<hr>
+
+<p>The big question here is: why do you have a file that's not writable by your Python script, but which you want arbitrary remote users to be able to append to? That sounds like a very bad system design. You make files non-writable because you want to restrict normal users from modifying them; if you want your Python script to be able to modify it on behalf of your remote users, why isn't it owned by the same user that the script runs as?</p>

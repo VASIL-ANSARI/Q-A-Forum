@@ -1,0 +1,39 @@
+<p>Because commands and filenames are in separate lines, it is best to parse received data by lines. Last part of block data doesn't have to finish with a <code>\n</code>, so it has to be merged with next received data block.</p>
+
+<p>This is (not tested) implementation of parsing received data by lines:</p>
+
+<pre><code>data = '' # contains last line of a read block if it didn't finish with \n
+in_get, in_done, reading_file, ended = False, False, False, False
+while not ended:
+  if len(data) &gt; 100:  # &lt; update
+    f.write( data )    # &lt;
+    data = ''          # &lt;
+  data += connection.recv(4096)
+  i = data.find('\n')
+  while i &gt;= 0 and not ended:
+    line = data[:i]
+    data = data[i+1:]
+    if in_get:
+      filename = line
+      reading_file = True
+      f = open(filename,'wb')
+      in_get = False
+    elif in_done:
+      if line != filename:  # done inside file content
+        f.write( 'done\n' + line + '\n' )
+      else:
+        f.close()
+        reading_file = False
+      in_done = False
+    else:
+      if line == 'get' and not reading_file:
+        in_get = True
+      elif line == 'done':
+        in_done = True
+      elif line == 'end' and not reading_file:
+        ended = True
+        break;
+      else:
+        f.write( line + '\n' )
+    i = data.find('\n')
+</code></pre>

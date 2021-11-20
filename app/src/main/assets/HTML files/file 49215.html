@@ -1,0 +1,21 @@
+<p>It requires a PagedResourcesAssembler, Spring will inject one for you if you ask.</p>
+
+<pre><code>public PagedResources&lt;Foo&gt; get(Pageable page, PagedResourcesAssembler&lt;Foo&gt; assembler) {
+    // ...
+}
+</code></pre>
+
+<p>In this case the resource is <code>Foo</code>.  It seems in your case the resource you're trying to return is an <code>Event</code>.  If that's so, I would expect your code to look something like:</p>
+
+<pre><code>private ResourceAssembler&lt;Event&gt; eventAssembler = ...;
+public PagedResources&lt;Event&gt; get(Pageable page, PagedResourcesAssembler&lt;Event&gt; pageAssembler) {
+    Event event = ...;
+    return eventAssembler.toResource(event, pageAssembler);
+}
+</code></pre>
+
+<p>You provide the <code>ResourceAssembler&lt;Event&gt;</code> that tells Spring how to turn <code>Event</code> into a <code>Resource</code>.  Spring injects the <code>PagedResourcesAssembler&lt;Event&gt;</code> into your controller method to handle the pagination links.  Combine them by calling <code>toResource</code> and passing in the injected <code>pageAssembler</code>.</p>
+
+<p>The final result can be returned simply as a body as above.  You could also use things like <code>HttpEntity</code> to gain more control over status codes and headers.</p>
+
+<p>Note: The <code>ResourceAssembler</code> you provide can literally be something as simple as wrapping the resource, such as <code>Event</code>, with a <code>Resource</code> object.  Generally you'll want to add any relevant links though.</p>

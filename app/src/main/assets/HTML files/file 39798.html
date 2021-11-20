@@ -1,0 +1,22 @@
+<p>As @Bakuriu said, importing is much preferred. Ignoring that, what you want is</p>
+
+<pre><code>def Reload():
+    execfile('routines.py', globals())
+</code></pre>
+
+<p>Lets clarify your example to show why it does not work.</p>
+
+<pre><code># Setup the namespace to use for execfile
+global_dict = {}
+local_dict = globals()
+execfile('routines.py', global_dict, local_dict)
+g() # raises NameError
+</code></pre>
+
+<p>Since you are passing two different dicts to <code>execfile</code>, the file is executed as if it were in a class definition (<a href="https://docs.python.org/2/library/functions.html#execfile" rel="nofollow">from the docs</a>). This means your functions are defined in <code>local_dict</code> but not <code>global_dict</code>.</p>
+
+<p>When you then call <code>g()</code>, it is executed using globals <code>global_dict</code> and a fresh empty local dict. Since neither <code>global_dict</code> or the new locals doesn't contain <code>f</code> we get a name error. By instead calling <code>execfile('routines.py', globals())</code>, we are using <code>global_dict = globals()</code> and <code>local_dict = globals()</code> so <code>f</code> is defined in <code>g</code>'s globals.</p>
+
+<p>EDIT:</p>
+
+<p>You noticed that <code>local_dict</code> has both <code>f</code> and <code>g</code>, but <code>global_dict</code> does not in the second example. Defining any variable without explicitly marking it global will always make a local variable, this applies to modules too! It just so happens that normally a module has <code>locals() == globals()</code>; however, we broke this standard by using different local and global dicts. This is what I meant when I said "the file is executed as if it were in a class definition".</p>

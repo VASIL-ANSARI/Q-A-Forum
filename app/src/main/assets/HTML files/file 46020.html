@@ -1,0 +1,114 @@
+<p>.Net provides comparison logic for predefined types.  In case of your join query your were joining (comparing) two IDs which were of type Int (predefined types)</p>
+
+<pre><code>var both = from l in usersL
+           join r in usersR on l.ID equals r.ID
+           select l;
+</code></pre>
+
+<p>In case of your intersect query you are trying to compare two user defined custom objects of type User.  Hence you need to provide your own custom compare  implementation logic.  </p>
+
+<p>There are <strong>2 ways</strong> to tackle this...</p>
+
+<p><em>Option 1:</em>
+<strong>Implement the IEqualityComparer</strong></p>
+
+<pre><code>public class User
+{
+    public int ID { get; set; }
+    public string Email { get; set; }
+}
+
+public class MyEqualityComparer : IEqualityComparer&lt;User&gt;
+{
+    public bool Equals(User x, User y)
+    {
+        if (object.ReferenceEquals(x, y))
+            return true;
+        if (x == null || y == null)
+            return false;
+        return x.ID.Equals(y.ID) &amp;&amp;
+               x.Email.Equals(y.Email);
+    }
+
+    public int GetHashCode(User u)
+    {
+        return new { u.ID, u.Email }.GetHashCode();
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+
+        var usersL = new List&lt;User&gt;()
+                    {
+                        new User{ID = 1,Email = "abc@foo.com"},
+                        new User{ID = 2,Email = "def@foo.com"}
+                    };
+
+        var usersR = new List&lt;User&gt;()
+                    {
+                        new User{ID = 1,Email = "abc@foo.com"},
+                        new User{ID = 2,Email = "def@foo.com"}
+                    };
+
+        var both =  (from l in usersL select l)
+          .Intersect(from users in usersR select users, new MyEqualityComparer());
+
+        foreach (var r in both)
+            Console.WriteLine(r.Email);
+    }
+}
+</code></pre>
+
+<p><em>Option 2</em>: <strong>Override the Equals and GetHashcode methods in the custom object itself</strong></p>
+
+<pre><code>public class User 
+{
+    public int ID { get; set; }
+    public string Email { get; set; }
+
+    public override bool Equals(Object obj)
+    {
+        // Check for null values and compare run-time types.
+        if (obj == null || GetType() != obj.GetType())
+            return false;
+
+        User x = (User)obj;
+        return (ID == x.ID) &amp;&amp; (Email == x.Email);
+    }
+
+    public override int GetHashCode()
+    {
+        return new { ID, Email }.GetHashCode();
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+
+        var usersL = new List&lt;User&gt;()
+            {
+                new User{ID = 1,Email = "abc@foo.com"},
+                new User{ID = 2,Email = "def@foo.com"}
+            };
+
+        var usersR = new List&lt;User&gt;()
+            {
+                new User{ID = 1,Email = "abc@foo.com"},
+                new User{ID = 2,Email = "def@foo.com"}
+            };
+
+        var both = (from l in usersL select l)
+          .Intersect(from users in usersR select users);
+
+        foreach (var r in both)
+            Console.WriteLine(r.Email);
+    }
+}
+</code></pre>
+
+<p>Hope this helps.</p>

@@ -1,0 +1,93 @@
+<p>The variable <code>MYGLOBALS</code> is local to your scoping function (the big outermost function that has no name), so it can only be accessed from within that function.</p>
+
+<p>I'm not sure what you mean by "...in the html javascript tag..." but if the <code>alert</code> you've quoted is outside that scoping function, <code>MYGLOBALS</code> is out of scope for it.</p>
+
+<hr>
+
+<p><strong>Update</strong>: The thing about JavaScript scope is that it's <em>much simpler</em> than people think it is. Variables declared with <code>var</code> are private to the scope (function or global; JavaScript has no block-level scope so just <code>{}</code> doesn't do it) in which they're declared, and sub-scopes of that scope (e.g., functions declared or define within it). And scope is entirely <em>lexical</em>&nbsp;&mdash; that is, it is what you see in the source code, not dictated by some other runtime structure. They don't pop out of that scope unless you see code somewhere explicitly making that happen, as with your <code>window.testQuery = testQuery;</code> line, which explicitly makes <code>testQuery</code> a property on <code>window</code> and therefore a global variable. (And even then, it's not that the variable has popped out of the scope, just that you've created a <em>new</em> property referring to the same thing which is more broadly-accessible.)</p>
+
+<hr>
+
+<p><strong>Update 2</strong>: Re your comment</p>
+
+<blockquote>
+  <p>Actually what I am trying to do is to create something like what you would see when you are doing programming in other language where there will be a final static integer which you can put into the parameters fields on the functions you call. is there a better way of doing it? For example, in visual basic its something like me.background = Color.YELLOW. what I want is to have a static variable which will represent that YELLOW color.</p>
+</blockquote>
+
+<p>JavaScript doesn't have user-defined constants, and doesn't have enums. <em>(Update: Both of those things may change with ES6.)</em> What you do instead is define an object with the properties, e.g.:</p>
+
+<pre><code>var COLORS = {
+    RED: "#FF0000",
+    BLUE: "#0000FF",
+    // ...
+    GREEN: "#00FF00"
+};
+</code></pre>
+
+<p>Those <em>aren't</em> constants, there's nothing to keep anyone from assigning to <code>COLORS.RED</code> except your telling them not to.</p>
+
+<p><em>(Update: In ES5, we can make those properties constant using <code>Object.defineProperties</code>, like this:</em></p>
+
+<pre><code>var COLORS = Object.defineProperties({}, {
+    RED:   {value: "#FF0000"},
+    BLUE:  {value: "#0000FF"},
+    // ...
+    GREEN: {value: "#00FF00"}
+});
+</code></pre>
+
+<p><em>When you define a property that way, by default it's not writable.)</em></p>
+
+<p>For what you're doing, you probably want the module pattern, where you have a single global symbol whose value is an object, and everything else is properties on that object:</p>
+
+<pre><code>(function() {
+    var mod;
+
+    // Create the global, and also give ourselves a convenient alias for it (`mod`)
+    window.MyModule = mod = {};
+
+    // Colors
+    mod.COLORS = {
+        RED: "#FF0000",
+        BLUE: "#0000FF",
+        // ...
+        GREEN: "#00FF00"
+    };
+
+    mod.testQuery = MyModule_testQuery;
+    function MyModule_testQuery() {
+        // Do something
+    }
+
+})();
+
+alert(MyModule.COLORS.RED); // #FF0000
+MyModule.testQuery();       // Do something
+</code></pre>
+
+<p>Or if you prefer, that <code>testQuery</code> function could be defined like this:</p>
+
+<pre><code>    mod.testQuery = function() {
+        // Do something
+    };
+</code></pre>
+
+<p>...but then the function is anonymous, and I'm <a href="http://blog.niftysnippets.org/2010/03/anonymouses-anonymous.html" rel="nofollow">not a fan of anonymous functions</a>. (Note that there's <em>nothing</em> special about the name <code>MyModule_testQuery</code>, that's purely my naming convention.)</p>
+
+<hr>
+
+<p><strong>Somewhat off topic</strong>:</p>
+
+<p>Regarding this line where we're publishing our global symbol above:</p>
+
+<pre><code>// Create the global, and also give ourselves a convenient alias for it (`mod`)
+window.MyModule = mod = {};
+</code></pre>
+
+<p>Note that that is very specific to browser environments. We could make it applicable to any JavaScript environment with a trivial change:</p>
+
+<pre><code>// Create the global, and also give ourselves a convenient alias for it (`mod`)
+this.MyModule = mod = {};
+</code></pre>
+
+<p>That works because we're the ones who call the outermost scoping function, and so we know that we're not calling it with any particular <code>this</code> value (<code>this</code> in JavaScript&nbsp;&mdash; unlike some other languages&nbsp;&mdash; is determined <em>entirely</em> by how a function is called, not where or how it's defined). So since we know we're not using any special <code>this</code> value, we know that it will be the global object, because that's how JavaScript works. And the global object is <code>window</code> on web browsers (effectively; technically <code>window</code> is a property on the global object that refers back to itself).</p>

@@ -1,0 +1,39 @@
+<blockquote>
+  <p>However, changes in AndroidManifest.xml seem to require manual intervention every time.</p>
+</blockquote>
+
+<p>In places where we had to do manual xml manipulation for our automated Android builds, we use the built-in XSLT support in Ant, using the <a href="http://ant.apache.org/manual/Tasks/style.html" rel="nofollow">&lt;style /&gt;</a> task.  A stylesheet might look something like:</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:android="http://schemas.android.com/apk/res/android"&gt;
+  &lt;xsl:output method="xml" version="1.0" encoding="UTF-8" indent="yes"/&gt;
+
+  &lt;xsl:template match="application[@android:debuggable='true']"&gt;
+    &lt;xsl:copy&gt;
+      &lt;xsl:copy-of select="@*[name(.)!='android:debuggable']" /&gt;
+      &lt;xsl:apply-templates /&gt;
+    &lt;/xsl:copy&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="@*|node()"&gt;
+    &lt;xsl:copy&gt;
+      &lt;xsl:apply-templates select="@*|node()"/&gt;
+    &lt;/xsl:copy&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>As for the SNAPSHOT release cycle:  The way the automated Jenkins build and release process does it is with a maven goal that will automatically perform these steps:</p>
+
+<ol>
+<li>Update the pom versions (e.g., <code>android:versionName</code>/<code>android:versionCode</code>) to remove "-SNAPSHOT" -- e.g., <code>x.y.y-SNAPSHOT</code> becomes simply <code>x.y.y</code></li>
+<li>Commit that as the "version x.y.y release"</li>
+<li>Tag that release in the git repo</li>
+<li>Update the pom versions to SNAPSHOT of the next logical release: <code>x.y.z-SNAPSHOT</code></li>
+<li>Commit that as the "prepare for next version" starting point</li>
+</ol>
+
+<p>At step #3, it also pushes that code to the public git server (if applicable), and publishes the release tag to the Jenkins plugin repository, so it becomes available as an update.</p>
+
+<p>I would imagine a similar approach for an Android release cycle would be fairly trivial to script as well.</p>

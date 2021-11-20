@@ -1,0 +1,34 @@
+<p>You don't need inheritance:</p>
+
+<ul>
+<li>To shape the result to <code>Request</code> , you even don't need inheritance, just shape it.</li>
+<li>To add a method to <code>RequestMaster</code>, you don't need inheritance, just crate another file and create a <code>public partial class RequestMaster</code> and add your method <code>public List&lt;RequestMaster&gt; SelectAll()</code> or <code>public List&lt;Request&gt; SelectAll()</code> to it.</li>
+<li>To drive a class from your base entity and have mapping still work, you should use standard mechanism of inheritance in EF like <a href="https://msdn.microsoft.com/en-us/library/vstudio/cc716702(v=vs.90).aspx" rel="nofollow"><code>Table Per Type</code></a> for example.</li>
+</ul>
+
+<p>But in general I strongly recommend to not do that and instead, separate concerns and use a different class called for example <code>RequestMasterBusinessLogic</code> to contain that logic, 
+you can also shape your entities here in this class and if you really need a Request class too, write this code in <code>RequestMasterBusinessLogic</code> without deriving from <code>RequestMaster</code>:</p>
+
+<pre><code>public partial class RequestMasterBusinessLogic
+{
+    private YourDataContext Context;
+    public RequestMasterBusinessLogic()
+    {
+        Context= new YourDataContext();
+    }
+    public List&lt;RequestMaster&gt; SelectAll()
+    {
+         Context.RequestMaster.Include("RequestType").ToList();
+    }
+    public List&lt;Request&gt; SelectAllRequests()
+    {
+         Context.RequestMaster
+                .Include("RequestType")
+                .Select(x =&gt; new Request()
+                {
+                    RequestId = x.RequestId,
+                    RequestType = x.RequestType,
+                }).ToList();
+    }
+}
+</code></pre>

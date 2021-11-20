@@ -1,0 +1,48 @@
+<p>You need to merge the changes in the temporary ManagedObjectContext (MOC) into the persisted one. This is an example of how I achieved this. 
+Im using threading (One MOC per thread), but Im pretty sure it should work out fine without threads aswell.</p>
+
+<p>You call this method to save your changes in the tempMOC:</p>
+
+<pre><code>- (void) saveNewEntry {
+    NSNotificationCenter *dnc = [NSNotificationCenter defaultCenter];
+
+    // Subscribe to "NSManagedObjectContextDidSaveNotification"
+    // ..which is sent when "[tempMOC save];" is called.
+    [dnc addObserver: self 
+            selector: @selector(mergeChanges:) 
+                name: NSManagedObjectContextDidSaveNotification 
+              object: tempMOC];
+
+    // Save changes
+    [tempMOC save];
+
+    // Remove subscribtion
+    [dnc removeObserver: self 
+                   name: NSManagedObjectContextDidSaveNotification 
+                 object: tempMOC];
+
+}
+</code></pre>
+
+<p>...which will fire off a notification to:</p>
+
+<pre><code>- (void) mergeChanges: (NSNotification*) saveNotification {
+
+    // If youre using threads, this is necessary:
+    [self performSelectorOnMainThread: @selector(mergeToMainContext:) 
+                           withObject: saveNotification 
+                        waitUntilDone: NO]; 
+
+    // ...otherwise, you could do the merge in this method
+    // [persistedMOC mergeChangesFromContextDidSaveNotification: saveNotification];
+}
+</code></pre>
+
+<p>...which in turn calls:</p>
+
+<pre><code>- (void) mergeToMainContext: (NSNotification*) saveNotification {
+
+    [persistedMOC mergeChangesFromContextDidSaveNotification: saveNotification];
+
+}
+</code></pre>

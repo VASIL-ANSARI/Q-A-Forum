@@ -1,0 +1,57 @@
+<p>this is more of a jersey problem than a dropwizard problem. You can have a look here: <a href="https://jersey.java.net/documentation/latest/filters-and-interceptors.html" rel="nofollow">https://jersey.java.net/documentation/latest/filters-and-interceptors.html</a></p>
+
+<p>Essentially what you want is:</p>
+
+<ol>
+<li><p>Create an annotation that indicates that you want to test for authentication (e.g. @AuthenticatePost) </p></li>
+<li><p>Create the resource and annotate the correct method with @AuthenticatePost</p></li>
+<li><p>Create your authentication filter (probably kind of like what you did above). </p></li>
+<li><p>In the dynamic feature, test for the annotation to be present on the passed in resource. This will hold true for post, false for get. Then register the AuthenticationFilter directly on the resource method instead of globally on the resource. </p></li>
+</ol>
+
+<p>This would be a semi-complete example of how I would solve this:</p>
+
+<pre><code>public class MyDynamicFeature implements DynamicFeature {
+
+    @Override
+    public void configure(ResourceInfo resourceInfo, FeatureContext context) {
+        if(resourceInfo.getResourceMethod().getAnnotation(AuthenticateMe.class) != null ) {
+            context.register(MyAuthFilter.class);
+        }
+    }
+
+    public class MyAuthFilter implements ContainerRequestFilter {
+
+        @Override
+        public void filter(ContainerRequestContext requestContext) throws IOException {
+            // do authentication here
+        }
+
+    }
+
+    public @interface AuthenticateMe {
+
+    }
+
+    @Path("myPath")
+    public class MyResource {
+
+        @GET
+        public String get() {
+            return "get-method";
+        }
+
+        @POST
+        @AuthenticateMe
+        public String post() {
+            return "post-method";
+        }
+    }
+}
+</code></pre>
+
+<p>Note, the DynamicFeature checks that the Authenticate Annotation is present, before registering the authentication with the feature context. </p>
+
+<p>I hope that helps,</p>
+
+<p>let me know if you have any questions.</p>

@@ -1,0 +1,23 @@
+<p>This is because you subscribe to the sequence twice. Once at <code>query.Subscribe(...)</code> and again at <code>query.Wait()</code>.</p>
+
+<p><code>Observable.Range(0, int.MaxValue)</code> is a cold observable. Every time you subscribe to it, it will be evaluated again. You could make the observable hot by publishing it with <code>Publish()</code>, then subscribe to it, and then <code>Connect()</code> and then <code>Wait()</code>. This does add a risk to get a <code>InvalidOperationException</code> if you call <code>Wait()</code> after the last element is already yielded. A better alternative is <code>LastOrDefaultAsync()</code>.</p>
+
+<p>That would get you something like this:</p>
+
+<pre><code>var connectable = query.Publish();
+var subscription = connectable.Subscribe(...);
+subscription = new CompositeDisposable(connectable.Connect(), subscription);
+await connectable.LastOrDefaultAsync();
+</code></pre>
+
+<p>Or you can avoid await and return a task directly with <code>ToTask()</code> (do remove async from your method signature).</p>
+
+<pre><code>return connectable.LastOrDefaultAsync().ToTask();
+</code></pre>
+
+<p>Once converted to a task, you can synchronously wait for it with <code>Wait()</code> (do not confuse <code>Task.Wait()</code> with <code>Observable.Wait()</code>).</p>
+
+<pre><code>connectable.LastOrDefaultAsync().ToTask().Wait();
+</code></pre>
+
+<p>However, most likely you do not want to wait at all! Waiting in a async context makes little sense. What you should do it put the remaining of the code that needs to run after the sequence completes in the <code>OnComplete()</code> part of the subscription. If you have (clean-up) code that needs to run even when you unsubscribe (Dispose), consider <code>Observable.Using</code> or the <code>Finally(...)</code> method to ensure this code is ran.</p>

@@ -1,0 +1,21 @@
+<p>I think something like this will perform the update operation you are looking for:</p>
+
+<pre><code>UPDATE users u
+  JOIN ( SELECT r.user_id
+              , GROUP_CONCAT(c.name SEPARATOR ' ') AS search_cache 
+          FROM relations_colors r
+          JOIN colors c ON c.id = r.color_id
+         GROUP BY r.user_id
+       ) s
+    ON u.id = s.user_id
+   SET u.search_cache = s.search_cache
+</code></pre>
+
+<p>Note that this will update only rows in the users table that have a matching row from <code>relations_colors</code>/<code>colors</code>.</p>
+
+<p>To update ALL rows of users, you'd want to include the <code>LEFT</code> keyword before the <code>JOIN</code> keyword to get an "outer join"; that would set the search_cache column to NULL for users that didn't have any matching rows.</p>
+
+<p>To make the result more deterministic, we'd typically include an <code>ORDER BY</code> clause inside the <code>GROUP_CONCAT</code> function, for example:</p>
+
+<pre><code>GROUP_CONCAT(c.name SEPARATOR ' ' ORDER BY c.id)
+</code></pre>

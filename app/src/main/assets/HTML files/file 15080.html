@@ -1,0 +1,48 @@
+<p>Structs are passed by value.  In other words, when you pass a struct, you're passing a copy of its value.  So if you take a copy of the value and change it, then the original will appear unchanged.  You changed the copy, not the original.</p>
+
+<p>Without seeing your code I cannot be sure, but I figure this is what's happening.</p>
+
+<p>This doesn't happen for classes as they're passed by reference.</p>
+
+<p>It's worth mentioning that this is why structs should be immutable -- that is, that once they're created, they do not change their value.  Operations that provide modified versions return new structs.</p>
+
+<hr>
+
+<p>EDIT: In the comments below, @supercat suggests that mutable properties can be more convenient.  However property setters on structs can cause weird failures too.  Here's an example that can catch you by surprise unless you deeply understand how structs work.  For me, it's reason enough to avoid mutable structs altogether.</p>
+
+<p>Consider the following types:</p>
+
+<pre><code>struct Rectangle {
+    public double Left { get; set; }
+}
+
+class Shape {
+    public Rectangle Bounds { get; private set; }
+}
+</code></pre>
+
+<p>Ok, now imagine this code:</p>
+
+<pre><code>myShape.Bounds.Left = 100;
+</code></pre>
+
+<p>Perhaps surprisingly, This has <strong>no effect</strong> at all!  Why?  Let's re-write the code in longer yet equivalent form:</p>
+
+<pre><code>var bounds = myShape.Bounds;
+bounds.Left = 100;
+</code></pre>
+
+<p>It's easier to see here how the <em>value</em> of <code>Bounds</code> is copied to a local variable, and then its value is changed.  However at no point is the original value in <code>Shape</code> updated.</p>
+
+<p>This is pretty compelling evidence to make all public structs immutable.  If you know what you're doing, mutable structs can be handy, but personally I only really use them in that form as private nested classes.</p>
+
+<p>As @supercat points out, the alternative is a little unsightly:</p>
+
+<pre><code>myShape.Bounds = new Rectangle(100, myShape.Bounds.Top, 
+                               myShape.Bounds.Width, myShape.Bounds.Height);
+</code></pre>
+
+<p>Sometimes it's more convenient to add helper methods:</p>
+
+<pre><code>myShape.Bounds = myShape.Bounds.WithLeft(100);
+</code></pre>

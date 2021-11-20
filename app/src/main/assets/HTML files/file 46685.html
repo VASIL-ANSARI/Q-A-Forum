@@ -1,0 +1,46 @@
+<p>The problem is - <em>you cannot manipulate that "Save As..." dialog via protractor/selenium</em>. You should avoid it being opened in the first place and let firefox automatically download the files of a specified mime-type(s) - in your case <code>application/zip</code>.</p>
+
+<p>In other words, you need to fire up Firefox with a custom <a href="https://github.com/juliemr/protractor-demo/tree/master/howtos/setFirefoxProfile" rel="nofollow">Firefox Profile</a> setting the <a href="http://yizeng.me/2014/05/23/download-pdf-files-automatically-in-firefox-using-selenium-webdriver/" rel="nofollow">appropriate preferences</a>:</p>
+
+<pre><code>var q = require("q");
+var FirefoxProfile = require("firefox-profile");
+
+var makeFirefoxProfile = function(preferenceMap, specs) {
+    var deferred = q.defer();
+    var firefoxProfile = new FirefoxProfile();
+
+    for (var key in preferenceMap) {
+        firefoxProfile.setPreference(key, preferenceMap[key]);
+    }
+
+    firefoxProfile.encoded(function (encodedProfile) {
+        var capabilities = {
+            browserName: "firefox",
+            firefox_profile: encodedProfile,
+            specs: specs
+        };
+
+        deferred.resolve(capabilities);
+    });
+    return deferred.promise;
+};
+
+exports.config = {
+    getMultiCapabilities: function() {
+        return q.all([
+            makeFirefoxProfile(
+                {
+                    "browser.download.folderList": 2,
+                    "browser.download.dir": "/path/to/save/downloads",
+                    "browser.helperApps.neverAsk.saveToDisk": "application/zip"
+                },
+                ["specs/*.spec.js"]
+            )
+        ]);
+    },
+
+    // ...
+}
+</code></pre>
+
+<p>Here we are basically saying: Firefox, please download zip files automatically, without asking into the <code>/path/to/save/downloads</code> directory.</p>

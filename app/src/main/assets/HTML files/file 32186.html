@@ -1,0 +1,29 @@
+<p>Yes, backing up from X and restoring to Y is a normal operation. We often call this "reinitializing the slave."</p>
+
+<p>This does interrupt replication. There's no reliable way to restore the data at the same time as letting the slave continue to apply changes, because the changes the slave is processing are not in sync with the snapshot of data represented by the backup. You could overwrite changed data, or miss changes, and this would make the slave totally out of sync. </p>
+
+<p>So you have to stop replication on the slave while you restore.</p>
+
+<p>Here are the steps for a typical slave reinitialization:</p>
+
+<ol>
+<li>mysqldump from the master, with the <code>--master-data</code> option so the dump includes the binary log position that was current at the moment of the dump.</li>
+<li>Stop replication on the slave.</li>
+<li>Restore the dump on the slave.</li>
+<li>Use <code>CHANGE MASTER</code> to alter what binary log coordinates the slave starts at. Use the coordinates that were saved in the dump.</li>
+<li>Start slave.</li>
+</ol>
+
+<hr>
+
+<p>Re your comment:</p>
+
+<p>Okay, I understand what you need better now.</p>
+
+<p>Yes, there's an option for <code>mysqldump --no-data</code> so the output only includes the CREATE TABLE and other DDL, but no INSERT statements with data. Then you can import that to a separate database on the same server.  And you're right, by default DDL statements are added to the binary log, so any replication slaves will automatically run the same statements.</p>
+
+<p>You can even do the export &amp; import in just two steps like this:</p>
+
+<pre><code>$ mysqladmin create newdatabase
+$ mysqldump --no-data olddatabase | mysql newdatabase
+</code></pre>

@@ -1,0 +1,110 @@
+<p>The second one is generally faster and <em>vastly</em> more scalable IF you inner lists are likely to be of any size.  The performance of sub-selects vs joins is well discussed in the sql world.</p>
+
+<p>basically, at least for linq to objects, there is nothing that is going to optimize away your subselects, and thus you WILL enumerate the inner sets over and over again.  If they are of any size this is potentially very expensive.</p>
+
+<p>Look at the benchmarks of this simplified example, the code is below (these in 32 bit and release mode).  </p>
+
+<pre><code>Test for SUBSELECT master=100000;a=10000;b=10 took 12ms and returned 10000
+Test for SUBSELECT master=100000;a=10000;b=100 took 7ms and returned 10000
+Test for SUBSELECT master=100000;a=10000;b=1000 took 41ms and returned 10000
+Test for SUBSELECT master=100000;a=10000;b=10000 took 387ms and returned 10000
+Test for SUBSELECT master=100000;a=10000;b=100000 took 3803ms and returned 10000
+Test for SUBSELECT master=100000;a=10000;b=1000000 took 38172ms and returned 10000
+
+Test for JOIN master=100000;a=10000;b=10 took 14ms and returned 10000
+Test for JOIN master=100000;a=10000;b=100 took 4ms and returned 10000
+Test for JOIN master=100000;a=10000;b=1000 took 4ms and returned 10000
+Test for JOIN master=100000;a=10000;b=10000 took 7ms and returned 10000
+Test for JOIN master=100000;a=10000;b=100000 took 13ms and returned 10000
+Test for JOIN master=100000;a=10000;b=1000000 took 297ms and returned 10000
+</code></pre>
+
+<p>You can see that for the subselect, with everything else fixed the timings scale up linearly with the size of the inner set. The join version if fairly flat, until b > master and a, whence it drives up the query time.</p>
+
+<p>This is because, basically, the join keyword can kick of a hash join and enumerate each side only once (memory allowing) and thus basically just scale with the largest set size, again there are many discussions of this is a DB context out on the net.</p>
+
+<p>I will answer your list question shortly.</p>
+
+<p>Example Code:</p>
+
+<pre><code>class Program
+{
+    static void Main(string[] args)
+    {
+        //Just looking at how the size of the INNER set affects time
+        TimedTest(100000, 10000, 10);
+        TimedTest(100000, 10000, 100);
+        TimedTest(100000, 10000, 1000);
+        TimedTest(100000, 10000, 10000);
+        TimedTest(100000, 10000, 100000);
+        TimedTest(100000, 10000, 1000000);
+        Console.ReadLine();
+    }
+    static void TimedTest(int masterSize, int aSize, int bSize)
+    {
+        var masterList = Enumerable.Range(1, masterSize).ToArray();
+        var aList = Enumerable.Range(1, aSize).ToArray();
+        var bList = Enumerable.Range(1, bSize).ToArray();
+        var w = new Stopwatch();
+        //Subselect
+        w.Restart();
+        var x = (from m in masterList
+                 join a in aList on m equals a
+                 select new { B = bList.Where(b =&gt; b == m).SingleOrDefault() }).ToList();
+        w.Stop();
+        Console.WriteLine("Test for SUBSELECT master={0};a={1};b={2} took {3}ms and returned {4}", masterSize, aSize, bSize, w.ElapsedMilliseconds, x.Count);
+        w.Restart();
+        var y = (from m in masterList
+                 join a in aList on m equals a
+                 join b in bList on a equals b into bLeft
+                 from bl in bLeft.DefaultIfEmpty()
+                 select new { B = bl }).ToList();
+        w.Stop();
+        Debug.Assert(x.SequenceEqual(y));
+        Console.WriteLine("Test for JOIN master={0};a={1};b={2} took {3}ms and returned {4}", masterSize, aSize, bSize, w.ElapsedMilliseconds, y.Count);
+
+        //Join
+
+    }
+</code></pre>
+
+<p>For the 'list' items.  You can pre-group them BEFORE the join and thus you have:</p>
+
+<pre><code>static void Example()
+{
+    var masterSize = 10000;
+    var aSize = 1000;
+    var bSize = 100000;
+    var masterList = Enumerable.Range(1, masterSize).ToArray();
+    var aList = Enumerable.Range(1, aSize).ToArray();
+    var bList = Enumerable.Range(1, bSize).Concat(Enumerable.Range(1, bSize)).ToArray();
+    var w = new Stopwatch();
+    //Subselect
+    w.Restart();
+    var x = (from m in masterList
+             join a in aList on m equals a
+             select new { A=a, M=m, B = bList.Where(b =&gt; b == m).ToList() }).ToList();
+    w.Stop();
+    Console.WriteLine("Test for SUBSELECT master={0};a={1};b={2} took {3}ms and returned {4}", masterSize, aSize, bSize, w.ElapsedMilliseconds, x.Count);
+    //Join
+    w.Restart();
+    var y = (from m in masterList
+             join a in aList on m equals a
+             join b in (from b in bList group b by b) on m equals b.Key into bLeft
+             from bl in bLeft.DefaultIfEmpty()
+             select new { A = a, M = m, B = bl.ToList() }).ToList();
+    w.Stop();
+    Debug.Assert(x.Select(i =&gt; new { A = i.A, BC = i.B.Sum() }).SequenceEqual(y.Select(i =&gt; new { A = i.A, BC = i.B.Sum() })));
+    Console.WriteLine("Test for JOIN master={0};a={1};b={2} took {3}ms and returned {4}", masterSize, aSize, bSize, w.ElapsedMilliseconds, y.Count);      
+
+}
+</code></pre>
+
+<p>ie in the terms of you question:</p>
+
+<pre><code>....
+            join m4 in (from m4 in Master4 group m4 by m4.id) on m1.id2 equals m4.Key into m4left
+            from m4l in m4left.DefaultIfEmpty()
+....
+            Prop4 = m4l.ToList()
+</code></pre>

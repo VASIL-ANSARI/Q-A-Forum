@@ -1,0 +1,28 @@
+<p>One problem is, you're inserting placeholders <code>?</code> into the SQL query but then you're binding to a named parameter <code>:language</code>. How is PDO to make the connection between the two? <em>Named parameters</em> work when you have a fixed list of known variables, but when you have an array of values, <em>placeholders</em> are simpler.</p>
+
+<p>Here, using PHP PDO placeholders <code>?</code> for all variables, rather than named parameters, then passing an array of all values to the PDO <code>execute</code> method.</p>
+
+<pre><code>function retrieve_events_by_type ($DB, $type, $language, $date) {
+    $sql = 'SELECT organizer, eventname, eventplace, language, eventdate, eventhour, eventminutes FROM events where eventtype = ?';
+    $exec_array = array($type);
+
+    if (!empty($language)) {
+        //$place_holders = str_repeat('?,', count($language) - 1) . '?'; // alternate
+        $place_holders = implode(',', array_fill(0, count($language), '?'));
+        $sql .= " AND language IN ($place_holders)";
+        $exec_array = array_merge($exec_array, $language);
+    }
+
+    if (!empty($date)) {
+        $sql .= ' AND eventdate = ?';
+        $exec_array = array_merge($exec_array, array($date));
+    }
+
+    $req = $DB-&gt;prepare($sql);
+    $req -&gt; execute($exec_array);
+
+    $events = $req-&gt;fetchAll(PDO::FETCH_ASSOC);
+    $req-&gt;closeCursor();
+    return ($events);
+}
+</code></pre>

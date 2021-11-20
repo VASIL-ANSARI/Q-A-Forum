@@ -1,0 +1,83 @@
+<p>There are two problems. You are using <code>temp</code> to keep track of the last item in of each of the lists. But <code>temp</code> points to the original <code>adj_list</code> (it <em>is</em> <code>adj_list</code> rather then being a copy if it), So the result is that <code>adj_list</code> itself only keeps the last item you added in each list. If you make a copy of the initial <code>adj_list</code> into <code>temp</code>, then updating <code>temp</code> won't affect the existing items in <code>adj_list</code>.</p>
+
+<p>The second problem is that there could be more pairs of neighbours than there are cities. An example for 5 cities: (2,3), (2,4), (2,5), (2,1), (1,5), (4,5), (3,4). So you can't loop on <code>num_city</code>. Instead keep looping until user enters <code>-1</code> for a city.</p>
+
+<p>I added a constructor <code>city( int id, city* next )</code> to make it easier to initialise each new city. <code>temp</code> is renamed to <code>tail</code> to make it clearer what its purpose is. The function is split into 3 parts, build, print and delete.</p>
+
+<pre><code>typedef struct city
+{
+    int id;
+    struct city *next;
+    city(int id, city *next) { this-&gt;id = id; this-&gt;next = next; }
+} city;
+
+// pass `adj_list` in as a reference (city **&amp;) so you keep the changes to it when you return
+int adj_list_build(city **&amp; adj_list)
+{
+    int num_city, index = 0;
+    cin &gt;&gt; num_city;
+
+    // you need to keep track of the "tail" (end) of each list so you know where to add next item
+    city **tail = new city*[num_city];
+
+    adj_list = new city*[num_city];
+    for (int index = 0; index &lt; num_city; index++)
+    {
+        adj_list[index] = new city( index, NULL );
+        tail[index] = adj_list[index]; // the tail starts off pointing to the first item in each list
+    }
+
+    while (true)
+    {
+        int a, b;
+        cin &gt;&gt; a;               // enter `-1` to stop
+        if (a == -1 ) break;
+        cin &gt;&gt; b;
+
+        a--;                    // convert to 0-index
+        b--;
+
+        city *t1 = new city( a, NULL );
+        city *t2 = new city( b, NULL );
+
+        tail[a]-&gt;next = t2;
+        tail[b]-&gt;next = t1;
+
+        tail[a] = t2; // or `tail[a] = tail[a]-&gt;next;` - they have same effect 
+        tail[b] = t1;
+    }
+    return num_city;
+}
+
+void adj_list_print(city ** adj_list, int length)
+{
+    for (int index = 0; index &lt; length; index++)
+    {
+        cout &lt;&lt; index &lt;&lt; ": ";
+        city * item = adj_list[index];
+        while (item)
+        {
+            cout &lt;&lt; item-&gt;id &lt;&lt; " " &lt;&lt; item-&gt;next &lt;&lt; " ";
+            item = item-&gt;next;
+        }
+        cout &lt;&lt; endl;
+    }
+}
+
+void adj_list_delete(city ** adj_list, int length)
+{
+    for (int index = 0; index &lt; length; index++)
+        delete[]  adj_list[index];
+    delete[] adj_list;
+
+    adj_list = NULL;
+}
+
+void main()
+{
+    city ** adj_list;
+    int len = adj_list_build( adj_list );
+    adj_list_print(adj_list, len);
+    adj_list_delete(adj_list, len);
+}
+</code></pre>

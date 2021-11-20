@@ -1,0 +1,91 @@
+<p>Make sure you are using credentials that have access to FTP. Also, your url would probably be something like <a href="ftp://www.domain.com/" rel="nofollow">ftp://www.domain.com/</a></p>
+
+<p>Here's some FTP code that I've used in the past.</p>
+
+<pre><code>public class FTP
+{
+    private String Username { get; set; }
+    private String Password { get; set; }
+    private String Host { get; set; }
+    private Int32 Port { get; set; }
+
+    public FTP(String username, String password, String host, Int32 port)
+    {
+        Username = username;
+        Password = password;
+        Host = host;
+        Port = port;
+    }
+
+    private Uri BuildServerUri(string Path)
+    {
+        return new Uri(String.Format("ftp://{0}:{1}/{2}", Host, Port, Path));
+    }
+
+    /// &lt;summary&gt;
+    /// Upload a byte[] to the FTP server
+    /// &lt;/summary&gt;
+    /// &lt;param name="path"&gt;Path on the FTP server (upload/myfile.txt)&lt;/param&gt;
+    /// &lt;param name="Data"&gt;A byte[] containing the data to upload&lt;/param&gt;
+    /// &lt;returns&gt;The server response in a byte[]&lt;/returns&gt;
+    private byte[] UploadData(string path, byte[] Data)
+    {
+        // Get the object used to communicate with the server.
+        WebClient request = new WebClient();
+
+        try
+        {
+            // Logon to the server using username + password
+            request.Credentials = new NetworkCredential(Username, Password);
+            return request.UploadData(BuildServerUri(path), Data);
+        }
+        finally
+        {
+            if (request != null)
+                request.Dispose();
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Load a file from disk and upload it to the FTP server
+    /// &lt;/summary&gt;
+    /// &lt;param name="ftppath"&gt;Path on the FTP server (/upload/myfile.txt)&lt;/param&gt;
+    /// &lt;param name="srcfile"&gt;File on the local harddisk to upload&lt;/param&gt;
+    /// &lt;returns&gt;The server response in a byte[]&lt;/returns&gt;
+    public byte[] UploadFile(string ftppath, string srcfile)
+    {
+        // Read the data from disk
+        FileStream fs = new FileStream(srcfile, FileMode.Open);
+        try
+        {
+            byte[] FileData = new byte[fs.Length];
+
+            int numBytesToRead = (int)fs.Length;
+            int numBytesRead = 0;
+            while (numBytesToRead &gt; 0)
+            {
+                // Read may return anything from 0 to numBytesToRead.
+                int n = fs.Read(FileData, numBytesRead, numBytesToRead);
+
+                // Break when the end of the file is reached.
+                if (n == 0) break;
+
+                numBytesRead += n;
+                numBytesToRead -= n;
+            }
+
+            numBytesToRead = FileData.Length;
+
+            // Upload the data from the buffer
+            return UploadData(ftppath, FileData);
+        }
+        finally
+        {
+            if (fs != null)
+                fs.Close();
+            if (fs != null)
+                fs.Dispose();
+        }
+    }
+}
+</code></pre>

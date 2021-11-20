@@ -1,0 +1,34 @@
+<p>Both List and Array are <code>IQueriable</code>, so there's no difference as far as LINQ goes. The problem lies in your <code>SelectMany()</code> method. I don't understand why you'd write it like that, when the LINQ in your last snippet was good. </p>
+
+<p>Of course you cannot use <code>b</code> and <code>n</code> for the 2 properties in your second snippet, because they are from some previous lambda expressions, they have nothing to do with your LINQ query under there. </p>
+
+<p>I've put up some dummy classes, and successfully compiled the linq (which is almost exactly your query)</p>
+
+<pre><code>        var nodes = new List&lt;NODE&gt;();
+        var linq = from n in nodes
+                   from b in n.propNodeBoardList
+                   from d in b.propBoardDeviceList
+                   where d.propDeviceInstalled == 1
+                   select new POINT() 
+                   {
+                    propPointNodeNumber = n.propNodeNumber,
+                    propPointSlotNumber = b.propBoardNumber,
+                    propPointAddressNumber = d.propBoardDeviceNumber,
+                    propObjectDevice = d
+                   };
+</code></pre>
+
+<p>Edit: for further clarification, when you wrote </p>
+
+<pre><code>from n in nodesEnumerable
+                .SelectMany(b =&gt; b.propNodeBoardList)
+                .SelectMany(d =&gt; d.propBoardDeviceList)
+</code></pre>
+
+<p>considering the methods have "higher precedence" so-to-speak than LINQ, what actually happens is:</p>
+
+<ol>
+<li><code>nodesEnumerable.SelectMany(b =&gt; b.propNodeBoardList)</code> returns a flattened <code>List&lt;BOARD&gt;</code> from all the nodes, let's call it <code>bList</code></li>
+<li><code>bList.SelectMany(d =&gt; d.propBoardDeviceList)</code> returns a flattened device list from all the boards returned by the previous function</li>
+<li>the actual collection that <code>n</code> is getting values from is the device list from 2., so n is actually a <code>DEVICE</code>. You can hover your mouse cursor over it for IntelliSense to confirm this fact. Hope that clears it up</li>
+</ol>

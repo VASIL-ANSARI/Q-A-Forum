@@ -1,0 +1,106 @@
+<p>Your <code>for</code> loop is not unpythonic.  Python loves for loops. :)  You mean, rather, that it probably does not make optimal use of <code>numpy</code>.  It's un-numpy-onic?</p>
+
+<p>I'm not sure that throwing it into blackboxes like numexpr, vectorize, or even apply_along_axis are more numpy-onic.  The ideal is to understand the problem and work around/within that structure to make it deal with larger structures.</p>
+
+<p>Let's try a sample function (like you should have given us?):</p>
+
+<pre><code>In [77]: def myfunction(t,x,p,a):
+     print(t.shape)
+     print(x.shape)
+     print(p,a)
+     return t*x
+
+In [78]: f=np.vectorize(myfunction)
+In [79]: f.excluded.add(2)   # so you can pass p,a 
+In [80]: f.excluded.add(3)
+In [81]: T=np.arange(5)
+In [83]: X=np.ones((4,5))
+In [85]: for i in range(T.shape[0]):
+    print(myfunction(T[i],X[:,i],{},{}))
+   ....:     
+()
+(4,)
+{} {}
+[ 0.  0.  0.  0.]
+()
+(4,)
+{} {}
+[ 1.  1.  1.  1.]
+...
+
+In [87]: f(T,X,{},{})
+()
+()
+{} {}
+---------------------------------------------------------------------------
+AttributeError                            Traceback (most recent call last)
+&lt;ipython-input-87-b585bb8fb6bc&gt; in &lt;module&gt;()
+----&gt; 1 f(T,X,{},{})
+...
+/usr/lib/python3/dist-packages/numpy/lib/function_base.py in func(*vargs)
+   1566                     the_args[_i] = vargs[_n]
+   1567                 kwargs.update(zip(names, vargs[len(inds):]))
+-&gt; 1568                 return self.pyfunc(*the_args, **kwargs)
+   1569 
+   1570             vargs = [args[_i] for _i in inds]
+
+&lt;ipython-input-77-a72fc1b2ad5e&gt; in myfunction(t, x, p, a)
+      1 def myfunction(t,x,p,a):
+----&gt; 2      print(t.shape)
+      3      print(x.shape)
+      4      print(p,a)
+      5      return t*x
+
+AttributeError: 'int' object has no attribute 'shape'
+</code></pre>
+
+<p>So <code>t</code> is a scalar.  I got a different error, but I think it's consistent with the one you got.  Does your function use <code>t[0]</code> someplace?</p>
+
+<hr>
+
+<p>Correction - your <code>t</code> can be a scalar, it is <code>x</code> that's supposed to be a vector.  Your criptic <code>This gives me the error "IndexError: invalid index to scalar variable" from somewhere inside the function.</code> didn't help.</p>
+
+<hr>
+
+<p>This <code>T</code> and <code>X</code> broadcast together just fine, for example <code>T*X</code> works.</p>
+
+<p>The problem with <code>vectorize</code> is that it passes to your function a tuple of scalar values taken from your <code>T</code> and <code>X</code>.  It's meant to vectorize a function that takes scalars, not a scalar and vector.</p>
+
+<p>Lets redefine the function so it doesn't care about the shape or type of inputs:</p>
+
+<pre><code>In [101]: def myfunction(t,x):
+     print(t)
+     print(x)
+     return t*x
+   .....: 
+In [102]: f=np.vectorize(myfunction)
+In [103]: f(T,X)
+0
+1.0
+0
+1.0
+1
+...
+1.0
+Out[103]: 
+array([[ 0.,  1.,  2.,  3.,  4.],
+       [ 0.,  1.,  2.,  3.,  4.],
+       [ 0.,  1.,  2.,  3.,  4.],
+       [ 0.,  1.,  2.,  3.,  4.]])
+</code></pre>
+
+<p>Even though <code>T</code> is 1d and <code>X</code> is 2d, it is passing 2 scalars to the function at each iteration.</p>
+
+<hr>
+
+<p>But first let me step back a bit.</p>
+
+<p><code>vectorize</code> can make it easier to 'broadcast' values, but it does not speed things up much.  It still iterate through the values, calling your function for each set.  It does not change your function at all.  It is just a wrapper, just like your for loop.</p>
+
+<p><code>appply_along/over_axis</code> is also an iteration wrapper.  Again no speed up.</p>
+
+<p>Dito for the map expression.</p>
+
+<p>...</p>
+
+<p>For a function that takes a scalar and vector, and can't be changed internally, your for loop is about as good as it gets.  Most alternatives will be harder to get right, be more obscure, and probably not much faster.</p>

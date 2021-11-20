@@ -1,0 +1,41 @@
+<p>Here is an example of using <code>DistanceMatrixApi</code> with a callback instead of <code>await()</code>. Note, I need to use a <code>CountDownLatch</code> due to OkHTTP invoking the callback on a background thread.</p>
+
+<pre><code>import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.maps.DistanceMatrixApi;
+import com.google.maps.DistanceMatrixApiRequest;
+import com.google.maps.GeoApiContext;
+import com.google.maps.PendingResult;
+import com.google.maps.model.DistanceMatrix;
+
+import java.util.concurrent.CountDownLatch;
+
+public class DistanceMatrixApp {
+  public static void main(String[] args) throws InterruptedException {
+    GeoApiContext context = new GeoApiContext();
+    context.setApiKey("[API KEY]");
+    DistanceMatrixApiRequest req = DistanceMatrixApi.getDistanceMatrix(context,
+    new String[]{"Sydney Town Hall"},
+    new String[]{"Parramatta Station"});
+
+    final CountDownLatch latch = new CountDownLatch(1);
+    req.setCallback(new PendingResult.Callback&lt;DistanceMatrix&gt;() {
+      @Override
+      public void onResult(DistanceMatrix result) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        System.out.println(gson.toJson(result));
+        latch.countDown();
+      }
+
+      @Override
+      public void onFailure(Throwable e) {
+        System.out.println("Exception thrown: "+e);
+        latch.countDown();
+      }
+    });
+
+    // We have to hold the main thread open until callback is called by OkHTTP.
+    latch.await();
+  }
+}
+</code></pre>

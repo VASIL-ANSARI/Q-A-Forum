@@ -1,0 +1,14 @@
+<p>No, <code>**((int**)a)</code> and <code>*((int*)(*(int*)a))</code> are not equivalent.  The first one is correct in the context: <code>a</code> is indeed a pointer to an element of the array of <code>int*</code> passed to <code>qsort</code>.  <code>**((int **)a)</code> or simply <code>**(int**)a</code> reads the integer you want to compare.</p>
+
+<p>Conversely, the expression <code>*((int*)(*(int*)a))</code> does something different: it reads from the same address in memory, but as an <code>int</code> and then pretends this <code>int</code> is actually an address and attempts to read from that address.  If <code>int</code> and addresses don't have the same width, this will fail spectacularly. It they happen to be the same size, it will succeed non portably.</p>
+
+<p>Furthermore, you cannot reliably compare <code>int</code> values by just subtracting one from the other.  For example <code>INT_MIN &lt; 1</code> but <code>INT_MIN - 1</code> invokes undefined behaviour and most likely computes to <code>INT_MAX</code>, a positive value.</p>
+
+<p><code>intcmp1</code> should be rewritten this way:</p>
+
+<pre><code>int intcmp1(const void *v1, const void *v2) { // works better
+    return (**(int**)v1 &gt; **(int**)v2) - (**(int**)v1 &lt; **(int**)v2);
+}
+</code></pre>
+
+<p>The <code>&lt;</code> and <code>&gt;</code> comparison operators return <code>1</code> or <code>0</code>, thus <code>imtcmp1</code> will return <code>-1</code>, <code>0</code> or <code>1</code> precisely.</p>

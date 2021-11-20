@@ -1,0 +1,58 @@
+<p>After you've retrieved the data you can collect, filter and count using Illuminate\Collection.</p>
+
+<pre><code>collect($comments)-&gt;where('unread', 1)-&gt;count();
+</code></pre>
+
+<p>That said, if your goal is to simply count the data and do nothing else with it, you could achieve this using Eloquent as presumably you've already used a similar query to get the data in the first place.</p>
+
+<pre><code>Comments::where('unread', 1)-&gt;count();
+</code></pre>
+
+<hr>
+
+<p>Amends based on OP edit.</p>
+
+<pre><code>$projects = Project::with(['comments'])
+    -&gt;where('user_id', Auth::id())
+    -&gt;get();
+
+$count = $projects-&gt;sum(function ($project) {
+    return $project-&gt;comments-&gt;where('unread', 1)-&gt;count();
+});
+
+dd($count);
+</code></pre>
+
+<hr>
+
+<p>Having thought a bit more about it, as you just want a count (it seems), you can add a relation and an accessor to your Project model.</p>
+
+<pre><code>public function commentsCountUnread() {
+  return $this-&gt;hasOne(Comment::class)
+    -&gt;selectRaw('project_id, count(*) as aggregate')
+    -&gt;where('unread', 1)
+    -&gt;groupBy('project_id');
+}
+
+public function getCommentsCountUnreadAttribute()
+{
+  if (! $this-&gt;relationLoaded('commentsCountUnread')) {
+    $this-&gt;load('commentsCountUnread');
+  }
+
+  $related = $this-&gt;getRelation('commentsCountUnread');
+
+  return ($related) ? (int) $related-&gt;aggregate : 0;
+}
+</code></pre>
+
+<p>Then you could do something like</p>
+
+<pre><code>$posts = Project::with('commentsCountUnread')-&gt;get();
+
+$count = $projects-&gt;sum(function($project) {
+  return $project-&gt;commentsCountUnread;
+});
+
+dd($count);
+</code></pre>

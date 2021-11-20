@@ -1,0 +1,35 @@
+<p>It is that easy (isn't that nice:) but if you want to check, then look at the <code>Content-Encoding</code> response header and it should say <code>gzip</code>. In a webkit browser it's in the developer tools under "Network", then select the resource, like <code>app.min.css</code> and the "Headers" tab.</p>
+
+<p>A way to test for this is given in the following blog post:</p>
+
+<p><a href="http://artsy.github.io/blog/2012/02/24/10x-rack-and-rails-output-compression-with-rack-deflater/">http://artsy.github.io/blog/2012/02/24/10x-rack-and-rails-output-compression-with-rack-deflater/</a></p>
+
+<p>I modified the specs into <a href="https://www.relishapp.com/rspec/rspec-core/docs/example-groups/shared-examples">shared examples</a>, so I can add them in where I really want to check:</p>
+
+<pre><code>shared_examples "Compressed pages" do
+  subject { last_response.headers }
+  its(["Content-Encoding"]) { should be_nil }
+  context "After compression" do
+    before do
+      get page
+      @etag = last_response.headers["Etag"]
+      @content_length = last_response.headers["Content-Length"]
+      get page, {}, { "HTTP_ACCEPT_ENCODING" =&gt; "gzip" }
+    end
+    its(["Etag"]) { should == @etag }
+    its(["Content-Length"]) { should_not == @content_length }
+    its(["Content-Encoding"]) { should == "gzip"}
+  end
+end
+</code></pre>
+
+<p>My main spec uses it like this:</p>
+
+<pre><code>  describe "Public pages" do
+
+    describe "Home page", :type =&gt; :request do
+      let(:page) { "/" }
+      it_behaves_like "Compressed pages"
+</code></pre>
+
+<p>The <code>it_behaves_like "Compressed pages"</code> will run that shared example and check it has the right header etc.</p>

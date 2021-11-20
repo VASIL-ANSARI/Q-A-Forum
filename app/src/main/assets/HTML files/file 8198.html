@@ -1,0 +1,49 @@
+<p>Regarding writing your own, you could definitely do that since your requirements are so narrow. If they're very unlikely to change, it may even be better. You'd have to take care with the design, of course, so that any interruptions simply result in re-attempting later.</p>
+
+<p>As for stuff already out there for highly configurable data synchronization, I've been using <a href="http://symmetricds.codehaus.org/" rel="nofollow">SymmetricDS</a>. It's very resilient to interruptions and works well with slow connections. Since you specify MySQL, it would only work with 5 and up, since it is based on triggers. But, it's an option to consider.</p>
+
+<p><strong>A bit on SymmetricDS configuration:</strong> Because I really can't answer to your comment briefly.</p>
+
+<p>Aside from a properties file that gives the service information like port, database driver and connection info, registration node url, self url, etc., the configuration for what to replicate and where to send it is all in the database (default table prefix <code>sym_</code>). Even most of the stuff you can put in the properties file can be put in the <code>sym_parameter</code> table.</p>
+
+<p>All replication config is done at the registration node (usually also the central/top-tier node). Changes are transmitted just like changes to data, with child nodes re-syncing their triggers automatically. I'm going to tersely go through a very basic config for a 2-tier setup (central and stores), 1 table bi-directional. I won't get into the nodes, registration, initial loads, or other management, though.</p>
+
+<p>The following statements are pretty simple. If you just read through them, it's apparent that they are part of defining the relationship between nodes of the 'central' group (or tier) and nodes of the 'stores' group. The routers are a key part of the replication config and define how captured data events are routed, and to where. Each as <code>identity</code> in the name here because the default is to use the table's primary keys and to send to all nodes of the target group.</p>
+
+<pre><code>insert into sym_node_group (node_group_id, description) values ('central', 'Central database');
+insert into sym_node_group (node_group_id, description) values ('stores', 'Store database');
+insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action)
+ values ('stores', 'central', 'P');
+-- stores push to central
+insert into sym_node_group_link (source_node_group_id, target_node_group_id, data_event_action)
+ values ('central', 'stores', 'W');
+-- central waits-for-pull from stores
+insert into sym_router (router_id, source_node_group_id, target_node_group_id, create_time, last_update_time)
+ values ('central-to-store-identity', 'central', 'stores', current_timestamp, current_timestamp);
+insert into sym_router (router_id, source_node_group_id, target_node_group_id, create_time, last_update_time)
+ values ('store-to-central-identity', 'stores', 'central', current_timestamp, current_timestamp);
+</code></pre>
+
+<p>The following is where we get into the specifics about the table we want to replicate. A channel is used to isolate groups of tables. If there's a problem batching data events for something in one channel, it doesn't affect other channels. You can also suspend or ignore batching for entire channels. The trigger entry simply says, "I want to capture data events from this table", and the <code>sync_on_incoming_batch</code> value of <code>1</code> is special because that is what will allow a change at a store to be replicated to central and then down to all the other stores. Then you create trigger/router associations to complete the relationship between capturing data events and sending those events to other nodes. One for the sending changes from store to central, and one for the other way.</p>
+
+<pre><code>insert into sym_channel (channel_id, processing_order, max_batch_size, enabled, description)
+ values ('rewardscard-channel', 1, 100000, 1, 'rewards card tables');
+insert into sym_trigger (trigger_id,source_table_name,channel_id,last_update_time,create_time,sync_on_incoming_batch)
+ values ('customer-trigger','customer','rewardscard-channel',current_timestamp,current_timestamp,1);
+insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+ values ('customer-trigger', 'store-to-central-identity', 200, current_timestamp, current_timestamp);
+insert into sym_trigger_router (trigger_id,router_id,initial_load_order,last_update_time,create_time)
+ values ('customer-trigger', 'central-to-store-identity', 100, current_timestamp, current_timestamp);
+</code></pre>
+
+<p>There are a number of columns on these tables that I don't show that allow you very fine control over the replication. All tables and columns are described in Appendix A of the user manual, though.</p>
+
+<p>It's not too hard to install, either, just a bit manual when you're learning it. I create the configurations we use for clients, but I made silent-install scripts for the techs to use to get a client going in a couple steps. Another script starts an initial load of the client's database uploading to the central database (if vice-versa, I do that at the central database).</p>
+
+<p>You could silently install Java and SymmetricDS (it does come with a way to install it as a windows service). Each node must have a unique id, so you'd have to partially generate the properties file, along with the information for connecting to the local database (manual talks about what privileges are needed, I think).</p>
+
+<p>You could have open registration at the central database so that any machine can register, otherwise central must have entries in <code>sym_node</code> and <code>sym_node_security</code> for enabling registration for a known <code>node_id</code> before the node attempts to register.</p>
+
+<p>You can go ahead with the idea of having an initial script of database data run by the installer into the client's local database. When you do an initial load from central down to the node, it will update existing rows, or insert if not found. However, the trigger/router associations have an <code>initial_load_select</code> column: you can define a select statement to limit the data sent to only what you know is not in the installation script.</p>
+
+<p>Getting central to start an initial load from a remote client installation might need the assistance of another service running at central that the installation can send requests to, then the service makes the change to the central database to start that initial load. I don't know yet of a way for a node to request an initial load from the parent node. Such a service could also easily facilitate registration if you don't want to use open registration (the installer sends the <code>node_id</code>, and the service inserts 2 rows to enable registration).</p>

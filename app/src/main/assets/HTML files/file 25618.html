@@ -1,0 +1,55 @@
+<p>If you want to use create_app function, then I would change your <code>__init__.py</code> to something like:</p>
+
+<p><strong><code>/myapp/__init__.py</code></strong></p>
+
+<pre><code>from flask import Flask, render_template, abort
+from flask.ext.mongokit import MongoKit, Document
+
+from .home.views import mod as home_blueprint
+from .users.views import mod as user_blueprint
+from .forums.views import mod as forum_blueprint
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('config')
+
+    # Register blueprints
+    app.register_blueprint(home_blueprint)
+    app.register_blueprint(user_blueprint, url_prefix="/users")
+    app.register_blueprint(forum_blueprint, url_prefix="/forums")
+
+    db = MongoKit(app)
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return render_template('404.html')
+
+    @app.errorhandler(500)
+    def internal_error(exception):
+        return "Some internal error has taken place.  Alert somebody!"
+
+    return app,db
+
+# Make sure you are calling create_app func below:
+(app,db) = create_app()
+</code></pre>
+
+<p>Now in your models code, you can refer to db variable.</p>
+
+<p><strong>/myapp/users/models.py</strong></p>
+
+<pre><code>from flask.ext.mongokit import MongoKit, Document
+
+# import db below like this
+from myapp import db
+
+class User(Document):
+    structure = {
+    'name': unicode,
+    'email': unicode,
+}
+use_dot_notation = True
+
+# ok to do this below
+db.register([User])
+</code></pre>

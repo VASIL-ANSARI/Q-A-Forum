@@ -1,0 +1,95 @@
+<p>I'm not aware that POSIX even dares to mention this topic, but I haven't done an exhaustive search.</p>
+
+<p>Some brief experimentation with a gcc/nptl system reveals that, as I suspected and I think you did too, there is no such protection in NPTL - the cancellation handlers do indeed get called, from within the signal handler context.</p>
+
+<p>The program below (apologies for the hackiness etc) displays the following output:</p>
+
+<pre><code>Signal handler called
+Sent cancellation
+Cleanup called
+In sighandler
+</code></pre>
+
+<p>... indicating that:</p>
+
+<ul>
+<li>the signal handler got called</li>
+<li>the other thread then called <code>pthread_cancel()</code></li>
+<li>the cancellation handler then got called, without the signal handler completing</li>
+</ul>
+
+<p>Here's the program:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;string.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;assert.h&gt;
+
+pthread_t mainthread;
+
+int in_sighandler = 0;
+
+void
+cleanup (void *arg)
+{
+    write(1, "Cleanup called\n", strlen("Cleanup called\n"));
+    if (in_sighandler) {
+        write(1, "In sighandler\n", strlen("In sighandler\n"));
+    } else {
+        write(1, "Not in sighandler\n", strlen("In sighandler\n"));
+    }
+}
+
+
+void
+sighandler (int sig, siginfo_t *siginfo, void *arg)
+{
+    in_sighandler = 1;
+    write(1,"Signal handler called\n", strlen("Signal handler called\n"));  // write() is a CP
+    usleep(3000000); // usleep() is a CP; not strictly async-signal-safe but happens to be so in Linux
+    write(1, "Signal handler exit\n", strlen("Signal handler exit\n"));
+    in_sighandler = 0;
+}
+
+void *
+thread (void *arg)
+{
+    sleep(1);
+    pthread_kill(mainthread, SIGUSR1);
+    usleep(500000);
+    pthread_cancel(mainthread);
+    printf("Sent cancellation\n");
+    return (NULL);
+}
+
+int
+main (int argc, char **argv)
+{
+    int rc;
+    struct sigaction sa;
+    pthread_t threadid;
+
+    mainthread = pthread_self();
+
+    // Set up a signal handler to test its cancellation properties
+    sa.sa_sigaction = &amp;sighandler;
+    sigemptyset(&amp;sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    rc = sigaction(SIGUSR1, &amp;sa, NULL);
+    assert(rc == 0);
+
+    // Set up a thread to send us signals and cancel us
+    rc = pthread_create(&amp;threadid, NULL, &amp;thread, NULL);
+    assert(rc == 0);
+
+    // Set up cleanup handlers and loop forever
+    pthread_cleanup_push(&amp;cleanup, NULL);
+    while (1) {
+        sleep(60);
+    }
+    pthread_cleanup_pop(0);
+    return (0);
+}
+</code></pre>

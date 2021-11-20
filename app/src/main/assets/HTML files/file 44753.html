@@ -1,0 +1,99 @@
+<p>You are doing this wrong.  Your query strings do not change except for the selected field based on the selected row.  This tells me several things:</p>
+
+<ol>
+<li>The field associated with this code: <code>r.Cells[2].Text</code> should be a DataKey of <code>MaintenanceTable</code></li>
+<li>Each of your other tables (lp, ws) has their own DataSource as you are setting the <code>Select</code> and forcing a <code>Databind()</code> but are not assigning a datasource, which leads me to believe you have set their <code>DataSourceID</code> (as you should)</li>
+<li>The Databind event on the dependent tables is not happening due to your playing with the visibility of the parent controls.  This is because of the order of things in the <a href="https://msdn.microsoft.com/en-us/library/ms178472(v=vs.100).aspx#lifecycle_events" rel="nofollow"><strong>Page Lifecycle</strong></a>.  When you set the visibility of controls to false in the <code>MaintenanceTable_SelectedIndexChanged</code> event, The <code>Panel</code>s and their relevant child control's <code>Databind</code> events are never raised.  which is why your visibility issues are always a step behind.</li>
+</ol>
+
+<p>so what should you do:</p>
+
+<ol>
+<li>Comment out your existing code above.</li>
+<li>Add the field associated with <code>r.Cells[2].Text</code> as a DataKey of <code>MaintenanceTable</code></li>
+<li>Add the select statement to each of the dependent DataSources but modified<br>
+to accept a parameter rather than appending the parameter as a string.  </li>
+<li>Add a ControlParameter to each of the dependant Tables DataSources that references the SelectedValue of <code>MaintenanceTable</code></li>
+<li>Panel Visibility needs to be set AFTER the Databind happens so do this in the <code>Page_PreRenderComplete</code> event or even better, in the <code>DataBound</code> events of the respective dependent tables.</li>
+</ol>
+
+<p>Edit: Generally speaking you were trying to control too much too soon in the SelectedIndexChanged event.  Typically I prefer to set state variable during events via Class member variables if they only need to exist for a given lifecycle or in ViewState or Session if they need to be persisted.  Then let controls sort themselves by accessing those state variables in their own respective events where necessary.</p>
+
+<p><strong>ADDENDUM</strong></p>
+
+<p>This is all that is needed to generate a webpage that fills dependent tables based on a row selection from a Main Table.  Absolutely no Code behind Required.</p>
+
+<pre><code>&lt;asp:GridView ID="gvMaintenanceTable" runat="server" AutoGenerateColumns="False"
+  DataSourceID="SqlDataSource1" DataKeyNames="case_id"&gt;
+  &lt;Columns&gt;
+    &lt;asp:CommandField ShowSelectButton="True" /&gt;
+    &lt;asp:BoundField DataField="caption" HeaderText="caption" SortExpression="caption"&gt;&lt;/asp:BoundField&gt;
+  &lt;/Columns&gt;
+&lt;/asp:GridView&gt;
+
+&lt;asp:SqlDataSource ID="SqlDataSource1" runat="server" ConnectionString='&lt;%$ ConnectionStrings:SomeConnectionString %&gt;'
+    SelectCommand="SELECT top 10 caption, case_id FROM tbl_case_info"&gt;
+&lt;/asp:SqlDataSource&gt;
+
+
+
+&lt;asp:Panel ID="Panel1" runat="server"&gt;
+  &lt;asp:GridView ID="lpTable" runat="server" AutoGenerateColumns="False"
+      DataSourceID="lpDataSource"
+      DataKeyNames="invoice_id"&gt;
+    &lt;Columns&gt;
+      &lt;asp:BoundField DataField="invoice_number" HeaderText="invoice_number" SortExpression="invoice_number"&gt;&lt;/asp:BoundField&gt;
+    &lt;/Columns&gt;
+  &lt;/asp:GridView&gt;
+
+  &lt;asp:SqlDataSource ID="lpDataSource" runat="server" ConnectionString='&lt;%$ ConnectionStrings:SomeConnectionString %&gt;'
+    SelectCommand="SELECT invoice_number, invoice_id FROM tbl_invoice WHERE (case_id = @CaseID)"&gt;
+    &lt;SelectParameters&gt;
+      &lt;asp:ControlParameter Name="CaseID" 
+                            ControlID="gvMaintenanceTable"
+                            PropertyName="SelectedValue"&gt;&lt;/asp:ControlParameter&gt;
+    &lt;/SelectParameters&gt;
+  &lt;/asp:SqlDataSource&gt;
+&lt;/asp:Panel&gt;
+
+
+
+&lt;asp:Panel ID="Panel2" runat="server"&gt;
+  &lt;asp:GridView ID="wsTable" runat="server" DataSourceID="wsDataSource" AutoGenerateColumns="False"&gt;
+    &lt;Columns&gt;
+      &lt;asp:BoundField DataField="caption" HeaderText="caption" SortExpression="caption"&gt;&lt;/asp:BoundField&gt;
+    &lt;/Columns&gt;
+  &lt;/asp:GridView&gt;
+
+  &lt;asp:SqlDataSource ID="wsDataSource" runat="server" ConnectionString='&lt;%$ ConnectionStrings:SomeConnectionString %&gt;'
+    SelectCommand="SELECT caption, user_id, case_id FROM tbl_case_info WHERE (case_id = @CaseID)"&gt;
+    &lt;SelectParameters&gt;
+      &lt;asp:ControlParameter Name="CaseID"
+                            ControlID="gvMaintenanceTable" 
+                            PropertyName="SelectedValue"&gt;&lt;/asp:ControlParameter&gt;
+    &lt;/SelectParameters&gt;
+  &lt;/asp:SqlDataSource&gt;
+&lt;/asp:Panel&gt;
+</code></pre>
+
+<p>And this is the Code Behind for visibility (pardon the VB) assuming that the labels appear inside the Panels.  Consider using the Gridview <code>Caption</code> property instead of an <code>&lt;asp:Label&gt;</code> if the label is associated with the table</p>
+
+<pre><code> Private Sub lpTable_DataBound(sender As Object, e As EventArgs) Handles lpTable.DataBound
+     Panel1.Visible = (lpTable.Rows.Count &gt; 0)
+ End Sub
+
+ Private Sub wsTable_DataBound(sender As Object, e As EventArgs) Handles wsTable.DataBound
+     Panel2.Visible = (wsTable.Rows.Count &gt; 0)
+ End Sub
+</code></pre>
+
+<p>EDIT:  Make sure the <code>Panel</code>s reset their <code>Visibility</code> property to <code>True</code> otherwise, once false, their contained <code>Gridview</code>s will never <code>Databind</code> on subsequent row selections of the main table.</p>
+
+<pre><code>Private Sub Panel1_Load(sender As Object, e As EventArgs) Handles Panel1.Load
+    Panel1.Visible = True
+End Sub
+
+Private Sub Panel2_Load(sender As Object, e As EventArgs) Handles Panel2.Load
+    Panel2.Visible = True
+End Sub
+</code></pre>

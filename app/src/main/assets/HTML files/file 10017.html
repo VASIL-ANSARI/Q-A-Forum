@@ -1,0 +1,51 @@
+<p>I suspect it's to do with differences in how they convert a hash into params.  Rack::Test will probably be using Hash#to_param, which gives the following results:</p>
+
+<pre><code>&gt; params = {:api_key =&gt; "12345", :data =&gt; [{"Company"=&gt;"Apple,Inc","Website"=&gt;"Apple.com"},{"Company"=&gt;"Google","Website"=&gt;"google.com"}], :run =&gt; { :title =&gt; "The First Run" }}
+
+&gt; paramstring = params.to_param
+ =&gt; "api_key=12345&amp;data%5B%5D%5BCompany%5D=Apple%2CInc&amp;data%5B%5D%5BWebsite%5D=Apple.com&amp;data%5B%5D%5BCompany%5D=Google&amp;data%5B%5D%5BWebsite%5D=google.com&amp;run%5Btitle%5D=The+First+Run" 
+
+&gt; URI.unescape(paramstring)
+ =&gt; "api_key=12345&amp;data[][Company]=Apple,Inc&amp;data[][Website]=Apple.com&amp;data[][Company]=Google&amp;data[][Website]=google.com&amp;run[title]=The+First+Run" 
+</code></pre>
+
+<p>This is the troublesome part:</p>
+
+<p>data[][Company]=Apple,Inc&amp;data[][Website]=Apple.com&amp;data[][Company]=Google&amp;data[][Website]=google.com</p>
+
+<p>The rails uri parser has to read this and turn it back into a hash.  In my opinion putting an array of hashes into your params is asking for trouble as it creates a string, like the above, which is fundamentally difficult to parse.  For example, presented with these two params</p>
+
+<pre><code>data[][Company]=Apple,Inc
+data[][Company]=Google
+</code></pre>
+
+<p>The parser may decide that both of them are describing the Company variable in the first hash in the array called "data", and so overwrite the first with the second, which is what's happening with you.</p>
+
+<p>It sounds like your problem is at the generation stage rather than the intepretation stage, but still, i would try to create a cleaner scheme for your parameters, in which arrays are only ever used as the final part of the param name, (ie use a hash instead of an array to hold company data) and you instead insert some unique keys to differentiate the company hashes from each other.  Something like this:</p>
+
+<pre><code>{:api_key =&gt; "12345", 
+ :data =&gt; {1 =&gt; {"Company"=&gt;"Apple,Inc","Website"=&gt;"Apple.com"}, 2 =&gt; {"Company"=&gt;"Google","Website"=&gt;"google.com"}}, 
+ :run =&gt; { :title =&gt; "The First Run" }}
+</code></pre>
+
+<p>1 and 2 could be the actual ids of some company record, or they could just be some numbers you put in to make unique keys, which are chucked away at the other end.  This will generate params like this:</p>
+
+<pre><code>data[1][Company]=Apple,Inc
+data[2][Company]=Google
+</code></pre>
+
+<p>Which are now in no danger of overwriting each other.</p>
+
+<p>In your subsequent controller action, it's just a change from doing this:</p>
+
+<pre><code>params[:data].each do |company_hash|
+  #do something with company hash
+end
+</code></pre>
+
+<p>to </p>
+
+<pre><code>params[:data].each do |k, company_hash|
+  #do something with company hash and optionally k if you want, or ignore k
+end
+</code></pre>

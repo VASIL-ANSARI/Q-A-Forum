@@ -1,0 +1,45 @@
+<p>The basic premise is to catch when a touch happens and remove gestures if the touch happened within a set of views. It then re-adds the gestures after the gesture recognizer handles the gestures.</p>
+
+<pre><code>@interface TouchIgnorer : UIView
+@property (nonatomic) NSMutableSet * ignoreOnViews;
+@property (nonatomic) NSMutableSet * gesturesToIgnore;
+@end
+@implementation TouchIgnorer
+- (id) init
+{
+    self = [super init];
+    if (self)
+    {
+        _ignoreOnViews = [[NSMutableSet alloc] init];
+        _gesturesToIgnore = [[NSMutableSet alloc] init];
+    }
+    return self;
+}
+- (BOOL) pointInside:(CGPoint)point withEvent:(UIEvent *)event
+{
+    CGPoint relativePt;
+    for (UIView * view in _ignoreOnViews)
+    {
+        relativePt = [view convertPoint:point toView:view];
+        if (!view.isHidden &amp;&amp; CGRectContainsPoint(view.frame, relativePt))
+        {
+            for (UIGestureRecognizer * gesture in _gesturesToIgnore)
+            {
+                [self removeGestureRecognizer:gesture];
+            }
+            [self performSelector:@selector(rebindGestures) withObject:self afterDelay:0];
+            break;
+        }
+    }
+    return [super pointInside:point withEvent:event];
+}
+
+- (void) rebindGestures
+{
+    for (UIGestureRecognizer * gesture in _gesturesToIgnore)
+    {
+        [self addGestureRecognizer:gesture];
+    }
+}
+@end
+</code></pre>

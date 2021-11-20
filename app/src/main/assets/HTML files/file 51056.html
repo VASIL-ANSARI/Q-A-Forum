@@ -1,0 +1,44 @@
+<p>The dot thing isn't to do with primitives, it's just the syntax of writing numeric literals. In a number, the <code>.</code> is a decimal point, whereas of course that's not the case for a string. To use a method on a literal number, you have two choices:</p>
+
+<ol>
+<li><p>Parens:</p>
+
+<pre><code>console.log((5).isPositive(3));
+</code></pre></li>
+<li><p>Two dots (yes, really):</p>
+
+<pre><code>console.log(5..isPositive(3));
+</code></pre></li>
+</ol>
+
+<p>In the second case, it works because the first dot is a decimal point; this means that the dot following can't be a decimal point, and so it's the property accessor operator.</p>
+
+<blockquote>
+  <p>How does it really have an access to it's prototype if it isn't an object.</p>
+</blockquote>
+
+<p>It's promoted to an object automatically by the JavaScript engine <em>when you do the propety access</em>. In the case of numbers, it's as though you called <code>new Number(5)</code> or similar. In the case of strings, it's as though you called <code>new String("the string")</code>. When the property access is complete, the temporary object is then discarded immediately when the expression is complete. Naturally, the JavaScript engine can optimize the object allocation out, but conceptually that's what happens.</p>
+
+<p>So conceptually:</p>
+
+<ol>
+<li><p>We do (say) <code>var n = 1;</code> The variable <code>a</code> contains the primitive number value <code>1</code>.</p></li>
+<li><p>We do <code>n.isPositive(3);</code> to create a string from it using <code>Number.prototype.toFixed</code>. That's a <em>property access</em> operation:</p>
+
+<ol>
+<li><p>The engine evaluates the left-hand side, <code>n</code>, and gets the result <code>1</code> (a primitive number); this is the <em>base</em> it'll use for the property access operation.</p></li>
+<li><p>The engine evaluates the right-hand side (<code>isPositive</code>) to determine the property key (name) to look up. In this case it's a literal, so the key is the string <code>"isPositive"</code>. This is the property key for the property access operation.</p></li>
+<li><p>The engine goes to look up the property on the base. Since the base we have is a primitive, the JavaScript engine promotes it (coerces it) to an equivalent <code>Number</code> object.</p></li>
+<li><p>Since that object doesn't have a <code>"isPositive"</code> property, the engine looks at its prototype, <code>Number.prototype</code>, and finds it; it's a reference to a function.</p></li>
+<li><p>Various things happen that aren't really germane, and ultimately <code>isPositive</code> is called with <code>this</code> being an object coerced from the primitive value <code>1</code>. It does its work and generates its return value.</p></li>
+<li><p>Since the temporary object isn't referenced by anything anymore, it's eligible for garbage collection.</p></li>
+</ol></li>
+</ol>
+
+<p>The mechanism by which this happens is a bit scattered in the specification:</p>
+
+<ul>
+<li><p>The <a href="http://www.ecma-international.org/ecma-262/6.0/index.html#sec-property-accessors-runtime-semantics-evaluation" rel="nofollow">runtime semantics</a> of the property accessor operator return something called a <code>Reference</code> specification type, which basically is a purely abstract specification holding object that will get evaluated later. It says that the base will be the result of evaluating the left-hand side of the property accessor, and the property anme will be the result of evaluting the right-hand side.</p></li>
+<li><p>The <a href="http://www.ecma-international.org/ecma-262/6.0/index.html#sec-getvalue" rel="nofollow"><code>GetValue</code> operation</a> on the <code>Reference</code> type, which says (step 5) that if it's a property reference and the base is primitive, it's coerced via the specification's <code>ToObject</code> operation.</p></li>
+<li><p><a href="http://www.ecma-international.org/ecma-262/6.0/index.html#sec-toobject" rel="nofollow"><code>ToObject</code></a>, which defines the rules for doing that.</p></li>
+</ul>

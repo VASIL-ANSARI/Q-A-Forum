@@ -1,0 +1,89 @@
+<p>To be sure that values have been send, you can see what headers the browser sent to the web server with PHP for testing purposes. </p>
+
+<p>This is possible using the apache_request_headers() function but it only works if PHP is run on Apache as a module. </p>
+
+<ul>
+<li><strong>How using apache_request_headers() :</strong></li>
+</ul>
+
+<p>If PHP is run on Apache as a module then the headers the browser send can be retrieved using the apache_request_headers() function. The following example code uses print_r to output the value from this function call:</p>
+
+<pre><code>print_r(apache_request_headers());
+</code></pre>
+
+<p>The output from the above using an example request from Google Chrome would output something similar to the following:</p>
+
+<pre><code>Array
+(
+  [Host] =&gt; www.testing.local
+  [Connection] =&gt; keep-alive
+  [User-Agent] =&gt; Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/532.0 (KHTML, like Gecko) Chrome/4.0.206.1 Safari/532.0
+  [Cache-Control] =&gt; max-age=0
+  [Accept] =&gt; application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5
+  [Accept-Encoding] =&gt; gzip,deflate,sdch
+  [Accept-Language] =&gt; en-US,en;q=0.8
+  [Accept-Charset] =&gt; ISO-8859-1,utf-8;q=0.7,*;q=0.3
+)
+</code></pre>
+
+<ul>
+<li><strong>Alternative when PHP is run as a CGI :</strong></li>
+</ul>
+
+<p>If PHP is not being run as a module on Apache, the browser headers should be stored in the $<em>SERVER array with the key being the request header name converted to upper case, hypens replaced with underscores, and prefixed with HTTP</em></p>
+
+<p>The same request above showing the relevent lines from $_SERVER are as follows:</p>
+
+<pre><code>[HTTP_HOST] =&gt; www.testing.local
+[HTTP_CONNECTION] =&gt; keep-alive
+[HTTP_USER_AGENT] =&gt; Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) AppleWebKit/532.0 (KHTML, like Gecko) Chrome/4.0.206.1 Safari/532.0
+[HTTP_CACHE_CONTROL] =&gt; max-age=0
+[HTTP_ACCEPT] =&gt; application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5
+[HTTP_ACCEPT_ENCODING] =&gt; gzip,deflate,sdch
+[HTTP_ACCEPT_LANGUAGE] =&gt; en-US,en;q=0.8
+[HTTP_ACCEPT_CHARSET] =&gt; ISO-8859-1,utf-8;q=0.7,*;q=0.3
+</code></pre>
+
+<p>The alternative method is create our own function if the apache_request_headers() function does not exist, which extracts just the values from $_SERVER and converts the key names to the same style as apache_request_headers(). This works like so:</p>
+
+<pre><code>if(!function_exists('apache_request_headers')) {
+    function apache_request_headers() {
+        $headers = array();
+        foreach($_SERVER as $key =&gt; $value) {
+            if(substr($key, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+</code></pre>
+
+<p>The new function is only declare if the function with that name does not already exist. The end result is that whether or not the internal PHP function exists, you will be able to call a function with this name in your code.</p>
+
+<p>A loop is done though the $<em>SERVER array and any whose key starts with HTTP</em> is added to the array, and the key is translated via a series of function calls to be in the same format as returned by apache_request_headers().</p>
+
+<ul>
+<li><strong>View HTTP headers in Google Chrome</strong></li>
+</ul>
+
+<p>Chrome has a tab "Network" with several items and when I click on them I can see the headers on the right in a tab.</p>
+
+<p>Press <kbd>F12</kbd> on windows or <kbd>â¥âI</kbd> on a mac to bring up the Chrome developer tools.</p>
+
+<p><a href="http://i.stack.imgur.com/Mgwta.png" rel="nofollow"><img src="http://i.stack.imgur.com/Mgwta.png" alt="enter image description here"></a></p>
+
+<ul>
+<li><strong>Try to retrieve value(s) without knowing HTTP methods</strong></li>
+</ul>
+
+<p>You can detect which request type was used (GET, POST, PUT or DELETE) in PHP by using</p>
+
+<pre><code>$_SERVER['REQUEST_METHOD']
+</code></pre>
+
+<p>For more details please see the <a href="http://php.net/manual/en/reserved.variables.server.php" rel="nofollow">documentation for the $_SERVER variable</a>.</p>
+
+<p>Or you can retrieve value(s) using $_REQUEST['you_variable'].</p>
+
+<p>Note $_REQUEST is a different variable than $_GET and $_POST, it is treated as such in PHP -- modifying $_GET or $_POST elements at runtime will not affect the elements in $_REQUEST, nor vice versa.</p>

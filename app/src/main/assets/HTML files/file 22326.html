@@ -1,0 +1,38 @@
+<p><strong>SOLUTION:</strong></p>
+
+<p>The installation runs in the SYSTEM account. Therefor the created process is also run in said account, not as the currently logged in user.</p>
+
+<p>I created an additional project (InstallHelper), which includes the</p>
+
+<pre><code>Process.Start("Outlook");
+</code></pre>
+
+<p>I added the InstallHelper as CustomAction on Commit in my setup project and changed InstallerClass to False in the properties of the CustomAction.  Then I copied WiRunSql.vbs to the project folder and added an PostBuildEvent to the setup project:</p>
+
+<pre><code>@echo off
+cscript //nologo "$(ProjectDir)WiRunSql.vbs" "$(BuiltOutputPath)" "UPDATE CustomAction SET Type=1554 WHERE Type=3602"
+</code></pre>
+
+<p>3602: </p>
+
+<ul>
+<li>0x800 (msidbCustomActionTypeNoImpersonate)</li>
+<li>0x400 (msidbCustomActionTypeInScript)</li>
+<li>0x200 (msidbCustomActionTypeCommit)</li>
+<li>0x12 (Custom Action Type 18: exe)</li>
+</ul>
+
+<p>1554: </p>
+
+<ul>
+<li>0x400 (msidbCustomActionTypeInScript)</li>
+<li>0x200 (msidbCustomActionTypeCommit)</li>
+<li>0x12 (Custom Action Type 18: exe)</li>
+</ul>
+
+<p>See:
+<a href="http://msdn.microsoft.com/en-us/library/Aa368069.aspx" rel="nofollow">msdn: Custom Action In-Script Execution Options</a></p>
+
+<p>The Type-change removed the bit for msidbCustomActionTypeNoImpersonate (0x00000800), so the InstallHelper and the created process are run as the logged in user, not as SYSTEM.</p>
+
+<p>Alternatively those changes are possible via opening the msi in orca (has to be repeated after each build, so I prefer the scripted change).</p>

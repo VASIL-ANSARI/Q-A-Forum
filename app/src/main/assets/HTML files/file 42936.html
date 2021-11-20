@@ -1,0 +1,60 @@
+<p>The <a href="https://docs.python.org/2.7/library/multiprocessing.html#multiprocessing.managers.SyncManager.list" rel="nofollow"><code>multiprocessing</code> documentation</a> has a note on this:</p>
+
+<blockquote>
+  <p><strong>Note</strong></p>
+  
+  <p>Modifications to mutable values or items in dict and list proxies will
+  not be propagated through the manager, because the proxy has no way of
+  knowing when its values or items are modified. To modify such an item,
+  you can re-assign the modified object to the container proxy:</p>
+
+<pre><code># create a list proxy and append a mutable object (a dictionary) 
+lproxy = manager.list() 
+lproxy.append({})
+# now mutate the dictionary 
+d = lproxy[0]
+d['a'] = 1 
+d['b'] = 2
+# at this point, the changes to d are not yet synced, but by
+# reassigning the dictionary, the proxy is notified of the change 
+lproxy[0] = d
+</code></pre>
+</blockquote>
+
+<p>So, the only way to use a multidimensional list is to actually reassign any changes you make to the second dimension of the list back to the top-level list, so instead of:</p>
+
+<pre><code>test[0][0] = 1
+</code></pre>
+
+<p>You do:</p>
+
+<pre><code>tmp = test[0]
+tmp[0] = 1
+test[0] = tmp
+</code></pre>
+
+<p>Not the most pleasant way to do things, but you can probably write some helper functions to make it a bit more tolerable.</p>
+
+<p><strong>Edit:</strong></p>
+
+<p>It seems the reason that you get a plain list back when you append a <code>ListProxy</code> to another <code>ListProxy</code> is because of how pickling Proxies works. <code>BaseProxy.__reduce__</code> creates a <code>RebuildProxy</code> object, which what actually is used to unpickle the <code>Proxy</code>. <code>RebuildProxy</code> looks like this:</p>
+
+<pre><code>def RebuildProxy(func, token, serializer, kwds):
+    '''
+    Function used for unpickling proxy objects.
+
+    If possible the shared object is returned, or otherwise a proxy for it.
+    '''
+    server = getattr(process.current_process(), '_manager_server', None)
+
+    if server and server.address == token.address:
+        return server.id_to_obj[token.id][0]
+    else:
+        incref = (
+            kwds.pop('incref', True) and
+            not getattr(process.current_process(), '_inheriting', False)
+            )
+        return func(token, serializer, incref=incref, **kwds)
+</code></pre>
+
+<p>As the docstring says, if the unpickling is occuring inside a manager server, the actual shared object is created, rather than the <code>Proxy</code> to it. This is probably a bug, and <a href="http://bugs.python.org/issue6766" rel="nofollow">there is actually one filed</a> against this behavior already.</p>

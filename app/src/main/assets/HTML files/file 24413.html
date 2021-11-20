@@ -1,0 +1,76 @@
+<p>Based on the comments by @squint I will present the solution that I tried. I reworked the general shim for <code>Object.getPrototypeOf</code> that seems to be common among the libraries, based on <a href="http://ejohn.org/blog/objectgetprototypeof/" rel="nofollow">a blog by John Resig</a> as far as I can tell.</p>
+
+<blockquote>
+  <p><strong>Cross-Browser Implementation</strong></p>
+  
+  <p>The obvious question now becomes: How do we begin using
+  Object.getPrototypeOf today if most browsers donât have it implemented
+  yet? In the meantime we can use something like the following code for
+  some form of compatibility:</p>
+
+<pre><code>if (typeof Object.getPrototypeOf !== "function") {
+    if (typeof "test".__proto__ === "object") {
+        Object.getPrototypeOf = function (object) {
+            return object.__proto__;
+        };
+    } else {
+        Object.getPrototypeOf = function (object) {
+            // May break if the constructor has been tampered with
+            return object.constructor.prototype;
+        };
+    }
+}
+</code></pre>
+  
+  <p>While itâs not 100% spot-on (since the .constructor property is
+  mutable on any object â itâs fully possible that it couldâve been
+  manipulated by the user at some point) the above code should serve as
+  a âgood enoughâ solution to tide you over until browsers have good
+  ECMAScript 3.1 compatibility.</p>
+</blockquote>
+
+<p>And this is what I came up with</p>
+
+<pre><code>if (typeof Object.getPrototypeOf !== "function") {
+    if (Object.prototype.__proto__ === null) {
+        Object.getPrototypeOf = function getPrototypeOf(object) {
+            return object[proto];
+        };
+    } else {
+        Object.getPrototypeOf = function getPrototypeOf(object) {
+            if (object === Object.prototype) {
+                return null;
+            }
+
+            if (object === object.constructor.prototype) {
+                return Object.prototype;
+            }
+
+            return object.constructor.prototype;
+        };
+    }
+}
+</code></pre>
+
+<p>As I mentioned in my comments, this solves the circular prototype chain problem that I experienced with the John Resig version. </p>
+
+<p>The problem that I do have with it (other than it may break if the constructor has been tampered with) is that during my tests I found that I get false result on one particular test (there may be more, but not that I have yet found). The test/s concern the <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error?redirectlocale=en-US&amp;redirectslug=JavaScript/Reference/Global_Objects/Error" rel="nofollow">Error objects</a></p>
+
+<p><strong>instanceof</strong></p>
+
+<pre><code>new TypeError() instanceof Error; // --&gt; true
+</code></pre>
+
+<p><strong>function instanceOf with ES5 Object.getPrototypeOf or _<em>proto</em>_</strong></p>
+
+<pre><code>instanceOf(new TypeError(), Error); // --&gt; true
+</code></pre>
+
+<p><strong>function instanceOf with object.constructor.prototype fallthrough</strong></p>
+
+<pre><code>instanceOf(new TypeError(), Error); // --&gt; false
+</code></pre>
+
+<p>All my other testing gave me matching results, but as I said, there may be more inconsistencies out there (where the constructor has not been tampered with). This is the best that I have managed to come up with, but at least I no longer have the possibility of infinite loops on functions similar to those given in my question.</p>
+
+<p>Here is a <a href="http://jsfiddle.net/Xotic750/xTLuV/" rel="nofollow">jsfiddle</a> that demonstrates the problem. (tested on Chromium v25, FireFox v20 and Opera 12.14: they are all that I have available)</p>

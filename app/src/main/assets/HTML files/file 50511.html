@@ -1,0 +1,35 @@
+<p>Here is an example of an approach you could try.  I think you want to get away from <code>Parallel.ForEach</code>ing and do something with asynchronous programming instead because you need to retrieve results as they finish, rather than in discrete chunks that could conceivably contain both long running tasks and tasks that finish very quickly.</p>
+
+<p>This approach uses a simple sequential loop to retrieve results from a list of asynchronous tasks.  In this case, you should be safe to use a simple non-thread safe mutable list because all of the mutation of the list happens sequentially in the same thread.</p>
+
+<p>Note that this approach uses <code>Task.WhenAny</code> in a loop which isn't very efficient for large task lists and you should consider an alternative approach in that case.  (See this blog: <a href="http://blogs.msdn.com/b/pfxteam/archive/2012/08/02/processing-tasks-as-they-complete.aspx" rel="nofollow">http://blogs.msdn.com/b/pfxteam/archive/2012/08/02/processing-tasks-as-they-complete.aspx</a>)</p>
+
+<p>This example is based on: <a href="https://msdn.microsoft.com/en-GB/library/jj155756.aspx" rel="nofollow">https://msdn.microsoft.com/en-GB/library/jj155756.aspx</a></p>
+
+<pre><code>private async Task&lt;ProcessResult&gt; processTask(ProcessTask task) 
+{
+    // do something intensive with data
+}
+
+private IEnumerable&lt;ProcessTask&gt; GetOutstandingTasks() 
+{
+    // retreive some tasks from db
+}
+
+private void ProcessAllData()
+{
+    List&lt;Task&lt;ProcessResult&gt;&gt; taskQueue = 
+        GetOutstandingTasks()
+        .Select(tsk =&gt; processTask(tsk))
+        .ToList(); // grab initial task queue
+
+    while(taskQueue.Any()) // iterate while tasks need completing
+    {
+        Task&lt;ProcessResult&gt; firstFinishedTask = await Task.WhenAny(taskQueue); // get first to finish
+        taskQueue.Remove(firstFinishedTask); // remove the one that finished
+        ProcessResult result = await firstFinishedTask; // get the result
+        // do something with task result
+        taskQueue.AddRange(GetOutstandingTasks().Select(tsk =&gt; processData(tsk))) // add more tasks that need performing
+    }
+}
+</code></pre>

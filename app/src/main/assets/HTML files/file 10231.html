@@ -1,0 +1,15 @@
+<p>I'm doubtful that this can be done.</p>
+
+<p>If you want to implement this without any sort of polling, then you need the OS to know that the thread is blocked, and the OS needs to be aware of the timeout, in order to unblock the thread after a while. For that, support needs to already exist in the OS; you can't implement this at the Python level.</p>
+
+<p>(You could have the thread blocked at either OS-level or app-level, and have a mechanism whereby it can be woken up by a different thread at the appropriate time, but then you need that other thread to be effectively polling)</p>
+
+<p>In general you don't have a truly bounded waiting/progress guarantee of the lock anyway, as your thread will have to wait an unbounded time for a context switch to take place for it to notice that it's been unblocked. So unless you can put an upper bound on the amount of CPU contention going on, you're not going to be able to use the timeout to hit any hard real-time deadlines. But you probably don't need that, otherwise you wouldn't dream of using locks implemented in Python.</p>
+
+<hr>
+
+<p>Due to the Python GIL (Global Interpreter Lock), those polling-based solutions probably aren't as inefficient or as badly unbounded as you think (depending on how they're implemented) (and assuming you're using either CPython or PyPy).</p>
+
+<p>There's only ever one thread running at a time, and by definition there's another thread that you want to run (the one that holds the lock you're waiting for). The GIL is held for a while by one thread to execute a bunch of bytecodes, then dropped and reacquired to give someone else a chance at it. So if the blocked-with-timeout thread is just in a loop checking the time and yielding to other threads, it will only wake up every so often when it gets the GIL and then almost immediately drop it back to someone else and block on the GIL again. Because this thread could only ever wake up when it gets a turn at the GIL anyway, it will also do this check as soon after the timeout expires as it would be able to resume execution even if the timeout was magically perfect.</p>
+
+<p>The only time this will cause a lot of inefficiency is if your thread is blocked waiting for the lock-holding thread, which is blocked waiting for something that can't be caused by another Python thread (say, blocked on IO), and there are no other runnable Python threads. Then your polling timeout really will just sit there checking the time repeatedly, which could be bad if you expect this situation to happen for long periods of time.</p>

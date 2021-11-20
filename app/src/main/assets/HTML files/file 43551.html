@@ -1,0 +1,84 @@
+<p>Lots of problems here. Let's see.</p>
+
+<ol>
+<li><p>It does not make sense to execute <code>getHTMLOfSelection()</code> at the point when the script is injected. You probably should put that inside the message handler: to get the selection <em>when asked to</em>.</p></li>
+<li><p>A much bigger problem is the fact that every time you inject a script. This, together with 1, leads to all kinds of <em>fun</em>. Let's look in more detail!</p>
+
+<ul>
+<li>The user triggers the context menu.</li>
+<li>Your first <code>contextMenu.onClicked</code> handler runs. The script injection is <em>scheduled</em>. It's asynchronous, so you don't know when it will finish unless you use a callback. Which you don't.</li>
+<li>Your second <code>contextMenu.onClicked</code> handler runs. It sends a message to a script which potentially haven't finished executing. If you're lucky, you get a response.</li>
+<li>User triggers the context menu again on the same page.</li>
+<li>Your first <code>contextMenu.onClicked</code> handler runs, again. The script is going to be injected <em>again</em>, creating a <em>second</em> listener for the message that will compete with the first. It's again asynchronous, so <em>maybe</em> by the time your message arrives <code>dom</code> is up to date. Maybe not.</li>
+<li>Your second <code>contextMenu.onClicked</code> handler runs, again. This time there sure is a message listener (maybe two!) that returns <em>maybe</em> up to date data.</li>
+</ul>
+
+<p>And so on. You see the problem?</p></li>
+<li><p>Furthermore, you <em>can't</em> pass a DOM object with <code>sendResponse</code>. The object needs to be JSON-serializable, and DOM objects contain circular references, which is a no-no. You need to extract the data you need on the content script side, and pass only that.</p></li>
+</ol>
+
+<p>So, let's try to tackle those problems.</p>
+
+<p>There are 2 ways of dealing with this. I'll present both, pick the one you prefer. Both will take care of problems 1 and 2.</p>
+
+<p><strong>First way</strong> is to ensure your message handler is only added once by including some kind of guard variable:</p>
+
+<pre><code>// getDOM.js
+
+if(!getDOM_ready) { // This will be undefined the first time around
+  getDOM_ready = true;
+  chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+      // If only you knew how I hate this "greeting" example copied over
+      if (request.command === "GetURL") {
+        var dom = getHTMLOfSelection();
+        sendResponse({DOM: dom});
+      }
+    }
+  );
+}
+
+function getHTMLOfSelection() {
+  /* ... */
+}
+</code></pre>
+
+<p>Then on the background side, we need to be sure we send a message only after the script finishes executing:</p>
+
+<pre><code>chrome.contextMenus.onClicked.addListener(function(info, tab){
+  chrome.tabs.executeScript(tab.id, {file: "getDOM.js"}, function() {
+    // This only executes after the content script runs
+    // Oh, and you most certainly don't need to query for tabs,
+    //   you already have a tab and its id in `onClicked`
+    chrome.tabs.sendMessage(tab.id, {command: "GetURL"}, function(response) {
+      alert(response.navURL);
+    });
+});
+</code></pre>
+
+<p>The <strong>second way</strong> is to drop Messaging altogether. <code>executeScript</code> actually returns the last value the content script evaluated. That makes the content script trivial and does not leave a message listener behind:</p>
+
+<pre><code>// getDOM.js
+function getHTMLOfSelection() {
+  /* ... */
+}
+
+getHTMLOfSelection(); // Yes, that's it
+</code></pre>
+
+<p>On the background side, you need to adapt the listener:</p>
+
+<pre><code>chrome.contextMenus.onClicked.addListener(function(info, tab){
+  chrome.tabs.executeScript(tab.id, {file: "getDOM.js"}, function(results) {
+    // results is an array, because it can be executed in more than one frame
+    alert(results[0]);
+});
+</code></pre>
+
+<p>The code is much simpler here, AND it does not leave an active event listener behind.</p>
+
+<p>As for problem 3, you need to extract the info you need (say, a link) from the selection and pass only that instead of the object.</p>
+
+<hr>
+
+<p>Finally, this is not a complete solution. Problem is, your selection can be inside an <code>iframe</code>, and this solution only injects code into the top frame. Solution to that is left as an exercise to the reader; using <code>all_frames: true</code> in the content script options will inject into all frames, and one of them will have a non-empty selection. You just need to see which.</p>

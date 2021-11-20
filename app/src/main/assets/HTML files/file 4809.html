@@ -1,0 +1,66 @@
+<p>I had misunderstood the question. Actually I don't know if there is a way to align the attributes in the way you shown. You could try to implement it yourself, something like this:</p>
+
+<pre><code>    public static string FormatXml(string xmlString, bool indented)
+    {
+        using (TextReader textReader = new StringReader(xmlString))
+        using (XmlReader xmlReader = new XmlTextReader(textReader))
+        {
+            using (TextWriter textWriter = new StringWriter())
+            {
+                string indent = "";
+                string attributeIndent = "";
+
+                while (xmlReader.Read())
+                {
+                    if (xmlReader.NodeType == XmlNodeType.Element)
+                    {
+                        attributeIndent = "";
+                        string element = xmlReader.Name;
+                        textWriter.Write("{0}&lt;{1}", indent, element);
+
+                        if (!xmlReader.HasAttributes)
+                            textWriter.WriteLine("&gt;");
+                        else
+                        {
+                            int actual = 1;
+                            while (xmlReader.MoveToNextAttribute())
+                            {
+                                string content = String.Format("{0} {1}={2}", attributeIndent, xmlReader.Name, xmlReader.Value);
+                                if (actual != xmlReader.AttributeCount)
+                                    textWriter.WriteLine(content);
+                                else
+                                    textWriter.Write(content);
+
+                                if (string.IsNullOrEmpty(attributeIndent))
+                                    attributeIndent = indent + Enumerable.Repeat&lt;string&gt;(" ", element.Length + 1).Aggregate((a, b) =&gt; a + b);
+
+                                actual++;
+                            }
+                            xmlReader.MoveToElement();
+                            textWriter.WriteLine("&gt;");
+                            attributeIndent = "";
+                        }
+                        if (!xmlReader.IsEmptyElement)
+                        {
+                            indent += "  ";
+                            textWriter.WriteLine("&gt;");
+                        }
+                        else
+                            textWriter.WriteLine("/&gt;");
+                    }
+                    else if (xmlReader.NodeType == XmlNodeType.EndElement)
+                    {
+                        indent = indent.Substring(0, indent.Length - 2);
+                        textWriter.WriteLine("{0}&lt;/{1}&gt;", indent, xmlReader.Name);
+                    }
+                    else if (xmlReader.NodeType == XmlNodeType.Text)
+                    {
+                        textWriter.WriteLine(xmlReader.Value);
+                    }
+                }
+
+                return textWriter.ToString();
+            }
+        }
+    }
+</code></pre>

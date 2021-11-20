@@ -1,0 +1,27 @@
+<blockquote>
+  <p>1) The program outputs a very big text file. I only wish to save the output to a new file (so not save the string as a python object), what's the best way to do this using the subprocess module?</p>
+</blockquote>
+
+<p>If you look at <a href="http://docs.python.org/2/library/subprocess.html#frequently-used-arguments" rel="nofollow">the documentation</a>, valid values for <code>stdout</code> are:</p>
+
+<blockquote>
+  <p>PIPE, an existing file descriptor (a positive integer), an existing file object, and None.</p>
+</blockquote>
+
+<p>So:</p>
+
+<pre><code>with open('new_file.txt', 'w') as outfile:
+    subprocess.call(['program', 'arg'], stdout=outfile)
+</code></pre>
+
+<hr>
+
+<blockquote>
+  <p>2) I wish to call the program many times in parallel using the multiprocess module. I normally just go the simple way and use the Pool.map function, will this interfere with the subprocess module?</p>
+</blockquote>
+
+<p>Not unless you do certain odd things. </p>
+
+<p><code>multiprocessing.Pool</code> keeps track of which processes it created, and won't try to manage other child processes that happen to get created elsewhere, so the obvious thing you're worried about isn't an issue.</p>
+
+<p>The most common problem I've seen is using <code>Popen</code> to create child processes that you never reap. You'll often get away with this in an app without <code>multiprocessing</code>, but as soon as you do the <code>Popen</code>-and-leak in a pool task, you stop getting away with it. (This isn't really anything about <code>multiprocessing</code> or Python; it's just that grandchild processes aren't the same as child processes.)</p>

@@ -1,0 +1,72 @@
+<p>Seems like what you want (retrive fees depeding on dates and members) can be fully handle in sql statement, so manage yourself to do only one SqlCommand instead of doing many queries handled by C# code.</p>
+
+<pre><code>select * 
+from 
+    members m
+    , fees f 
+where 
+    m.m_id=f.m_id 
+    and datediff(day, f.f_start_date, getdate()) &gt; 30
+</code></pre>
+
+<p><em>To retrieve all members with all fees linked but only if start date exceeded last 30 days (ofc, retrieve paid fees..)</em></p>
+
+<p>I don't understood what is the condition that make one fee "the last fee" of a member.</p>
+
+<p>If <code>f_end_date</code> is set if the fee is paid it would be something like :</p>
+
+<pre><code>select * 
+from 
+    members m
+    , fees f 
+where 
+    m.m_id=f.m_id 
+    and datediff(day, f.f_start_date, getdate()) &gt; 30
+    and f_end_date is null
+</code></pre>
+
+<p>If fees existing in fees are just current fees to paid, then manage only the last fee by date :</p>
+
+<pre><code>select * 
+from 
+    members m
+    , ( SELECT m_id,max(f_start_date) as f_start_date
+        FROM fees
+        GROUP BY m_id) f_lastfees
+    ,fees f
+where 
+    m.m_id=f.m_id 
+    and f.m_id = f_lastfees.m_id
+    and f.f_start_date = f_lastfees.f_start_date
+    and datediff(day, f.f_start_date, getdate()) &gt; 30 
+</code></pre>
+
+<p><em>Will retrieve only members who didn't paid the last fees over last 30 days</em></p>
+
+<p>Just comment above if you need some help in sql, but anyway try to retrieve directly the information you need in sql statement, it's better for performance and makes code more readable.</p>
+
+<p>Hope it helps ;)</p>
+
+<h2>EDITED</h2>
+
+<p>The new table fees will contains :</p>
+
+<pre><code>f_id
+f_amount
+f_creation_date --used to know if fee is not paid over last 30days
+f_paid_date --used to know if fee is paid or not (equals null if not paid)
+</code></pre>
+
+<p>Final request looks like</p>
+
+<pre><code>select * 
+from 
+    members m
+    ,fees f
+where 
+    m.m_id=f.m_id 
+    and datediff(day, f.f_creation_date, getdate()) &gt; 30 
+    and f_paid_date is null
+</code></pre>
+
+<p><em>Will retrieve only merbers who didn't paid the last fees over last 30 days according to alter table made on fees table</em>        </p>

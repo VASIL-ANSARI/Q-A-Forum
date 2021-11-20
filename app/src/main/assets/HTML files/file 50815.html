@@ -1,0 +1,12 @@
+<p>Several things I see. </p>
+
+<p>1) <code>#pragma for ordered</code> means: execute every single one of the iterations of this loop in order. This essentially means that while you're executing "in parallel," all of your work will be done in serial. Remove it.</p>
+
+<p>2) You have not declared any of your variables shared or private. Note that all variables by default will be shared, so in your case <code>ij</code> and <code>kl</code> for instance will be accessible by any thread working on any iteration. You can no doubt see how this would cause a race condition if, say, iteration 100 changed variable <code>ij</code> while iteration 1 thought it was using it.</p>
+
+<p>3) Your variable <code>eris[ijkl]</code> as you rightly noted must be reduced properly. If <code>ijkl</code> can never be the same value for two different iterations in your <code>i_orbital</code> loop, then you're fine as-is; no two threads will ever be changing the same variable <code>eris[ijkl]</code> potentially at the same time. If it can be the same value, then you <a href="http://stackoverflow.com/questions/20413995/reducing-on-array-in-openmp">have to carefully handle reduction on the array</a>.</p>
+
+<p>4) Here's what you should work with for starters. This is assuming that <code>ijkl</code> will never be the same value for two different iterations, and your functions do not take in any non-constant references (potentially changing what I'm assuming input variables to output variables).</p>
+
+<pre><code>#pragma omp parallel for private(i_orbital, j_orbital, ij, k_orbital, l_orbital, kl, ijkl, ijij, klkl, i_primitive, j_primitive, k_primitive, l_primitive)
+</code></pre>

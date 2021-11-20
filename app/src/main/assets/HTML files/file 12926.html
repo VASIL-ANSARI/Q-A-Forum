@@ -1,0 +1,32 @@
+<p>Your <code>Application</code> is created before any other component in the process. So in <code>onCreate()</code> there is no <code>Serivce</code> running. And if you send broadcast at the moment when Application's <code>onCreate()</code> is called, <code>Service</code> has no broadcast receiver registered because it wasn't even created.</p>
+
+<p>So, in other words, you service is not receiving broadcast notification because broadcast receiver is not yet registered. And its not yet registered because <code>Service</code> is not yet started. And it can't be started before Application's <code>onCreate()</code> returns by design.</p>
+
+<p>You can directly start service using <code>Context.startService()</code> from Application's <code>onCreate()</code>. You'll be able to path all the required data through <code>Intent</code>.</p>
+
+<hr>
+
+<p><em><strong>Updated answer to an updated question:</em></strong></p>
+
+<p>When you call:</p>
+
+<pre><code>getApplicationContext().startService(intent);
+</code></pre>
+
+<p>You ask Android to start service at some later time. The service <strong>is not</strong> started right away. It's only scheduled to start later. In fact it will definitely not start before you return from Application's <code>onCreate()</code> function. That's because all Service's lifecycle callback functions (like <code>onCreate()</code> and <code>onStart()</code>) are called from main UI thread. And Applicaiton's <code>onCreate</code> is currently blocking main UI thread. </p>
+
+<p>So when you send broadcast using these lines of code:</p>
+
+<pre><code>getApplicationContext().startService(intent);
+getApplicationContext().sendBroadcast(new Intent(Constants.ACTION_DO_SOMETHING));
+</code></pre>
+
+<p>You actually ask to start service at some later time, then immediately after that you send broadcast. And because service didn't even had chance to start and to register for this broadcast
+notifications, it will not receive anything when it actually gets started.</p>
+
+<p>You could change your service's <code>onStart()</code> code to handle the intent and then start service using:</p>
+
+<pre><code>Intent intent = new Intent(getApplicationContext(), MyService.class);
+intent.setAction(Constants.ACTION_DO_SOMETHING);
+getApplicationContext().startService(intent);
+</code></pre>

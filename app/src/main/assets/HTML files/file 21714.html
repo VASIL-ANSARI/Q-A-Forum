@@ -1,0 +1,65 @@
+<p>A semaphore is used in a multi-threading/IPC environment. With a javascript engine, you don't have this. You're trying to <em> poll </em> in Javascript, which won't work in its single threaded environment, unless you use setTimeout or setInteval.</p>
+
+<p>In your setup, it looks like you have three types of events: a new voice task presents itself (and should be enqueued), a Yelp AJAX call returns, and audio playback ends. You seem to have handled the first two events and you're trying to figure out how to handle the audio ending event.</p>
+
+<p>I'd move all the queue <em> servicing </em> code into its own function and then just call it whenever an interesting event happens. Let the queue servicing code figure out what to do. The rest of the code just has to handle the events and keep track of state. Something like this might work:</p>
+
+<pre><code>    var ajaxOutstanding = false;
+    var audioOutstanding = false;
+
+    function voiceSynth(string, name) {
+       if(voiceQueue.indexOf(string)== -1){
+          voiceQueue.push(string) 
+          voiceQueue.push(name) //used to keep track of the current item being read
+       }
+       serviceQueue();
+    }
+
+    //ajax call to the TTS service
+    function voiceCall (string, name) {
+        console.log('synth called on ' + string)
+        $.ajax('read/?string=' + string + '&speed=' + speed, {
+            type: 'GET',
+            success: function(src) {
+                ajaxOutstanding = false;
+                audio.setAttribute('src', src);
+                audioOutstanding = true;
+                audio.play();
+                voiceCursor = name;
+                serviceQueue();
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                ajaxOutstanding = false;
+                console.log(xhr);
+                console.log(ajaxOptions);
+                console.log(thrownError);
+                serviceQueue();
+            }
+        });
+    }
+
+    function handleAudioEnded() {
+        audioOutstanding = false;
+        serviceQueue();
+    }
+
+    audio.addEventListener('ended', handleAudioEnded);
+
+    function serviceQueue() {
+        if (voiceQueue.length > 1 && !ajaxOustanding && !audioOutstanding) {
+        voiceCall.call(undefined, voiceQueue.shift(),voiceQueue.shift());
+        }
+    }
+</code></pre>
+
+<p>By the way,</p>
+
+<pre><code>    voiceCall.call(undefined, voiceQueue.shift(),voiceQueue.shift());
+</code></pre>
+
+<p>is the same as</p>
+
+<pre><code>    voiceCall(voiceQueue.shift(), voiceQueue.shift());
+</code></pre>
+
+<p>and is clearer.</p>

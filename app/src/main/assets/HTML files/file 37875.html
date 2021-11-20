@@ -1,0 +1,165 @@
+<p><a href="http://jsfiddle.net/zombiesplat/zoohcveh/17/" rel="nofollow">http://jsfiddle.net/zombiesplat/zoohcveh/17/</a> Here is a working version of what I answered below.</p>
+
+<p>The problem appears to be some kind of compatibility issue with isotope v2 and knockout.  My fix came from finding this example <a href="http://zubinraj.com/demo/isotope-knockout/isotope-knockout-binding.htm" rel="nofollow">http://zubinraj.com/demo/isotope-knockout/isotope-knockout-binding.htm</a> and converting your code to use knockout v1.5</p>
+
+<p>HTML</p>
+
+<pre><code>&lt;div&gt;
+    &lt;button data-bind="click: addNew"&gt;Add New&lt;/button&gt;
+&lt;/div&gt;
+
+&lt;div id="container" class="isotope" data-bind="foreach: bills"&gt;
+    &lt;div class="item" data-bind="isotope: {container: '#container', itemSelector: '.item'}, style: {height: RandomHeight() + 'px'}"&gt;
+        &lt;h3 data-bind="text: title"&gt;&lt;/h3&gt;
+        &lt;p&gt;Votes: &lt;span data-bind="text: votes"&gt;&lt;/span&gt;&lt;p&gt;
+        &lt;p data-bind="text: desc"&gt;&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>CSS</p>
+
+<pre><code>/* ---- .item ---- */
+
+.item {
+  float: left;
+  width: 380px;
+  background: #0D8;
+  border: 2px solid #333;
+  border-color: hsla(0, 0%, 0%, 0.7);
+}
+
+
+/* Begin Required Isotope Styles - see http://isotope.metafizzy.co for more info */
+ .isotope-item {
+    z-index: 2;
+}
+.isotope-hidden.isotope-item {
+    pointer-events: none;
+    z-index: 1;
+}
+/**** Isotope CSS3 transitions ****/
+ .isotope, .isotope .isotope-item {
+    -webkit-transition-duration: 0.8s;
+    -moz-transition-duration: 0.8s;
+    -ms-transition-duration: 0.8s;
+    -o-transition-duration: 0.8s;
+    transition-duration: 0.8s;
+}
+.isotope {
+    -webkit-transition-property: height, width;
+    -moz-transition-property: height, width;
+    -ms-transition-property: height, width;
+    -o-transition-property: height, width;
+    transition-property: height, width;
+}
+.isotope .isotope-item {
+    -webkit-transition-property: -webkit-transform, opacity;
+    -moz-transition-property: -moz-transform, opacity;
+    -ms-transition-property: -ms-transform, opacity;
+    -o-transition-property: -o-transform, opacity;
+    transition-property: transform, opacity;
+}
+/**** disabling Isotope CSS3 transitions ****/
+ .isotope.no-transition, .isotope.no-transition .isotope-item, .isotope .isotope-item.no-transition {
+    -webkit-transition-duration: 0s;
+    -moz-transition-duration: 0s;
+    -ms-transition-duration: 0s;
+    -o-transition-duration: 0s;
+    transition-duration: 0s;
+}
+</code></pre>
+
+<p>Javascript on Dom Ready</p>
+
+<pre><code>var $container = $("#container");
+var data = [
+    {
+        title: "Test 1",
+        desc: "Some description text goes here",
+        votes: 1000,
+        category: "catA",
+    },
+    {
+        title: "Test 2",
+        desc: "Some description text goes here",
+        votes: 2000,
+        category: "catB",
+    },
+    {
+        title: "Test 3",
+        desc: "Some description text goes here",
+        votes: 100,
+        category: "catC",
+    }
+];
+
+function Bill(title, desc, votes, category)
+{
+    var self = this;
+    self.title = ko.observable(title);
+    self.desc = ko.observable(desc);
+    self.votes = ko.observable(votes);
+    self.category = ko.observable(category);
+    self.RandomHeight = ko.observable(Math.floor(Math.random() * 200) + 400);
+    console.log("Added new bill");
+};
+
+function ViewModel() {
+    var self = this;
+
+    self.bills = ko.observableArray();
+
+    self.count = 1;
+
+    self.search = function() {
+        self.bills.removeAll();
+        for(var i=0; i&lt;data.length; i++)
+        {
+            var bill = new Bill(
+                data[i].title,
+                data[i].desc,
+                data[i].votes,
+                data[i].category
+            );
+            self.bills.push(bill);
+        }
+    };
+
+    self.addNew = function() {
+        for(var i=0; i&lt;data.length; i++)
+        {
+            var bill = new Bill(
+                self.count,
+                data[i].desc,
+                data[i].votes,
+                data[i].category
+            );
+            self.bills.push(bill);
+            self.count++;
+        }
+    };
+};
+
+ko.bindingHandlers.isotope = {
+    init : function(element, valueAccessor, allBindings, viewModel, bindingContext) {
+
+    },  
+    update : function(element, valueAccessor, allBindings, viewModel, bindingContext) {
+        var $el = $(element);
+        var value = ko.utils.unwrapObservable(valueAccessor());
+        console.log("updating..." + value);
+        var $container = $(value.container);
+        $container.isotope({
+            itemSelector: value.itemSelector,
+            masonry: {
+              columnWidth: 100
+            }
+        });
+        $container.isotope('appended', $el);
+    }
+
+};
+
+ko.applyBindings(new ViewModel());
+</code></pre>

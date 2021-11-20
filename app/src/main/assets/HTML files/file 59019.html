@@ -1,0 +1,93 @@
+<p>You need to calculate the right positions. Remember that the MouseMove will not give you positions (percentages) or values(data) but pixels. You can transform them using the various axis functions. Officially they only work in a xxxPaint event, but during mouse events they also work fine.</p>
+
+<p><strong>Update</strong>: There two ways to do the anchoring: </p>
+
+<ul>
+<li>Either by using the '<strong>Positions</strong>', i.e. the percentages or the 'Values', i.e. the data values.</li>
+</ul>
+
+<p>Here is an example of the 1st kind:</p>
+
+<p><a href="http://i.stack.imgur.com/WwsKJ.gif" rel="nofollow"><img src="http://i.stack.imgur.com/WwsKJ.gif" alt="enter image description here"></a></p>
+
+<pre><code>    LineAnnotation laNew = null;
+
+    private void chart1_MouseDown(object sender, MouseEventArgs e)
+    {
+        if (cbx_drawAnnotation.Checked)
+        {
+            Axis ax = chart1.ChartAreas[0].AxisX;
+            Axis ay = chart1.ChartAreas[0].AxisY;
+            laNew = new LineAnnotation();
+            chart1.Annotations.Add(laNew);
+            double vx = ax.ValueToPosition(ax.PixelPositionToValue(e.X));
+            double vy = ay.ValueToPosition(ay.PixelPositionToValue(e.Y));
+            laNew.X = vx;
+            laNew.Y = vy;
+        }
+    }
+
+
+    private void chart1_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.Button.HasFlag(MouseButtons.Left) &amp;&amp; cbx_drawAnnotation.Checked)
+        {
+            Axis ax = chart1.ChartAreas[0].AxisX;
+            Axis ay = chart1.ChartAreas[0].AxisY;
+            double vx = ax.ValueToPosition(ax.PixelPositionToValue(e.X))- laNew.X;
+            double vy = ay.ValueToPosition(ay.PixelPositionToValue(e.Y)) - laNew.Y;
+            laNew.Width =  Math.Min(100, vx);
+            laNew.Height =  Math.Min(100, vy);
+            laNew.LineColor = rb_green.Checked ? Color.Green : Color.Red;
+            laNew.AllowMoving = true;  // optional
+        }
+    }
+</code></pre>
+
+<p>This works fine unles you need to rescale the axis in some way, like chaning the axis minimum and/or maximum values.</p>
+
+<ul>
+<li>In the case you need to <strong>anchor to data values</strong>.</li>
+</ul>
+
+<p>First we need to relate the <code>Annotation</code> to the <code>Axes</code> and also set <code>IsSizeAlwaysRelative</code> to <code>false</code>. Then we can calculate the anchor and size values:</p>
+
+<pre><code>private void chart1_MouseDown(object sender, MouseEventArgs e)
+{
+    if (cbx_drawAnnotation.Checked)
+    {
+        Axis ax = chart1.ChartAreas[0].AxisX;
+        Axis ay = chart1.ChartAreas[0].AxisY;
+        laNew = new LineAnnotation();
+        chart1.Annotations.Add(laNew);
+
+        laNew.IsSizeAlwaysRelative = false;
+
+        laNew.AxisX = ax;
+        laNew.AxisY = ay;
+
+        laNew.AnchorX = ax.PixelPositionToValue(e.X);
+        laNew.AnchorY = ay.PixelPositionToValue(e.Y);
+
+        laNew.LineColor = rb_green.Checked ? Color.Green : Color.Red;
+        laNew.AllowMoving = true;
+    }
+}
+
+
+private void chart1_MouseMove(object sender, MouseEventArgs e)
+{
+    if (e.Button.HasFlag(MouseButtons.Left) &amp;&amp; cbx_drawAnnotation.Checked)
+    {
+        Axis ax = chart1.ChartAreas[0].AxisX;
+        Axis ay = chart1.ChartAreas[0].AxisY;
+
+        laNew.Width = ax.PixelPositionToValue(e.X) - laNew.AnchorX;   // values
+        laNew.Height = ay.PixelPositionToValue(e.Y) - laNew.AnchorY;  
+    }
+}
+</code></pre>
+
+<p>Note how I now can scale the maximum and also still resize the the chart and the annotations stay with the data points..:</p>
+
+<p><a href="http://i.stack.imgur.com/oAQ1G.gif" rel="nofollow"><img src="http://i.stack.imgur.com/oAQ1G.gif" alt="enter image description here"></a></p>

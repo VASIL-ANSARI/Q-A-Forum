@@ -1,0 +1,99 @@
+<p>Methond annotated with <code>@BeforeTest</code> annotation will be executed, if the corresponding class is added in you <code>testng.xml</code> in the <code>&lt;test&gt;&lt;classes&gt;&lt;class&gt;</code> tag along with the TestClass with <code>@Test</code> annotations.</p>
+
+<p>Example: </p>
+
+<pre><code>public class TestNG1 {
+    @BeforeTest
+    public void init() {
+        System.out.println("Initialized");
+    }
+}
+
+public class TestNG2 {
+    @Test
+    public void doSomeThing() {
+        System.out.println("Test method");
+    }
+}
+</code></pre>
+
+<p>Then testng.xml should like </p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;suite name="Suite" parallel="false"&gt;
+  &lt;test name="Test"&gt;
+    &lt;classes&gt;
+      &lt;class name="com.sample.TestNG1"/&gt;
+       &lt;class name="com.sample.TestNG2"/&gt;
+    &lt;/classes&gt;
+  &lt;/test&gt; &lt;!-- Test --&gt;
+&lt;/suite&gt; &lt;!-- Suite --&gt;
+</code></pre>
+
+<p>So, make sure you have added the class in your <code>testng.xml</code> where you initialize the webdriver.  </p>
+
+<p><strong>Editing to give a more direct solution to the problem at hand.</strong> </p>
+
+<p>Base Class where the webdriver is initialized</p>
+
+<pre><code>public class BaseTest {
+
+    private static final String HOMEPAGE = "http://www.google.com";
+    private static final String HOMEPAGE_TITLE = "Google";
+
+    protected static WebDriverWait wait;
+    protected static WebDriver driver;
+
+    @BeforeTest
+    public void setUp() {
+        driver = new FirefoxDriver();
+        wait = new WebDriverWait(driver, 60);
+    }
+
+    @Test
+    public void openGoogle() {
+        driver.get(HOMEPAGE);
+        wait.until(ExpectedConditions.titleContains(HOMEPAGE_TITLE));
+
+        final String windowTitle = driver.getTitle();
+        System.out.println(windowTitle);
+    }
+
+    @AfterTest
+    public void tearDown() {
+        driver.quit();
+    }
+
+}
+</code></pre>
+
+<p>Dependent class where the pre-initialized driver is used.</p>
+
+<pre><code>public class SearchTest extends BaseTest {
+
+    private static final String SEARCH_BTN_NAME = "btnG";
+    private static final String SEARCH_BOX_ID = "lst-ib";
+
+    @Test(testName = "search", dependsOnMethods="openGoogle")
+    public void search() {
+        driver.findElement(By.id(SEARCH_BOX_ID)).sendKeys("Sharath Bhaskara");
+        driver.findElement(By.name(SEARCH_BTN_NAME)).click();
+    }
+
+}
+</code></pre>
+
+<p>testng.xml that runs the complete test suite.</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;suite name="Suite" parallel="false"&gt;
+  &lt;test name="WebdriverTest"&gt;
+    &lt;classes&gt;
+      &lt;class name="com.sample.project.BaseTest"/&gt;
+       &lt;class name="com.sample.project.SearchTest"/&gt;
+    &lt;/classes&gt;
+  &lt;/test&gt; &lt;!-- Test --&gt;
+&lt;/suite&gt; &lt;!-- Suite --&gt;
+</code></pre>
+
+<p><strong>Note:</strong> The WebDriver instance in <code>BaseTest</code> is marked <code>protected static</code> as the state of the instance variable will not be saved by default. </p>

@@ -1,0 +1,33 @@
+<p>We are using LightTPD as web server and i am using "mod_magnet" to do such things. Mod_magnet allows me to do request handling using simple lua scripts. We have an automatic task, which will create an empty file somewhere in the web-server's filesystem. The lua script will check for existance of this file on every request and return a static maintenance page, if the file is found. The important part of the script looks like the following:</p>
+
+<pre><code>--
+-- maintenance page
+--
+local config = {
+    ['maintenance'] = {
+        ['allow'] = {
+            '127.0.0.1'    -- just an example IP address
+        }
+    }
+}
+
+if lighty.stat(lighty.env['physical.doc-root'] .. 'maintenance') then
+    tmp, _ = table.search(config.maintenance.allow, lighty.env['request.remote-ip'])
+    if not tmp then
+        -- maintenance modus
+        lighty.content = {
+            { filename = lighty.env['physical.doc-root'] .. 'error/maintenance.html' }
+        }
+
+        return 503
+    end
+end
+</code></pre>
+
+<p>In the script there's also a configuration to still let specific IP addresses through, so you can still view the website for example from your company network, when everyone else just get's the maintenance page.</p>
+
+<p>This solution works very well and because of automation, it does not matter, if you need the maintenance page on one or on many webservers.</p>
+
+<p>If you are interested, you can find more information regarding "mod_magnet" over here:</p>
+
+<p><a href="http://redmine.lighttpd.net/projects/lighttpd/wiki/Docs:ModMagnet" rel="nofollow">http://redmine.lighttpd.net/projects/lighttpd/wiki/Docs:ModMagnet</a></p>

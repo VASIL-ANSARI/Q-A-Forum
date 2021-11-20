@@ -1,0 +1,98 @@
+<p>Okay, I'll try to write a complete walk-through.</p>
+
+<p>First, it is a common mistake to treat WAV (or, more likely, RIFF) file as a linear structure. It is actually a tree, with each element having a 4-byte tag, 4-byte length of data and/or child elements, and some kind of data inside. </p>
+
+<p>It is just common for WAV files to have only two child elements ('fmt ' and 'data'), but it also may have metadata ('LIST') with some child elements ('INAM', 'IART', 'ICMT' etc.) or some other elements. Also there's no actual order requirement for blocks, so it is incorrect to think that 'data' follows 'fmt ', because metadata may stick in between. </p>
+
+<p>So let's look at the RIFF file:</p>
+
+<pre><code>'RIFF'
+  |-- file type ('WAVE') 
+  |-- 'fmt '
+  |     |-- AudioFormat
+  |     |-- NumChannels
+  |     |-- ...
+  |     Lï¼¿ BitsPerSample
+  |-- 'LIST' (optional)
+  |     |-- ... (other tags)
+  |     Lï¼¿ ... (other tags)
+  Lï¼¿ 'data'
+        |-- sample 1 for channel 1
+        |-- ...
+        |-- sample 1 for channel N
+        |-- sample 2 for channel 1
+        |-- ...
+        |-- sample 2 for channel N
+        Lï¼¿ ...
+</code></pre>
+
+<p>So, how should you read a WAV file? Well, first you need to read 4 bytes from the beginning of the file and make sure it is <code>RIFF</code> or <code>RIFX</code> tag, otherwise it is not a valid RIFF file. The difference between <code>RIFF</code> and <code>RIFX</code> is the former uses little-endian encoding (and is supported everywhere) while the latter uses big-endian (and virtually nobody supports it). For simplicity let's assume we're dealing only with little-endian RIFF files. </p>
+
+<p>Next you read the root element length (in file endianness) and following file type. If file type is not <code>WAVE</code>, it is not a WAV file, so you might abandon further processing. After reading the root element, you start to read all child elements and process those you're interested in.</p>
+
+<p>Reading <code>fmt</code> header is pretty straightforward, and you have actually done it in your code.</p>
+
+<p>Data samples are usually represented as 1, 2, 3 or 4 bytes (again, in the file endianness). The most common format is a so-called <code>s16_le</code> (you might have seen such naming in some audio processing utilities like ffmpeg), which means samples are presented as signed 16-bit integers in little endian. Other possible formats are <code>u8</code> (8-bit samples are unsigned numbers!), <code>s24_le</code>, <code>s32_le</code>. Data samples are interleaved, so it is easy to seek to arbitrary position in a stream even for multi-channel audio. <em>Note: this is valid only for uncompressed WAV files, as indicated by AudioFormat == 1. For other formats data samples may have another layout.</em></p>
+
+<p>So let's take a look at a simple WAV reader:</p>
+
+<pre><code>stHeaderFields = dict()
+rawData = None
+
+with open("file.wav", "rb") as f:
+    riffTag = f.read(4)
+    if riffTag != 'RIFF':
+        print 'not a valid RIFF file'
+        exit(1)
+
+    riffLength = struct.unpack('&lt;L', f.read(4))[0]
+    riffType = f.read(4)
+    if riffType != 'WAVE':
+        print 'not a WAV file'
+        exit(1)
+
+    # now read children
+    while f.tell() &lt; 8 + riffLength:
+        tag = f.read(4)
+        length = struct.unpack('&lt;L', f.read(4))[0]
+
+        if tag == 'fmt ': # format element
+            fmtData = f.read(length)
+            fmt, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample = struct.unpack('&lt;HHLLHH', fmtData)
+            stHeaderFields['AudioFormat'] = fmt
+            stHeaderFields['NumChannels'] = numChannels
+            stHeaderFields['SampleRate'] = sampleRate
+            stHeaderFields['ByteRate'] = byteRate
+            stHeaderFields['BlockAlign'] = blockAlign
+            stHeaderFields['BitsPerSample'] = bitsPerSample
+
+        elif tag == 'data': # data element
+            rawData = f.read(length)
+
+        else: # some other element, just skip it
+            f.seek(length, 1)
+</code></pre>
+
+<p>Now we know file format info and its sample data, so we can parse it. As it was said, sample may have any size, but for now let's assume we're dealing only with 16-bit samples:</p>
+
+<pre><code>blockAlign = stHeaderFields['BlockAlign']
+numChannels = stHeaderFields['NumChannels']
+
+# some sanity checks
+assert(stHeaderFields['BitsPerSample'] == 16)
+assert(numChannels * stHeaderFields['BitsPerSample'] == blockAlign * 8)
+
+for offset in range(0, len(rawData), blockAlign):
+    samples = struct.unpack('&lt;' + 'h' * numChannels, rawData[offset:offset+blockAlign])
+
+    # now samples contains a tuple with sample values for each channel
+    # (in case of mono audio, you'll have a tuple with just one element).
+    # you may store it in the array for future processing, 
+    # change and immediately write to another stream, whatever.
+</code></pre>
+
+<p>So now you have all the samples in rawData, and you may access and modify it as you like. It might be handy to use Python's <a href="https://docs.python.org/2/library/array.html" rel="nofollow">array()</a> to effectively access and modify data (but it won't do in case of 24-bit audio, you'll need to write your own serialization and deserialization).</p>
+
+<p>After you've done with data processing (which may involve upscaling or downscaling the number of bits per sample, changing number of channels, sound levels manipulation etc.), you just write a new <code>RIFF</code> header with correct data length (usually may be computed with a simplified formula <code>36 + len(rawData)</code>), an altered <code>fmt</code> header and <code>data</code> stream.</p>
+
+<p>Hope this helps.</p>

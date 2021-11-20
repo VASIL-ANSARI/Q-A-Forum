@@ -1,0 +1,41 @@
+<p>Firstly you need to create an <code>IObservable&lt;string&gt;</code> to abstract the changing the value on your control. The "easiest" way to do this would be with a <code>Subject&lt;string&gt;</code>, but most likely its the wrong way to do it.</p>
+
+<p>Below is the code you should put into your ViewModel.</p>
+
+<pre><code>IDisposable _searchSubscriber =
+    _searchString
+         .Buffer(TimeSpan.FromMillisecond(300))
+         .Select(searchString =&gt; 
+                Observable.StartAsync(cancelToken =&gt; 
+                      Search(searchString, cancelToken)
+                ).Switch()
+         .ObserveOn(new DispatcherScheduler())
+         .Subscribe(results =&gt; Channels = results);
+
+public Task&lt;List&lt;Channel&gt;&gt; Search(string searchTerm, CancellationToken cancel)
+{
+    var query = dbContext.Channels.Where(x =&gt; x.Name.StartsWith(searchTerm));
+    return query.ToListAsync(cancel);
+}
+
+private BehaviorSubject&lt;string&gt; _searchString = new BehaviorSubject&lt;string&gt;("");
+public string SearchString
+{
+    get { return _searchString.Value; }
+    set { _searchString.OnNext(value); OnPropertyChanged("SearchString"); }
+}
+</code></pre>
+
+<p>Rx.net is an extremely powerful library, which of course means it does have a bit of a learning curve (although the fact is this is complex because your problem is complex).</p>
+
+<p>Let me lay it out...</p>
+
+<p><code>.Buffer(TimeSpan.FromMilliseconds(300))</code> debounces your query, so it only runs the query once every 300 milliseconds.</p>
+
+<p><code>Observable.StartAsync(cancelToken =&gt; Search(searchString, cancelToken))</code> creates an Observable for the search task, which will be cancelled when it is disposed.</p>
+
+<p><code>Select(x =&gt; ...).Switch()</code> takes only the latest query results, and disposes the last query.</p>
+
+<p><code>ObserveOn(...)</code> run the following on the scheduler used, make sure you use either <code>DispatchScheduler</code> if you are using <code>WPF</code>, or <code>WinformsScheduler</code> if you use Winforms.</p>
+
+<p><code>Subscribe(results =&gt; ...)</code> do something with the results.</p>

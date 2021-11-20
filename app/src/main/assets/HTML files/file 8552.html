@@ -1,0 +1,86 @@
+<p>Your <code>Fetch</code> function is only pulling one row from the database, and you aren't returning the results...</p>
+
+<p>The method isn't the best, but in order to achieve what you're trying to do:</p>
+
+<pre><code>public function Fetch($set_table_name){
+    $query=mysql_query("SELECT * FROM ".$set_table_name); 
+    $result = array();
+    while ($record = mysql_fetch_array($query)) {
+         $result[] = $record;
+    }
+    return $result;
+}
+</code></pre>
+
+<p>This will make each row a part of $result, but you'll have to access it like this:</p>
+
+<p>You would call the fetch function like this:</p>
+
+<pre><code>$result = $connect-&gt;Fetch('posts');
+
+echo $result[0]['columnName'];  // for row 0;
+</code></pre>
+
+<p>Or in a loop:</p>
+
+<pre><code>for ($x = 0; $x &lt; count($result); $x++) {
+   echo $result[$x][0] . "&lt;BR&gt;";  // outputs the first column from every row
+}
+</code></pre>
+
+<p>That said, fetching the entire result set into memory is not a great idea (some would say it's a very bad idea.)</p>
+
+<p>Edit: It also looks like you have other issues with your class...  I have to run but will check back tomorrow and if others haven't set you straight I will expand.</p>
+
+<p>Edit2: Ok, going to do a once-over on your class and try to explain a few things:</p>
+
+<pre><code>class MySQL {
+
+  //declaring the private variables that you will access through $this-&gt;variable;
+  private $host;  
+  private $username;
+  private $password;
+  private $database;
+  private $conn;  // Adding the connection, more on this later.
+
+  public function __Construct($set_host, $set_username, $set_password){
+    $this-&gt;host = $set_host;
+    $this-&gt;username = $set_username;
+    $this-&gt;password = $set_password;
+    // Combining the connection &amp; connection check using 'or'
+    // Notice that I removed the semi-colon after the mysql_connect function
+    $this-&gt;conn = mysql_connect($this-&gt;host, $this-&gt;username, $this-&gt;password)
+                  or die("Couldn't connect");
+  }
+
+  public function Database($set_database)
+  {   
+    $this-&gt;database=$set_database;
+    // Adding the connection to the function allows you to have multiple 
+    // different connections at the same time.  Without it, it would use
+    // the most recent connection.
+    mysql_select_db($this-&gt;database, $this-&gt;conn) or die("cannot select Dataabase");
+  }
+
+  public function Fetch($table_name){
+    // Adding the connection to the function and return the result object instead
+    return mysql_query("SELECT * FROM ".$table_name, $this-&gt;conn);         
+  }
+
+}
+
+$connect = new MySQL('localhost','root','');
+$connect-&gt;Database('cms');
+$posts = $connect-&gt;Fetch('posts');
+
+if ($posts &amp;&amp; mysql_num_rows($posts) &gt; 0) {
+     echo "Here is some post data:&lt;BR&gt;";
+     while ($record = mysql_fetch_array($posts)) {
+         echo $record[0];  // or a quoted string column name instead of numerical index.
+     }
+} else {
+     echo "No posts!";
+}
+</code></pre>
+
+<p>I hope this helps... It should get you started at least.  If you have more questions you should ask them separately.</p>

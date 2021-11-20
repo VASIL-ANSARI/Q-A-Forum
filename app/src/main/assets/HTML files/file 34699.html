@@ -1,0 +1,65 @@
+<p>There are a couple of things wrong here. </p>
+
+<p><strong>First</strong>, <code>mmap()</code> and <code>mremap()</code> return a <code>void*</code> pointer, which you must not just cast to an <code>int</code>.</p>
+
+<p><strong>Second</strong>, the <code>mremap()</code> <a href="http://man7.org/linux/man-pages/man2/mremap.2.html" rel="nofollow">man page</a> states:</p>
+
+<blockquote>
+  <p>RETURN VALUE</p>
+  
+  <p>On success mremap() returns a pointer to the new virtual memory area.  On error, the value MAP_FAILED (that is, (void *) -1) is returned, and errno is set appropriately.</p>
+</blockquote>
+
+<p>So your check <code>temp &lt; 0</code> is wrong. It should be <code>temp == (void*)-1</code>. It is entirely possible that <code>mremap()</code> returns a valid pointer on success that is smaller than zero when cast to an int.</p>
+
+<p><strong>Third</strong>, both <code>mmap()</code> and <code>mremap()</code> set the <code>errno</code> (<a href="http://man7.org/linux/man-pages/man3/errno.3.html" rel="nofollow">man page</a>) variable when an error occurs. You can read that to get more information about what exactly went wrong. To just output a text error message use the <code>perror()</code> function (<a href="http://man7.org/linux/man-pages/man3/perror.3.html" rel="nofollow">man page</a>). Note that you have to <code>#include &lt;errno.h&gt;</code> for that.</p>
+
+<p><strong>Fourth</strong>, if you detect an error condition, you always print a message, but you mostly allow execution to continue. That doesn't make sense. If <code>shm_open()</code> failed, you want to return immediately (or call <code>exit(EXIT_FAILURE)</code>). None of the following functions will work if you couldn't even open the SHM file.</p>
+
+<p>Thus, my cleaned up version looks like this:</p>
+
+<pre><code>#include &lt;error.h&gt;
+
+int main()
+{
+    int size_of_mem = 1024;
+    int fd = shm_open("/myregion", O_CREAT | O_RDWR,
+                      S_IRWXO | S_IRUSR | S_IWUSR);
+    if (fd == -1)
+    {
+        perror("Error in shm_open");
+        return EXIT_FAILURE;
+    }
+
+    if (ftruncate(fd, size_of_mem) == -1)
+    {
+        perror("Error in ftruncate");
+        return EXIT_FAILURE;
+    }
+
+    void *shm_address = mmap(0, size_of_mem,
+                             PROT_READ | PROT_WRITE | PROT_EXEC,
+                             MAP_SHARED, fd, 0);
+    if (shm_address == MAP_FAILED)
+    {
+        perror("Error mmapping the file");
+        return EXIT_FAILURE;
+    }
+
+    void *temp = mremap(shm_address, size_of_mem, 4000, MREMAP_MAYMOVE);
+    if(temp == (void*)-1)
+    {
+        perror("Error on mremap()");
+        return EXIT_FAILURE;
+    }
+    return 0;
+}
+</code></pre>
+
+<p>Note:</p>
+
+<ul>
+<li>Correct data types (<code>void*</code>), correct error checking for <code>mremap()</code>, usage of <code>perror()</code> to print more informative error messages, error paths ending execution of the function.</li>
+<li>Correct/consistent indentation.</li>
+<li>No spaces before <code>,</code> in function calls.</li>
+</ul>

@@ -1,0 +1,21 @@
+<p><code>stret</code> is Apple-speak for "returns a structure". <code>___sincos_stret</code> is an LLVM optimisation â if you write code that calls <code>sin(n)</code> and then <code>cos(n)</code> and uses both results then the compiler will make one call to the structure-returning sincos method, receiving a structure with both things in it. It's faster to work out both at once rather than individually if the operand is the same.</p>
+
+<p>On a superficial browsing I can't see a <code>sin</code> or <code>cos</code> in <code>initInterTab2D</code> but I expect something is being inlined.</p>
+
+<p>While poking around I tried:</p>
+
+<pre><code>cd /Applications/Xcode.app/Contents/Developer/Platforms 
+grep -lr ___sincos_stret *
+</code></pre>
+
+<p>Via that and using <code>nm</code> on likely results, I found the <code>___sincos_stret</code> function is exposed in both iOS since 7.0 and OS X since 10.9 as part of their <code>libsystem_m.dylib</code>s. E.g. if your Xcode is installed in the default place, try:</p>
+
+<pre><code>nm /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk/usr/lib/system/libsystem_m.dylib | grep sincos
+</code></pre>
+
+<p>And/or:</p>
+
+<pre><code>nm /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/usr/lib/system/libsystem_m.dylib | grep sincos
+</code></pre>
+
+<p>You'll see the symbol in either of those. So the correct solution would be to set an older deployment target in Xcode, or do the equivalent in your makefile.</p>

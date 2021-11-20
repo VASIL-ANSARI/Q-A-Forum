@@ -1,0 +1,45 @@
+<p>Good question. So, few things to note:</p>
+
+<ol>
+<li><p><strong>Where are you attaching your listener?</strong> If you are attaching this anywhere <em>but</em> the <code>onResume</code>, it will re-initialize your listener. When setting a listener it fires all events for that particular node. However, I still do all my registering and unregistering to my Firebase reference in <code>onPause</code>, and <code>onResume</code></p></li>
+<li><p><strong>You can have multiple instances</strong> of any Firebase listener. </p>
+
+<blockquote>
+  <p>Is firebase smart enough to know that this particular listener already exists?</p>
+</blockquote>
+
+<p>Firebase <em>is</em> aware that listener already exists and will not send the same event twice. However, when rotating you are creating a new instance of your listener. Firebase cannot see this as the same instanced listener. Therefore, you receive all data again. </p></li>
+<li><p><strong>Firebase caches all of the data</strong>. When a fragment is attached and the listener is set, firebase will make two main calls - </p>
+
+<ul>
+<li><p>First - A query to retrieve cached data.  </p></li>
+<li><p>Second - A query to the remote data. </p></li>
+</ul>
+
+<p>Calling cache first is nice because it still works in cases with slow to no network. <em>Now, bare with me here...</em> When Firebase receives that snapshot from the the online servers it will do a complex evaluation of the remote object and local object. And to the best of its ability, Firebase will merge the objects using a complex ID that utilizes timestamps and black magic [source needed]. With this new snapshot, if needed, it will save it to the servers. Then, **Firebase will provide the date to you only if it differs from the cached version and <em>changes relative to the instance of the listener that provided said data.</em> This cache-driven structure even applies to when you save your data: </p>
+
+<ul>
+<li><p>First- save to cache. </p></li>
+<li><p>Second- trigger callback. </p></li>
+<li><p>Third- attempt to save to server. </p></li>
+</ul></li>
+</ol>
+
+<hr>
+
+<h2>To answer the question</h2>
+
+<p>If you are attaching your listener to Firebase <code>onPause</code>/<code>onResume</code>, you will receive all data again. The only way to not receive it again is to maintain the same instance of that listener.</p>
+
+<p>In addition to maintaining my listener instance, I also have used another solution. In my opinion, I am not fond of it. But still is what I use most often. What I do, is </p>
+
+<ul>
+<li><p>I will keep a <code>final List&lt;String&gt;</code>, called <code>ignoredList</code>. This list would be built of a <code>String</code> key, which would be the key for the object you already have in your adapter. </p></li>
+<li><p>Then, in <code>onPause</code> I will add this data to my <code>ignoredList</code> and null out the <code>childEvent</code> listener. </p></li>
+<li><p>After the <code>onResume</code> callback I set a new instance of <code>childEvent</code> listener. </p></li>
+<li><p>On the <code>onAdded</code> of the event listener I check the newly added object against my list. If I have it, I will remove it from the list and nothing else. Essentially ignoring it. If the object is not in my <code>ignoredList</code> I will handle it like normal. If I receive it from one of the call backs other than <code>onAdded</code>, (i.e. <code>onRemoved</code> <code>onChanged</code> or <code>onMoved</code>) then I will make that event change to that object in the list and remove from <code>ignoredList</code>. </p></li>
+</ul>
+
+<p>Now, I admit this is not really the prettiest solution. You <em>could</em> see incorrect data if two sources were modifying the same DataSnapshot. It would be a small chance, but entirely possible. Luckily if the data sets were to fall inaccurate, it will not save to Firebase. </p>
+
+<p>I am always actively looking for better strategies for this, and if I find one I will share. In the meantime, this solution has been working perfectly for my apps. </p>

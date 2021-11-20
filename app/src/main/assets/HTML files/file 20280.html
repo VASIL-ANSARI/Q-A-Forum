@@ -1,0 +1,231 @@
+<p><strong>EDIT</strong>: as required by the OP, I've updated the example code to introduce a correction factor, required to change the diagonal movement direction and degree.</p>
+
+<p>If you want to use jQuery you'll have to download the <a href="https://github.com/brandonaaron/jquery-mousewheel" rel="nofollow">MouseWheel</a> plugin.</p>
+
+<p>Then, you can write a simple function binded to the <code>mousewheel</code> event, such as:</p>
+
+<p><strong>HTML</strong></p>
+
+<pre><code>&lt;div id="block"&gt;&lt;/div&gt;
+</code></pre>
+
+<p><strong>CSS</strong></p>
+
+<pre><code>#block {
+    position: absolute;
+    width: 200px;
+    height: 150px;
+    top: 200px;
+    left: 50px;
+    background-color: red;
+}
+</code></pre>
+
+<p><strong>Alternative 1: JS using CSS top and left</strong></p>
+
+<pre><code>$(function(){
+    $(window).on('mousewheel', function(evt,delta){
+        var $block = $('#block'),
+            // retrieves the top and left coordinates
+            top = parseInt($block.css('top')),
+            left = parseInt($block.css('left')),
+            // mouse wheel delta is inverted respect to the direction, so we need to
+            // normalize it against the direction
+            offset = -1 * delta,
+            // X and Y factors allows to change the diagonal movement direction and
+            // degree. Negative values inverts the direction.
+            factorX = 5,
+            factorY = 2,
+            // calculates the new position. NOTE: if integers only are used for factors,
+            // then `Math.floor()` isn't required.
+            newTop = top + Math.floor(offset * factorY),
+            newLeft = left - Math.floor(offset * factorX);
+
+        // moves the block
+        $block.css({ 
+            top: newTop + 'px',
+            left: newLeft + 'px'
+        });
+    });
+});
+</code></pre>
+
+<p><strong>Alternative 2: JS using offset()</strong></p>
+
+<pre><code>$(function(){
+    $(window).on('mousewheel', function(evt,delta){
+        var $block = $('#block'),
+            // retrieves the top and left coordinates
+            position = $block.offset(),
+            // mouse wheel delta is inverted respect to the direction, so we need to
+            // normalize it against the direction
+            offset = -1 * delta,
+            // X and Y factors allows to change the diagonal movement direction and
+            // degree. Negative values inverts the direction.
+            factorX = 5,
+            factorY = 2,
+            // calculates the new position. NOTE: if integers only are used for factors,
+            // then `Math.floor()` isn't required.
+            newTop = position.top + Math.floor(offset * factorY),
+            newLeft = position.left - Math.floor(offset * factorX);
+
+        // moves the block
+        $block.offset({ top: newTop, left: newLeft });
+    });
+});
+</code></pre>
+
+<p>Now you can move the box up&amp;right by scrolling up and vice-versa by scrolling down.
+In this example, on every <code>mousewheel</code> event, the callback function:</p>
+
+<ol>
+<li>retrieves the current element position (<code>top</code> and <code>left</code> CSS properties)</li>
+<li>inverts the delta value returned by the <code>mousewheel</code> event, so that scrolling up we have a negative delta, and scrolling down we have a positive delta</li>
+<li>set the factor values required to define diagonal movement direction and degree</li>
+<li>calculates the new position</li>
+<li>moves the object.</li>
+</ol>
+
+<p>To change degree and direction, just change <code>factorX</code> and/or <code>factorY</code> values, so that:</p>
+
+<ul>
+<li>negative values inverts the direction, and</li>
+<li>different values change the degree (for example, X = 2 and Y = 5 makes the element moving with a much more closed angle, respect to X = 5 and Y = 2).</li>
+</ul>
+
+<p>Here's a <a href="http://jsfiddle.net/ragnarokkr/Ntxud/" rel="nofollow">demo</a> you can test.</p>
+
+<p><strong>Alternative 3: JS using cos() and sin()</strong></p>
+
+<pre><code>$(function(){
+    $(window).on('mousewheel', function(evt,delta){
+        var $block = $('#block'),
+            // read current block position
+            position = $block.offset(),
+            // inverts the delta; scroll up == -1 - scroll down == +1
+            direction = -1 * delta,
+            // sets the angle and converts it in radians
+            angle = 45 * Math.PI / 180,
+            // set displacememt factor
+            factorX = Math.cos(angle) * direction,
+            factorY = Math.sin(angle) * direction,
+            // calculate the new position
+            newTop = position.top + factorY,
+            newLeft = position.left - factorX;
+
+        // moves the block
+        $block.offset({ top: newTop, left: newLeft });
+    });
+});
+</code></pre>
+
+<p>In this example, what to change is the value in <code>angle</code> (45 in this example). Everything else works just like the others examples.</p>
+
+<p>Last thing, if it's required to change the <em>velocity</em> of the movement, just multiply <code>factorX</code> and/or <code>factorY</code> by the wanted coefficient (for example, 1.5 for one and half time of the velocity, or 2 for twice the velocity, etc.).</p>
+
+<p>It's possibile to try it in a <a href="http://jsfiddle.net/ragnarokkr/4ptTx/" rel="nofollow">demo</a>.</p>
+
+<hr>
+
+<p><strong>EDIT</strong></p>
+
+<p>Just for the sake of knowledge, you can reach the same goal using <a href="https://developer.mozilla.org/en-US/docs/CSS/transform" rel="nofollow">CSS Transform</a>. This allows you to take advantage from GPU accelerated hardware. (Further informations can be found in the article of <a href="http://mobile.smashingmagazine.com/2012/06/21/play-with-hardware-accelerated-css/" rel="nofollow">Smashing Magazine</a> and <a href="http://paulirish.com/2012/why-moving-elements-with-translate-is-better-than-posabs-topleft/" rel="nofollow">Paul Irish</a>).</p>
+
+<p><strong>HTML</strong></p>
+
+<pre><code>&lt;div id="block"&gt;&lt;/div&gt;
+</code></pre>
+
+<p><strong>CSS</strong></p>
+
+<pre><code>#block {
+    width: 200px;
+    height: 150px;
+    background-color: red;
+    transform: translate3d(0, 0, 0);
+}
+</code></pre>
+
+<p><strong>JS</strong></p>
+
+<pre><code>$(function(){
+    var blockOffsetX = 50,
+        blockOffsetY = 200;
+
+    $('#block').css({
+        transform: 'translate3d(' + blockOffsetX + 'px' + ', ' + blockOffsetY + 'px, 0)'
+    });
+
+    $(window).on('mousewheel', function(evt,delta){
+        var $block = $('#block'),
+            offset = -1 * delta;
+            factorX = 5,
+            factorY = 2;
+
+        blockOffsetX -= offset * factorX;
+        blockOffsetY += offset * factorY;
+        $block.css({ 
+            transform: 'translate3d(' + blockOffsetX + 'px, ' + blockOffsetY + 'px, 0)'
+        });
+    });
+});
+</code></pre>
+
+<p>However, as you can see in this example, you'll need to keep track of the element X,Y position, because it's a little bit complicated to retrieve these values directly from the CSS. Moreover, this example is kept easier, but in production you'll have to support every vendor specific CSS property (<code>-webkit-</code>, <code>-moz-</code>, <code>-o-</code>, <code>-ms-</code>, etc.).</p>
+
+<p>Here's a working <a href="http://jsfiddle.net/ragnarokkr/JBDSG/" rel="nofollow">demo</a> (if it doesn't work, you probably will have to edit the code according to the specific prefixed CSS property for your browser).</p>
+
+<hr>
+
+<p><strong>EDIT</strong>: Since the OP has seen that listening to the <code>scroll</code> event it was the better choice for him, I've added the relative code (<em>only the JS code is reported here, since HTML and CSS are pretty the same as the first example</em>):</p>
+
+<pre><code>$(function(){
+    var lastScrollYPos = 0;
+    $(window).on('scroll', function(){
+        var $this = $(this),
+            $block = $('#block'),
+            // retrieves the top and left coordinates
+            position = $block.offset(),
+            // X and Y factors allows to change the diagonal movement direction and
+            // degree. Negative values inverts the direction.
+            factorX = 1,
+            factorY = 1,
+            // retrieves current vertical scrolling position and calculate the
+            // relative offset
+            scrollYPos = $this.scrollTop(),
+            offset = Math.abs(scrollYPos - lastScrollYPos),
+            // mouse wheel delta is inverted respect to the direction, so we need to
+            // normalize it against the direction
+            direction = scrollYPos &gt; lastScrollYPos ? -1 : 1,
+            // calculates the new position. NOTE: if integers only are used for factors,
+            // then `Math.floor()` isn't required.
+            newTop = position.top + Math.floor(direction * offset * factorY),
+            newLeft = position.left - Math.floor(direction * offset * factorX);
+
+        // moves the block
+        $block.offset({ top: newTop, left: newLeft });
+        lastScrollYPos = scrollYPos;
+    });
+});
+</code></pre>
+
+<p>Here's a working <a href="http://jsfiddle.net/ragnarokkr/JjxPM/" rel="nofollow">demo</a>.</p>
+
+<hr>
+
+<p><strong>BONUS: IDEA</strong></p>
+
+<p>Instead of use common local variables for every element, HTML5 <code>data-*</code> properties could be used to store element's data (for example: correction factor, last position, etc.), then jQuery <code>.data()</code> method could be used to retrieve these data and process them.</p>
+
+<p>PRO:</p>
+
+<ul>
+<li>Decouple the callback function from the element</li>
+<li>Customize every element on the page to act differently from each other</li>
+</ul>
+
+<p>CONS:</p>
+
+<ul>
+<li>It will probably affect the rendering performance in some way, especially whether many elements have to be managed at same time by the callback function.</li>
+</ul>

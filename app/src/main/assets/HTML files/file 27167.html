@@ -1,0 +1,62 @@
+<p>As one of the options, you could turn on sql tracing with bind variables dumping by setting 10046  event of level 12 or 4 for a session, either manually or automatically(in a logon trigger for a user for instance):</p>
+
+<pre><code>alter session set events '10046 trace name context forever, level 12';
+</code></pre>
+
+<p>After that trace file will be generated in a directory specified by <code>user_dump_dest</code> parameter. </p>
+
+<pre><code>SQL&gt; show parameter user_dump_dest;
+
+NAME                                 TYPE        VALUE                          
+------------------------------------ ----------- ------------------------------ 
+user_dump_dest                       string      D:\...\diag\rdbms\cdb\cdb 
+                                                 \trace   
+</code></pre>
+
+<p>Here is an example:</p>
+
+<pre><code>SQL&gt; alter session set events '10046 trace name context forever, level 12';
+  2 variable var number;
+  3 exec :var := 1234567;     -- our bind variable
+  4 select 1 from dual where 1234567 = :var ;
+</code></pre>
+
+<p>Among other information presented in a newly generated trace file we could find information about the query, bind variable(s) and its/their values:</p>
+
+<blockquote>
+  <p>PARSING IN CURSOR #375980232 len=40 dep=0 uid=103<br>
+                  oct=3 lid=103 tim=2640550035 hv=1641534478<br> 
+                  ad='7ff5bd0baf0' sqlid='ap9rzz5hxgp0f'<br>
+  <strong>select 1 from dual where 1234567 = :var</strong>            <em>&lt;-- our query</em><br> 
+      END OF STMT<br>
+      PARSE #375980232:c=0,e=375,p=0,cr=0,cu=0,mis=1,r=0,dep=0,og=1,plh=0,tim=2640550034<br>
+      BINDS #375980232:<br>
+       Bind#0<br>
+        oacdty=02 mxl=22(22) mxlc=00 mal=00 scl=00 pre=00<br>
+        oacflg=03 fl2=1000000 frm=01 csi=178 siz=24 off=0<br>
+        kxsbbbfp=16646e10  bln=22  avl=05  flg=05<br>
+        <strong>value=1234567</strong>      &lt;-- value of the bind variable <br></p>
+</blockquote>
+
+<p>You could also, starting from Oracle 10g and up, query <code>v$sql_bind_capture</code> dynamic performance view to get information about bind variable(s) and their values:</p>
+
+<pre><code>select t.parsing_user_id
+     , t.sql_fulltext         -- text of a query
+     , bc.name                -- name of a bind variable
+     , bc.value_string        -- value of a bind variable
+  from v$sqlarea t
+  join v$sql_bind_capture bc
+    on (bc.sql_id = t.sql_id)
+  join v$session s
+    on (s.user# = t.parsing_schema_id)
+  where s.username = user
+    and bc.name in (':VAR') -- name of a bind variable(s), 
+                            -- value(s) of which we want to know
+</code></pre>
+
+<p>Result:</p>
+
+<pre><code>PARSING_USER_ID   SQL_FULLTEXT                      NAME    VALUE_STRING   
+ ------------------------------------------------------------------------ 
+           103   select 1 from dual where 1 =:var  :VAR     1234567
+</code></pre>

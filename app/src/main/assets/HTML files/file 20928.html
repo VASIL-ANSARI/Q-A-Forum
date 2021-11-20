@@ -1,0 +1,23 @@
+<p>If you want to create a simple text window, you need to pick a GUI framework to do that with. For something this simple, there's no reason not to use <code>Tkinter</code> (which comes with any Python) or <code>PyObjC</code> (which is pre-installed with Apple's Python 2.7), unless you happen to be more familiar with <code>wx</code>, <code>gobject</code>, <code>Qt</code>, etc.</p>
+
+<p>At any rate, however you do it, you'll need to write a function that takes a message and appends it to the text window (maybe creating it lazily, if necessary), and call that function wherever you would normally <code>print</code>. You may also want to write and install a <code>logging</code> handler that does the same thing, so you can just <code>log.info</code> stuff. (You <em>could</em> instead create a file-like object that does this and redirect <code>stdout</code> and/or <code>stderr</code>, but unless you have no control over the <code>print</code>ing code, that's going to be a lot more work.)</p>
+
+<p>The only real problem here is that a GUI needs an event loop, and you probably just wrote your code as a sequential script. </p>
+
+<p>One way around that is to turn your whole current script into a background thread. If you're using a GUI library that allows you to access the widgets from background threads, everything is easy; your <code>printfunc</code> just does <code>textwidget.append(msg)</code>. If not, it may at least have a <code>call_on_main_thread</code> type function, so your <code>printfunc</code> does <code>call_on_main_thread(textwidget.append, msg)</code>. If worst comes to worst (and I believe with Tkinter, it does), you have to create an explicit queue to push messages through, and write a queue handler in the event loop. <a href="http://code.activestate.com/recipes/82965-threads-tkinter-and-asynchronous-io/" rel="nofollow">This recipe</a> should give you an idea. Replace the body of <code>workerThread</code> with your code, and end it with <code>self.endApplication()</code>. (There are probably better examples out there; this was just what I found first in a quick search.)</p>
+
+<p>The other way around that is to have your code cooperatively operate with the event loop. Some libraries, like <code>wx</code>, have functions like <code>SafeYield</code> that make things work if you just call it after every chunk of processing. Others don't have that, but have a way to explicitly drive the event loop from your code. Others have neitherâbut every event loop framework has to have a way to schedule new events, so you can break your code up into a sequence of functions that each finish quickly and then do something like <code>root.after_idle(nextfunc)</code>.</p>
+
+<hr>
+
+<p>Howeverâ¦ are you sure you need to do this?</p>
+
+<p>First, any app, including one created by <code>py2app</code>, will send its stdout to the terminal if you run it with <code>Foo.app/Contents/MacOS/Foo</code>. And you can even set things up so that <code>open Foo.app</code> works that way, if you want. Obviously this doesn't help for people who just double-click the app in Finder (because then there <em>is</em> no terminal), but sometimes it's sufficient to just have to output available when people need it and know how to follow instructions.</p>
+
+<p>And you can take this farther: Create a <code>Foo.command</code> file that just does something like <code>$(dirname $0)/Foo.app/Contents/MacOS/Foo</code>, and when you double-click that file, it launches Terminal.app and runs your script.</p>
+
+<p>Or you can get even simpler: Just use <code>logging</code> to syslog the output, and if you want to see when each file is done, just watch the log messages go by in <code>Console.app</code>.</p>
+
+<p>Finally, do you even need <code>py2app</code> in the first place? If you don't have any external dependencies, just rename you script to <code>Foo.command</code>, and double-clicking it will run it in Terminal.app. If you <em>do</em> have external dependencies, you might still be able to get away with bundling it all together as a folder with a <code>.command</code> in it instead of as a <code>.app</code>.</p>
+
+<p>Obviously none of these ideas are exactly a professional or newbie-friendly way to build an interface, so if that matters, you will have to create a GUI.</p>

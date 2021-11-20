@@ -1,0 +1,125 @@
+<p>Here's a general idea:</p>
+
+<pre><code>template &lt;typename, typename&gt; struct pattern;
+
+template &lt;typename T&gt; struct pattern&lt;T, T&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef U other;
+    };
+};
+
+template &lt;typename A, typename B&gt; struct pattern&lt;A*, B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern&lt;A, B&gt;::template rebind&lt;U&gt;::other * other;
+    };
+};
+
+template &lt;typename Haystack, typename Needle, typename New&gt;
+struct replace
+{
+    typedef typename pattern&lt;Haystack, Needle&gt;::template rebind&lt;New&gt;::other type;
+};
+</code></pre>
+
+<p>Test:</p>
+
+<pre><code>#include &lt;demangle.hpp&gt;
+#include &lt;iostream&gt;
+int main()
+{
+    typedef replace&lt;void, void, int&gt;::type T1;
+    typedef replace&lt;void*, void, int&gt;::type T2;
+
+    std::cout &lt;&lt; demangle&lt;T1&gt;() &lt;&lt; std::endl;
+    std::cout &lt;&lt; demangle&lt;T2&gt;() &lt;&lt; std::endl;
+}
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>int
+int*
+</code></pre>
+
+<hr>
+
+<p><strong>Edit:</strong> Here's a somewhat more complete set:</p>
+
+<pre><code>template &lt;typename, typename&gt; struct pattern;
+template &lt;typename, typename&gt; struct pattern_aux;
+
+template &lt;typename A, typename B&gt; struct pattern_aux
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern&lt;A, B&gt;::template rebind&lt;U&gt;::other other;
+    };
+};
+
+template &lt;typename A, typename B, unsigned int N&gt; struct pattern_aux&lt;A[N], B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern&lt;A, B&gt;::template rebind&lt;U&gt;::other other[N];
+    };
+};
+
+
+template &lt;typename A, typename B&gt; struct pattern
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern_aux&lt;A, B&gt;::template rebind&lt;U&gt;::other * other;
+    };
+};
+
+template &lt;typename T&gt; struct pattern&lt;T, T&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef U other;
+    };
+};
+
+template &lt;typename A, typename B&gt; struct pattern&lt;A*, B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern&lt;A, B&gt;::template rebind&lt;U&gt;::other * other;
+    };
+};
+
+template &lt;typename A, typename B&gt; struct pattern&lt;A const, B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern_aux&lt;A, B&gt;::template rebind&lt;U&gt;::other const other;
+    };
+};
+
+template &lt;typename A, typename B&gt; struct pattern&lt;A volatile, B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern_aux&lt;A, B&gt;::template rebind&lt;U&gt;::other volatile other;
+    };
+};
+
+template &lt;typename A, typename B&gt; struct pattern&lt;A const volatile, B&gt;
+{
+    template &lt;typename U&gt; struct rebind
+    {
+        typedef typename pattern_aux&lt;A, B&gt;::template rebind&lt;U&gt;::other const volatile other;
+    };
+};
+
+template &lt;typename Haystack, typename Needle, typename New&gt;
+struct replace
+{
+    typedef typename pattern&lt;Haystack, Needle&gt;::template rebind&lt;New&gt;::other type;
+};
+</code></pre>

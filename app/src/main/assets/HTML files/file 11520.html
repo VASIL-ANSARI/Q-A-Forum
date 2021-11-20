@@ -1,0 +1,39 @@
+<p>To answer your question : in my opinion JOINs are better in 99% of the cases as they show the underlying data-model more clearly. This makes it easier to maintain the code AND the query optimizer also has an easier time to come up with a decent query-plan.</p>
+
+<p>I'm not a big fan of UDF's, but in this case it might be the easiest way to solve your problem as aggregating a string isn't natively supported by MSSQL:</p>
+
+<pre><code>-- create User Defined Function to fetch list of names for given taskid
+CREATE FUNCTION dbo.fn_names_from_taskid ( @taskid int )
+RETURNS nvarchar(max)
+AS
+    BEGIN
+        DECLARE @result nvarchar(max)
+        SELECT @result = ''
+
+        SELECT @result = @result 
+                       +  Portal_Users_View.ArabicName + ','
+          FROM Portal_Users_View 
+          JOIN CRSTaskReceiver 
+            ON CRSTaskReceiver.ReceiverID = Portal_Users_View.ID
+          JOIN CRSTask c 
+            ON CAST(c.id AS VARCHAR(200)) = CRSTaskReceiver.CRSTaskID -- cast really necessary?
+           AND c.ParentTask = @taskid 
+
+        -- strip last comma (if present)
+        SELECT @result = (CASE WHEN Right(@result, 1) = ',' THEN Left(@result, Len(@result) - 1) ELSE @result END)
+
+        Return(@result)
+    END
+
+GO
+
+-- usage    
+SELECT taskid    = t.id,
+       nameslist = dbo.fn_names_from_taskid (t.id)
+  INTO #test
+ WHERE id = 7652
+</code></pre>
+
+<p>PS: I tried to interpret your datamodel from the code above, you'll need to double-check it though!</p>
+
+<p>PS: is the Cast() really necessary ? I would assume all id fields to be stored as int ?!? If so (and with the right indexes) those joins should be 'blazingly fast', but with the Cast() in there the server can't use its indexes properly and you might have the weirdest behavior performance-wise.</p>

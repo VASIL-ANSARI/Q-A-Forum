@@ -1,0 +1,23 @@
+<p>jQuery is a fantastic tool for parsing and manipulating XML in javascript. jQuery's ajax APIs were, in fact, built with this in mind which is why you're able to specify the response type of an ajax call by setting the <code>dataType</code> argument to <code>xml</code> (although they do try to do some auto-detection if this argument is omitted). From the jQuery <code>$.ajax()</code> documentation for the <code>dataType</code> argument:</p>
+
+<blockquote>
+  <p>"xml": Returns a XML document that can
+  be processed via jQuery.</p>
+</blockquote>
+
+<p>You can parse and manipulate XML as much as want using jQuery. I'll have to add that using CSS selectors is wonderful compared to XPath queries in server-side XML libraries. </p>
+
+<p>While <code>empty</code> and <code>remove</code> work as expected, there's a gotcha when adding nodes on the fly with functions like <code>append</code>: jQuery, for whatever reason (I haven't really dug into this), won't create the element for you when appending to the XML structure (although this works fine in HTML structures). You can get around this easily by explicitly creating the node yourself as a DOM element or jQuery object and then calling <code>append</code>:</p>
+
+<pre><code>//Either of these will work
+var elem = document.createElement('app');
+xml.find('layout').append(elem); // Appends &lt;app&gt;&lt;/app&gt; to &lt;layout&gt;
+xml.find('layout').append($('&lt;app&gt;')); // Does the same
+
+// You can also you use other manipulation functions such as `attr`
+xml.find('layout').append($('&lt;app&gt;').attr('id', 'ego'));
+</code></pre>
+
+<p>It looks like, however, that there are other problems with your code that would be preventing it from behaving as expected. The <code>$.ajax</code> <code>beforeSend</code> callback, for example, passes in the <code>XMLHttpRequest</code> object to the callback function and not your XML object to be manipulated. The result is that your <code>empty</code> call in that callback does nothing.</p>
+
+<p>Also, if you're trying to manipulate the response of <code>Database/UserConfig/config.xml</code> in the <code>beforeSend</code> callback, it probably won't have existed yet since <code>beforeSend</code> is called before the ajax request is fired off. It's possible that the <code>xml</code> argument you intended to pass in was scoped globally, but it's squashed in the scope of the callback since jQuery is passing in <code>XMLHttpRequest</code> as I mentioned before.</p>

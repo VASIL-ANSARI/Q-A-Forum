@@ -1,0 +1,143 @@
+<p>Try returning a Stream instead of writing to the response.OutputStream.</p>
+
+<pre><code>[ServiceContract]
+public interface IStreamingService
+{
+    [OperationContract]
+    [WebGet(BodyStyle=WebMessageBodyStyle.Bare, UriTemplate = "/video?id={id}")]
+    Stream GetVideo(string id);
+}
+
+public class StreamingService : IStreamingService
+{
+    public System.IO.Stream GetVideo(string id)
+    {
+        Stream stream = File.OpenRead("c:\\Temp\\Video.mp4");
+        //WriteResponseHeaders(stuff);
+        return stream;
+    }
+}
+</code></pre>
+
+<p>Update:</p>
+
+<p>If you want to support seeking you can either copy the chunk into a byte[] and return a MemoryStream or you could wrap your stream in a proxy that only returns a part of your full file.</p>
+
+<pre><code>public class PartialStream : Stream
+{
+    private Stream underlying;
+
+    private long offset;
+
+    private long length;
+
+    public PartialStream(Stream underlying, long offset, long length)
+    {
+        this.underlying = underlying;
+        this.offset = offset;
+        if (offset + length &gt; underlying.Length) {
+            this.length = underlying.Length - offset;
+        } else {
+            this.length = length;
+        }
+
+        this.underlying.Seek(offset, SeekOrigin.Begin);
+    }
+
+    public override bool CanRead { get { return true; } }
+
+    public override bool CanSeek { get { return false; } }
+
+    public override bool CanWrite { get { return false; } }
+
+    public override void Flush()
+    {
+        throw new NotSupportedException();
+    }
+
+    public override long Length
+    {
+        get { return this.length; }
+    }
+
+    public override long Position
+    {
+        get
+        {
+            return this.underlying.Position - offset;
+        }
+        set
+        {
+            this.underlying.Position = offset + Math.Min(value,this.length) ;
+        }
+    }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        if (this.Position + offset &gt;= this.length)
+            return 0;
+
+        if (this.Position + offset + count &gt; this.length) {
+            count = (int)(this.length - this.Position - offset);
+        }
+
+
+        return underlying.Read(buffer, offset, count);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        this.underlying.Dispose();
+    }
+
+    public override long Seek(long offset, SeekOrigin origin)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void SetLength(long value)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        throw new NotImplementedException();
+    }
+
+}
+</code></pre>
+
+<p>And you have to respect the Range request header.</p>
+
+<pre><code>public System.IO.Stream GetVideo(string id)
+{
+    RangeHeaderValue rangeHeader;
+
+    bool hasRangeHeader = RangeHeaderValue.TryParse(
+                WebOperationContext.Current.IncomingRequest.Headers["Range"], 
+                out rangeHeader);
+
+    var response = WebOperationContext.Current.OutgoingResponse;
+    Stream stream = File.OpenRead("c:\\Temp\\Video.mp4");
+
+    var offset = hasRangeHeader ? rangeHeader.Ranges.First().From.Value : 0;
+
+    response.Headers.Add("Accept-Ranges", "bytes");
+    response.ContentType = "video/mp4";
+
+    if (hasRangeHeader) {
+        response.StatusCode = System.Net.HttpStatusCode.PartialContent;
+        var totalLength = stream.Length;
+        stream = new PartialStream(stream, offset, 10 * 1024 * 1024);
+
+
+        var header = new ContentRangeHeaderValue(offset, offset + stream.Length - 1,totalLength);
+        response.Headers.Add("Content-Range", header.ToString());
+    }
+    response.ContentLength = stream.Length;
+
+    return stream;
+}
+</code></pre>

@@ -1,0 +1,37 @@
+<p>In your example you have indeed recursion, the real reason behind it not reaching stack overflow could be because it's a <a href="https://en.wikipedia.org/wiki/Tail_call" rel="nofollow">tail-call recursion</a> which could be optimized to an iterative solution.</p>
+
+<p>With this snippet of code:</p>
+
+<pre><code>struct Node
+{
+  int value;
+  std::unique_ptr&lt;Node&gt; next;
+
+  Node(int value, Node* next) : value(value), next(next) { }
+
+  ~Node()
+  {
+    if (value == 0)
+      cout &lt;&lt; "foo" &lt;&lt; endl;
+  }
+};
+
+int main()
+{
+  Node* node = new Node(0, nullptr);
+  for (int i = 1; i &lt;= 5; ++i)
+    node = new Node(i, node);
+
+  delete node;
+
+  return 0;
+}
+</code></pre>
+
+<p>By placing a breakpoint on the <code>cout</code> statement and inspecting the stack trace you clearly see that behavior is recursive:</p>
+
+<p><a href="http://i.stack.imgur.com/gNk1G.png" rel="nofollow"><img src="http://i.stack.imgur.com/gNk1G.png" alt="enter image description here"></a></p>
+
+<p>The behavior is shown also <a href="http://ideone.com/idIpVD" rel="nofollow">here</a> by using a base destructor to track when <code>~Node()</code> returns.</p>
+
+<p>Since the <code>next</code> node must be destroyed before returning from the destructor, which leads to invoking <code>~Node()</code> again. This behaviour would be the same by using raw pointers and deleting next pointer directly in the destructor, which indeed has already been answered <a href="http://stackoverflow.com/questions/6965313/is-a-recursive-destructor-for-linked-list-tree-etc-bad">here</a>.</p>

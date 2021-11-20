@@ -1,0 +1,213 @@
+<p>First thing is first, get rid of the using namespace std. You don't want to import all of <code>std</code> into your class just to use cout and cin.</p>
+
+<p>Now lets get to the basics. You have a class which is supposed to encapsulate/hold data of its own. This class can be passed around and be worked on. Each class has its own unique set of data for your vector/matrix class.</p>
+
+<p>In the above, you have your classes using global variables. This is bad because every vector will have the same exact data. They all share the same variables (global)!</p>
+
+<p>Thus we need to put somehow get Vector to contain its own data. We do this by putting the variable inside the vector class itself. We make it private so that it cannot be accessed outside of the class.</p>
+
+<p>Next, we need a way to initialize <code>data</code>. We cannot give it <code>elements</code> anymore because elements is no longer going to be global and constant. Thus we must now dynamically allocate <code>elements</code> amount of doubles in the constructor and delete it in the destructor.</p>
+
+<p>To prevent weird behavior for now, we disallow copying and assigning. You should REALLY take look at a tutorial on classes and encapsulation.. This answer will be pretty incomplete but should help somewhat and fix a couple things..</p>
+
+<p>If you are 100% sure that vector MUST ONLY have 3 elements, nothing more, nothing less, then you may change <code>double* data</code> to <code>double data[3]</code> and remove <code>new data[...]</code> from the constructor and <code>delete[] data</code> from the destructor.</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+class Vector
+{
+    private:
+        double* data; //will point to an array of elements.
+        int elements; //amount of elements this vector has.
+        Vector(const Vector&amp; other); //copying not allowed.
+        Vector&amp; operator = (const Vector&amp; other); //copy assignment not allowed.
+
+    public:
+        Vector(int elements); //constructor that tells us how large of an array we need.
+        ~Vector(); //destructor to delete the dynamically allocated array when done.
+        int size() const; //returns the amount of elements.
+        double get_element(int n) const;
+        void set_element(double value, int index);
+};
+
+//This is our constructor. It stores the amount of elements we allocated within our class.
+//It also initialises data to point to the `new` array.
+Vector::Vector(int elements_) : elements(elements_), data(new double[elements_]())
+{
+}
+
+Vector::~Vector()
+{
+    delete[] data; //before the class gets destroyed, we clean up our dynamically allocated array. ALWAYS!
+}
+
+double Vector::get_element(int n) const
+{
+    return data[n];
+}
+
+void Vector::set_element(double value, int index)
+{
+    data[index] = value;
+}
+
+int Vector::size() const
+{
+    return elements;
+}
+
+
+/** We do the same for the matrix class.**/
+class Matrix
+{
+    private:
+        double* data;
+        int rows, columns; //instead of elements, we have rows and columns.
+        Matrix (const Matrix &amp;other); //prevent copying.
+        Matrix&amp; operator = (const Matrix &amp;other); //prevent assignment.
+
+    public:
+        Matrix(const Vector &amp;a, const Vector &amp;b); //constructor takes TWO vectors.
+        ~Matrix();
+        void add (const Matrix&amp;);
+        void mult (double);
+        double trace();
+        double norm();
+        void print ();
+};
+
+/** Data is initialized to an array of doubles[rows * columns] **/
+/** We also store the amount of rows and columns allocated **/
+Matrix::Matrix(const Vector &amp;a, const Vector &amp;b) : data(new double[a.size() * b.size()]), rows(a.size()), columns(b.size())
+{
+    int d, f;
+    for (d = 0; d &lt; rows; d++)
+    {
+        for (f = 0; f &lt; columns; f++)
+        {
+            data[d * f] = a.get_element(d) * b.get_element(f);
+        }
+    }
+}
+
+Matrix::~Matrix()
+{
+    delete[] data;  //Before the class is destroyed, we must delete the array.
+}
+
+void Matrix::print()
+{
+    std::cout.setf(std::ios::showpoint | std::ios::fixed);
+    std::cout.precision(3);
+    for (int i = 0; i &lt; rows; i++)
+    {
+        std::cout &lt;&lt; std::endl;
+        for (int j = 0; j &lt; columns; j++)
+        {
+            std::cout &lt;&lt; " " &lt;&lt; data[i * j];
+        }
+    }
+}
+
+int main()
+{
+    Vector a(3);  //Now we can a vector.
+    Vector b(3);  //another vector.
+    Vector c(2);  //notice we can choose how many elements the vector can hold.. 2 elements = a point. Nevertheless..
+
+    a.set_element(5.0d, 0);
+    b.set_element(10.0d, 2);
+
+    Matrix m(a, b); //Create a matrix from our two vectors.
+    m.print(); //Print it..
+}
+</code></pre>
+
+<p>As said before, if you are 100% sure that all matrices are 3x3 and all vectors have 3 elements only, then the following is what the class would look like:</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+class Vector
+{
+    private:
+        static const int elements = 3; //static. All vector instances will have the same amount of elements.
+        double data[elements];  //stack allocation. 3 elements only.
+        Vector(const Vector&amp; other);
+        Vector&amp; operator = (const Vector&amp; other);
+
+    public:
+        Vector();
+        ~Vector();
+        void read();
+        int size() const;
+        double get_element(int n) const;
+};
+
+Vector::Vector() : data() {} //nothing in the constructor. data is filled with 0's.
+
+Vector::~Vector() {} //nothing to delete in the destructor..
+
+double Vector::get_element(int n) const
+{
+    return data[n];
+}
+
+int Vector::size() const
+{
+    return elements;
+}
+
+class Matrix
+{
+    private:
+        static const int rows = 3, columns = 3; //all matrix instances will have 3 rows, 3 columns.
+        double data[rows * columns];
+        Matrix (const Matrix &amp;other);
+        Matrix&amp; operator = (const Matrix &amp;other);
+
+    public:
+        Matrix(const Vector &amp;a, const Vector &amp;b);
+        ~Matrix();
+        void add (const Matrix&amp;);
+        void mult (double);
+        double trace();
+        double norm();
+        void print ();
+};
+
+Matrix::Matrix(const Vector &amp;a, const Vector &amp;b) //nothing to allocate in the constructor.
+{
+    for (int d = 0; d &lt; rows; d++)
+    {
+        for (int f = 0; f &lt; columns; f++)
+        {
+            data[d * f] = a.get_element(d) * b.get_element(f);
+        }
+    }
+}
+
+Matrix::~Matrix() {}  //nothing to delete in the destructor.
+
+void Matrix::print()
+{
+    std::cout.setf(std::ios::showpoint | std::ios::fixed);
+    std::cout.precision(3);
+    for (int i = 0; i &lt; rows; i++)
+    {
+        std::cout &lt;&lt; std::endl;
+        for (int j = 0; j &lt; columns; j++)
+        {
+            std::cout &lt;&lt; " " &lt;&lt; data[i * j];
+        }
+    }
+}
+
+int main()
+{
+    Vector a;
+    Vector b;
+
+    Matrix m(a, b);
+    m.print();
+}
+</code></pre>

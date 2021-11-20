@@ -1,0 +1,82 @@
+<p>There are at least a couple things wrong with the program:</p>
+
+<ol>
+<li><p>You never initialize the condition variables:</p>
+
+<pre><code>pthread_cond_init(&amp;even, NULL);
+pthread_cond_init(&amp;odd, NULL);
+</code></pre></li>
+<li><p>You can reach a deadlock if you signal a condition when the other thread isn't waiting on that condition.  Normally, when you use <code>pthread_cond_wait()</code>, you also are checking some other shared variable in a while loop.  I rewrote your program to demonstrate this:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;pthread.h&gt;
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  even  = PTHREAD_COND_INITIALIZER;
+pthread_cond_t  odd   = PTHREAD_COND_INITIALIZER;
+
+void *printfun1(void *pnt);
+void *printfun2(void *pnt);
+
+int main(void)
+{
+    pthread_t pthread1, pthread2;
+    int ret1, ret2;
+
+    ret1 = pthread_create(&amp;pthread1, NULL, printfun1, NULL);
+
+    if(ret1)
+    {
+        printf("thread creation failed");
+    }
+    ret2 = pthread_create(&amp;pthread2, NULL, printfun2, NULL);
+    if(ret2)
+    {
+        printf("thread creation failed");
+    }
+
+    pthread_join(pthread1, NULL);
+    pthread_join(pthread2, NULL);
+}
+
+int counter = 0;
+
+void *printfun1(void *ptr)
+{
+    while(counter &lt; 50)
+    {
+        pthread_mutex_lock(&amp;mutex);
+        while ((counter &amp; 1) == 1)
+            pthread_cond_wait(&amp;even, &amp;mutex);
+
+        printf("%d \n", counter);
+        counter++;
+        pthread_cond_signal(&amp;odd);
+        pthread_mutex_unlock(&amp;mutex);
+
+        usleep( 1000000);
+    }
+    return NULL;
+}
+
+void *printfun2(void *ptr)
+{
+    while(counter &lt; 50)
+    {
+        pthread_mutex_lock(&amp;mutex);
+        while ((counter &amp; 1) == 0)
+            pthread_cond_wait(&amp;odd, &amp;mutex);
+
+        printf("%d \n", counter);
+        counter++;
+        pthread_cond_signal(&amp;even);
+        pthread_mutex_unlock(&amp;mutex);
+
+        usleep( 1000000);
+    }
+    return NULL;
+}
+</code></pre>
+
+<p>Now you can see how deadlock is avoided.  A thread only starts waiting on a condition when it knows that it needs to wait on the condition.  So even if the second thread signalled the condition when the first thread wasn't waiting on it, it doesn't matter.</p></li>
+</ol>

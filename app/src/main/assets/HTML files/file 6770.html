@@ -1,0 +1,51 @@
+<p>I don't know if you can do it directly with Hudson, but you certainly be able to do it if you run <a href="http://wiki.hudson-ci.org/display/HUDSON/Tomcat" rel="nofollow">Hudson within a Tomcat instance</a> (I run mine in a Tomcat 7 without any problem).</p>
+
+<p>You would define a JSP <a href="http://tomcat.apache.org/tomcat-7.0-doc/realm-howto.html" rel="nofollow">security-constraint</a>, a bit like <a href="http://blog.mc-thias.org/?title=tomcat_ldap_authentication&amp;more=1&amp;c=1&amp;tb=1&amp;pb=1" rel="nofollow">those ones</a> (note: adapted for LDAP because I defer all user authentication to the webapp container of Hudson: in my case, Tomcat)</p>
+
+<hr>
+
+<p>The OP asks:</p>
+
+<blockquote>
+  <p>You're suggesting to make changes to <code>hudson/WEB-INF/web.xml</code>? Could you please explicitly mention the file I have to change?</p>
+</blockquote>
+
+<p>@Vincenzo: I don't! I never touch one bit of the <code>hudson.jar</code>. I only use it within a Tomcat instance, meaning:</p>
+
+<ul>
+<li>I declare in <code>&lt;tomcat&gt;/conf/Catalina/localhost</code> a context for each Hudson I want to manage:  </li>
+</ul>
+
+<pre>
+  hudson-xxx -> /home/me/context/hudson-xxx.xml
+</pre>  
+
+<p>(it is a link because I want to upgrade Tomcat easily, so I externalize the context definition outside of Tomcat). I define my Realm for ACL purposes:</p>
+
+<pre><code>&lt;?xml version='1.0' encoding='utf-8'?&gt;
+&lt;Context docBase="/home/me/hudson/hudson.war" path="/hudson-xxx"&gt;
+  &lt;Realm className="org.apache.catalina.real.CombinedRealm" &gt;
+    &lt;Realm className="org.apache.catalina.real.JNDIRealm" debug="99"
+           connectionURL="ldap://xxxxx:389"
+           alternateURL="ldap://xxxxx:389"
+           connexionName="yyyy"
+           connectionPassword="zzzz"
+           userPattern="CN={0},OU=...,DC=..."
+           userRoleName="memberOf"
+           useSubtree="false"
+           roleBase="OU=...,DC=..."
+           roleName="cn"
+           roleSearch="(member={0})"
+           roleSubtree="false"
+    /&gt;
+  &lt;/Realm&gt;
+  &lt;Environment name="HUDSON_XXX" value="/home/me/hudson/hudson-xxx-home" type="java.lang.String" override="false" /&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<p>(With that context, a <code>hudson.war</code> stored outside of Tomcat is automatically deployed with the <code>&lt;/tomcat&gt;/webapps</code> directory, and access from <code>http://tomcat-server/hudson-xxx</code>, with an LDAP-based authentication)</p>
+
+<ul>
+<li><strong>I suggests modifying the <code>&lt;/tomcat&gt;/conf/web.xml</code></strong> to add security-constraint which would prevent anybody to access the user page while letting only certain tomcat users (as defined in <strong>/conf/tomcat-users.xml</strong>.<br>
+(I haven't tested it yet)</li>
+</ul>

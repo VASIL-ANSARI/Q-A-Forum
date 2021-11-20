@@ -1,0 +1,46 @@
+<p>During the enumeration in the <code>together.ToList()</code> constructor, we try to move to the next element in the <em>deferred</em> query, that is now <em>resolved</em>.</p>
+
+<p><code>MoveNext</code> is going to create some object from the database results.
+The database query is turned into a <code>DataReader</code> and a row is extracted from the <code>DataReader</code>.
+Now <code>get_Boolean</code> is implemented in a way that it does a <code>VerifyType</code> of the object and casts an exception if it is not valid.</p>
+
+<p>What you are missing to show in your question is the <code>SqlText</code> of <code>together</code>'s query (as well as the <code>_sqlText</code> of your <code>ctx.TransferJobs</code>), so I'm forced to make a reasonable assumption. </p>
+
+<p>TRUE is converted to 1 and FALSE is converted to 0. Converting to bit promotes any nonzero value to 1.</p>
+
+<p>The Linq to Sql Data Source will trasform the <code>Select</code> for a <code>true</code> parameter in something like</p>
+
+<pre><code>([table].[column] = 1)
+</code></pre>
+
+<p>and for a <code>false</code> parameter in </p>
+
+<pre><code>NOT ([table].[column] = 1)
+</code></pre>
+
+<p>So - when your first filter is not based on a <code>true</code> boolean condition - the above line of code is where a cast exception might come into play if the Linq Provider is getting an object that is not 0 (or what the <code>false</code> boolean corresponds to), my guess is a null.</p>
+
+<p>-- <em>footnote</em> --</p>
+
+<p>A helper to log the actual sql under a Linq query (besides the <a href="https://msdn.microsoft.com/en-us/library/bb386961.aspx" rel="nofollow">Log</a> Property, of course)</p>
+
+<pre><code>Debug.WriteLine(together.ToString());
+</code></pre>
+
+<p>(or the <code>GetQueryText(query)</code> as described in the <a href="https://msdn.microsoft.com/en-us/library/bb425822.aspx#linqtosql_topic37" rel="nofollow">debugging support</a>)</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>After having seen the SQL, a working fix is simply to map the bit field as int like below, using the <a href="https://msdn.microsoft.com/en-us/library/system.data.linq.mapping.columnattribute.dbtype.aspx" rel="nofollow">DbType</a> Property</p>
+
+<pre><code>    [global::System.Data.Linq.Mapping.ColumnAttribute
+(Storage="_IsFromAutoRebalance", DbType="INT NOT NULL")]
+            public bool IsFromAutoRebalance
+            {
+                get
+                {
+                    return this._IsFromAutoRebalance;
+                }
+</code></pre>
+
+<p>Related (old) VS feedback <a href="https://connect.microsoft.com/VisualStudio/feedback/details/651648/linq-to-sql-union-query-with-bit-column-gives-specified-cast-is-not-valid-error" rel="nofollow">link</a> where the bug was closed as <code>Won't Fix</code> with a suggested workaround</p>

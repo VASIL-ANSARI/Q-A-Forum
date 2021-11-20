@@ -1,0 +1,19 @@
+<p>You're generating a C++ <code>yylex</code> and then declaring it as <code>extern "C"</code> in your parser. A C++ function and a C function do not have the same name (even though they appear to) and consequently the linker can't find <code>yylex</code> (or <code>_yylex</code>, as it is actually called.)</p>
+
+<p>Remove the extern "C" from both declarations and it will probably link.</p>
+
+<p>You should change <code>char* s</code> in your <code>%union</code> to <code>std::string* s</code>; otherwise, you'll run into one of the most common bison/flex problems for beginners: the C-string <code>yytext</code> points to is only valid until <code>yylex</code> is called the next time, so that when bison gets around to using the pointer, it's pointing to a different string.</p>
+
+<p>So you need to make a copy of <code>yytext</code> in the lexer, not in the parser. Consequently, in your lexer, you would do:</p>
+
+<pre><code>yylval.s = new std::string(yytext);
+</code></pre>
+
+<p>and in your grammar, you would do (for example):</p>
+
+<pre><code>term : TERM_ID OP termlist CP   { 
+         $$ = new struct ts();
+         $$-&gt;name = $1;        // &lt;-- Here is the change
+         $$-&gt;plist = $3;
+       }
+</code></pre>

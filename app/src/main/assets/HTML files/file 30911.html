@@ -1,0 +1,41 @@
+<p>Turns out if you actually read the docs you find out that you can't just change serialization configuration by calling getSerializationConfig and calling setters on it.</p>
+
+<pre><code>/**
+ * Method that returns the shared default {@link SerializationConfig}
+ * object that defines configuration settings for serialization.
+ *&lt;p&gt;
+ * Note that since instances are immutable, you can NOT change settings
+ * by accessing an instance and calling methods: this will simply create
+ * new instance of config object.
+ */
+SerializationConfig getSerializationConfig();
+</code></pre>
+
+<p>I repeat, <strong><em>you can NOT change settings by accessing an instance and calling methods:</em></strong></p>
+
+<p>So you must call the <code>.configure</code> method instead of <code>.without</code> and you cannot set the view by calling <code>.withView</code>.  Those methods will construct a new instance of SerializationConfig, but there is no way to get your new SerializationConfig back into the ObjectMapper.</p>
+
+<p>In order to get around that and wire my ObjectMapper up to be used by Spring MVC when it processes a @ResponseBody I implemented the following:</p>
+
+<pre><code>  @Configuration
+  class WebConfig extends WebMvcConfigurerAdapter {
+    @Override
+    public void configureMessageConverters(List&lt;HttpMessageConverter&lt;?&gt;&gt; converters) {
+      MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
+      ObjectMapper mapper = new ObjectMapper() {
+        private static final long serialVersionUID = 1L;
+        @Override
+        protected DefaultSerializerProvider _serializerProvider(SerializationConfig config) {
+          // replace the configuration with my modified configuration.
+          // calling "withView" should keep previous config and just add my changes.
+          return super._serializerProvider(config.withView(Views.Public.class));
+        }        
+      };
+      mapper.configure(MapperFeature.DEFAULT_VIEW_INCLUSION, false);
+      converter.setObjectMapper(mapper);
+      converters.add(converter);
+    }
+  }
+</code></pre>
+
+<p>With all that in place, everything is working for me.</p>

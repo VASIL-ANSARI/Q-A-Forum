@@ -1,0 +1,53 @@
+<p>The issue is most likely a different in database collation settings between your home test server &amp; your new remote server. Meaning that while your database was transferred correctly, the way that data is then spit out of database is a whole other thing.</p>
+
+<p>What is the data collation of the database giving you an issue?  By default, most MySQL installs set <code>latin1_swedish_ci</code> instead of <code>utf8_general_ci</code> for newly created databases.</p>
+
+<p>Change the collation of the database &amp; try again.</p>
+
+<pre><code>ALTER DATABASE [name of your database] CHARACTER SET utf8;
+</code></pre>
+
+<p>If this is a specific table, the collation can be changed as so:</p>
+
+<pre><code>ALTER TABLE [name of your table] CONVERT TO CHARACTER SET utf8;
+</code></pre>
+
+<p>And if it is a specific column in a table:</p>
+
+<pre><code>ALTER TABLE [name of your table] MODIFY [name of your column] [other settings] CHARACTER SET utf8 COLLATE utf8_general_ci;
+</code></pre>
+
+<p>Or perhaps you could export the current database, create a new database with this command &amp; reimport the data:</p>
+
+<pre><code>CREATE DATABASE [name of your database] CHARACTER SET utf8 COLLATE utf8_general_ci;
+</code></pre>
+
+<p>And if you want to make a permanent change to the MySQL install on the machine giving you an issue, go and edit <code>my.cnf</code>.  The following would set the whole chain to UTF-8:</p>
+
+<pre><code>[client]
+default-character-set=utf8
+
+[mysql]
+default-character-set=utf8
+
+[mysqld]
+collation-server = utf8_unicode_ci
+init-connect='SET NAMES utf8'
+character-set-server = utf8
+</code></pre>
+
+<p><strong>EDIT:</strong> The original poster states that the connection &amp; DB are all UTF8 clean.  But what about trying an edit to the Apache default character set. Go here &amp; open the character set file for Apache like so:</p>
+
+<p>sudo nano /etc/apache2/conf.d/charset</p>
+
+<p>And uncomment the line that looks like this:</p>
+
+<pre><code>#AddDefaultCharset UTF-8
+</code></pre>
+
+<p>So it looks like this:</p>
+
+<pre><code>AddDefaultCharset UTF-8
+</code></pre>
+
+<p>And restart Apache. This is not a great idea for a long term setup in my humble opinion, but if t solves the issue it indicates there is something in your codebase that can be changed to affect the same results without having to force Apache to force UTF8.</p>

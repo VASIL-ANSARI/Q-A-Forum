@@ -1,0 +1,143 @@
+<p>Here is my interpretation of your question: You are capturing video on a device with a screen ratio of 4:3, thus your <code>AVCaptureVideoPreviewLayer</code> is 4:3, but the video input device captures video in 16:9 so the resulting video is 'larger' than seen in the preview.</p>
+
+<p>If you are simply looking to crop the extra pixels not caught by the preview then check out this <a href="http://www.netwalk.be/article/record-square-video-ios">http://www.netwalk.be/article/record-square-video-ios</a>. This article shows how to crop the video into a square. However you'll only need a few modifications to crop to 4:3. I've gone and tested this, here are the changes I made:</p>
+
+<p>Once you have the <code>AVAssetTrack</code> for the video you will need to calculate a new height.</p>
+
+<pre><code>// we convert the captured height i.e. 1080 to a 4:3 screen ratio and get the new height
+CGFloat newHeight = clipVideoTrack.naturalSize.height/3*4;
+</code></pre>
+
+<p>Then modify these two lines, using newHeight.</p>
+
+<pre><code>videoComposition.renderSize = CGSizeMake(clipVideoTrack.naturalSize.height, newHeight);
+
+CGAffineTransform t1 = CGAffineTransformMakeTranslation(clipVideoTrack.naturalSize.height, -(clipVideoTrack.naturalSize.width - newHeight)/2 );
+</code></pre>
+
+<p>So what we've done here is set the renderSize to a 4:3 ratio - the exact dimension are based on the input device. We then use a <code>CGAffineTransform</code> to translate the video position so that what we saw in the <code>AVCaptureVideoPreviewLayer</code> is what is rendered to our file.</p>
+
+<p><strong>Edit:</strong> If you want to put it all together and crop a video based on the device's screen ratio (3:2, 4:3, 16:9) and take the video orientation into mind we need to add a few things. </p>
+
+<p>First here is the modified sample code with a few critical alterations:</p>
+
+<pre><code>// output file
+NSString* docFolder = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
+NSString* outputPath = [docFolder stringByAppendingPathComponent:@"output2.mov"];
+if ([[NSFileManager defaultManager] fileExistsAtPath:outputPath])
+    [[NSFileManager defaultManager] removeItemAtPath:outputPath error:nil];
+
+// input file
+AVAsset* asset = [AVAsset assetWithURL:outputFileURL];
+
+AVMutableComposition *composition = [AVMutableComposition composition];
+[composition  addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+
+// input clip
+AVAssetTrack *videoTrack = [[asset tracksWithMediaType:AVMediaTypeVideo] objectAtIndex:0];
+
+// crop clip to screen ratio
+UIInterfaceOrientation orientation = [self orientationForTrack:asset];
+BOOL isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown) ? YES: NO;
+CGFloat complimentSize = [self getComplimentSize:videoTrack.naturalSize.height];
+CGSize videoSize;
+
+if(isPortrait) {
+    videoSize = CGSizeMake(videoTrack.naturalSize.height, complimentSize);
+} else {
+    videoSize = CGSizeMake(complimentSize, videoTrack.naturalSize.height);
+}
+
+AVMutableVideoComposition* videoComposition = [AVMutableVideoComposition videoComposition];
+videoComposition.renderSize = videoSize;
+videoComposition.frameDuration = CMTimeMake(1, 30);
+
+AVMutableVideoCompositionInstruction *instruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
+instruction.timeRange = CMTimeRangeMake(kCMTimeZero, CMTimeMakeWithSeconds(60, 30) );
+
+// rotate and position video
+AVMutableVideoCompositionLayerInstruction* transformer = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
+
+CGFloat tx = (videoTrack.naturalSize.width-complimentSize)/2;
+if (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationLandscapeRight) {
+    // invert translation
+    tx *= -1;
+}
+
+// t1: rotate and position video since it may have been cropped to screen ratio
+CGAffineTransform t1 = CGAffineTransformTranslate(videoTrack.preferredTransform, tx, 0);
+// t2/t3: mirror video horizontally
+CGAffineTransform t2 = CGAffineTransformTranslate(t1, isPortrait?0:videoTrack.naturalSize.width, isPortrait?videoTrack.naturalSize.height:0);
+CGAffineTransform t3 = CGAffineTransformScale(t2, isPortrait?1:-1, isPortrait?-1:1);
+
+[transformer setTransform:t3 atTime:kCMTimeZero];
+instruction.layerInstructions = [NSArray arrayWithObject: transformer];
+videoComposition.instructions = [NSArray arrayWithObject: instruction];
+
+// export
+exporter = [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetHighestQuality] ;
+exporter.videoComposition = videoComposition;
+exporter.outputURL=[NSURL fileURLWithPath:outputPath];
+exporter.outputFileType=AVFileTypeQuickTimeMovie;
+
+[exporter exportAsynchronouslyWithCompletionHandler:^(void){
+    NSLog(@"Exporting done!");
+
+    // added export to library for testing
+    ALAssetsLibrary *library = [[ALAssetsLibrary alloc] init];
+    if ([library videoAtPathIsCompatibleWithSavedPhotosAlbum:[NSURL fileURLWithPath:outputPath]]) {
+        [library writeVideoAtPathToSavedPhotosAlbum:[NSURL fileURLWithPath:outputPath]
+                                    completionBlock:^(NSURL *assetURL, NSError *error) {
+             NSLog(@"Saved to album");
+             if (error) {
+
+             }
+         }];
+    }
+}];
+</code></pre>
+
+<p>What we added here is a call to get the new render size of the video based on cropping its dimensions to the screen ratio. Once we crop the size down, we need to translate the position to recenter the video. So we grab its orientation to move it in the proper direction. This will fix the off-center issue we saw with <code>UIInterfaceOrientationLandscapeLeft</code>. Finally <code>CGAffineTransform t2, t3</code> mirror the video horizontally.</p>
+
+<p>And here are the two new methods that make this happen:</p>
+
+<pre><code>- (CGFloat)getComplimentSize:(CGFloat)size {
+    CGRect screenRect = [[UIScreen mainScreen] bounds];
+    CGFloat ratio = screenRect.size.height / screenRect.size.width;
+
+    // we have to adjust the ratio for 16:9 screens
+    if (ratio == 1.775) ratio = 1.77777777777778;
+
+    return size * ratio;
+}
+
+- (UIInterfaceOrientation)orientationForTrack:(AVAsset *)asset {
+    UIInterfaceOrientation orientation = UIInterfaceOrientationPortrait;
+    NSArray *tracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+
+    if([tracks count] &gt; 0) {
+        AVAssetTrack *videoTrack = [tracks objectAtIndex:0];
+        CGAffineTransform t = videoTrack.preferredTransform;
+
+        // Portrait
+        if(t.a == 0 &amp;&amp; t.b == 1.0 &amp;&amp; t.c == -1.0 &amp;&amp; t.d == 0) {
+            orientation = UIInterfaceOrientationPortrait;
+        }
+        // PortraitUpsideDown
+        if(t.a == 0 &amp;&amp; t.b == -1.0 &amp;&amp; t.c == 1.0 &amp;&amp; t.d == 0) {
+            orientation = UIInterfaceOrientationPortraitUpsideDown;
+        }
+        // LandscapeRight
+        if(t.a == 1.0 &amp;&amp; t.b == 0 &amp;&amp; t.c == 0 &amp;&amp; t.d == 1.0) {
+            orientation = UIInterfaceOrientationLandscapeRight;
+        }
+        // LandscapeLeft
+        if(t.a == -1.0 &amp;&amp; t.b == 0 &amp;&amp; t.c == 0 &amp;&amp; t.d == -1.0) {
+            orientation = UIInterfaceOrientationLandscapeLeft;
+        }
+    }
+    return orientation;
+}
+</code></pre>
+
+<p>These are pretty straight forward. The only thing to note is that in the <code>getComplimentSize:</code> method we have to manually adjust the ratio for 16:9 since the iPhone5+ resolution is mathematically shy of true 16:9.</p>

@@ -1,0 +1,20 @@
+<p>If you aren't getting any errors, and you are 100% sure that you are indeed writing to the correct database, then it may be that you have an ambient transaction, such as <code>TransactionScope</code> (which is rolling back your transaction)</p>
+
+<p>A way to check this is to place a breakpoint on <code>konekt.Close();</code> and then switch to SQL Query Analyzer and do </p>
+
+<pre><code>select * from error_log (NOLOCK) 
+</code></pre>
+
+<p>to see if the log is there. If it is, and then getting rolled back when you continue your code, you can suppress the ambient transaction as follows:</p>
+
+<pre><code>        using (new TransactionScope(TransactionScopeOption.Suppress))
+        using (var konekt = new SqlConnection(connectionstring))
+        using (var prikaz = new SqlCommand("insert into ERROR_LOG (ULOHA, OPERACE, POPIS, MESSAGE, DATUM) values ('3', '3', 'Chyba v ExportNOHEL', @error, @datum)", konekt))
+        {
+           konekt.Open();
+           prikaz.Parameters.AddWithValue("@error", "ASASAS");
+           prikaz.Parameters.AddWithValue("@datum", DateTime.Now);
+           prikaz.ExecuteNonQuery();
+           konekt.Close();
+        }
+</code></pre>

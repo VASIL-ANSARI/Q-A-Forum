@@ -1,0 +1,63 @@
+<p>As far as I know, Java has no analogous structure to the <code>WaitHandle.WaitAny</code> method.</p>
+
+<p>It seems to me that this could be achieved through a "WaitableFuture" decorator:</p>
+
+<pre><code>public WaitableFuture&lt;T&gt;
+    extends Future&lt;T&gt;
+{
+    private CountDownLatch countDownLatch;
+
+    WaitableFuture(CountDownLatch countDownLatch)
+    {
+        super();
+
+        this.countDownLatch = countDownLatch;
+    }
+
+    void doTask()
+    {
+        super.doTask();
+
+        this.countDownLatch.countDown();
+    }
+}
+</code></pre>
+
+<p>Though this would only work if it can be inserted before the execution code, since otherwise the execution code would not have the new <code>doTask()</code> method. But I really see no way of doing this without polling if you cannot somehow gain control of the Future object before execution.</p>
+
+<p>Or if the future always runs in its own thread, and you can somehow get that thread. Then you could spawn a new thread to join each other thread, then handle the waiting mechanism after the join returns... This would be really ugly and would induce a lot of overhead though. And if some Future objects don't finish, you could have a lot of blocked threads depending on dead threads. If you're not careful, this could leak memory and system resources.</p>
+
+<pre><code>/**
+ * Extremely ugly way of implementing WaitHandle.WaitAny for Thread.Join().
+ */
+public static joinAny(Collection&lt;Thread&gt; threads, int numberToWaitFor)
+{
+    CountDownLatch countDownLatch = new CountDownLatch(numberToWaitFor);
+
+    foreach(Thread thread in threads)
+    {
+        (new Thread(new JoinThreadHelper(thread, countDownLatch))).start();
+    }
+
+    countDownLatch.await();
+}
+
+class JoinThreadHelper
+    implements Runnable
+{
+    Thread thread;
+    CountDownLatch countDownLatch;
+
+    JoinThreadHelper(Thread thread, CountDownLatch countDownLatch)
+    {
+        this.thread = thread;
+        this.countDownLatch = countDownLatch;
+    }
+
+    void run()
+    {
+        this.thread.join();
+        this.countDownLatch.countDown();
+    }
+}
+</code></pre>

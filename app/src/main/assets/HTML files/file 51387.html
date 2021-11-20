@@ -1,0 +1,58 @@
+<p>When working Native bridges, callbacks should be invoked with <code>WritableNative</code> components from the <code>com.facebook.react.bridge</code> package.</p>
+
+<p>Instead of a <code>JSONObject</code>, use a <code>WritableNativeMap</code>.<br>
+Instead of a <code>JSONArray</code>, use a <code>WritableNativeArray</code>.</p>
+
+<p>For instance, with a <code>WritableNativeMap</code>:</p>
+
+<pre><code>@ReactMethod
+public void reactMethod(Callback onSuccess) {
+  WritableMap resultData = new WritableNativeMap();
+  resultData.putString("key1", "data");
+  resultData.putString("key2", "data2");
+
+  onSuccessCallback(resultData);
+}
+</code></pre>
+
+<p>In your case, you should have something like:</p>
+
+<pre><code>public static WritableArray applist;
+
+// ...
+
+@ReactMethod
+public void show(Callback errorCallback, Callback successCallback) {
+    try {
+        //get a list of installed apps.
+        PackageManager pm = getReactApplicationContext().getPackageManager();
+        List&lt;ApplicationInfo&gt; packages = pm.getInstalledApplications(0);
+
+        WritableArray app_list = new WritableNativeArray();
+
+        // ...
+
+        for (ApplicationInfo packageInfo : packages) {
+            try {
+
+                if (getReactApplicationContext().getPackageManager().getLaunchIntentForPackage(packageInfo.packageName) != null) {
+                    WritableMap info = new WritableNativeMap();
+                    info.putString("name", packageInfo.loadLabel(pm).toString());
+                    info.putString("packagename", packageInfo.packageName);
+
+                    // ...
+
+                    app_list.pushMap(info);
+                }
+            } catch (Exception ex) {
+                System.err.println("Exception: " + ex.getMessage());
+            }
+        }
+        applist = app_list;
+        successCallback.invoke(applist);
+
+    } catch (Exception e) {
+        errorCallback.invoke(e.getMessage());
+    }
+}
+</code></pre>

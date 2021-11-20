@@ -1,0 +1,170 @@
+<p>This would probably be a little bit easier if there were a way to keep track of the current state of the slideshow outside the context of clicking on a slide's navigation link. The first thing I would add, right above <code>$('.feature .ei-slider-nav li a').click( function(e) {...</code> would be:</p>
+
+<pre><code>var eiSlider = {
+  currentSlideIndex: 0,
+  nextSlide: null, // we will define this later
+  autoPlay: null // we will define this later too
+};
+</code></pre>
+
+<p>Then, inside of the function I mentioned above, as the first order of business inside of the check for whether the slide is already active, I'd add this:</p>
+
+<pre><code>// Set the currentSlide index on the global eiSlider tracking object
+eiSlider.currentSlide = navIndex;
+</code></pre>
+
+<p>Next, you'll want to make a function to handle advancing the slideshow automatically:</p>
+
+<pre><code>eiSlider.nextSlide = function() {
+
+  var currentSlideIndex = eiSlider.currentSlideIndex,
+      nextSlideIndex = currentSlideIndex + 1,
+      totalSlides = $('.ei-slider-large img').length;
+
+  // If we are already at the end of the images, loop back to the beginning
+  if ( nextSlideIndex &lt; totalSlides ) {
+
+    nextSlideIndex = 0;
+  }
+
+  // Trigger a click to move forward to the next slide
+  $('.feature .ei-slider-nav li:eq(' + nextSlideIndex + ') a').trigger('click');
+};
+</code></pre>
+
+<p>I've also moved the work of setting the "active" class on a given slide's nav link to happen inside of the logic around making sure the slide you clicked on wasn't already active, to make sure it doesn't get set incorrectly.</p>
+
+<p>Finally, you can use setInterval (at the bottom of all of the above code) to handle the autoplay portion.</p>
+
+<pre><code>// Auto-advance the slides every 5 seconds. Adjust the value as necessary
+eiSlider.autoPlay = window.setInterval(function(){
+  eiSlider.nextSlide();
+}, 5000);
+</code></pre>
+
+<p>Your final, updated code would look something like this:</p>
+
+<pre><code>$(document).ready(function() {
+  // A little script for preloading all of the images
+  // It"s not necessary, but generally a good idea
+  $(images).each(function(index, value){
+    // Ski first image since it is already loaded
+    if( index !== 0 ) {
+
+      $("&lt;img/&gt;")[0].src = this; 
+    }
+  });
+
+  // Object for basic state tracking and namespacing of slideshow functions
+  var eiSlider = {
+    currentSlideIndex: 0,
+    nextSlide: null, // we will define this later
+    autoPlay: null // we will define this later too
+  };
+
+  // Feature Slider Navagitaion
+  $('.feature .ei-slider-nav li a').click( function(e) {
+
+    e.preventDefault();
+
+    var thisLink = $(this),
+        navIndex = thisLink.parent('li').index();
+
+      // Is this item already active?
+      if( !$('.feature .ei-slider-title .ei-slider-title-item:eq('+navIndex+')').hasClass('active')) {
+
+        thisLink.closest('li').siblings().removeClass('active');
+        thisLink.closest('li').addClass('active');
+
+        // Set the currentSlide index on the global eiSlider tracking object
+        eiSlider.currentSlideIndex = navIndex;
+
+        // Fade in/out feature image
+        $('.feature .ei-slider-large img').animate({opacity: 0}, 500, function() {
+
+          // Support for non-opacity browsers
+          $(this).css('visibility', 'hidden');
+
+          // Load new feature image
+          $(this).attr('src', images[navIndex]);
+          $(this).attr('alt', imagesAlt[navIndex]);
+          $(this).css('visibility', 'visible');
+          $('.feature .ei-slider-large img').animate({opacity: 1}, 500);
+        });
+
+        // Fade in/out feature text
+        $('.feature .ei-slider-title .ei-slider-title-item.active').fadeOut(500, function() {
+
+          $(this).parent().children().removeClass('active');
+          $('.feature .ei-slider-title .ei-slider-title-item:eq('+navIndex+')').addClass('active').fadeIn();
+        });
+
+        // Fade in/out feature credit
+        $('.content .ei-slider-credit span.active').fadeOut(500, function() {
+
+          $(this).parent().children().removeClass('active');
+          $('.content .ei-slider-credit span:eq('+navIndex+')').addClass('active').fadeIn();
+        });
+      }
+  });
+
+  // Feature Slider Learn More
+  $('.feature .ei-slider-title-item-learn').click( function(e) {
+
+    e.preventDefault();
+    thisPrev = $(this).prev();
+
+    if ( thisPrev.css('display') === 'none') {
+
+      thisPrev.slideDown();
+      thisPrev.css('visibility', 'visible');
+      thisPrev.animate({'opacity': 1}, 500, function() {});
+
+      $(this).html('Hide');
+
+    } else {
+
+      thisPrev.animate({'opacity': 0}, 500, function() {
+        thisPrev.slideUp();
+        thisPrev.css('visibility', 'hidden');
+      });
+
+      $(this).html('Hide');
+      $(this).html('Learn More');
+    }
+  });
+
+  // Function to handle slide advancement
+  eiSlider.nextSlide = function() {
+
+    var currentSlideIndex = eiSlider.currentSlideIndex,
+        nextSlideIndex = currentSlideIndex + 1,
+        totalSlides = $('.ei-slider-large img').length;
+
+    // If we are already at the end of the images, loop back to the beginning
+    if ( currentSlideIndex &lt; (totalSlides - 1) ) {
+
+      nextSlideIndex = 0;
+    }
+
+    // Trigger a click to move forward to the next slide
+    $('.feature .ei-slider-nav li:eq(' + nextSlideIndex + ') a').trigger('click');
+  };
+
+  // Auto-advance the slides every 5 seconds. Adjust the value as necessary
+  eiSlider.autoPlay = window.setInterval(function(){
+    eiSlider.nextSlide();
+  }, 5000);
+
+});
+</code></pre>
+
+<p>Bear in mind this answer makes a few assumptions, the main one being that the <code>eiSldier</code> namespace is available; if it's not, just use a different namespace than the one I provided, OR add these three new items to the existing namespace so it doesn't get overwritten. The only change in that case would not be defining <code>eiSlider</code> as an object with three properties, but instead defining simply <code>eiSlider.currentSlide = 0</code>, and then proceeding to define the other two functions the way they already are defined later on in the example.</p>
+
+<p>If the <code>eiSlider</code> namespace already exists, it's entirely possible that <code>currentSlide</code> or some equivalent property exists on it already, so you could take advantage of that if it does, rather than making a duplicate (or worse, overriding it in a way that could cause errors in the rest of its functionality).</p>
+
+<p>One thing I should note that the code above doesn't currently do is stop/clear the autoplay out when you manually click on a slide's navigation link. That's a pretty important usability issue that will need to get cleaned up. You can accomplish this by using <code>clearInterval(eiSlider.autoPlay)</code>, but to make that really work correctly, you'd need to separate out the code that handles slide advancement from the actual click event.</p>
+
+<p>Check out this slightly modified JS Bin that shows the auto-advance working as intended, plus the changes I mentioned above with clearInterval:</p>
+
+<p><a href="http://jsbin.com/gumaqefere/1/edit?html,js,console,output" rel="nofollow">http://jsbin.com/gumaqefere/1/edit?html,js,console,output</a></p>

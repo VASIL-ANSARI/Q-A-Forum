@@ -1,0 +1,22 @@
+<p>Oops, I didn't read the question carefully.  You're talking about using these after a <code>cmpeqps</code>.  They're always slower than <code>movmskps / test</code> if you already have a mask.  <code>cmpps</code> / <code>ptest / jcc</code> is 4 uops.  <code>cmpps</code> / <code>movmskps eax, xmm0</code> / <code>test eax,eax</code> / <code>jnz</code> is 3 uops.  (test/jnz fuse into a single uop).  Also, none of the instructions are multi-uop, so no decode bottlenecks.</p>
+
+<p>Only use <code>ptest</code> / <code>vtestps/pd</code> when you can take full advantage of the AND or ANDN operation to avoid an earlier step.  I've posted answers before where I compared <code>ptest</code> vs. an alternative.  I think I did find one case once where <code>ptest</code> was a win, but it's hard to use.  Yup, <a href="http://stackoverflow.com/questions/34951714/simd-instructions-for-floating-point-equality-comparison-with-nan-nan/34955804#34955804">found it: someone wanted an FP compare that was true for NaN == NaN</a>.  It's one of the only times I've ever found a use for the carry flag result of <code>ptest</code>.</p>
+
+<p>If the high element of a compare result is "garbage", then you can still ignore it cheaply with <code>movmskps</code>:</p>
+
+<pre><code>_mm_movemask_ps(vec) &amp; 0b0111 == 0  // tests for none of the first three being true
+</code></pre>
+
+<p>This is totally free.  The x86 <code>test</code> instruction works a lot like <code>ptest</code>: You can use it with an immediate mask instead of to test a register against itself.  (It actually has a tiny cost: one extra byte of machine code, because <code>test eax, 3</code> is one byte longer than <code>test eax, eax</code>, but they run identically.).</p>
+
+<p>See the <a href="/questions/tagged/x86" class="post-tag" title="show questions tagged &#39;x86&#39;" rel="tag">x86</a> wiki for links to guides (Agner Fog's guide is good for perf analysis at the instruction level).  There's an AVX version of <em>every</em> legacy SSE instruction, but some are only 128 bits wide.  They all get an extra operand (so the dest doesn't have to be one of the src regs), which saves on <code>mov</code> instructions to copy registers.</p>
+
+<hr>
+
+<p>Answer to a question you didn't ask:</p>
+
+<p>Neither <code>_mm_testc_ps</code> nor <code>_mm_testc_si128</code> can be used to compare floats for equality.  <code>vtestps</code> is like <code>ptest</code>, but only operates on the sign bits of each float element.</p>
+
+<p>They all compute <code>(~x) &amp; y</code> (on sign bits or on the full register), which doesn't tell you whether they're equal, or even whether the sign bits are equal.</p>
+
+<p>Note that even checking for bitwise equality of floats (with <code>pcmpeqd</code>) isn't the same as <code>cmpeqps</code> (which implements C's <code>==</code> operator), because <code>-0.0</code> isn't bitwise equal to <code>0.0</code>.  And two bitwise-identical NaNs aren't equal to each other.  The comparison is unordered (which means not equal) if either or both operand is <code>NaN</code>.</p>

@@ -1,0 +1,24 @@
+<p>This is probably also not working if you scroll way down and back up your collection view.  The issue is that <code>cell</code> only points to the correct cell until it's scrolled off screen (it might be reused for different content, or might be <code>nil</code> later).</p>
+
+<p>The operation should tell the controller the progress, instead of the cell.</p>
+
+<p>One possible implementation could look like this:</p>
+
+<pre><code>__weak typeof(operation1)weakOperation = operation1;
+[operation1 setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead) {
+    __strong __typeof(weakOperation)strongOperation = weakOperation;
+    NSLog(@"Progress = %f", (float)totalBytesRead / totalBytesExpectedToRead );
+    float progressValue = (float)totalBytesRead / totalBytesExpectedToRead;
+    [self updateProgress:progressValue forOperation:strongOperation];
+}];
+
+[operation1 start];
+</code></pre>
+
+<p>And the method in your controller could look like this:</p>
+
+<pre><code>- (void) updateProgress:(float)progress forOperation:(AFHTTPRequestOperation *)operation {
+    YourCustomCollectionViewCell *cell = // find the correct cell using 'operation', and your data model
+    [cell.downloadProgress setProgress:progress];
+}
+</code></pre>

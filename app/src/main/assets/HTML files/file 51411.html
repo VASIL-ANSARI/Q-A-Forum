@@ -1,0 +1,28 @@
+<p>One option is to use an <code>NSFetchedResultsController</code> (see the <a href="https://developer.apple.com/library/ios/documentation/CoreData/Reference/NSFetchedResultsController_Class/" rel="nofollow">Apple Docs</a>).  This is normally used to populate a table view, but can also be used to group the results of a CoreData fetch - the <code>sectionNameKeyPath</code> determines the grouping.  The fetch must be sorted in a way that ensures that all items in a group are sorted together.  In your example, you are grouping by <code>shopItem.keyword</code>, so you need to specify <code>shopItem.keyword</code> as the first sort descriptor.  The second sort descriptor should be <code>mainBestPrice</code> (ascending), so that the first item in each group is the item with the lowest <code>mainBestPrice</code> for that group.  Hence the configuration for the FRC would look something like this:</p>
+
+<pre><code>let fetchRequest = NSFetchRequest(entityName: "Product")
+fetchRequest.predicate = NSPredicate(format: "shopItem.wishList == %@", currentWishList)
+let keyWordSort = NSSortDescriptor(key: "shopItem.keyword", ascending: true)
+let priceSort = NSSortDescriptor(key: "mainBestPrice", ascending: true)
+fetchRequest.sortDescriptors = [keyWordSort, priceSort];
+let myFetchedResultsController = NSFetchedResultsController(fetchRequest: fetchRequest, managedObjectContext: self.managedObjectContext!, sectionNameKeyPath:"shopItem.keyword", cacheName:nil)
+do {
+    try myFetchedResultsController.performFetch()
+} catch let error as NSError {
+    // Replace this implementation with code to handle the error appropriately.
+    print("Unresolved error \(error), \(error!.userInfo)")
+    abort()
+}
+</code></pre>
+
+<p>Now, the products with the minimum best price will be the first item in each section, eg. for the first section (i.e. the first <code>shopItem.keyword</code>):</p>
+
+<pre><code>let firstProduct = myFetchedResultsController.sections![0].objects![0] as! Product
+</code></pre>
+
+<p>or to get an array of them (for all <code>shopItem.keyword</code>s), </p>
+
+<pre><code>let products = myFetchedResultsController.sections!.map() { $0.objects![0] as! Product}
+</code></pre>
+
+<p>The NSFetchedResultsController will do its best to optimise for memory and speed, though you should take care if you have large volumes.</p>

@@ -1,0 +1,69 @@
+<p>It is a cute algorithm, but I don't think it's a "known" one. It's a clever way of comparing lists, and probably not the first time that someone thought of it, but I had never seen it before.</p>
+
+<p>Basically, the output is telling you the ranges that look different in <code>src</code> and <code>dst</code>. </p>
+
+<p>The function always returns a list with 2 lists. The first list refers to the elements in <code>src</code> and <code>dst</code> that are on the left side of the longest common subsequence between <code>src</code> and <code>dst</code>; the second refers to the elements that are on the right side of the longest common subsequence. Each of these lists holds a pair of tuples. Tuples represent a range in the list - <code>(x, y)</code> denotes the elements you would get if you performed <code>lst[x:y]</code>. From this pair of tuples, the first tuple is the range from <code>src</code>, the second tuple is the range from <code>dst</code>.</p>
+
+<p>At each step, the algorithm computes the ranges of <code>src</code> and <code>dst</code> that are to the left of the longest common subsequence and to the right of the longest common subsequence between <code>src</code> and <code>dst</code>.</p>
+
+<p>Let's look at your first example to clear things up:</p>
+
+<pre><code>src [0, 1, 2, 3]
+dst [1, 2, 4, 5]
+</code></pre>
+
+<p>The longest common subsequence between <code>src</code> and <code>dst</code> is <code>[1, 2]</code>. In <code>src</code>, the range <code>(0, 1)</code> defines the elements that are immediately to the left of <code>[1, 2]</code>; in <code>dst</code>, that range is empty, because there is nothing before <code>[1, 2]</code>. So, the first list will be <code>[(0, 1), None]</code>.</p>
+
+<p>To the right of <code>[1, 2]</code>, in <code>src</code>, we have the elements in the range <code>(3, 4)</code>, and in <code>dst</code> we have 4 and 5, which are represented by the range <code>(2, 4)</code>. So the second list will be <code>[(3, 4), (2, 4)]</code>.</p>
+
+<p>And there you go:</p>
+
+<pre><code>[[(0, 1), None], [(3, 4), (2, 4)]]
+</code></pre>
+
+<p><strong>How does this relate to the tree in the comments?</strong></p>
+
+<p>The leafs in the tree are using a different notation: instead of a tuple describing a range, the actual elements on that range are shown. In fact, <code>[0]</code> is the only element in the range <code>(0, 1)</code> in <code>src</code>. The same applies for the rest.</p>
+
+<p>Once you get this, the other examples you posted should be pretty easy to follow. But note that the output can become more complex if there is more than one common subsequence: the algorithm finds every common subsequences in nonincreasing order; since each invocation returns a list with 2 elements, this means that you will get nested lists in cases like these. Consider:</p>
+
+<pre><code>src = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+dst = [46, 1, 2, 3, 4, 5, 99, 98, 97, 5, 6, 7, 30, 31, 32, 11, 12, 956]
+</code></pre>
+
+<p>This outputs:</p>
+
+<pre><code>[[(0, 1), (0, 1)], [[[None, (6, 10)], [(8, 11), (12, 15)]], [(13, 14), (17, 18)]]]
+</code></pre>
+
+<p>The second list is nested because there was more than one recursion level (your previous examples immediately fell on a base case).</p>
+
+<p>The explanation shown before applies recursively to each list: the second list in <code>[[(0, 1), (0, 1)], [[[None, (6, 10)], [(8, 11), (12, 15)]], [(13, 14), (17, 18)]]]</code> shows the differences in the lists to the right of the longest common subsequence. </p>
+
+<p>The longest common subsequence is <code>[1, 2, 3, 4, 5]</code>. To the left of <code>[1, 2, 3, 4, 5]</code>, both lists are different in the first element (the ranges are equal and easy to check). </p>
+
+<p>Now, the procedure applies recursively. For the right side, there is a new recursive call, and <code>src</code> and <code>dst</code> become:</p>
+
+<pre><code>src = [6, 7, 8, 9, 10, 11, 12, 13]
+dst = [99, 98, 97, 5, 6, 7, 30, 31, 32, 11, 12, 956]
+
+    # LCS = [6, 7]; Call on the left
+        src = []
+        dst = [99, 98, 97, 5]
+    # LCS = [6, 7]; Call on the right
+        src = [8, 9, 10, 11, 12, 13]
+        dst = [30, 31, 32, 11, 12, 956]
+        # LCS = [11, 12]; Call on the left
+            src = [8, 9, 10]
+            dst = [30, 31, 32]
+        # LCS = [11, 12]; Call on the right
+            src = [13]
+            dst = [956]
+</code></pre>
+
+<p>The longest common subsequence is <code>[6, 7]</code>. Then you will have another recursive call 
+on the left, for <code>src = []</code> and <code>dst = [99, 98, 97, 5]</code>, now there is no longest common subsequence and the recursion on this side stops (just follow the picture).</p>
+
+<p>Each nested list recursively represents the differences on the sub-list with which the procedure was invoked, but note that the indices always refer to positions in the original list (due to the way arguments for <code>bx</code> and <code>by</code> are passed - note that they always accumulate since the beginning).</p>
+
+<p>The key point here is that you will get nested lists linearly proportional to the depth of the recursion, and in fact, you can actually tell how many common subsequences exist in the original lists just by looking at the nesting level.</p>

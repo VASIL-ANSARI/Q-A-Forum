@@ -1,0 +1,30 @@
+<p>As noted by @ildjarn, this applies to all patterns. They can appear in cases of the <code>match</code> clause (and in <code>function</code> which is similar), but also in the parameter declaration of <code>let</code> bound function and even in the <code>let</code> value binding.</p>
+
+<p>The key difference is that with <code>let</code>, you only want to use <em>complete</em> patterns that will always succeed. This is not needed for <code>match</code> or <code>function</code>, because there are multiple clauses, so if the first one fails, the matching can continue and try the next one.</p>
+
+<p>For example, the following <em>complete</em> pattern takes <code>int</code> and returns it as a <code>string</code>:</p>
+
+<pre><code>let (|AsString|) (n:int) = n.ToString()
+</code></pre>
+
+<p>Here are some ways how you can use it:</p>
+
+<pre><code>let (AsString s) = 42         // Defines a value 's' of type string
+match 3 with AsString s -&gt; s  // Returns a value "3" of type string
+let convert (AsString s) = s  // Defines a function 'int -&gt; string'
+let convert = function AsString s -&gt; s  // Same as the previous line
+</code></pre>
+
+<p><strong>EDIT</strong>: To answer your second question, if you use <code>let</code> with an <em>incomplete</em> pattern (i.e. that accepts only a single case of a discriminated union) then you get a compiler warning and the code may fail at runtime (if you call it with the other discriminated union case):</p>
+
+<pre><code>let f (A(a, b)) = a + b      // This gives compile-time warning
+f (B 42)                     // This will fail at runtime 
+</code></pre>
+
+<p>If you need to define a function that works only one of the cases, then you need to define a separate type.</p>
+
+<pre><code>type AInfo = int * int 
+type Union = A of AInfo | B of int  
+</code></pre>
+
+<p>Then you can write a function that will only take <code>AInfo</code> (but you can still work with <code>Union</code> in places where both options represent a valid input).</p>

@@ -1,0 +1,18 @@
+<p>You have a race condition; bad things happen if another thread changes the counter between <code>increment_thread_counter()</code>'s test for <code>clearing_flag</code> and the <code>fetch_add</code>.</p>
+
+<p>I think this classic CAS loop should work better:</p>
+
+<pre><code>void increment_thread_counter()
+{
+    std::size_t expected = 0;
+    std::size_t updated;
+    do {
+        if (expected == clearing_flag) {     // don't want to succeed while clearing, 
+             expected = 0;      //take a chance that clearing completes before CMPEXC
+        }
+
+        updated = expected + 1;
+        // if (updated == clearing_flag) TOO MANY READERS!
+    } while (!std::atomic_compare_exchange_weak(&amp;thread_counter, &amp;expected, updated));
+}
+</code></pre>

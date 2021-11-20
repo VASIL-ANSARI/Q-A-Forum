@@ -1,0 +1,38 @@
+<p>You need many-to-one mapping instead one-to-one.
+Try this configuration:</p>
+
+<pre><code>&lt;hibernate-mapping xmlns="urn:nhibernate-mapping-2.2"&gt;
+  &lt;class xmlns="urn:nhibernate-mapping-2.2" name="NewA.Domain.Entities.Units.Units, NewA.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" table="`Units`"&gt;
+    &lt;id name="Unit_Id" type="System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089"&gt;
+      &lt;column name="Unit_Id" /&gt;
+      &lt;generator class="native" /&gt;
+    &lt;/id&gt;
+    &lt;property name="Unit" type="System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089"&gt;
+      &lt;column name="Unit" /&gt;
+    &lt;/property&gt;
+    &lt;property name="Unit_Value" type="System.Decimal, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089"&gt;
+      &lt;column name="Unit_Value" /&gt;
+    &lt;/property&gt;
+    &lt;many-to-one class="NewA.Domain.Entities.Units.Units, NewA.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" name="Main_Unit"&gt;
+      &lt;column name="Main_Unit_id" /&gt;
+    &lt;/many-to-one&gt;
+  &lt;/class&gt;
+&lt;/hibernate-mapping&gt;
+</code></pre>
+
+<p>I suggest you to try <strong>Fluent NHibernate</strong> - it can dynamically generate mappings for you.
+Here's the configuration I used:</p>
+
+<pre><code>var fluent = Fluently.Configure()
+    .Mappings(c =&gt; c.AutoMappings.Add(AutoMap.AssemblyOf&lt;Units&gt;()
+        .Override&lt;Units&gt;(u =&gt; u.Id(uu =&gt; uu.Unit_Id).GeneratedBy.Native())))
+    .Database(() =&gt; SQLiteConfiguration.Standard.UsingFile("test.sqlite3"));
+
+var configuration = fluent.BuildConfiguration();
+
+// Generate database schema
+new SchemaExport(configuration).Create(false, true);
+
+var sessionFactory = configuration.BuildSessionFactory();
+// Now just open session and do whatever you need
+</code></pre>

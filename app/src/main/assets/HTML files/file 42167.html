@@ -1,0 +1,89 @@
+<p>I have not yet found any conclusive documentation to answer my question, so I went about trying to prove it instead. Although not proof in the scientific sense, my findings suggest a consistent snapshot <em>is</em> created for all tables in a UNION query.</p>
+
+<p>Here's what I did.</p>
+
+<p>Create the tables</p>
+
+<pre><code>DROP TABLE IF EXISTS `current`;
+
+CREATE TABLE IF NOT EXISTS `current` (
+  `id` BIGINT NOT NULL COMMENT 'Unique numerical ID.',
+  `dept` BIGINT NOT NULL COMMENT 'Department',
+  `value` BIGINT NOT NULL COMMENT 'Value',
+  PRIMARY KEY (`id`));
+
+
+DROP TABLE IF EXISTS `history`;
+
+CREATE TABLE IF NOT EXISTS `history` (
+  `id` BIGINT NOT NULL COMMENT 'Unique numerical ID.',
+  `dept` BIGINT NOT NULL COMMENT 'Department',
+  `value` BIGINT NOT NULL COMMENT 'Value',
+  PRIMARY KEY (`id`));
+</code></pre>
+
+<p>Create a procedure that sets up 10 entries in the current table (id = 0, .. 9), then sits in a tight loop inserting 1 new row into current and 'moving' the oldest row from current to history. Each iteration is performed in a transaction, as a result the current table remains at a steady 10 rows, while the history table grows quickly. At any point in time min(current.id) = max(history.id) + 1</p>
+
+<pre><code>DROP PROCEDURE IF EXISTS `idLoop`;
+
+DELIMITER $$
+CREATE PROCEDURE `idLoop`()
+BEGIN
+
+DECLARE n bigint;
+
+-- Populate initial 10 rows in current table if not already there
+SELECT IFNULL(MAX(id), -1) + 1 INTO n from current;
+START TRANSACTION;
+WHILE n &lt; 10 DO
+  INSERT INTO current VALUES (n, n % 10, n % 1000);
+  SET n = n + 1;
+END WHILE;
+COMMIT;
+
+-- In tight loop, insert new row and 'move' oldest current row to history
+WHILE n &lt; 10000000 DO
+  START TRANSACTION;
+  -- Insert new row to current
+  INSERT INTO current values(n,  n % 10, n % 1000);
+  -- Move oldest row from current to history
+  INSERT INTO history SELECT * FROM current WHERE id = (n - 10);
+  DELETE FROM current where id = (n - 10);
+  COMMIT;
+  SET n = n + 1;
+END WHILE;
+
+END$$
+DELIMITER ;
+</code></pre>
+
+<p>Start this procedure running (this call won't return for some time - which is intentional)</p>
+
+<pre><code>call idLoop();
+</code></pre>
+
+<p>In another session on the same database we can now try out a variation on the UNION ALL query in my original posting.</p>
+
+<p>I have modified it to (a) slow down execution,and (b) return a simple result set (two rows) that indicates whether any entries 'moved' whilst the query was running have been missed or double counted.</p>
+
+<pre><code>SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+SELECT 'HST' AS src, MAX(id) AS idx, COUNT(*) AS cnt, SUM(value) FROM history WHERE dept IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+UNION ALL
+SELECT 'CRT' AS src, MIN(id) AS idx, COUNT(*) AS cnt, SUM(value) FROM current WHERE dept IN (0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+</code></pre>
+
+<p>The <code>sum(value)</code> and <code>where dept in (...)</code> are just there to add work to the query and slow it down.</p>
+
+<p>The indication of a positive outcome is if the two idx values are adjacent, like this:</p>
+
+<pre><code>+-----+--------+--------+------------+
+| src | idx    | cnt    | SUM(value) |
++-----+--------+--------+------------+
+| HST | 625874 | 625875 |  312569875 |
+| CRT | 625875 |     10 |       8795 |
++-----+--------+--------+------------+
+2 rows in set (1.43 sec)
+</code></pre>
+
+<p>I'd still be happy to hear any authoritative information on this.</p>

@@ -1,0 +1,30 @@
+<p>Yes, it is possible. This question speaks to the more general issue of how to handle errors in PHP. You should define and register a custom error handler using <a href="http://php.net/manual/en/function.set-error-handler.php"><code>set_error_handler</code><sup><em>docs</em></sup></a> to customize handling for PHP errors.</p>
+
+<p>IMHO it's best to throw an exception on any PHP error and use try/catch blocks to control program flow, but opinions differ on this point.</p>
+
+<p>To accomplish the OP's stated goal you might do something like:</p>
+
+<pre><code>function errHandle($errNo, $errStr, $errFile, $errLine) {
+    $msg = "$errStr in $errFile on line $errLine";
+    if ($errNo == E_NOTICE || $errNo == E_WARNING) {
+        throw new ErrorException($msg, $errNo);
+    } else {
+        echo $msg;
+    }
+}
+
+set_error_handler('errHandle');
+</code></pre>
+
+<p>The above code will throw an <code>ErrorException</code> any time an <code>E_NOTICE</code> or <code>E_WARNING</code> is raised, effectively terminating script output (if the exception isn't caught). Throwing exceptions on PHP errors is best combined with a parallel exception handling strategy (<a href="http://us.php.net/manual/en/function.set-exception-handler.php"><code>set_exception_handler</code></a>) to gracefully terminate in production environments.</p>
+
+<p>Note that the above example will not respect the <code>@</code> error suppression operator. If this is important to you, simply add a check with the <code>error_reporting()</code> function as demonstrated here:</p>
+
+<pre><code>function errHandle($errNo, $errStr, $errFile, $errLine) {
+    if (error_reporting() == 0) {
+        // @ suppression used, don't worry about it
+        return;
+    }
+    // handle error here
+}
+</code></pre>

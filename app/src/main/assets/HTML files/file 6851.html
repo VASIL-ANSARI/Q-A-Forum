@@ -1,0 +1,80 @@
+<p>You aren't keeping a reference to your UIWindow, meaning it can be collected and released.</p>
+
+<p>I rewrote your class like so:</p>
+
+<pre><code>using System;
+using System.Drawing;
+using MonoTouch.CoreAnimation;
+using MonoTouch.UIKit;
+using MonoTouch.Foundation;
+using MonoTouch.ObjCRuntime;
+
+namespace FadeTest
+{
+    [Register("NoFadeTiledLayer")]
+    public class NoFadeTiledLayer : CATiledLayer
+    {
+
+        public NoFadeTiledLayer () : base()
+        {
+        }
+
+        public NoFadeTiledLayer (IntPtr handle) : base(handle)
+        {
+        }
+
+        public override void DrawInContext (MonoTouch.CoreGraphics.CGContext ctx)
+        {
+            // This is being called everytime
+            base.DrawInContext (ctx); 
+        }
+
+        [Export("fadeDuration")]
+        public static new double FadeDuration
+        {
+            get
+            {
+                return 0;
+            }
+        }
+    }
+
+    public class ContentView : UIView
+    {
+
+        [Export("layerClass")]
+        public static Class LayerClass ()
+        {
+            return new Class (typeof(NoFadeTiledLayer));
+        }
+
+        public override void Draw (RectangleF rect)
+        {
+            DrawString ("Lorem ipsum", rect, UIFont.SystemFontOfSize (15));
+        }
+    }
+
+    public partial class AppDelegate : UIApplicationDelegate
+    {
+        static void Main (string[] args)
+        {
+            UIApplication.Main (args, null, "AppDelegate");
+        }
+
+        public override bool FinishedLaunching (UIApplication app, NSDictionary options)
+        {
+            window = new UIWindow (UIScreen.MainScreen.ApplicationFrame);
+            window.BackgroundColor = UIColor.Green;
+            var view = new ContentView ();
+            view.BackgroundColor = UIColor.White;
+            view.Frame = window.Bounds;
+            window.AddSubview (view);
+            window.MakeKeyAndVisible ();
+
+            return true;
+        }
+    }
+}
+</code></pre>
+
+<p>and placed it in the default project template for a window based project, and it worked as expected.</p>

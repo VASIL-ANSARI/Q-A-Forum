@@ -1,0 +1,30 @@
+<p>This is exactly what the <code>userToken</code> parameter of the <a href="https://msdn.microsoft.com/en-us/library/ms144961(v=vs.110).aspx" rel="nofollow">SendAsync</a> method should be used for</p>
+
+<pre><code>PingOptions options = new PingOptions(10, true);
+Ping thisPing = new Ping();
+thisPing.SendAsync(IPAddress.Parse(IP), 100, new byte[0], options, i);
+thisPing.PingCompleted += new PingCompletedEventHandler(thisPing_PingCompleted); 
+...
+
+void thisPing_PingCompleted(object sender, PingCompletedEventArgs e)
+{
+    var index = (int)e.UserState;
+    ...
+}
+</code></pre>
+
+<p>Also, given you are using <code>SendAsync</code> you don't need to create an instance of <code>Ping</code> per iteration. You can simply re-use the existing instance, each call to <code>SendAsync</code> will send off the ping in a different thread and then callback to your event handler i.e.</p>
+
+<pre><code>void t_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+{            
+    PingOptions Options = new PingOptions(10, true);
+    Ping thisPing = new Ping();
+    thisPing.PingCompleted += new PingCompletedEventHandler(thisPing_PingCompleted);  
+    // send pings asynchronously
+    for (int i = 0; i &lt; this.View.Rows.Count; i++)
+    {
+        var ip = View.Rows[i].Cells[2].Value.ToString();
+        thisPing.SendAsync(ip, 100, new byte[0], options, i);                  
+    }
+}
+</code></pre>

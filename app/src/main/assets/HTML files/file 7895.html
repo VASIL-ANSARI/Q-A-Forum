@@ -1,0 +1,20 @@
+<p>Just for a balanced view, you can also do this with a CTE but its not as good as the cross apply method I don't think.  I've coded this of the hoof so apologies if it doesn't work.</p>
+
+<pre><code>WITH CommaDelimitedCTE (RowNumber,ID,[Value],[Values]) AS
+(
+  SELECT 1,MT.ID , MIN(MT.Value), CAST(MIN(MT.Value) AS VARCHAR(8000)) 
+  FROM  MyTable MT
+  GROUP BY MT.ID
+
+  UNION ALL
+
+  SELECT CT.RowNumber + 1, MT.ID, MT.Value, CT.[Values] + ', ' + MT.Value
+  FROM  MyTable MT
+  INNER JOIN CommaDelimitedCTE CT ON CT.ID = MT.ID
+  WHERE MT.[Value] &gt; CT.[Value]
+)
+
+Select CommaDelimitedCTE.* from CommaDelimitedCTE 
+    INNER JOIN (SELECT MT.ID,MAX(RowNumber) as MaxRowNumber from CommaDelimitedCTE GROUP BY MT.ID) Q on Q.MT.ID = CommaDelimitedCTE.MT.ID
+    AND Q.MaxRowNumber = CommaDelimitedCTE.RowNumber
+</code></pre>

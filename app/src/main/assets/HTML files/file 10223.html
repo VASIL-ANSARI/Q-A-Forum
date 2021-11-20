@@ -1,0 +1,80 @@
+<p>As suggested in <a href="http://docs.oracle.com/javase/tutorial/uiswing/components/internalframe.html" rel="nofollow"><em>How to Use Internal Frames</em></a>, "Usually, you add internal frames to a desktop pane." This allows you to use <a href="http://docs.oracle.com/javase/7/docs/api/javax/swing/DesktopManager.html#activateFrame%28javax.swing.JInternalFrame%29" rel="nofollow"><code>activateFrame()</code></a> to indicate that a frame has focus. In this <a href="http://groups.google.com/group/comp.lang.java.programmer/msg/2e1b14bcad9bd7fa" rel="nofollow">example</a>, a <a href="http://docs.oracle.com/javase/7/docs/api/javax/swing/Action.html" rel="nofollow"><code>javax.swing.Action</code></a> is used to select frames from a menu via <a href="http://docs.oracle.com/javase/7/docs/api/javax/swing/JInternalFrame.html#setSelected%28boolean%29" rel="nofollow"><code>setSelected()</code></a>. Additional discussion may be found in this <a href="http://stackoverflow.com/questions/4337838/jinternalframe-to-front-and-focussed">Q&amp;A</a>.</p>
+
+<p>Addendum: If you want to use a <code>JPanel</code>, perhaps to get a nice <code>GridLayout</code>, one aproach is to use an <a href="http://docs.oracle.com/javase/tutorial/uiswing/events/internalframelistener.html" rel="nofollow"><code>InternalFrameListener</code></a> as shown below.</p>
+
+<p><img src="http://i.stack.imgur.com/L6mjE.png" alt="enter image description here"></p>
+
+<pre><code>import java.awt.EventQueue;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.beans.PropertyVetoException;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.event.InternalFrameAdapter;
+import javax.swing.event.InternalFrameEvent;
+
+/** @see http://stackoverflow.com/questions/8389640 */
+public class InternalGrid extends JPanel {
+
+    private final List&lt;MyFrame&gt; list = new ArrayList&lt;MyFrame&gt;();
+
+    public InternalGrid() {
+        super(new GridLayout(2, 2));
+        for (int i = 0; i &lt; 4; i++) {
+            MyFrame f = new MyFrame("Frame", i);
+            list.add(f);
+            this.add(f);
+        }
+    }
+
+    private void display() {
+        JFrame f = new JFrame("InternalGrid");
+        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        f.add(this);
+        f.pack();
+        f.setSize(320, 240);
+        f.setLocationRelativeTo(null);
+        f.setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+
+            @Override
+            public void run() {
+                new InternalGrid().display();
+            }
+        });
+    }
+
+    class MyFrame extends JInternalFrame {
+
+        MyFrame(String name, int i) {
+            super(name + String.valueOf(i), true, true, true, false);
+            this.pack();
+            this.setVisible(true);
+            this.setLayout(new FlowLayout());
+            this.add(new JLabel("Hi, I'm " + this.getTitle()));
+            this.addInternalFrameListener(new InternalFrameAdapter() {
+
+                @Override
+                public void internalFrameActivated(InternalFrameEvent e) {
+                    for (MyFrame f : list) {
+                        if (f != MyFrame.this) {
+                            try {
+                                f.setSelected(false);
+                            } catch (PropertyVetoException ex) {
+                                System.out.println(ex);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+</code></pre>

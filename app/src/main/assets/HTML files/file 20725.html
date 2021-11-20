@@ -1,0 +1,33 @@
+<p>I don't have experience with Mongoid, so the answer might not be fully correct, but to me it seems you are mixing two things: database querying, and calling methods on an instance.</p>
+
+<p>They are two separate things and can not be intermixed. For example:</p>
+
+<pre><code>def expensive? 
+  price &gt;= 10
+end
+</code></pre>
+
+<p>...is not a database query method. You're simply looking at an instance variable and checking if it's >= 10. Therefore you can't use this method in database queries since it's not a query construct.</p>
+
+<p>But to make it work should not be too hard. All you need to change is this:</p>
+
+<pre><code>scope :expensive ... do
+  is_expensive ? where(:price.gte =&gt; 10) : where(:price.lt =&gt; 10)
+end
+</code></pre>
+
+<p>The argument to <code>where</code> must always be a <a href="http://two.mongoid.org/docs/querying/criteria.html#where" rel="nofollow">Mongoid query expression</a>. It cannot be something else.</p>
+
+<p>Now your setup should work. You can ask everything you need:</p>
+
+<pre><code>MyItem.expensive          # Returns a collection of expensive items
+MyItem.first.expensive?   # Calls the instance method. Returns true or false
+items.expensive           # Returns all expensive items in the collection
+</code></pre>
+
+<p>However this is will not work:</p>
+
+<pre><code>MyItem.where(:expensive?)
+</code></pre>
+
+<p>Because <code>:expensive?</code> is not a valid query expression, which is what is always needed as an argument to <code>where</code>.</p>

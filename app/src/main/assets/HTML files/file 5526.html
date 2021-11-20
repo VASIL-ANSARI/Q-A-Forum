@@ -1,0 +1,47 @@
+<p>All CoreData entities derive from NSManagedObject and all the database data from those can be accessed via key value encoding. The minimum you need to know can be gained from the Model. You don't necessarily require the headers.</p>
+
+<p>For example an entity <strong>PersonEntity</strong> which has a relationship to <strong>NameEntity</strong> with attribute <strong>firstname</strong></p>
+
+<pre><code>NSArray *results = [managedObjectContext queryEntityForName:@"PersonEntity" predicateFormat:nil argumentArray:nil];
+
+for(NSManagedObject *object in results)
+{
+NSString *name = [object valueForKeyPath:@"nameobject.firstname";
+[self doSomething:name];
+}
+</code></pre>
+
+<p>queryEntityForName is my own category. You might find it useful.</p>
+
+<pre><code>@implementation NSManagedObjectContext(VMQueryAdditions)
+
+-(NSArray *)queryEntityForName:(NSString *)name predicateFormat:(NSString *)pstring argumentArray:(NSArray *)arr
+{
+    NSEntityDescription *entity = [NSEntityDescription entityForName:name inManagedObjectContext:self];
+    NSFetchRequest *fetch = [[[NSFetchRequest alloc] init] autorelease];
+
+    [fetch setEntity:entity];
+    NSPredicate *pred;
+
+    if(pstring)
+    {
+        if(arr) pred = [NSPredicate predicateWithFormat:pstring argumentArray:arr];
+        else    pred = [NSPredicate predicateWithFormat:pstring];
+        [fetch setPredicate:pred];
+    }
+
+    NSError *error = nil;
+
+    NSArray *results = [self executeFetchRequest:fetch error:&amp;error];
+
+    if (error) {
+        NSLog(@"MOC Fetch - Unresolved error %@, %@", error, [error userInfo]);
+        return [NSArray array];
+    }
+
+    return results;
+
+}
+
+@end
+</code></pre>

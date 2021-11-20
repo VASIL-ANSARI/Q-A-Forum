@@ -1,0 +1,30 @@
+<p>When you write <code>entities.Relations.Select(r =&gt; new ...)</code> you are making a projection of each Relation EF object into a new non-EF object. By EF object I mean a class which is known by and tracked by EntityFramework. </p>
+
+<p>Making changes to a EF-known class instance would propagate the changes back to DB when you save changes in your db/entity context. In contrast, making changes to a EF-unknown projection (or any projection) has no effect on the original object.</p>
+
+<p>There are two ways you can achive what you want: If your DataGrid (NetAdvantage UltraGrid?) supports binding to subobjects (such as relation.device) you can then use <code>ultraGrid.DataSource = entities.relations</code> and define grid columns to bind to field <code>devices.device_name</code>. The other way would be something like this:</p>
+
+<pre><code>class Relation
+{
+    private readonly EfRelation _originalRelation;
+
+    public Relation(EfRelation originalRelation)
+    {
+        this._originalRelation = originalRelation;
+    }
+
+    public string Devices 
+    { 
+        get { return this._originalRelation.devices.device_name; } 
+        set { this._originalRelation.devices.device_name = value; } 
+    }
+
+    // Repeat for other properties
+}
+
+...
+
+var reltables = entities.relations.ToList().Select(r =&gt; new Relation(r)).ToList();
+</code></pre>
+
+<p>Then you just save changes to your db/object context. The <code>EfRelation</code> is the name of your EF <code>Relation</code> class, change it to the name of your EF class which represents a relation.</p>

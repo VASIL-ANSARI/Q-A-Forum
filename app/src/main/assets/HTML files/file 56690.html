@@ -1,0 +1,33 @@
+<p>You are using the wrong data structure: a <code>Queue</code> would be a better choice, specifically one designed for concurrent modification.</p>
+
+<p>For example, you can use <a href="https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/LinkedBlockingQueue.html" rel="nofollow"><code>LinkedBlockingQueue</code></a>. You can add to this like a list, and then consume the added actions like:</p>
+
+<pre><code>Action r;
+while ((r = queue.poll()) != null) {
+  r.run();
+}
+</code></pre>
+
+<hr>
+
+<p>Using <code>Collections.synchronizedList</code> would not fix your issue, at least not in and of itself.</p>
+
+<p>The thing to bear in mind about wrapping a list with <code>Collections.synchronizedList()</code> is that it only provides mutual exclusion <em>for each individual method call</em>, e.g. until the call to <code>pendingActions.get()</code> or <code>pendingActions.iterator()</code> returns.</p>
+
+<p>The enhanced for loop implicitly creates an <code>Iterator</code>; but the list is not then locked while you iterate over it, whether or not this comes from a synchronized list.</p>
+
+<p>Your other thread is changing the list during this iteration, and would still cause the <code>ConcurrentModificationException</code> next time you try to get a value from the iterator.</p>
+
+<p>Now, you could make it work (without the CME) by wrapping the iteration in a <code>synchronized</code> block <em>as well</em>:</p>
+
+<pre><code>synchronized (pendingActions) {
+  for (Action r : pendingActions) {
+    r.run();
+  }
+  r.clear();
+}
+</code></pre>
+
+<p>The problem with this is that other threads will now be blocked whilst the list is being iterated. That might cause a noticeable delay in your app; or it might not, depending upon how frequently this method is called, and how long the actions take to run.</p>
+
+<p>However, using a concurrent queue avoids that issue entirely, and is likely to be faster than a synchronized list too, since non-blocking concurrent queues don't require the use of "full-blown" synchronization.</p>

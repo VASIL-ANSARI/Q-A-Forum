@@ -1,0 +1,50 @@
+<p>I was not able to solve this, only find a way around it.</p>
+
+<p>My last stab at solving this was to figure out whether the [super touchesEnded...] inside the completion block was being executed in a thread that was different from the thread it was executed in when it was outside the completion block... and no, they both appear to be the main thread (Apple's documentation on CATransaction does state that its completionBlock is always run in the main thread).</p>
+
+<p>So in case someone else is banging their head against this, here's my less-than-elegant solution:</p>
+
+<p>1.) In my subclass of UIButton I created a weak property called containingVC.</p>
+
+<p>2.) In every single (ugh) VC that uses the custom button class I have to do this:</p>
+
+<pre><code>@implemenation VCThatUsesCustomButtonsOneOfWayTooMany
+
+-(void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    self.firstCustomButton.containingVC = self;
+    self.secondCustomButton.containingVC = self;
+    self.thirdCustomButton.containingVC = self;
+    ....
+    self.lastCustomButton.containingVC = self;
+    //you're probably better off using an IBOutletColletion and NSArray's makeObjectPerformSelector:withObject...
+}
+
+@end
+</code></pre>
+
+<p>3.) Then in my custom UIButton class I have something like this:</p>
+
+<pre><code>-(void)animateForPushDismissCurrView
+{
+    CAAnimation *buttonAnimation = ...make animation
+
+    [CATransaction begin];
+    [CATransaction setCompletionBlock:^{
+
+        [self.containingVC performSegueWithIdentifier:@"segueID" sender:self.containingVC];
+
+    }];
+    [self.layer addAnimation:buttonAnimation forKey:nil];
+    [CATransaction commit];
+}
+</code></pre>
+
+<p>4.) Then in whatever VC that the user is currently interacting with, after making sure the button has done whatever it was supposed to do (in my case it checks with the model to confirm that the relevant change was made), each button has to call [someCustomButton animateForPushDismissCurrView] which then animates the button press and then fires the UIStoryboardSegue that actually dismisses the view.</p>
+
+<p>Obviously this would work for going deeper, not just unwinding, but you'd need additional logic in the custom button's -(void)animateForPush method or a separate method entirely.</p>
+
+<p>Again, if I'm missing something here, I'd love to know what it is. This seems like an absurd number of hoops to jump through to accomplish what seems like a simple task.</p>
+
+<p>Lastly, and most importantly, if it just won't work with the [super touchesEnded...] method in CATransaction's completionBlock, I'd like to know WHY. I suspect that it has something to do with threads or the weirdness that is Objective-C's super keyword.</p>

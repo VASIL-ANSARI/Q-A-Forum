@@ -1,0 +1,87 @@
+<p><code>pandas</code> and <code>statsmodel</code> work beautifully together for things like this, see this example:</p>
+
+<pre><code>In [16]:
+
+import statsmodels.formula.api as smf
+In [17]:
+
+df=pd.DataFrame(np.random.random((10,2)), columns=['A','B'])
+In [18]:
+
+df.index=pd.date_range('1/1/2014', periods=10)
+In [19]:
+
+dfd=df.diff().dropna()
+In [20]:
+
+print df
+                   A         B
+2014-01-01  0.455924  0.375653
+2014-01-02  0.585738  0.864693
+2014-01-03  0.201121  0.640144
+2014-01-04  0.685951  0.256225
+2014-01-05  0.203623  0.007993
+2014-01-06  0.626527  0.719438
+2014-01-07  0.327197  0.324088
+2014-01-08  0.115016  0.635999
+2014-01-09  0.660070  0.246438
+2014-01-10  0.141730  0.125918
+
+[10 rows x 2 columns]
+In [21]:
+
+print dfd
+                   A         B
+2014-01-02  0.129814  0.489041
+2014-01-03 -0.384617 -0.224549
+2014-01-04  0.484830 -0.383919
+2014-01-05 -0.482328 -0.248233
+2014-01-06  0.422905  0.711446
+2014-01-07 -0.299330 -0.395351
+2014-01-08 -0.212182  0.311911
+2014-01-09  0.545054 -0.389561
+2014-01-10 -0.518340 -0.120520
+
+[9 rows x 2 columns]
+In [22]:
+
+mod1 = smf.ols('A ~ B', data=dfd).fit()
+In [23]:
+
+print mod1.summary()
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      A   R-squared:                       0.036
+Model:                            OLS   Adj. R-squared:                 -0.101
+Method:                 Least Squares   F-statistic:                    0.2637
+Date:                Fri, 18 Apr 2014   Prob (F-statistic):              0.623
+Time:                        13:54:27   Log-Likelihood:                -4.5434
+No. Observations:                   9   AIC:                             13.09
+Df Residuals:                       7   BIC:                             13.48
+Df Model:                           1                                         
+==============================================================================
+                 coef    std err          t      P&gt;|t|      [95.0% Conf. Int.]
+------------------------------------------------------------------------------
+Intercept     -0.0295      0.152     -0.194      0.852        -0.389     0.330
+B              0.1960      0.382      0.513      0.623        -0.707     1.099
+==============================================================================
+Omnibus:                        1.832   Durbin-Watson:                   3.290
+Prob(Omnibus):                  0.400   Jarque-Bera (JB):                1.006
+Skew:                           0.506   Prob(JB):                        0.605
+Kurtosis:                       1.711   Cond. No.                         2.52
+==============================================================================
+</code></pre>
+
+<p>For the 2nd question you have to provide more detail or open a separate question. There are many different kinds of sliding windows, you need to be more specific.</p>
+
+<h1>Edit</h1>
+
+<p>The simple linear regression you just described, in case you only want to store the two coefficients, can be achieved as follows:</p>
+
+<pre><code>win_size=5
+win_step=2
+coef_ls=[]
+for i in range(0,len(dfd)-win_size,2):
+    coef_ls.append(smf.ols('A ~ B', data=dfd.ix[i:i+win_size]).fit().params)
+pd.concat(coef_ls, axis=1).T # The resulting DataFrame of coefficients. 
+</code></pre>

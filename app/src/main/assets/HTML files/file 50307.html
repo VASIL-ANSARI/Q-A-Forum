@@ -1,0 +1,32 @@
+<p>As you are using transient lifestyle for all dependencies, it is obvious that you have different instances of <code>IRepository</code> in Service and Command classes. What you need, is to increase lifetime of <code>IRepository</code> and probably bind it to lifetime of your service, meaning that the instance of IRepository is created and disposed when the instance of Service is created and disposed.</p>
+
+<p>Castle Windsor has <a href="https://github.com/castleproject/Windsor/blob/master/docs/lifestyles.md#bound" rel="nofollow">Bound</a> lifestyle:</p>
+
+<blockquote>
+  <p>Somewhere in the graph we have two view models, one depending on the other, and both of them depend on some other service, say a repository. You might want to bind the repository to the subgraph. In other words you might want the entire subgraph of the outermost view model (WelcomeScreenViewModel) to share the same instance of the repository, and to have the repository released when the view model itself is released.</p>
+</blockquote>
+
+<p>So should register your IRepository in the following way:</p>
+
+<pre><code>Container.Register(Component.For&lt;IRepository&gt;().ImplementedBy&lt;Repository&gt;().LifestyleBoundTo&lt;Service&gt;());
+</code></pre>
+
+<p><strong>EDIT:</strong>
+The above solution will not work as ICommand is bound to ICommandFactory not to Service. If you are resolving service instance manually you can use LifestyleScoped:</p>
+
+<pre><code>        container.AddFacility&lt;TypedFactoryFacility&gt;();
+        container.Register(Component.For&lt;Service&gt;().LifestyleTransient());
+        container.Register(Component.For&lt;IRepository&gt;().ImplementedBy&lt;Repository&gt;().LifestyleScoped());
+        container.Register(Component.For&lt;ICommand&gt;().ImplementedBy&lt;Command&gt;().LifestyleTransient());
+        container.Register(Component.For&lt;ICommandFactory&gt;().AsFactory().LifestyleTransient());
+
+        using (container.BeginScope())
+        {
+            var service = container.Resolve&lt;Service&gt;();
+            service.DoIt();
+        }
+</code></pre>
+
+<p>In this case your IRepository is scoped per scope. </p>
+
+<p><em>Note</em> To use container.BeginScope() add <code>using Castle.MicroKernel.Lifestyle;</code></p>

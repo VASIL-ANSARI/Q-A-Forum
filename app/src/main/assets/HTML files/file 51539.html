@@ -1,0 +1,29 @@
+<p>If I understand correctly, you are currently seeing progress updates reported to your <code>RichTextBox</code> control as individual lines, while you would like to emulate the behavior of the console window. I.e. to overwrite the previously output line with the new one, rather than keeping the previous line and adding a new one. With that in mind&hellip;</p>
+
+<p>The .NET types, including things like <code>TextReader</code> and the <code>Process</code> class's handling of output, consider a newline to be any of <code>\r</code>, <code>\n</code>, or <code>\r\n</code>. So even a process that is simply using a <code>\r</code> to overwrite the current line would still be interpreted by <code>OutputDataReceived</code> as starting a new line. Given how consistent this behavior is across .NET, your only real option is to avoid using any built-in line-based I/O mechanisms.</p>
+
+<p>Fortunately, you can get asynchronous reads from the process directly via <code>StandardOutput</code>, instead of having to handle the line-based <code>OutputDataReceived</code> event. For example:</p>
+
+<pre><code>async Task ConsumeOutput(TextReader reader, Action&lt;string&gt; callback)
+{
+    char[] buffer = new char[256];
+    int cch;
+
+    while ((cch = await reader.ReadAsync(buffer, 0, buffer.Length)) &gt; 0)
+    {
+        callback(new string(buffer, 0, cch));
+    }
+}
+</code></pre>
+
+<p>You might call it like this:</p>
+
+<pre><code>// don't "await", but do keep "task" so that at some later time, you can
+// check the result, "await" it, whatever, to determine the outcome.
+Task task = ConsumeOutput(process.StandardOutput, s =&gt;
+    {
+        richTextBox1.AppendText(s);
+    });
+</code></pre>
+
+<p>Of course, without any modification the above will just do what you are already getting. But reading the output this way will not do any interpretation of the line-break characters. Instead, they will be present in the string <code>s</code> that is passed to the anonymous method handling each read callback. So you can scan that string yourself, looking for lone carriage returns that indicate that you are starting a new line, but should delete the previous line before adding the new text. Be sure to add (or at least skip) all of the text up to the carriage return first, and <em>then</em> delete the last line, before adding the new text.</p>

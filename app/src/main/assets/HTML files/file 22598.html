@@ -1,0 +1,37 @@
+<p>You are misinterpreting the return value of <code>getMoreResults()</code>. You are also ignoring the return value of <a href="http://docs.oracle.com/javase/7/docs/api/java/sql/Statement.html#executeQuery%28java.lang.String%29" rel="nofollow"><code>execute()</code></a>, this method returns a <code>boolean</code> indicating the type of the first result:</p>
+
+<ul>
+<li><code>true</code>: result is a <code>ResultSet</code></li>
+<li><code>false</code> : result is an update count</li>
+</ul>
+
+<p>If the result is <code>true</code>, then you use <a href="http://docs.oracle.com/javase/7/docs/api/java/sql/Statement.html#getResultSet%28%29" rel="nofollow"><code>getResultSet()</code></a> to retrieve the <code>ResultSet</code>, otherwise <a href="http://docs.oracle.com/javase/7/docs/api/java/sql/Statement.html#getUpdateCount%28%29" rel="nofollow"><code>getUpdateCount()</code></a> to retrieve the update count. If the update count is <code>-1</code> it means there are no more results. Note that the update count will also be <code>-1</code> when the current result is a <code>ResultSet</code>. It is also good to know that <code>getResultSet()</code> should return null if there are no more results or if the result is an update count (this last condition is why you get so many <code>null</code> values).</p>
+
+<p>Now if you want to retrieve more results, you call <a href="http://docs.oracle.com/javase/7/docs/api/java/sql/Statement.html#getMoreResults%28%29" rel="nofollow"><code>getMoreResults()</code></a> (or its brother accepting an <code>int</code> parameter). The return value of <code>boolean</code> has the same meaning as that of <code>execute()</code>, so <code>false</code> <em>does not mean there are no more results</em>!</p>
+
+<p>There are only no more results if the <code>getMoreResults()</code> returns false and <code>getUpdateCount()</code> returns <code>-1</code> (as also documented in the Javadoc)</p>
+
+<p>Essentially this means that if you want to correctly process all results you need to do something like below:</p>
+
+<pre><code>boolean result = stmt.execute(...);
+while(true) {
+    if (result) {
+        ResultSet rs = stmt.getResultSet();
+        // Do something with resultset ...
+    } else {
+        int updateCount = stmt.getUpdateCount();
+        if (updateCount == -1) {
+            // no more results
+            break;
+        }
+        // Do something with update count ...
+    }
+    result = stmt.getMoreResults();
+}
+</code></pre>
+
+<p>My guess is that you are getting a lot of update counts before you get the actual <code>ResultSet</code>. </p>
+
+<p>I am not really familiar with Sybase, but its cousin SQL Server has the 'annoying' feature to return update counts from stored procedures if you don't explicitly put <code>SET NOCOUNT ON;</code> at the start of the stored procedure.</p>
+
+<p>NOTE: Part of this answer is based on my answer to <a href="http://stackoverflow.com/a/14694174/466862">Execute âsp_msforeachdbâ in a Java application</a></p>

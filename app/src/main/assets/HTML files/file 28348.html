@@ -1,0 +1,52 @@
+<p>I believe that section 59.4 of <a href="http://www.gradle.org/docs/current/userguide/organizing_build_logic.html" rel="nofollow">the Gradle doc</a> can help you.</p>
+
+<p>Using Gradle 1.8, I tried to "run another Gradle build from a build", where the other Gradle build is buildSrc.</p>
+
+<p>This does not involve codegen, but might be enough to help.</p>
+
+<p>To replicate, I have a simple Java project in buildSrc, with a build.gradle that looks like this:</p>
+
+<pre><code>apply plugin: 'java'
+
+build &lt;&lt; { 
+    println "TRACER: hello from buildSrc java build"
+}
+
+task compile2() &lt;&lt; {
+    println "TRACER: hello from buildSrc compile2"
+}
+</code></pre>
+
+<p>The 'build' task is called automatically via the buildSrc mechanism. The goal is to call 'compile2' from the root. At the root, the build.gradle looks like this:</p>
+
+<pre><code>task build1() &lt;&lt; {
+    println "TRACER: top-level build1" 
+}
+
+task build2(type: GradleBuild) {
+    buildFile = 'buildSrc/build.gradle'
+    tasks = ['compile2']
+}
+
+build2.dependsOn build1
+</code></pre>
+
+<p>At the root level, the output is as follows:</p>
+
+<pre><code>$ gradle build2
+
+:buildSrc:compileJava etc etc
+TRACER: hello from buildSrc java build
+TRACER: top-level build1
+TRACER: hello from buildSrc compile2
+</code></pre>
+
+<p>This shows that:</p>
+
+<ul>
+<li>the Java project in buildSrc is compiled</li>
+<li>the root 'build1' is called (compile your main project here)</li>
+<li>the buildSrc 'compile2' is called</li>
+</ul>
+
+<p>The classpath and codegen is nasty but may be straight-forward. </p>

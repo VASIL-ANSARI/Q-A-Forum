@@ -1,0 +1,59 @@
+<p>Your stored procedure GetTotalProductWcnCrashes calls itself in a endless loop. How did you generate this stored procedure. </p>
+
+<p>Having a general look at your stored procedure you only need the first select statement the rest of the stored procedure seems like some auto generated code from the SQL Management Studio when you select a stored procedure to execute. For some reason that was saved on top of your stored procedure.</p>
+
+<p>Your stored procedure should be something like this instead. But bear in mind I dont your database.</p>
+
+<pre><code>USE [Reports]
+ GO
+
+ SET ANSI_NULLS ON
+ GO
+
+ SET QUOTED_IDENTIFIER ON
+ GO
+
+
+Create Procedure [dbo].[GetTotalProductWcnCrashes]
+(
+@DroidbugCount int,
+@totalproductcrashes int out,
+@Uniqueproductcrashes int out,
+@SnsPL varchar(500) out,
+@Startdate datetime out,
+@Metabuild varchar(500) out,
+@Rivabuild varchar(500) out,
+@Appsbuild varchar(500) out,
+@toatalWcnCrashes int out,
+@UniqueWcnCrashes int out,
+@TotalHours numeric(18,0) OUT,  
+@Mtbf numeric(18,4) OUT,
+@Cpth numeric(18,4) OUT 
+ ) 
+ AS
+
+ BEGIN
+
+SET NOCOUNT ON;
+
+
+SELECT @SnsPL =   SnsPl.PL,@Startdate=SnsHeader.Startdate,@Metabuild=SnsHeader.Metabuild,
+  @Rivabuild=SnsHeader.RivaBuild,@Appsbuild=SnsHeader.Appsbuild,
+  @totalproductcrashes = SUM(CASE WHEN dbo.SnsResult.Crash like '%Yes%' THEN 1 ELSE 0 END),
+  @Uniqueproductcrashes = SUM(CASE WHEN dbo.SnsResult.UniqueCrash like '%Yes%' AND dbo.SnsResult.CR_ID is NULL THEN 1 ELSE 0 END),
+  @TotalHours = Sum(CAST(dbo.SnsResult.ResultDuration AS int))
+  FROM dbo.SnsHeader
+  INNER JOIN dbo.SnsResult ON dbo.SnsHeader.SnsHeader_PK = dbo.SnsResult.SnsHeader_FK 
+  INNER JOIN dbo.SnsPl ON dbo.SnsHeader.PL_FK = dbo.SnsPl.PL_PK 
+  GROUP BY dbo.SnsPl.PL , SnsHeader.Startdate ,SnsHeader.Metabuild,SnsHeader.RivaBuild,SnsHeader.Appsbuild
+
+  END
+
+  GO
+</code></pre>
+
+<p>Please bear in mind I dont have the database this example I put up might not be right but for sure your stored procedure is not correct and calls itself contentiously up to the maximum 32 nested call count.</p>
+
+<p>Also to answer your question on the comments please follow this stackoverflow link to find out how to call a stored procedure using c#.</p>
+
+<p><a href="http://stackoverflow.com/questions/1260952/how-to-execute-a-stored-procedure-within-c-sharp-program">How to execute a stored procedure within C# program</a></p>

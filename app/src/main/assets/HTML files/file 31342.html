@@ -1,0 +1,23 @@
+<p>I think I understand what you're trying to do. There is more than one way to skin a cat, but may I suggest splitting your query into two separate queries, and then replacing the complicated WHERE clause with a couple inner joins? So, something like this:</p>
+
+<pre><code>/* Find connections based on health care */
+SELECT p2.p_id as id, p2.fname, p2.lname, p2.image
+FROM person p
+JOIN health_case hc on hc.patient = p.p_id
+JOIN health_case hc2 on hc2.doctor = hc.doctor and hc2.healthcenter = hc.healthcenter and hc.start &lt;= hc2.end and hc.end &gt;= hc2.start and hc2.patient &lt;&gt; hc.patient
+JOIN person p2 on p2.p_id = hc2.patient and p2.p_id &lt;&gt; p.p_id
+WHERE p.p_id = :id
+</code></pre>
+
+<p>Then, create a separate query to get connections based on education:</p>
+
+<pre><code>/* Find connections based on education */
+SELECT p2.p_id as id, p2.fname, p2.lname, p2.image
+FROM person p
+JOIN education e on e.pupil = p.p_id
+JOIN education e2 on e2.school = e.school and e2.start &lt;= e.end AND e2.end &gt;= e.start and e.pupil &lt;&gt; e2.pupil
+JOIN person p2 on p2.p_id = e2.pupil and p2.p_id &lt;&gt; p.p_id
+WHERE p.p_id = :id
+</code></pre>
+
+<p>If you really want the data results to be combined, you can use <code>UNION</code> since both queries return the same columns from the person table.</p>

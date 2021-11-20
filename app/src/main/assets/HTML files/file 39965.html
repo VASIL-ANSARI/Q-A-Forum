@@ -1,0 +1,70 @@
+<p><strong>What is the cross-database way to bind arguments?</strong></p>
+
+<p>With database/sql, there is none. Each database has its own way to represent parameter placeholders. The Go database/sql package does not provide any normalization facility for the prepared statements. Prepared statement texts are just passed to the underlying driver, and the driver typically just sends them unmodified to the database server (or library for embedded databases).</p>
+
+<p><strong>How to bind arguments for LIKE-statement correctly?</strong></p>
+
+<p>You can use parameter placeholders after a like statement and bind it as a string. For instance, you could write a prepared statement as:</p>
+
+<pre><code>SELECT a from bla WHERE b LIKE ?
+</code></pre>
+
+<p>Here is an example (error management handling omitted).</p>
+
+<pre><code>package main
+
+import (
+    "database/sql"
+    "fmt"
+    _ "github.com/go-sql-driver/mysql"
+)
+
+// &gt; select * from bla ;
+// +------+------+
+// | a    | b    |
+// +------+------+
+// | toto | titi |
+// | bobo | bibi |
+// +------+------+
+
+func main() {
+
+    // Open connection
+    db, err := sql.Open("mysql", "root:XXXXXXX@/test")
+    if err != nil {
+         panic(err.Error())  // proper error handling instead of panic in your app
+    }
+    defer db.Close()
+
+    // Prepare statement for reading data
+    stmtOut, err := db.Prepare("SELECT a FROM bla WHERE b LIKE ?")
+    if err != nil {
+        panic(err.Error()) // proper error handling instead of panic in your app
+    }
+    defer stmtOut.Close()
+
+    var a string
+    b := "bi%"    // LIKE 'bi%'
+    err = stmtOut.QueryRow(b).Scan(&amp;a)
+    if err != nil {
+        panic(err.Error()) // proper error handling instead of panic in your app
+    }
+    fmt.Printf("a = %s\n", a)
+} 
+</code></pre>
+
+<p>Note that the % character is part of the bound string, not of the query text.</p>
+
+<p><strong>How to bind arguments for IN statement correctly?</strong></p>
+
+<p>None of the databases I know allows binding a list of parameters directly with a IN clause. This is not a limitation of database/sql or the drivers, but this is simply not supported by most database servers.</p>
+
+<p>You have several ways to work the problem around:</p>
+
+<ul>
+<li><p>you can build a query with a fixed number of placeholders in the IN clause. Only bind the parameters you are provided with, and complete the other placeholders by the NULL value. If you have more values than the fixed number you have chosen, just execute the query several times. This is not extremely elegant, but it can be effective.</p></li>
+<li><p>you can build multiple queries with various number of placeholders. One query for IN ( ? ), a second query for IN (?, ?), a third for IN (?,?,?), etc ... Keep those prepared queries in a statement cache, and choose the right one at runtime depending on the number of input parameters. Note that it takes memory, and generally the maximum number of prepared statements is limited, so it cannot be used when the number of parameters is high.</p></li>
+<li><p>if the number of input parameters is high, insert them in a temporary table, and replace the query with the IN clause by a join with the temporary table. It is effective if you manage to perform the insertion in the temporary table in one roundtrip. With Go and database/sql, it is not convenient because there is no way to batch queries.</p></li>
+</ul>
+
+<p>Each of these solutions has drawbacks. None of them is perfect.</p>

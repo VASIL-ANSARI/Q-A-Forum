@@ -1,0 +1,51 @@
+<blockquote>
+  <p>There does not seem to be any annotation to specify constraints like a key must exist in a Map.</p>
+</blockquote>
+
+<p>This can be solved by implementing a <a href="http://docs.jboss.org/hibernate/stable/validator/reference/en-US/html_single/#validator-customconstraints" rel="nofollow">custom constraint</a>:</p>
+
+<pre><code>@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER })
+@Retention(RUNTIME)
+@Documented
+@Constraint(validatedBy = { ContainsKeyValidator.class })
+public @interface ContainsKeys {
+    String message() default "{com.acme.ContainsKey.message}";
+    Class&lt;?&gt;[] groups() default { };
+    Class&lt;? extends Payload&gt;[] payload() default { };
+    String[] value() default {};
+}
+</code></pre>
+
+<p>And a validator like this:</p>
+
+<pre><code>public class ContainsKeysValidator implements ConstraintValidator&lt;ContainsKeys, Map&lt;?, ?&gt;&gt; {
+
+    String[] requiredKeys;
+
+    @Override
+    public void initialize(ContainsKeys constraintAnnotation) {
+        requiredKeys = constraintAnnotation.values();
+    }
+
+    @Override
+    public boolean isValid(Map&lt;?, ?&gt; value, ConstraintValidatorContext context) {
+        if( value == null ) {
+            return true;
+        }
+
+        for( String requiredKey : requiredKeys ) {
+            if( value.containsKey( requiredKey ) ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+</code></pre>
+
+<blockquote>
+  <p>My use case is that some map keys are required to have valid values only if some other property of the bean is set to true.</p>
+</blockquote>
+
+<p>For this requirement you could implement a <a href="http://docs.jboss.org/hibernate/stable/validator/reference/en-US/html_single/#d0e341" rel="nofollow">class-level</a> constraint, which allows to access the complete bean with all its attributes in the validator implementation.</p>

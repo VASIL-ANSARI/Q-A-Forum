@@ -1,0 +1,89 @@
+<p>Here I can see problems on both sides.</p>
+
+<p>Please keep in mind that what you get when encoding is not string, but rather an array of bytes.
+So in PHP you don't need to urlencode cyphertext.</p>
+
+<p>base64 encoding is all you need. When you open <a href="http://php.net/manual/en/function.urlencode.php">base64_encode help</a> you see</p>
+
+<blockquote>
+  <p><strong>base64_encode</strong> Encodes the given data with base64.  This encoding is
+  designed to make binary data survive transport</p>
+</blockquote>
+
+<p>One more thing - to have your message decoded in .net with a correct length, you have to manually append it with padding characters. Default padding mode for RijndaelManaged is PKCS7, lets' stick with it. You have to extend your source string to even blocks with characters code equal to number of padding bytes.</p>
+
+<pre><code>&lt;?php
+  $iv = "45287112549354892144548565456541";
+  $key = "anjueolkdiwpoida";
+  $text = "This is my encrypted message";
+
+  // to append string with trailing characters as for PKCS7 padding scheme
+  $block = mcrypt_get_block_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC);
+  $padding = $block - (strlen($text) % $block);
+  $text .= str_repeat(chr($padding), $padding);
+
+  $crypttext = mcrypt_encrypt(MCRYPT_RIJNDAEL_256, $key, $text, MCRYPT_MODE_CBC, $iv);
+
+  // this is not needed here            
+  //$crypttext = urlencode($crypttext);
+
+  $crypttext64=base64_encode($crypttext);
+  print($crypttext64) . "\n&lt;br/&gt;";
+?&gt;
+</code></pre>
+
+<p>At C# side you have casting from <strong>base64</strong> to <strong>byte[]</strong> to <strong>string</strong> to <strong>byte[]</strong>. You have to do the first conversion from <strong>base64</strong> to <strong>byte[]</strong> only. Remember, base64 is holding the cyphered text that is binary data, not string.
+Also please note that RijndaelManaged is IDisposable, so I have wrapped it in using() construct. Calling Close() is necessary but not enough as stated in MSDN.</p>
+
+<pre><code>public byte[] Decode(string str)
+{
+    var decbuff = Convert.FromBase64String(str);
+    return decbuff;
+}
+
+static public String DecryptRJ256(byte[] cypher, string KeyString, string IVString)
+{
+    var sRet = "";
+
+    var encoding = new UTF8Encoding();
+    var Key = encoding.GetBytes(KeyString);
+    var IV = encoding.GetBytes(IVString);
+
+    using (var rj = new RijndaelManaged())
+    {
+        try
+        {
+            rj.Padding = PaddingMode.PKCS7;
+            rj.Mode = CipherMode.CBC;
+            rj.KeySize = 256;
+            rj.BlockSize = 256;
+            rj.Key = Key;
+            rj.IV = IV;
+            var ms = new MemoryStream(cypher);
+
+            using (var cs = new CryptoStream(ms, rj.CreateDecryptor(Key, IV), CryptoStreamMode.Read))
+            {
+                using (var sr = new StreamReader(cs))
+                {
+                    sRet = sr.ReadLine();
+                }
+            }
+        }
+        finally
+        {
+            rj.Clear();
+        }
+    }
+
+    return sRet;
+}
+</code></pre>
+
+<p>As a result, following code in C# will return you the initial string:</p>
+
+<pre><code>var iv = "45287112549354892144548565456541";
+var key = "anjueolkdiwpoida";
+var cypher = "u+rIlHB/2rrT/u/qFInnlEkg2unhizsNzGVb9O54sP8=";
+
+var temp = DecryptRJ256(Decode(cypher), key, iv);
+</code></pre>

@@ -1,0 +1,50 @@
+<p>I reproduced your experiment but I do not get any error. 
+The error indicates one of your vectors <code>actual</code> or <code>prediction</code> <strong>contains more than two discrete values</strong>.</p>
+
+<p>It is indeed weird that you are able to score a random forest trained outside <code>GridSearchCV</code>.<br>
+Could you provide the exact code you run to do this? </p>
+
+<p>Here's the code I used to try to reproduce the error:</p>
+
+<pre><code>from sklearn.datasets import make_classification
+from sklearn.grid_search import GridSearchCV
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, \
+    matthews_corrcoef, make_scorer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.cross_validation import train_test_split
+
+def overall_average_score(actual,prediction):
+    precision, recall, f1_score, _ = precision_recall_fscore_support(
+        actual, prediction, average='binary')
+    total_score = (matthews_corrcoef(actual, prediction) +
+        accuracy_score(actual, prediction) + precision + recall + f1_score)
+    return total_score / 5
+
+grid_scorer = make_scorer(overall_average_score, greater_is_better=True)
+
+print("Without GridSearchCV")
+X, y = make_classification(n_samples=500, n_informative=10, n_classes=2)
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+    test_size=0.5, random_state=0)
+rf = RandomForestClassifier()
+rf.fit(X_train, y_train)
+y_pred = rf.predict(X_test)
+print("Overall average score: ", overall_average_score(y_test, y_pred))
+
+print("-" * 30)
+print("With GridSearchCV:")
+
+parameters = {'n_estimators': [10,20,30],
+              'max_features': ['auto','sqrt','log2',0.5,0.3], }
+gs_rf = GridSearchCV(rf, parameters, cv=5, scoring=grid_scorer)
+gs_rf.fit(X_train,y_train)
+print("Best score with grid search: ", gs_rf.best_score_)
+</code></pre>
+
+<p>Now I'd like to make a few comments on the code you provided:</p>
+
+<ul>
+<li>It's not a great practice to use variable names such as <code>random</code> (this is usually a module) or <code>f1_score</code> (this conflicts with the <code>sklearn.metrics.f1_score</code> method). </li>
+<li>You could unpack <code>precision</code>, <code>recall</code> and <code>f1_score</code> directly instead of calling 3 times <code>precision_recall_fscore_support</code>.</li>
+<li>It does not really make sense to grid search on <code>n_estimators</code>: <strong>more trees is always better</strong>. If you are worried about overfitting you can reduce the complexity of the individual models by using other parameters such as <code>max_depth</code> or <code>min_samples_split</code>.</li>
+</ul>

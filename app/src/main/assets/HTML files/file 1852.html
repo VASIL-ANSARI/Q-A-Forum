@@ -1,0 +1,77 @@
+<p>This approach is a little bit funky in my opinion, as I think of both a ScrollViewer and a VerticalScrollOffset as "View" entities that should have very little (or nothing) to do with a ViewModel. It seems like this might be forcing MVVM a little too much, and creating a lot of extra work in creating an attached dependency property and basically trying to keep a bound Offset ViewModel property in sync with the readonly VerticalScrollOffset of the ScrollViewer.</p>
+
+<p>I am not <em>exactly</em> sure of what you are trying to achieve, but it sounds like you are trying to scroll to a specified offset when some dynamic element is added to the underlying panel of your ScrollViewer. Personally, I would just want to handle this behavior with a little bit of code in my View and forget about tying it to the ViewModel.</p>
+
+<p>One really nice way to do this type of thing in Silverlight 3 is with Blend behaviors. You write a little bit of behavior code in C# and then can attach it declaratively to an element in XAML. This keeps it reusable and out of your code-behind. Your project will have to reference the System.Windows.Interactivity DLL which is part of the Blend SKD.</p>
+
+<p>Here's a simple example of a simple Blend behavior you could add to a ScrollViewer which scrolls to a specified offset whenever the size of the underlying content of the ScrollViewer changes:</p>
+
+<pre><code>public class ScrollToOffsetBehavior : Behavior&lt;ScrollViewer&gt;
+{
+    private FrameworkElement contentElement = null;
+
+    public static readonly DependencyProperty OffsetProperty = DependencyProperty.Register(
+        "Offset",
+        typeof(double),
+        typeof(ScrollToOffsetBehavior),
+        new PropertyMetadata(0.0));
+
+    public double Offset
+    {
+        get { return (double)GetValue(OffsetProperty); }
+        set { SetValue(OffsetProperty, value); }
+    }
+
+    protected override void OnAttached()
+    {
+        base.OnAttached();
+
+        if (this.AssociatedObject != null)
+        {
+            this.AssociatedObject.Loaded += new RoutedEventHandler(AssociatedObject_Loaded);
+        }
+    }
+
+    protected override void OnDetaching()
+    {
+        base.OnDetaching();
+
+        if (this.contentElement != null)
+        {
+            this.contentElement.SizeChanged -= contentElement_SizeChanged;
+        }
+
+        if (this.AssociatedObject != null)
+        {
+            this.AssociatedObject.Loaded -= AssociatedObject_Loaded;
+        }
+    }
+
+    void AssociatedObject_Loaded(object sender, RoutedEventArgs e)
+    {
+        this.contentElement = this.AssociatedObject.Content as FrameworkElement;
+
+        if (this.contentElement != null)
+        {
+            this.contentElement.SizeChanged += new SizeChangedEventHandler(contentElement_SizeChanged);
+        }
+    }
+
+    void contentElement_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        this.AssociatedObject.ScrollToVerticalOffset(this.Offset);
+    }
+}
+</code></pre>
+
+<p>You could then apply this behavior to the ScrollViewer in XAML (and specify an offset of 0 to scroll back to the top):</p>
+
+<pre><code>   &lt;ScrollViewer&gt;
+        &lt;i:Interaction.Behaviors&gt;
+            &lt;local:ScrollToOffsetBehavior Offset="0"/&gt;
+        &lt;/i:Interaction.Behaviors&gt;
+        ...Scroll Viewer Content...
+    &lt;/ScrollViewer&gt;
+</code></pre>
+
+<p>This would be assuming that you always want to scroll to the offset whenever the content size changes. This may not be exactly what you are looking for, but it is one example of how something like this can be done in the view using a behavior.</p>

@@ -1,0 +1,32 @@
+<p>You could store the .sql file in Azure Blob Storage, and within the runbook download the .sql file, read its contents, and pass that to the SqlCommand object.</p>
+
+<p>Something like:</p>
+
+<pre><code>try {
+    # Connect to Azure using service principal auth
+    $ServicePrincipalConnection = Get-AutomationConnection -Name $AzureConnectionAssetName         
+
+    Write-Output "Logging in to Azure..."
+
+    $Null = Add-AzureRmAccount `
+        -ServicePrincipal `
+        -TenantId $ServicePrincipalConnection.TenantId `
+        -ApplicationId $ServicePrincipalConnection.ApplicationId `
+        -CertificateThumbprint $ServicePrincipalConnection.CertificateThumbprint 
+}
+catch {
+    if(!$ServicePrincipalConnection) {
+        throw "Connection $AzureConnectionAssetName not found."
+    }
+    else {
+        throw $_.Exception
+    }
+}
+
+$Path = "C:\abc.sql"
+Set-AzureRmCurrentStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName
+
+Get-AzureStorageBlobContent -Container $Container -Blob $Blob -Destination $Path
+$Content = Get-Content $Path
+$Cmd = New-Object System.Data.SqlClient.SqlCommand($Content, $Conn) 
+</code></pre>

@@ -1,0 +1,52 @@
+<p>I would do like this:</p>
+
+<p><strong>EDIT :</strong> <code>OnClientClick</code> wouldn't work with GridViewRow. You can try the following:</p>
+
+<pre><code>protected void GridView1_RowDataBound(object sender, GridViewRowEventArgs e)
+{
+    e.Row.Attributes["onclick"] = Page.ClientScript.GetPostBackClientHyperlink(GridView1, "Select$" + e.Row.RowIndex);
+    e.Row.Attributes.Add("onclick", "setVisible('cfilterpopup');__doPostBack('" + GridView1.ClientID + "', 'Select$" + e.Row.RowIndex + "');");
+}
+</code></pre>
+
+<p><strong>Explanation:</strong> In the secod line we are changing the attribute to inject our <code>setVisible()</code> method and calling the <code>__doPostBack()</code>.</p>
+
+<p><strong>EDIT 2 :</strong>  There are two issues right now: </p>
+
+<ol>
+<li><p>The <code>cfilterpopup</code> will be invisible again upon postback.</p></li>
+<li><p>The <code>Onclick</code> attribute is wiped out on postback</p></li>
+</ol>
+
+<p><strong>How to fix #1 :</strong></p>
+
+<p>Add a hidden field in markup. Inside <code>setVisible()</code> set the hidden fields value to "1". On body <code>onload</code> add a method to scan this value and make the part visible/invisble. </p>
+
+<p>Your markup with the javascript may look like this:</p>
+
+<pre><code>&lt;head runat="server"&gt;
+    &lt;title&gt;&lt;/title&gt;
+    &lt;script type="text/javascript"&gt;
+        function setVisible(itm) {
+           document.getElementById('&lt;%=hdnStatus.ClientID %&gt;').value="1";
+        }
+
+        function showcfilterpopup() {
+            var status = document.getElementById('&lt;%=hdnStatus.ClientID %&gt;').value;
+            document.getElementById('cfilterpopup').style.visibility = status == "1" ? "visible" : "hidden";           
+        }
+    &lt;/script&gt;
+&lt;/head&gt;
+&lt;body onload="showcfilterpopup();"&gt;
+    &lt;form id="form1" runat="server"&gt;
+    &lt;div&gt;
+        &lt;div id="cfilterpopup" style="display:none"&gt;
+            &lt;p&gt;cfilterpopup&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;asp:HiddenField ID="hdnStatus" Value="0" runat="server" /&gt;
+        &lt;asp:GridView ID="GridView1" runat="server" OnRowDataBound="GridView1_RowDataBound"&gt;&lt;/asp:GridView&gt;
+    &lt;/div&gt;
+    &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>

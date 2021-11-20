@@ -1,0 +1,34 @@
+<p>Since no one answered me :(  I have to choose the most painful way : compile libnids, then debug step by step to see wtf was going on.</p>
+
+<p>I try turn off the -O2 compile options.</p>
+
+<p>And see where the tcp callback should be called. I find that two facts:</p>
+
+<ul>
+<li>the checksum of some packets is wrong.</li>
+<li>it merely find a tcp stream and add a new connection because of ACKs' not being seen.</li>
+</ul>
+
+<p>the first one is verified by wireshark. And I see wireshark nofify me that <code>tcp checksum offload</code>. I get the explaination from the wiki of wireshark:</p>
+
+<blockquote>
+  <p>Most modern operating systems support some form of network offloading,
+  where some network processing happens on the NIC instead of the CPU.
+  Normally this is a great thing. It can free up resources on the rest
+  of the system and let it handle more connections. If you're trying to
+  capture traffic it can result in false errors and strange or even
+  missing traffic.
+        Checksum Offload
+       On systems that support checksum offloading, IP, TCP, and UDP checksums are calculated on the NIC just before they're transmitted on
+  the wire. In Wireshark these show up as outgoing packets marked black
+  with red Text and the note [incorrect, should be xxxx (maybe caused by
+  "TCP checksum offload"?)].</p>
+</blockquote>
+
+<p>The second one is because libnids is able to reassemble the stream by the hand shake message.</p>
+
+<p>All of a sudden, The idea come to my mind that combining these two fact result in the result output nothing. </p>
+
+<p><strong>Since most ACKs packet have wrong checksum.</strong> So the packet is skipped before it can be seen by the reassemble function.</p>
+
+<p>After disable checksum, I finally get the output of tcp payload. Two days and I got it!</p>

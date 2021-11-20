@@ -1,0 +1,267 @@
+<p>As is often the case with such problems, it becomes much easier to solve once you've put the data into a "shape" that closely resembles your desired output. Your output is a nested tree structure, so your data should be, too. Let's do that first. Here's your data:</p>
+
+<pre><code>data = {
+  genesis: [
+    { id: 1, verse: "Genesis 4:12" },
+    { id: 1, verse: "Genesis 4:23-25" },
+    { id: 2, verse: "Genesis 6:17" }
+  ],
+  exodus: [
+    { id: 5, verse: "Exodus 2:7" },
+    # ...
+  ],
+  # ...
+}
+</code></pre>
+
+<p>And, setting aside the HTML for now, here's the structure we want:</p>
+
+<pre class="lang-none prettyprint-override"><code>Genesis
+  Chapter 4
+    ID 1 - Verse 12
+    ID 1 - Verse 23-25
+  Chapter 6
+    ID 2 - Verse 17
+Exodus
+  Chapter 2
+    ID 5 - Verse 7
+    ...
+...
+</code></pre>
+
+<p>The first thing I notice about your data is that it has a level of nesting you don't need. Since the <code>:verse</code> values contain the book name, we don't the keys from the outer hash (<code>:genesis</code> et al) and we can just flatten all of the inner hashes into a single array:</p>
+
+<pre><code>data.values.flatten
+# =&gt; [ { id: 1, verse: "Genesis 4:12" },
+#      { id: 1, verse: "Genesis 4:23-25" },
+#      { id: 2, verse: "Genesis 6:17" }
+#      { id: 5, verse: "Exodus 2:7" },
+#      # ... ]
+</code></pre>
+
+<p>Now we need a method to extract the book, chapter, and verse from the <code>:verse</code> strings. You can use <code>String#split</code> if you want, but a Regexp is a good choice too:</p>
+
+<pre><code>VERSE_EXPR = /(.+)\s+(\d+):(.+)$/
+
+def parse_verse(str)
+  m = str.match(VERSE_EXPR)
+  raise "Invalid verse string!" if m.nil?
+  book, chapter, verse = m.captures
+  { book: book, chapter: chapter, verse: verse }
+end
+
+flat_data = data.values.flatten.map do |id:, verse:|
+  { id: id }.merge(parse_verse(verse))
+end
+# =&gt; [ { id: 1, book: "Genesis", chapter: "4", verse: "12" },
+#      { id: 1, book: "Genesis", chapter: "4", verse: "23-25" },
+#      { id: 2, book: "Genesis", chapter: "6", verse: "17" },
+#      { id: 5, book: "Exodus", chapter: "2", verse: "7" },
+#      # ... ]
+</code></pre>
+
+<p>Now it's easy to group the data by book:</p>
+
+<pre><code>books = flat_data.group_by {|book:, **| book }
+# =&gt; { "Genesis" =&gt; [
+#        { id: 1, book: "Genesis", chapter: "4", verse: "12" },
+#        { id: 1, book: "Genesis", chapter: "4", verse: "23-25" },
+#        { id: 2, book: "Genesis", chapter: "6", verse: "17" }
+#      ],
+#      "Exodus" =&gt; [
+#        { id: 5, book: "Exodus", chapter: "2", verse: "7" },
+#        # ...
+#      ],
+#      # ...
+#    }
+</code></pre>
+
+<p>...and within each book, by chapter:</p>
+
+<pre><code>books_chapters = books.map do |book, verses|
+  [ book, verses.group_by {|chapter:, **| chapter } ]
+end
+# =&gt; [ [ "Genesis",
+#        { "4" =&gt; [ { id: 1, book: "Genesis", chapter: "4", verse: "12" },
+#                   { id: 1, book: "Genesis", chapter: "4", verse: "23-25" } ],
+#          "6" =&gt; [ { id: 2, book: "Genesis", chapter: "6", verse: "17" } ]
+#        }
+#      ],
+#      [ "Exodus",
+#        { "2" =&gt; [ { id: 5, book: "Exodus", chapter: "2", verse: "7" },
+#                   # ... ],
+#          # ...
+#        }
+#      ],
+#      # ...
+#    ]
+</code></pre>
+
+<p>You'll notice that since we called <code>map</code> on <code>books</code> our final result is an Array, not a Hash. You could call <code>to_h</code> on it to make it a Hash again, but for our purposes it's not necessary (iterating over an Array of key-value pairs works the same as iterating over a Hash).</p>
+
+<p>It looks a little messy, but you can see that the structure is there: Verses nested within chapters nested within books. Now we just need to turn it into HTML.</p>
+
+<blockquote>
+  <p>An aside, for the sake of our friends with disabilities: The correct
+  HTML element to use for nested tree structures is <code>&lt;ul&gt;</code> or <code>&lt;ol&gt;</code>. If
+  you have some requirement to use <code>&lt;div&gt;</code>s instead you can, but
+  otherwise use the right element for the jobâusers who use
+  accessibility devices will thank you. (Many articles have been written
+  on styling such trees, so I won't go into it, but for a start you can
+  hide the bullets with <code>list-style-type: none;</code>.)</p>
+</blockquote>
+
+<p>I don't have a Rails app at my disposal, so to generate the HTML I'll just use ERB from the Ruby standard library. It will look more-or-less identical in Rails except for how you pass the variable to the view.</p>
+
+<pre><code>require "erb"
+
+VIEW = &lt;&lt;END
+&lt;ul&gt;
+&lt;% books.each do |book_name, chapters| %&gt;
+  &lt;li&gt;
+    &lt;a href="#"&gt;&lt;%= book_name %&gt;&lt;/a&gt;
+    &lt;ul&gt;
+    &lt;% chapters.each do |chapter, verses| %&gt;
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter &lt;%= chapter %&gt;&lt;/a&gt;
+        &lt;ul&gt;
+        &lt;% verses.each do |id:, verse:, **| %&gt;
+          &lt;li&gt;
+            &lt;a onclick="load(&lt;%= id %&gt;)"&gt;ID &lt;%= id %&gt;: Verse &lt;%= verse %&gt;&lt;/a&gt;
+          &lt;/li&gt;
+        &lt;% end %&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;% end %&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;% end %&gt;
+&lt;/ul&gt;
+END
+
+def render(books)
+   b = binding
+   ERB.new(VIEW, nil, "&lt;&gt;-").result(b)
+end
+
+puts render(books_chapters)
+</code></pre>
+
+<p>And here's the result as an HTML snippet:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="false" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;ul&gt;
+
+  &lt;li&gt;
+    &lt;a href="#"&gt;Genesis&lt;/a&gt;
+    &lt;ul&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 4&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(1)"&gt;ID 1: Verse 12&lt;/a&gt;
+          &lt;/li&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(1)"&gt;ID 1: Verse 23-25&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 6&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(2)"&gt;ID 2: Verse 17&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+    &lt;/ul&gt;
+  &lt;/li&gt;
+
+  &lt;li&gt;
+    &lt;a href="#"&gt;Exodus&lt;/a&gt;
+    &lt;ul&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 2&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(5)"&gt;ID 5: Verse 7&lt;/a&gt;
+          &lt;/li&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(3)"&gt;ID 3: Verse 14-15&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 12&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(4)"&gt;ID 4: Verse 16&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+    &lt;/ul&gt;
+  &lt;/li&gt;
+
+  &lt;li&gt;
+    &lt;a href="#"&gt;Leviticus&lt;/a&gt;
+    &lt;ul&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 11&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(2)"&gt;ID 2: Verse 19-21&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 15&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(7)"&gt;ID 7: Verse 14-31&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+      &lt;li&gt;
+        &lt;a href="#"&gt;Chapter 19&lt;/a&gt;
+        &lt;ul&gt;
+
+          &lt;li&gt;
+            &lt;a onclick="load(7)"&gt;ID 7: Verse 11-12&lt;/a&gt;
+          &lt;/li&gt;
+
+        &lt;/ul&gt;
+      &lt;/li&gt;
+
+    &lt;/ul&gt;
+  &lt;/li&gt;
+
+&lt;/ul&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<p>Finally, here it is in action on repl.it: <a href="https://repl.it/Duhm" rel="nofollow">https://repl.it/Duhm</a></p>

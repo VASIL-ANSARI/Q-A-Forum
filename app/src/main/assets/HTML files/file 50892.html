@@ -1,0 +1,101 @@
+<p>Are you overriding the $httpProvider in the angular app.config method?</p>
+
+<p>By using <code>$httpProvider.interceptors.push(&lt;Your auth interceptor&gt;);</code></p>
+
+<p>If not, the interceptor will monitor all the requests your angular app makes and processes them using the "optional functions" below.</p>
+
+<p>You would setup a factory to handle everything such as the bare bones one below.
+This will basically take it one request at a time. So for the simulatanious request problem, the first request will pass through the factories request function and set the headers. The request will then be made and the response function will be hit. If the response returns an error the factories response error function will be called and if will evaluate the status code for 401 and you can implement a way to request a new bearer token. After that is done the second request will send and the new bearer token will already be set and you should be good to go.</p>
+
+<pre><code>angular.module('authInterceptor', []).factory('Interceptor', Interceptor);
+
+function Interceptor($q, $cookie){
+    var factory = {
+        response: response,
+        responseError: responseError,
+        request: request,
+        };
+
+    //////////////////
+
+    //This will setup the http request
+    //Since your using a bearer token and refresh token you will want to add the bearer token the the header of all the requests
+    function request(config) {
+        //Set config.headers to existing headers or if none exists set it to an empty object
+        config.headers = config.headers || {};
+
+        //Grab you auth data from storage
+        //I usually store the object from the /token request in $cookie
+        var authData = $cookies.getObject("authData");
+
+        //If authData exists set it as a Authorization header
+        if (authData) {
+            config.headers.Authorization = "Bearer " + authData.access_token;
+        }
+    }
+
+    function response(response) {
+        return response || $q.when(response);
+    }
+
+    //Where the 401 magic happens
+    //If your rejection status is a 401(UnAuthorized)
+    //You want to request a new token from the authorization service
+    function responseError(rejection) {
+        var deferred = $q.defer();
+
+        if (rejection.status === 401) {
+            //You need to manually inject services or factories since your in the .config method
+            var Authentication = $injector.get("Authentication");
+
+            //I usually set up a Authentication Service to do the dirty work so the interceptor doesnt get bloated with code
+
+            //See below for reissue token
+            Authentication.reissueToken()
+                .then(function () {
+
+                //Valid grant
+
+            }, function (err) {
+
+                //Invalid grant
+            });
+
+            //When this get his the original $http request that failed will get resent to the server
+            return deferred.promise;
+        }
+
+        return $q.reject(rejection);
+    }
+}
+
+
+/*Reissue token 
+         * Grabs the authData from storage, using the bearer token make a request to the token endpoint
+         * If the refresh token hasnt expired the success will send back a new bearer token.
+         * Update the auth cookie with the new token object
+         * If the refresh token has expired the request will result in an invalid_grant request will
+         * be rejected, user must log in again*/
+ function reissueToken() {
+        var deferred = $q.defer();
+        var authData = $cookies.getObject("authData");
+
+        if (authData) {
+            var token = authData.refresh_token;
+            var data = "grant_type=refresh_token&amp;refresh_token=" + token + "&amp;client_id=" + clientId;
+
+            $http.post("/token", data)
+                .success(function (newToken) {
+                    //Update wherever you store the authorization data
+                }).error(function (err, status) {
+                    deferred.reject();
+            });
+        } else {
+            deferred.reject();
+        }
+
+        return deferred.promise;
+    }
+</code></pre>
+
+<p>You can read more <a href="https://docs.angularjs.org/api/ng/service/$http" rel="nofollow">here</a> ctrl + f for interceptor</p>

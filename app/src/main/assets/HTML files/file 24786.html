@@ -1,0 +1,49 @@
+<p>First of all, please see this <a href="http://stackoverflow.com/questions/6566322/scrapy-crawl-urls-in-order">thread</a> - I think you'll find all the answers there.</p>
+
+<blockquote>
+  <p>the order of the urls used by downloader? Will the requests made by
+  just_test1,just_test2 be used by downloader only after the all
+  start_urls are used?(I have made some tests, it seems that the answer
+  is No)</p>
+</blockquote>
+
+<p>You are right, the answer is <code>No</code>. The behavior is completely asynchronous: when the spider starts, <code>start_requests</code> method is called (<a href="https://github.com/scrapy/scrapy/blob/master/scrapy/spider.py#L49">source</a>):</p>
+
+<pre><code>def start_requests(self):
+    for url in self.start_urls:
+        yield self.make_requests_from_url(url)
+
+def make_requests_from_url(self, url):
+    return Request(url, dont_filter=True)
+</code></pre>
+
+<blockquote>
+  <p>What decides the order? Why and How is this order? How can we control
+  it?</p>
+</blockquote>
+
+<p>By default, there is no pre-defined order - you cannot know when <code>Requests</code> from <code>make_requests_from_url</code> will arrive - it's asynchronous. </p>
+
+<p>See <a href="http://stackoverflow.com/a/6593427/771848">this answer</a> on how you may control the order.
+Long story short, you can override <code>start_requests</code> and mark yielded <code>Requests</code> with <code>priority</code> key (like <code>yield Request(url, meta={'priority': 0})</code>). For example, the value of <code>priority</code> can be the line number where the url was found.</p>
+
+<blockquote>
+  <p>Is this a good way to deal with so many urls which are already in a
+  file? What else?</p>
+</blockquote>
+
+<p>I think you should read your file and yield urls directly in <code>start_requests</code> method: see <a href="http://stackoverflow.com/a/10379463/771848">this answer</a>.</p>
+
+<p>So, you should do smth like this:</p>
+
+<pre><code>def start_requests(self):
+    with codecs.open(self.file_path, u"r", encoding=u"GB18030") as f:
+        for index, line in enumerate(f):
+            try:
+                url = line.strip()
+                yield Request(url, meta={'priority': index})
+            except:
+                continue
+</code></pre>
+
+<p>Hope that helps.</p>

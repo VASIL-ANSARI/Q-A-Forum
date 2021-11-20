@@ -1,0 +1,120 @@
+<p>This is a bit messy way but its quickly does what you want. First of all make a class to hold each uniqe domains and its URLs:</p>
+
+<pre><code>public class ShortLink
+{
+    public string DomainName { get; set; }
+    public List&lt;string&gt; UrlList;
+
+    public ShortLink(string domainName)
+    {
+        DomainName = domainName;
+        UrlList = new List&lt;string&gt;();
+    }
+
+    public void AddUrl(string url)
+    {
+        if(!UrlList.Contains(url))
+            UrlList.Add(url);
+    }
+
+    public string GetFullUrl(int indexOfUrlInList)
+    {
+        return DomainName + "/" + UrlList[indexOfUrlInList];
+    }
+
+    //Add other methods like remove and stuff
+}
+</code></pre>
+
+<p>Assuming that your form has a treview called <code>treeView1</code> then try the code below:</p>
+
+<pre><code>public partial class Form1 : Form
+{
+    private List&lt;string&gt; _links = new List&lt;string&gt;(new []{
+        "bit.ly/sh125ad",
+        "adf.ly/sh1d5ad",
+        "bit.ly/sh1d5ad",
+        "adf.ly/sh125ad",
+        "adf.ly/sh12had"
+    });
+
+    private List&lt;ShortLink&gt; _shortLinks = new List&lt;ShortLink&gt;();
+
+    public Form1()
+    {
+        InitializeComponent();
+
+        PopulateTreeView();
+    }
+
+    private void PopulateTreeView()
+    {
+        //Make the dictionary
+        foreach (var link in _links)
+        {
+            var parts = link.Split('/');
+            var domainPart = parts[0];
+
+            if (!_shortLinks.Contains(_shortLinks.FirstOrDefault(x =&gt; x.DomainName == domainPart)))
+            {
+                var shortLink = new ShortLink(domainPart);
+                _shortLinks.Add(shortLink);
+            }
+        }
+
+        foreach (var link in _links)
+        {
+            var parts = link.Split('/');
+            var domainPart = parts[0];
+            var urlPart = parts[1];
+            //find a ShortLink in the list we made that matches this domainpart
+            var shortLink = _shortLinks.FirstOrDefault(x =&gt; x.DomainName == domainPart);
+
+            //if its not null, we add the url part to taht!
+            if(shortLink != null)
+                shortLink.AddUrl(urlPart);
+
+            //now we have all domains and parts
+        }
+
+
+        //Populate treeview
+        foreach (var shortLink in _shortLinks)
+        {
+            var parentNode = new TreeNode(shortLink.DomainName);
+            var childNodes = new List&lt;TreeNode&gt;();
+
+            //add all the links in the current shortLink to the list of treenodes
+            foreach (var link in shortLink.UrlList)
+            {
+                childNodes.Add(new TreeNode(link));
+            }
+
+            //now time to add child notes to parent node
+            parentNode.Nodes.AddRange(childNodes.ToArray());
+
+            treeView1.Nodes.Add(parentNode);
+        }
+    }
+}
+</code></pre>
+
+<p><strong>UPDATE</strong></p>
+
+<p>I just realised your question was actually about finding parent nodes. See the method below:</p>
+
+<pre><code>private void AddToTreeView(string domain, string link)
+{
+    foreach (TreeNode node in treeView1.Nodes)
+    {
+        if (node.Text == domain)
+        {
+            node.Nodes.Add(link);
+        }
+    }
+}
+</code></pre>
+
+<p>Of course you can create a full node details when creating <code>Node</code> in a foreach loop. You can set fieds such as <code>Name</code> and <code>Tag</code> for each node for further use!</p>
+
+<p>You can also subclass the <code>TreeNode</code> and have your own custom fields to it.</p>

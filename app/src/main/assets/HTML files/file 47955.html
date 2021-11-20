@@ -1,0 +1,162 @@
+<p>First thing you should do is analyze your source format, and your destination format.</p>
+
+<ul>
+<li><p>Your <strong>source</strong> format is just an array of objects of individual people.</p></li>
+<li><p>Your <strong>destination</strong> format is an object that groups the people by state
+and into certain categories.</p></li>
+</ul>
+
+<p>Next, think about how you can get the source into this destination.</p>
+
+<p>You're going to want to iterate over each individual person in the source, and try to add it to your array of states. Now, I'll say your destination format is a bit peculiar, but by writing a couple of helper functions, you can achieve that format.</p>
+
+<p>Take a look at your destination format again. It's an array of objects. Part of each object in that array is a property called <code>state</code> that has a value for the state that object represents. You're going to want a function that can look through this array for a specific state, and return the existing object for you. If the state doesn't exist, it should add a new entry to the array for you and return that.</p>
+
+<p>Since JSON just means JavaScript Object Notation, and you are actually working with JavaScript objects, you should create an object that models each entry of your destination array. I'm going to call these StateSummary.</p>
+
+<pre><code>function StateSummary(state) {
+    this.state = state;
+    this.Matriculation = [];
+    this.Graduation = [];
+    this.Masters = [];
+    this.Phd = [];
+}
+</code></pre>
+
+<p>Can you see how this object represents each entry in your destination array?</p>
+
+<p>Now that you have an object that models each entry, we need a function that can check to see if an entry for a certain state already exists. If it exists, it will return that object. If it doesn't exist, it will add a new object to the array, and return this new object.</p>
+
+<pre><code>function addOrGetState(array, state) {
+    for (var i = 0; i &lt; array.length; i++) {
+        var obj = array[i];
+
+        if (obj.state === state)
+            return obj;
+    }
+
+    //If the function got here, then it didn't find a matching state.
+    var obj = new StateSummary(state);
+    array.push(obj); //Add the new object to the array.
+    return obj; //Return the new object.
+}
+</code></pre>
+
+<p>So, now you can get an entry by state from your destination array, and you can create new entries.</p>
+
+<p>Go ahead and create a function that will add a person to a StateSummary object.</p>
+
+<pre><code>function addPersonToStateSummary(person, stateSummary) {
+    stateSummary.Matriculation.push({ Name: person.Name, status: person.Matriculation });
+    stateSummary.Graduation.push({ Name: person.Name, status: person.Graduation});
+    stateSummary.Masters.push({ Name: person.Name, status: person.Masters});
+    stateSummary.Phd.push({ Name: person.Name, status: person.Phd});
+}
+</code></pre>
+
+<p>The last piece is iterating over the source array, and massaging that data into your destination array.</p>
+
+<pre><code>var sourceArray = response.data.List; //You provided this.
+var destinationArray = []; //Allocate a new array to put stuff in.
+
+for (var i = 0; i &lt; sourceArray.length; i++) {
+    var person = sourceArray[i]; //Each entry of the source array represents a person.
+
+    var stateSummary = addOrGetState(destinationArray, person.state);
+
+    addPersonToStateSummary(person, stateSummary);
+}
+</code></pre>
+
+<p>This should give you what you are looking for. <em>I hope this breakdown teaches you how to think about the problem in an analytical way, breaking its steps down first, and then solving them with code.</em></p>
+
+<p>Here is a demo:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var response = {
+  "data": {
+    "List": [{
+      "Name": "Mary",
+      "state": "AZ",
+      "Matriculation": "complete",
+      "Graduation": "complete",
+      "Masters": "complete",
+      "Phd": "notStarted"
+    }, {
+      "Name": "Stephanie",
+      "state": "CT",
+      "Matriculation": "complete",
+      "Graduation": "complete",
+      "Masters": "complete",
+      "Phd": "notStarted"
+    }, {
+      "Name": "John",
+      "state": "CT",
+      "Matriculation": "complete",
+      "Graduation": "planning",
+      "Masters": "notStarted",
+      "Phd": "notStarted"
+    }]
+  }
+};
+
+function StateSummary(state) {
+  this.state = state;
+  this.Matriculation = [];
+  this.Graduation = [];
+  this.Masters = [];
+  this.Phd = [];
+}
+
+function addOrGetState(array, state) {
+  for (var i = 0; i &lt; array.length; i++) {
+    var obj = array[i];
+
+    if (obj.state === state)
+      return obj;
+  }
+
+  //If the function got here, then it didn't find a matching state.
+  var obj = new StateSummary(state);
+  array.push(obj); //Add the new object to the array.
+  return obj; //Return the new object.
+}
+
+
+function addPersonToStateSummary(person, stateSummary) {
+  stateSummary.Matriculation.push({
+    Name: person.Name,
+    status: person.Matriculation
+  });
+  stateSummary.Graduation.push({
+    Name: person.Name,
+    status: person.Graduation
+  });
+  stateSummary.Masters.push({
+    Name: person.Name,
+    status: person.Masters
+  });
+  stateSummary.Phd.push({
+    Name: person.Name,
+    status: person.Phd
+  });
+}
+
+
+var sourceArray = response.data.List; //You provided this.
+var destinationArray = []; //Allocate a new array to put stuff in.
+
+for (var i = 0; i &lt; sourceArray.length; i++) {
+  var person = sourceArray[i]; //Each entry of the source array represents a person.
+
+  var stateSummary = addOrGetState(destinationArray, person.state);
+
+  addPersonToStateSummary(person, stateSummary);
+}
+
+document.getElementById('result').innerHTML = JSON.stringify(destinationArray);</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;div id="result"&gt;&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

@@ -1,0 +1,106 @@
+<p>I don't have a complete grasp of your code. However, you can save an image of the bounding rectangle to the circle with something like the following. First find the center of a given circle.</p>
+
+<pre><code>// Assuming the variable circle is your output from HoughCircles
+cv::Point center(cvRound(circle[0]),cvRound(circles[1]));
+</code></pre>
+
+<p>Then find the radius.</p>
+
+<pre><code>int radius = cvRound(circle[2]);
+</code></pre>
+
+<p>Given the center and the radius you can create a new image from the circles bounding rectangle</p>
+
+<pre><code>// Assuming src is your original image
+cv::Mat boundingRectangle(images_read[i], cv::Rect(
+              cv::Point(
+                  center.x - radius,
+                  center.y - radius
+                  ),
+              cv::Point(
+                  center.x + radius,
+                  center.y + radius
+                  )
+              ));
+</code></pre>
+
+<p>And then save it with the following</p>
+
+<pre><code>cv::imwrite("/path/to/file", boundingRectangle);
+</code></pre>
+
+<p>So putting it all together you could end up with something like the following</p>
+
+<pre><code>#include &lt;vector&gt;
+#include &lt;sstream&gt;
+#include &lt;string&gt;
+
+int main(int argc, char **argv) {
+    std::vector&lt;cv::Mat&gt; images_read;
+    std::vector&lt;std::string&gt; image_names;
+
+    // Read the image
+    for(size_t i = 1; i &lt; argc; ++i) {
+        cv::Mat tmp = cv::imread(argv[i], 1);
+
+        if(!tmp.data){
+            std::cout &lt;&lt; "Image " &lt;&lt; *argv &lt;&lt; " couldn't be read!\n";
+            exit(-1);
+        }
+        images_read.push_back(tmp);
+        image_names.push_back(argv[i]);
+    }
+
+    std::vector&lt;cv::Mat&gt; images_gray(images_read.size());
+
+    // Convert it to gray
+    for(size_t i = 0; i &lt; images_read.size(); ++i){
+        cv::cvtColor(images_read[i], images_gray[i], CV_BGR2GRAY);
+
+        // Reduce the noise so we avoid false circle detection
+        cv::GaussianBlur(images_gray[i], images_gray[i], cv::Size(9, 9), 2, 2);
+
+        // Apply the Hough Transform to find the circles
+        std::vector&lt;cv::Vec3f&gt; circles;
+        cv::HoughCircles(images_gray[i], circles, CV_HOUGH_GRADIENT,1,
+            images_gray[i].rows / 8, 200, 100, 0, 0);
+
+        // Loop through all of the circles found and write them
+        for(size_t j = 0; j &lt; circles.size(); ++j) {
+            cv::Point center(
+                         cvRound(circles[j][0]),
+                         cvRound(circles[j][1])
+                        );
+            int radius = cvRound(circles[j][2]);
+
+            // Create a image from the bounding
+            // rectangle using the center and radius
+            cv::Mat boundingRectangle(images_read[i], cv::Rect(
+                       cv::Point(
+                                 center.x - radius,
+                                 center.y - radius
+                                 ),
+                       cv::Point(
+                                 center.x + radius,
+                                 center.y + radius
+                                 )
+                                ));
+            std::string tmp = std::string(image_names[i]);
+            // Assuming the files you're reading are jpeg images
+            std::string output = std::string(tmp, 0, tmp.find(".jpg"));     
+
+            std::ostringstream os;
+            os &lt;&lt; "-" &lt;&lt; j &lt;&lt; ".jpg";
+
+            output += os.str();
+
+            cv::imwrite(output, boundingRectangle);
+        }
+    }
+    return 0;
+}
+</code></pre>
+
+<p>The key parts including finding the radius, the center, and then creating an image from the bounding rectangle of the circle.</p>
+
+<p>The image inside the bounding rectangle will be saved as the file path with the number of <code>j</code> after it.</p>

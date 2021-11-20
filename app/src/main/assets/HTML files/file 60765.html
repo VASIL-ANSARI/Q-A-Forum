@@ -1,0 +1,41 @@
+<p>This is how I ended up doing it.</p>
+
+<pre><code>  public void OpenWordprocessingDocumentReadonly()
+        {
+            string filepath = @"C:\...\test.docx";
+            // Open a WordprocessingDocument based on a filepath.
+            Dictionary&lt;int, string&gt; pageviseContent = new Dictionary&lt;int, string&gt;();
+            int pageCount = 0;
+            using (WordprocessingDocument wordDocument =
+                WordprocessingDocument.Open(filepath, false))
+            {
+                // Assign a reference to the existing document body.  
+                Body body = wordDocument.MainDocumentPart.Document.Body;
+                if (wordDocument.ExtendedFilePropertiesPart.Properties.Pages.Text != null)
+                {
+                    pageCount = Convert.ToInt32(wordDocument.ExtendedFilePropertiesPart.Properties.Pages.Text);
+                }
+                int i = 1;
+                StringBuilder pageContentBuilder = new StringBuilder();
+                foreach (var element in body.ChildElements)
+                {
+                    if (element.InnerXml.IndexOf("&lt;w:br w:type=\"page\" /&gt;", StringComparison.OrdinalIgnoreCase) &lt; 0)
+                    {
+                        pageContentBuilder.Append(element.InnerText);
+                    }
+                    else
+                    {
+                        pageviseContent.Add(i, pageContentBuilder.ToString());
+                        i++;
+                        pageContentBuilder = new StringBuilder();
+                    }
+                    if (body.LastChild == element &amp;&amp; pageContentBuilder.Length &gt; 0)
+                    {
+                        pageviseContent.Add(i, pageContentBuilder.ToString());
+                    }
+                }
+            }
+        }
+</code></pre>
+
+<p><strong>Downside: This wont work in all scenarios. This will work only when you have a page break, but if you have text extended from page 1 to page 2, there is no identifier to know you are in page two.</strong></p>

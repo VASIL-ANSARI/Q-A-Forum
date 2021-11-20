@@ -1,0 +1,23 @@
+<p>Although your comment addresses your programming mistake, there is a much better way to send and receive data of unknown types (and even unknown size) in MPI.</p>
+
+<p>One common way to differentiate different message types is to use different tag numbers for each type. In your code, you are using a tag number of 0 in your <code>MPI_Send</code> call. Use a tag number that describes the the type of message, and then use <a href="http://www.mcs.anl.gov/research/projects/mpi/www/www3/MPI_Probe.html" rel="nofollow"><code>MPI_Probe</code></a>  before your <code>MPI_Recv</code> call to find out what type of message you are about to receive. For example, your code could be modified like so:</p>
+
+<pre><code>if (rank == 0) {
+    MPI_Send(data_buf, data_size, MPI_BYTE, 1, tag_that_describes_message_type, MPI_COMM_WORLD)
+} else if (rank == 1) {
+    MPI_Status status;
+    // Probe for a message coming from rank 0 with any tag.
+    MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &amp;status);
+    // Find out what type of message is ready to be received by accessing the MPI_TAG variable in the status struct
+    if (status.MPI_TAG == 0) {
+        // Receive messages of this type. Maybe you sent an array of ints?
+        MPI_Recv(...)
+    } else if (status.MPI_TAG == 1) {
+        // Receive messages of this type. Maybe you sent an array of floats? Handle it here.
+        MPI_Recv(...)
+    } else if ...
+</code></pre>
+
+<p><code>MPI_Probe</code> can also be used to find out the size of a message before you receive a message, which allows you dynamically receive virtually any type of message. For a better explanation and illustration of using <code>MPI_Probe</code> for this purpose, go to <a href="http://www.mpitutorial.com/dynamic-receiving-with-mpi-probe-and-mpi-status/" rel="nofollow">this tutorial</a>.</p>
+
+<p>If you need to send widely-different types of data (too many to enumerate with tag numbers), pack your messages into a <a href="http://code.google.com/p/protobuf/" rel="nofollow">Google Protocol Buffer</a>, receive it as an array of <code>MPI_BYTE</code>s (as you do in your example), and then unpack it on the receiving side. A C implementation of Protocol Buffers is <a href="http://code.google.com/p/protobuf-c/" rel="nofollow">here</a>.</p>

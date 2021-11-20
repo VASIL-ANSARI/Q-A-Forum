@@ -1,0 +1,60 @@
+<p>Until the OpenSSL's <a href="http://wiki.openssl.org/index.php/Android" rel="nofollow">wiki</a> and setenv-android.sh are updated accordingly, I'll publish the recipe here. The required fixes to the process are:</p>
+
+<ol>
+<li>Update setenv-android.sh to support Windows.</li>
+<li>Update PATH to use Android NDK's (mingw) GNU make (rather than Cygwin's).</li>
+<li>Invoke <code>make</code> with a Windows-style path to Cygwin's perl.</li>
+</ol>
+
+<p>This recipe will be a strange hybrid of Cygwin and mingw (since Android NDK gcc toolchains for win32 are mingw). I'm assuming a Windows x86_64 build of the Android NDK unpacked into <strong>c:\android-ndk-r9d</strong>, and that you wish to use a gcc 4.8 toolchain.</p>
+
+<ol>
+<li>Install Android NDK (duh!). </li>
+<li>Install Cygwin -- make sure to include <strong>perl</strong></li>
+<li>Start Cygwin shell as an administrator to make sure native symlinks will work.</li>
+</ol>
+
+<p>Within the console, run the following script to set the variables:</p>
+
+<pre><code>export \
+  CYGWIN=winsymlinks:native \
+  ANDROID_API=android-14 \
+  ANDROID_DEV=c:/android-ndk-r9d/platforms/android-14/arch-arm/usr \
+  PATH=/cygdrive/c/android-ndk-r9d/prebuilt/windows-x86_64/bin:/cygdrive/c/android-ndk-r9d/toolchains/arm-linux-androideabi-4.8/prebuilt/windows-x86_64/bin:$PATH \
+  MACHINE=armv7 \
+  SYSTEM=android \
+  ARCH=arm \
+  CROSS_COMPILE=arm-linux-androideabi-
+</code></pre>
+
+<p>Now, unpack openssl:</p>
+
+<ol>
+<li><code>tar xzfv openssl-1.0.1i.tar.gz</code> (or whatever your tarball is)</li>
+<li><code>cd openssl-1.0.1i</code> (or whatever your version is)</li>
+</ol>
+
+<p>Make sure you have actual native Win32 (!) symlinks in include/openssl:</p>
+
+<pre><code>cmd /c "dir include\openssl"
+</code></pre>
+
+<p>You should see something like:</p>
+
+<pre><code>13-Aug-14  05:59 PM    &lt;SYMLINK&gt;      aes.h [..\..\crypto\aes\aes.h]
+13-Aug-14  05:59 PM    &lt;SYMLINK&gt;      asn1.h [..\..\crypto\asn1\asn1.h]
+</code></pre>
+
+<p>(etc.)</p>
+
+<p>Now it's time to configure:</p>
+
+<pre><code>./config shared -no-ssl2 -no-ssl3 -no-comp -no-hw -no-engine --openssldir=/foo/bar
+</code></pre>
+
+<p>Ignore the failure to build (due to failure to find perl). We'll rectify this right away. Do this:</p>
+
+<pre><code>make PERL=$(cygpath -w $(which perl))
+</code></pre>
+
+<p>Now wait for a few minutes until it builds, and presto, you have your libcrypto.so etc.</p>

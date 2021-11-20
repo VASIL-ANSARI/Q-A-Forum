@@ -1,0 +1,65 @@
+<p>All of this code goes into functions.php</p>
+
+<ol>
+<li><p>This captures additional posted information (all sent in one array)</p>
+
+<pre><code>add_filter('woocommerce_add_cart_item_data','wdm_add_item_data',1,10);
+function wdm_add_item_data($cart_item_data, $product_id) {
+
+    global $woocommerce;
+    $new_value = array();
+    $new_value['_custom_options'] = $_POST['custom_options'];
+
+    if(empty($cart_item_data)) {
+        return $new_value;
+    } else {
+        return array_merge($cart_item_data, $new_value);
+    }
+}
+</code></pre></li>
+<li><p>This captures the information from the previous function and attaches it to the item.</p>
+
+<pre><code>add_filter('woocommerce_get_cart_item_from_session', 'wdm_get_cart_items_from_session', 1, 3 );
+function wdm_get_cart_items_from_session($item,$values,$key) {
+
+    if (array_key_exists( '_custom_options', $values ) ) {
+        $item['_custom_options'] = $values['_custom_options'];
+    }
+
+    return $item;
+}
+</code></pre></li>
+<li><p>This displays extra information on basket &amp; checkout from within the added info that was attached to the item.</p>
+
+<pre><code>add_filter('woocommerce_cart_item_name','add_usr_custom_session',1,3);
+function add_usr_custom_session($product_name, $values, $cart_item_key ) {
+
+    $return_string = $product_name . "&lt;br /&gt;" . $values['_custom_options']['description'];// . "&lt;br /&gt;" . print_r($values['_custom_options']);
+    return $return_string;
+
+}
+</code></pre></li>
+<li><p>This adds the information as meta data so that it can be seen as part of the order (to hide any meta data from the customer just start it with an underscore)</p>
+
+<pre><code>add_action('woocommerce_add_order_item_meta','wdm_add_values_to_order_item_meta',1,2);
+function wdm_add_values_to_order_item_meta($item_id, $values) {
+    global $woocommerce,$wpdb;
+
+    wc_add_order_item_meta($item_id,'item_details',$values['_custom_options']['description']);
+    wc_add_order_item_meta($item_id,'customer_image',$values['_custom_options']['another_example_field']);
+    wc_add_order_item_meta($item_id,'_hidden_field',$values['_custom_options']['hidden_info']);
+
+}
+</code></pre></li>
+<li><p>If you want to override the price you can use information saved against the product to do so</p>
+
+<pre><code>add_action( 'woocommerce_before_calculate_totals', 'update_custom_price', 1, 1 );
+function update_custom_price( $cart_object ) {
+    foreach ( $cart_object-&gt;cart_contents as $cart_item_key =&gt; $value ) {       
+        $value['data']-&gt;price = $value['_custom_options']['custom_price'];       
+    }
+}
+</code></pre></li>
+</ol>
+
+<p>All your custom information will appear in the customer email and order from within wordpress providing you added it as meta data (4.)</p>

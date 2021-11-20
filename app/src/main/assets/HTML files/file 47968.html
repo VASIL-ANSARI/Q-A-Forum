@@ -1,0 +1,26 @@
+<p>Since the function you apply to each item is asynchronous, the loop that processes them also must be asynchronous (likewise the function that consumes the result of this loop must also be async). Check out <a href="http://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/" rel="nofollow">Bob Nystrom's "What Color is Your Function?"</a> for more insight on this particular point.</p>
+
+<p>There's two ways to do this (both using <a href="https://github.com/caolan/async" rel="nofollow">caolan's <code>async</code> library</a> to wrap all the nasty callback logic):</p>
+
+<ul>
+<li><p>Do one async operation one at a time, waiting for the previous to finish before the next can begin. This is probably most similar to the way a traditional synchronous loop runs. We can do this with <a href="https://github.com/caolan/async#reduce" rel="nofollow"><code>async.reduce</code></a>:</p>
+
+<pre><code>async.reduce(itemCollection, "", function(memo, item, callback) {
+    someFunctionThatDoesALongIOOperation(item, function(dataBackFromThisFunction) {
+        callback(null, memo + dataBackFromThisFunction.dataToAppend);
+    });
+}, function(err, result) {
+    var aString = result;
+});
+</code></pre></li>
+<li><p>Of course, there's little point in having async code if we don't actually reap it's benefits and execute many things at once. We can do all the async operations in parallel and reduce all at once in a single step afterwards. I've found this is great if processing each item requires some long operation such as network I/O, since we can kick off and wait for many requests at once. We use <a href="https://github.com/caolan/async#reduce" rel="nofollow"><code>async.map</code></a> to achieve this:</p>
+
+<pre><code>async.map(itemCollection, function(item, cb) {
+    someFunctionThatDoesALongIOOperation(item, function(dataBackFromThisFunction) {
+        cb(null, dataBackFromThisFunction.dataToAppend);
+    });
+}, function(err, results) {
+    var aString = results.join('');
+});
+</code></pre></li>
+</ul>

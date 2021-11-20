@@ -1,0 +1,40 @@
+<p>I have solved the above issue by creating a function specific to what's expected on an <code>input_fn</code>; it takes in a dense column and creates a SparseTensor without knowing shape. The function was made possible using <code>tf.range</code> and <code>tf.shape</code>. Without further ado, here is the working generic <code>input_fn</code> code that works independently of <code>num_epochs</code> being set:</p>
+
+
+
+<pre><code>def input_fn(batch_size):
+    examples_op = tf.contrib.learn.read_batch_examples(
+        FILE_NAMES,
+        batch_size=batch_size,
+        reader=tf.TextLineReader,
+        num_epochs=1,
+        parse_fn=lambda x: tf.decode_csv(x, [tf.constant([''], dtype=tf.string)] * len(HEADERS)))
+
+    examples_dict = {}
+    for i, header in enumerate(HEADERS):
+        examples_dict[header] = examples_op[:, i]
+
+    feature_cols = {k: tf.string_to_number(examples_dict[k], out_type=tf.float32)
+                    for k in CONTINUOUS_FEATURES}
+
+    feature_cols.update({k: dense_to_sparse(examples_dict[k])
+                         for k in CATEGORICAL_FEATURES})
+
+    label = tf.string_to_number(examples_dict[LABEL], out_type=tf.int32)
+
+    return feature_cols, label
+
+
+def dense_to_sparse(dense_tensor):
+    indices = tf.to_int64(tf.transpose([tf.range(tf.shape(dense_tensor)[0]), tf.zeros_like(dense_tensor, dtype=tf.int32)]))
+    values = dense_tensor
+    shape = tf.to_int64([tf.shape(dense_tensor)[0], tf.constant(1)])
+
+    return tf.SparseTensor(
+        indices=indices,
+        values=values,
+        shape=shape
+    )
+</code></pre>
+
+<p>Hope this helps someone!</p>

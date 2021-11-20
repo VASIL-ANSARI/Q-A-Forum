@@ -1,0 +1,51 @@
+<p>Okay, this is strange, but what happened is that this construct:</p>
+
+<pre><code>typedef class
+{
+    public:
+            int a;
+            int b;
+
+            void set(int x, int y);
+            int add(void);
+} Test;
+</code></pre>
+
+<p>while legal is not being treated semantically the same by the compiler as:</p>
+
+<pre><code>class Test
+{
+    public:
+            int a;
+            int b;
+
+            void set(int x, int y);
+            int add(void);
+};
+</code></pre>
+
+<p>The <code>typedef</code> version makes your methods <code>static</code> to the file, as indicated in the <code>nm</code> output:</p>
+
+<pre><code>$ nm class.o
+0000000000000024 t _ZN4Test3addEv
+0000000000000000 t _ZN4Test3setEii
+                 U __gxx_personality_v0
+</code></pre>
+
+<p>While the <code>class Test</code> version makes them proper methods:</p>
+
+<pre><code>$ nm class2.o
+0000000000000024 T _ZN4Test3addEv
+0000000000000000 T _ZN4Test3setEii
+                 U __gxx_personality_v0
+</code></pre>
+
+<p>This is why the linker failed to find the symbols.</p>
+
+<blockquote>
+  <p><strong>Edit:</strong> As to why this is happening, it seems to be due to an issue with interpreting how the Standard specifies the treatment of the <code>typedef</code> name as a <em>class-name</em>. Newer compilers do not seem to exhibit the same issue. The problem reported in this question was reproduced with g++ 4.4.7.</p>
+</blockquote>
+
+<p>If you move the code in your <code>class.cpp</code> file into <code>main.cpp</code> and only compile <code>main.cpp</code>, things will work. Alternatively, you can inline the method definitions into <code>class.h</code>.</p>
+
+<p>If you want to leave them as separate translation units, you need to change the <code>class.h</code> file so that your class is defined using the <code>class Test</code> way instead of using the <code>typedef</code> on the anonymous class.</p>

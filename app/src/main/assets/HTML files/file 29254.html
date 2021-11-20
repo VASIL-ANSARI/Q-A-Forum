@@ -1,0 +1,36 @@
+<p>I haven't seen an existing solution for this problem. But building one will be quite straight forward. </p>
+
+<p>The following assumes <code>gem uglifier</code> is the js compressor in use.</p>
+
+<p>Version 2 of uglifier has a mechanism to create sourcemap. It has the following syntax</p>
+
+<pre><code>uglified, source_map = Uglifier.new.compile_with_map(source)
+</code></pre>
+
+<p>Rails asset pipeline allows to specify custom JS Compressor (with a <code>compress</code> method) using the following syntax</p>
+
+<pre><code>config.assets.js_compressor = Transformer.new
+</code></pre>
+
+<p>read about that <a href="http://guides.rubyonrails.org/asset_pipeline.html#using-your-own-compressor">here</a></p>
+
+<p>A simple Transformer class would look like the following</p>
+
+<pre><code>class Transformer
+  def compress(string)
+    if Rails.env.development?
+      output, sourcemap = Uglifier.new.compile_with_map(string)
+
+      # write the sourcemap to a file somewhere under public
+
+      sourcemap_comment = "//@ sourceMappingURL=#{sourcemap_path}}\n"
+
+      return output + sourcemap_comment
+    else
+      Uglifier.compile(string)
+    end
+  end
+end
+</code></pre>
+
+<p><strong>Note</strong>: This is not full solution just explaining the concepts. You can build on this and add ways to make it more robust.</p>

@@ -1,0 +1,24 @@
+<p>I have a few years experience working with highly denormalized databases in the field of Data Warehousing(you should read up on it if you want to be knowledgeable of scenarios where denormalization applies), as well as several years working with traditional applications doing OLTP.</p>
+
+<p>You said that the company chose to switch to a single denormalized table because it is faster for reading and writing.  In the majority of cases, it is absolutely <strong>NOT</strong> faster for <strong>writing</strong>.  Imagine if you denormalized a region/employee table.  The region record would be duplicated thousands of times in this table.  If a single region must be changed, such as it's name, then you will be applying that update across thousands of records, when a normalized database would require only one record be updated.  This has many serious performance problems.  One, in any type of transaction, an update to a region would cause thousands of employee records to be locked in some way(depending on the type of transaction).  Snapshot transactions would consume a much larger amount of memory.  Indexes on region columns would be much larger than necessary.  You would be limited in your index optimization strategies due to only one clustered index per table.  With a normalized database, you have greater flexibility in the physical ordering of the separate tables.</p>
+
+<p>The most important thing to understand, is that you cannot evaluated one use case(such as selecting a single record) and then conclude that design 1, 2, or 3 is the best.  Such a test doesn't represent a typical usage scenario.  If you are selecting single records, then most likely you are dealing with an OLTP scenario where you selecting AND likely editing single records.  In such a scenario, if your test would be extremely unrealistic if you didn't also include in your tests the most common CRUD operations:</p>
+
+<ul>
+<li>Single inserts </li>
+<li>Single updates</li>
+<li>Single deletes</li>
+<li>Thousands of concurrent operations</li>
+</ul>
+
+<p>Also you must account for the fact that thousands of these operations will be occurring concurrently, and thus deadlocks and waiting for locks will cause the denormalized database to perform very poorly.  This is will make a huge difference when you account for that common usage scenario.</p>
+
+<p>And by "single", I don't mean an entire denormalized record, I mean only the portion of it that represents an entity.  For example, updating or deleting a region, but leaving the employee portions of the record in place, which will make your code more complicated, and it will perform poorly.</p>
+
+<p>The other scenario you could evaluate, instead of OLTP, is OLAP, which is a subject area of Data Warehousing.  While there are OLAP database engines that use cubes, you can implement a data warehouse using an OLTP engine, but using a denormalized design.  Usually though, you don't denormalize everything down to a single table.  Usually you have a denormalized fact table and then other tables joined to it which are also denormalized to prevent there ever being a scenario with more than one join to get from the fact table to any other data.  <strong>The usage scenario of this type of denormalized design is almost never a single record!</strong>  Usually you are aggregating a very large number of records(on order of millions) and have denormalized the structure in a way to do two things, minimize joins, and minimize record size(maximizing records per page).  Thus you get maximum throughput from your "fact" table.  There is a WHOLE LOT more to it than that.  The field of data warehousing is vast, and there's lots of things to evaluate when deciding how to denormalize your data.  The good thing is that it has just about been boiled down to a science.  Kimball's "Date Warehousing Toolkit" is a great book, although it is a little bit TOO far on the conceptual side, and won't go over implementation details.</p>
+
+<p><strong>The point being, you should recognize that there is no declaring one design as best, there are lots of hybrid designs, and there are usage scenarios that each design is tailored to.</strong></p>
+
+<p>If I were you, I would clarify my propspectus to only cover the investigation of one usage scenario, and acknowledge that there are other usage scenarios in which other database designs might perform better.  But doing a single record select does not, in my opinion, cover a complete usage scenario, that should include other common operations I listed for OLTP.</p>
+
+<p>Or you could do the data warehousing usage scenario, but the problem here is that you would really need good data warehousing design skills in order to make a fair comparison.  It is very easy to denormalize a database in a way that produces poor results for even the most applicable usage scenario of aggregate reporting.</p>

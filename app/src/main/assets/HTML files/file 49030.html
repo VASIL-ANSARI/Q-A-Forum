@@ -1,0 +1,118 @@
+<p><strong>UPDATE</strong> In response to updated question with code:</p>
+
+<hr>
+
+<p>Your client is waiting for 128 bytes or EOF. None of these come, because the server doesn't send anything (yet doesn't close the connection).</p>
+
+<p>Either change </p>
+
+<ol>
+<li><p>the client, e.g.</p>
+
+<ul>
+<li><p>Don't wait for actual data to arrive</p>
+
+<pre><code>boost::array&lt;char, 0&gt; buf;
+</code></pre></li>
+<li><p>Or make it <code>socket.cancel()</code> after a <code>deadline_timer</code> (or so.</p></li>
+</ul></li>
+<li><p>the server, e.g. replace the infinite loop with a true socket write</p></li>
+</ol>
+
+<p>Here's a sample </p>
+
+<p><strong><kbd><a href="http://coliru.stacked-crooked.com/a/34630d4fdaa8c09f" rel="nofollow">Live On Coliru</a></kbd></strong></p>
+
+<pre><code>#include &lt;boost/array.hpp&gt;
+#include &lt;boost/asio.hpp&gt;
+#include &lt;boost/bind.hpp&gt;
+#include &lt;iostream&gt;
+
+using boost::asio::ip::tcp;
+using namespace std;
+
+#ifdef SERVER
+    int main()
+    {
+        //establishing connection
+        boost::asio::io_service io_service;
+        tcp::socket             socket(io_service);
+        tcp::acceptor           acceptor(io_service, tcp::endpoint(tcp::v4(), 17073));
+
+        acceptor.accept(socket);
+
+        std::cout &lt;&lt; "connection has been established!" &lt;&lt; std::endl;
+        //connection established
+
+        socket.send(boost::asio::buffer(std::string("Hello world\n")));
+    }
+#else
+    void handler(
+        boost::array&lt;char, 128&gt; const&amp; buf,
+        const boost::system::error_code &amp;error,
+        size_t bytes_transferred
+    )
+    {
+        cout &lt;&lt; "Handler called (" &lt;&lt; error.message() &lt;&lt; "): "  &lt;&lt; endl;
+        cout.write(buf.data(), bytes_transferred);
+    }
+
+    int main()
+    {
+        //establishing connection
+        boost::asio::io_service io_service;
+        tcp::socket socket(io_service);
+        tcp::resolver resolver(io_service);
+        tcp::resolver::query query("127.0.0.1", "17073");
+        tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+        boost::asio::connect(socket, endpoint_iterator);
+        //connection established
+
+        boost::array&lt;char, 128&gt; buf;
+        socket.async_read_some(boost::asio::buffer(buf), boost::bind(handler, boost::ref(buf), _1, _2));
+
+        //async_read_some returns
+
+        io_service.run();       //I suppose that handler_for_async_response is called if:
+                                //1) EOF was read (no data read twice) by async_read_some
+                                //2) something was in fact read
+                                //is this right?
+
+        //execution does not get here
+
+        return 0;
+    }
+#endif
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>//(server)
+connection has been established!
+//(client)
+Handler called (Success): 
+</code></pre>
+
+<h2>    Hello world</h2>
+
+<p>You have to make up your mind about synchronous or asynchronous programming. </p>
+
+<p>In this case, I'd think you're probably looking for <code>tcp::istream</code> really.</p>
+
+<hr>
+
+<p>Run returns when it runs out of tasks: </p>
+
+<ul>
+<li><a href="http://www.boost.org/doc/libs/1_59_0/doc/html/boost_asio/reference/io_service/run/overload1.html" rel="nofollow">http://www.boost.org/doc/libs/1_59_0/doc/html/boost_asio/reference/io_service/run/overload1.html</a></li>
+</ul>
+
+<blockquote>
+  <p>The <code>run()</code> function blocks until all work has finished and there are no more handlers to be dispatched, or until the <code>io_service</code> has been stopped. </p>
+  
+  <p>Multiple threads may call the <code>run()</code> function to set up a pool of threads from which the <code>io_service</code> may execute handlers. All threads that are waiting in the pool are equivalent and the <code>io_service</code> may choose any one of them to invoke a handler. </p>
+  
+  <p>A normal exit from the <code>run()</code> function implies that the <code>io_service</code> object is stopped (the stopped() function returns true). Subsequent calls to <code>run()</code>, <code>run_one()</code>, <code>poll()</code> or <code>poll_one()</code> will return immediately unless there is a prior call to <code>reset()</code>.</p>
+</blockquote>
+
+<p>So you have other work pending on the service (io_service::work?). Check that. Make your code a SSCCE and we would be able to see more.</p>

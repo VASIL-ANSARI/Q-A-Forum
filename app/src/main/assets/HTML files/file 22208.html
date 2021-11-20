@@ -1,0 +1,126 @@
+<p>The same is done in <code>std::vector&lt;bool&gt;</code> and in <code>std::bitset</code> in the standard library. As stated in the <a href="http://en.cppreference.com/w/cpp/container/vector_bool" rel="nofollow">reference</a>, <code>std::vector&lt;bool&gt;</code> it returns a proxy class that has its operators overloaded to act as an element of the vector.</p>
+
+<p>You could to that as well.</p>
+
+<p>For a user-friendly example see again the <a href="http://en.cppreference.com/w/cpp/container/vector_bool/reference" rel="nofollow">reference</a> for a public interface, it is something like this:</p>
+
+<pre><code>template &lt;class Allocator&gt;
+class vector&lt;bool, Allocator&gt; {
+  // ...
+  public:
+    class reference {
+        friend class vector;
+        reference();
+      public:
+        ~reference();
+        operator bool() const;
+        reference&amp; operator=(bool x);
+        reference&amp; operator=(const reference&amp;);
+        void flip();
+    };
+  // ...
+};
+</code></pre>
+
+<p>To implement this class you should store a member pointer to your actual data block and a mask to operate with.</p>
+
+<p>For a real example, in the g++ headers look for member class of <code>std::vector&lt;bool&gt;</code> called <code>std::vector&lt;bool&gt;::_Bit_reference</code> in the file <code>bits/stl_bvector.h</code>.</p>
+
+<hr>
+
+<p>To clarify the OP with an example:</p>
+
+<p>Let's say you have a class containing 320 bools. You could write it as:</p>
+
+<pre><code>class boolcontainer {
+  uint32_t data[10];
+public:
+  //default ctor. to initialize the elements with zeros
+  boolcontainer() { for (int i = 0; i &lt; 10; ++i) { data[i] = 0; } }
+}
+</code></pre>
+
+<p>You want to add an operator[]. To add a const one is easy:</p>
+
+<pre><code>class boolcontainer {
+  uint32_t data[10];
+public:
+  bool operator[](int i) const { return data[i/32] &amp; (1 &lt;&lt; (i%32)); }
+}
+</code></pre>
+
+<p>to have a non-const one you need much more. First you need to create a class that represents a reference to your value. You must have some kind of pointer to where the value is stored and (in this case) you need a bitmask to specify one concrete bit. To be able to handle this as a bool&amp; you need to add some operators, namely conversion to bool and operator=: </p>
+
+<pre><code>class reference {
+  uint32_t *dataptr;
+  uint32_t mask;
+public:
+  //constructor just initializing members
+  reference(uint32_t *dataptr_, uint32_t mask_) : dataptr(dataptr_), mask(mask_) {}
+
+  //conversion to bool
+  operator bool() const {
+    //just like in the getter, but the bitmask is stored now locally
+    return *dataptr &amp; mask;
+  }
+
+  //sets one single bit represented by mask to b
+  reference&amp; operator=(bool b) {
+    if (b) {
+      *dataptr |= mask;
+    } else {
+      *dataptr &amp;= ~mask;
+    }
+    return *this;
+  }
+
+  //TODO copy ctor., operator==, operator&lt;
+};
+</code></pre>
+
+<p>Note that the above struct will behave as a bool&amp; -- reading from it reads the value from the data point represented by the pointer and the mask, and similarly, writing to it overwrites the bit at the represented location. I also wrote a constructor that initializes the members.</p>
+
+<p>Now all you need is that your boolcontainer's operator[] should return an object of the above class:</p>
+
+<pre><code>class boolcontainer {
+  uint32_t data[10];
+public:
+
+  boolcontainer() { for (int i = 0; i &lt; 10; ++i) { data[i] = 0; } }
+
+  class reference {
+     ... //see above
+  }
+
+  //keep the const version for efficiency
+  bool operator[](int i) const { return data[i/32] &amp; (1 &lt;&lt; (i%32)); }
+
+  //non-const version returns our reference object.
+  reference operator[](int i) { return reference(&amp;data[i/32], 1 &lt;&lt; (i%32)); }
+};
+</code></pre>
+
+<p>And now some code to test it (prints only the first 40 values):</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include "boolcontainer.h"
+
+void printboolcontainer(const boolcontainer &amp;bc)
+{
+    //note that this is the constant version
+    for (int i = 0; i &lt; 40; ++i) {
+        std::cout &lt;&lt; bc[i];
+    }
+    std::cout &lt;&lt; std::endl;
+}
+
+int main()
+{
+    boolcontainer bc;
+    printboolcontainer(bc);
+    bc[0] = true;
+    bc[3] = true;
+    bc[39] = true;
+    printboolcontainer(bc);
+}
+</code></pre>

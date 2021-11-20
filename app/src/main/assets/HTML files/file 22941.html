@@ -1,0 +1,61 @@
+<p>I cannot tell whether this is a standard practice, but I would use DynamicObject instead.
+Here is blog post to give you some ideas about DynamicObect, it is worth reading about ExpandoObject as well.
+<a href="http://blogs.msdn.com/b/csharpfaq/archive/2009/10/19/dynamic-in-c-4-0-creating-wrappers-with-dynamicobject.aspx" rel="nofollow">http://blogs.msdn.com/b/csharpfaq/archive/2009/10/19/dynamic-in-c-4-0-creating-wrappers-with-dynamicobject.aspx</a></p>
+
+<p>Here is a LinqPad snippet </p>
+
+<pre><code>void Main()
+{
+    List&lt;dynamic&gt; flexibleList = new List&lt;dynamic&gt;();
+    dynamic aa = new FlexibleTable();
+    aa.ColumnA = "testA";
+    aa.ColumnB="testB";
+    flexibleList.Add(aa);
+    aa = new FlexibleTable();
+    aa.ColumnA = "testA1";
+    aa.ColumnB="testB1";
+    flexibleList.Add(aa);
+    foreach(dynamic item in flexibleList){
+      foreach(var columnName in item.VisibleColumns){
+
+         new object[]{item[columnName]}.Dump();
+
+      }
+    }
+}
+
+// Define other methods and classes here
+public class FlexibleTable: DynamicObject{
+ private Dictionary&lt;string,object&gt; Columns{get; set;}
+ public FlexibleTable(){
+   this.Columns = new Dictionary&lt;string,object&gt;();
+ }
+  public  override bool TryGetMember(GetMemberBinder binder, out object result){
+   if(Columns.ContainsKey(binder.Name)){
+        result = Columns[binder.Name];
+        return true;
+   }else{
+        result = null;
+        return false;
+        }
+  }
+  public  override bool TrySetMember(SetMemberBinder binder, object value){
+    Columns[binder.Name] = value;
+    return true;
+  }
+
+  public override bool TryGetIndex(
+        GetIndexBinder binder, object[] indexes, out object result)
+    {
+
+        string index = (string)indexes[0];
+        return Columns.TryGetValue(index , out result);
+    }
+
+
+  public IEnumerable&lt;string&gt; VisibleColumns{
+     get{   return Columns.Select(x=&gt;x.Key);}
+  }
+
+}
+</code></pre>

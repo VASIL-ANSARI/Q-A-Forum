@@ -1,0 +1,51 @@
+<p>I suggest you don't use <code>FBConnect</code>.  simply start up a <code>NSURLConnection</code> (in your <code>viewDidLoad</code> function perhaps) and parse the Facebook JSON feed in <code>connectionDidFinishLoading</code> function:</p>
+
+<pre><code>- (void)viewDidLoad {
+    NSURLRequest *request = [NSURLRequest requestWithURL:
+                                 [NSURL URLWithString: [NSString stringWithFormat:@"%@%@/feed", @"http://graph.facebook.com/", @"cocacola"]]];
+        [NSURLConnection connectionWithRequest:request delegate:self];
+}
+
+
+- (void)connection:(NSURLConnection*)connection didReceiveResponse:(NSURLResponse*)response {
+    [responseData setLength:0];
+}
+
+- (void)connection:(NSURLConnection*)connection didReceiveData:(NSData*)data {
+    [responseData appendData:data];
+}
+
+- (void)connection:(NSURLConnection*)connection didFailWithError:(NSError*)error {
+    NSLog(@"Connection failed: %@", [error description]);
+}
+
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
+    SBJsonParser *parser = [[SBJsonParser alloc] init];
+    NSString *json = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+    NSDictionary *dictionary = [parser objectWithString:json];
+
+    NSMutableArray *arr = [dictionary mutableArrayValueForKey:@"data"];
+    int len = [arr count];
+    for(int i = 0; i &lt; len; ++i) {
+        NSDictionary *d = [arr objectAtIndex:i];
+        [list addObject:d];
+    }
+    [json release];
+    [parser release];
+}
+</code></pre>
+
+<p>where <code>list</code> is an <code>NSMutableArray</code>, <code>SBJsonParser</code> is imported(json-framework for objective-c, see <a href="http://json.org" rel="nofollow">http://json.org</a>), <code>responseData</code> is an <code>NSMutableData</code></p>
+
+<p>after this, access <code>list</code> to display wall posts:</p>
+
+<p><code>NSString *message= [[list objectAtIndex:0] objectForKey:@"message"];</code></p>
+
+<p>if you want to grab a user's profile icon, use this:</p>
+
+<pre><code>self.profileImage = [UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:[NSString stringWithFormat:@"%@%@/picture", @"http://graph.facebook.com/", @"cocacola"]]]];
+</code></pre>
+
+<p>where <code>profileImage</code> is a <code>UIImage</code> object.</p>
+
+<p>be sure to replace <code>@"cocacola"</code> with the appropriate user ID</p>

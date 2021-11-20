@@ -1,0 +1,36 @@
+<p>Since you always access the same URL with AJAX, chances are good it is being cached. Try adding this at the top of the Flask controller responsible for the data AJAX:</p>
+
+<pre><code>response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+response.headers['Pragma'] = 'no-cache'
+response.headers['Expires'] = '-1'
+</code></pre>
+
+<p>Alternately, you can change your URL to:</p>
+
+<pre><code>url: "/?" + new Date().getTime(),
+</code></pre>
+
+<p>so it's impossible to cache (since it will be different each time).</p>
+
+<p><strong>EDIT</strong>: I just noticed, you're setting the value of <code>y</code> in the template, which has no relevance to the AJAX call. To refresh that value, you would have to reload the page, AJAX is useless as it stands, since it fetches some data and then <em>ignores it</em>.</p>
+
+<pre><code>url: '/get_car_value',
+success: function(data) {
+  var y = data.car_value;
+  console.log(y)
+  series.addPoint([x, y], true, true);
+}
+</code></pre>
+
+<p>and make a new controller:</p>
+
+<pre><code>@app.route('/get_car_value', methods=['GET'])
+def get_car_value():
+    import json
+    data = json.dumps({ car_value: get_data_route() })
+    return data, 200, {'Content-Type': 'application/json; charset=utf-8'}
+</code></pre>
+
+<p>(you could use the existing <code>get_data_route</code> controller, but I like a consistent API, and always using JSON when transfering data with AJAX is pretty useful).</p>
+
+<p><strong>EDIT</strong>: JSON brain fart.</p>

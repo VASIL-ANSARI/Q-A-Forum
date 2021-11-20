@@ -1,0 +1,54 @@
+<p>This isn't easy in MySQL.</p>
+
+<p>First you need to create a table of variables, one for storing the current group, and one for storing the current row number in the group. Initialize them both to NULL.</p>
+
+<p>Then iterate group by month and select all rows ordered by score and select the current rown number and increase it. If the group changes, reset the row number to one.</p>
+
+<p>Then put all this in a subselect and in the outer select, select all rows with rownumber &lt;= 3.</p>
+
+<p>You could use this query:</p>
+
+<pre><code>SELECT month, p_userid, points FROM (
+    SELECT
+        *,
+        (@rn := CASE WHEN month = @last_month THEN @rn + 1 ELSE 1 END) AS rn,
+        (@last_month := month)
+    FROM (
+        SELECT p_userid, month(p_timestamp) AS month, SUM(p_points) AS points
+        FROM Table1, (SELECT @last_month := NULL, @rn := 0) AS vars
+        GROUP BY p_userid, month(p_timestamp)
+        ORDER BY month, points DESC
+    ) AS T1
+) AS T2
+WHERE rn &lt;= 3
+</code></pre>
+
+<p>Result:</p>
+
+<pre><code>Month User Score
+1     4    7
+1     3    5
+1     2    4
+2     4    17
+2     5    10
+2     3    6
+</code></pre>
+
+<p>Test data:</p>
+
+<pre><code>CREATE TABLE Table1 (p_userid INT NOT NULL,
+                     p_points INT NOT NULL,
+                     p_timestamp TIMESTAMP NOT NULL);
+
+INSERT INTO Table1 (p_userid, p_points, p_timestamp) VALUES
+(1, 1, '2010-01-01'),
+(1, 2, '2010-01-02'),
+(1, 3, '2010-02-01'),
+(2, 4, '2010-01-01'),
+(3, 5, '2010-01-01'),
+(3, 6, '2010-02-01'),
+(4, 7, '2010-01-01'),
+(4, 8, '2010-02-01'),
+(4, 9, '2010-02-02'),
+(5, 10, '2010-02-02');
+</code></pre>

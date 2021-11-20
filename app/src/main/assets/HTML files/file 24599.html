@@ -1,0 +1,33 @@
+<p>If <code>send_ssl_post()</code> is run by two threads simultaneously, you have a race. Consider these two parts of the function:</p>
+
+<pre><code>  SSL_set_session( ssl, g_session );
+</code></pre>
+
+<p>And</p>
+
+<pre><code>  // free the session. We may change sessions below
+  if ( g_session != NULL ) {
+     SSL_SESSION_free( g_session );
+  }
+</code></pre>
+
+<p>There is a race between when one thread calls <code>SSL_SESSION_free()</code> on the global session, and some other thread trying to use it to set the session. If the free happens first, the thread that tries to use it will be accessing freed memory.</p>
+
+<p>You can resolve this race with mutual exclusion. One around the <code>SSL_set_session()</code> call.</p>
+
+<pre><code>acquire_session_lock();
+if ( g_session != NULL ) {
+    SSL_set_session( ssl, g_session );
+}
+release_session_lock();
+</code></pre>
+
+<p>The other around the <code>SSL_SESSION_free()</code> call:</p>
+
+<pre><code>acquire_session_lock();
+if ( g_session != NULL ) {
+    SSL_SESSION_free( g_session );
+    g_session = NULL;
+}
+release_session_lock();
+</code></pre>

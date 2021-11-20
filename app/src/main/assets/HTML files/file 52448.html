@@ -1,0 +1,51 @@
+<p>There are no values in your example that meet your specified criteria, so I added a single line to your <code>inputfile.txt</code>:</p>
+
+<pre><code>chr1    34870091    34899887    pi-Fam168b.1 +
+</code></pre>
+
+<p>I copied the first line of your <code>inputfile.txt</code> and added <code>20</code> to the integers in the second and third columns.</p>
+
+<p>To begin, you don't need to import <code>csv</code>, you won't use it.  You should import <a href="https://docs.python.org/2/library/itertools.html#itertools.groupby" rel="nofollow"><code>groupby</code></a> and <a href="https://docs.python.org/2/library/itertools.html#itertools.product" rel="nofollow"><code>product</code></a> and <a href="https://docs.python.org/2/library/operator.html" rel="nofollow"><code>itemgetter</code></a>, I'll explain below.</p>
+
+<pre><code>from itertools import groupby,product
+from operator import itemgetter
+</code></pre>
+
+<p>This block is just parsing your <code>inputfile.txt</code> into a usable data structure (list of dictionaries) where each record in the file will be a <code>dictionary</code> element in the <code>sites</code> list.  </p>
+
+<pre><code>with open('/home/kevin/inputfile.txt', 'rb') as f: # should use with open()
+    sites = []  #list to hold each record as a dictionary
+    for row in f:
+        row = tuple(row.strip().split())
+        d = {'chr': row[0], 'start': row[1], 'stop':row[2], 'gene_name':row[3], 'strand':row[4]}
+        sites.append(d)
+</code></pre>
+
+<p>I chose to first, sort by <em>strand</em> using <code>itemgetter</code>,  Now, when you <code>groupby</code> strand we can separate the dictionaries into list of all the <code>plus</code> strands and a list of all the <code>minus</code> strands:</p>
+
+<pre><code>plus = []
+minus = []
+
+for elmt,grp in groupby(sites, itemgetter('strand')): # sites is our sorted list of dicts
+    for item in grp:
+        if elmt == '+':
+            plus.append(item)
+        else:
+            minus.append(item)
+</code></pre>
+
+<p>Now you can iterate through <code>plus</code> and <code>minus</code> using <code>product</code>, which acts like a nested for loop and compare <code>start</code> positions:</p>
+
+<pre><code>for p,m in product(plus,minus):
+    if p['chr'] == m['chr'] and abs(int(p['start']) - int(m['start'])) &lt; 200:
+            print ("%s\t%s\t%s") % (p['chr'], p['start'], p['gene_name'])
+            print ("%s\t%s\t%s") % (m['chr'], m['start'], m['gene_name'])
+</code></pre>
+
+<p>This returned:</p>
+
+<pre><code>chr1    34870091    pi-Fam168b.1 #remember I artificially added this one
+chr1    34870071    pi-Fam168b.1
+</code></pre>
+
+<p>As a reference, this type of task may be more elegantly achieved in the python library <a href="http://pandas.pydata.org/" rel="nofollow">pandas</a>.  <a href="http://bedtools.readthedocs.org/en/latest/" rel="nofollow">Bedtools</a> (C++ i think) is specifically designed to work with <code>.bed</code> files, which is the format you're working with.  HTH!</p>

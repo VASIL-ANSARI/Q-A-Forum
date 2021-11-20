@@ -1,0 +1,23 @@
+<p>I'm afraid there isn't a good solution for your problem. As you have said, PHPActiveRecord is a library built on singletons and static methods, that doesn't mix well with dependency injection.</p>
+
+<p>But mainly, in your example, you are trying to inject a model object. That's (usually) something you should never do. You should inject configuration values or "services" or whatever objects are shared throughout the application, but not models.</p>
+
+<p>Models are fetched from the database depending on queries (for example an ID). So it doesn't make sense to inject <strong>a user</strong> in the controller since by definition there are <strong>many users</strong> (there's a whole table of them).</p>
+
+<p>What is usually done is inject the object/service that provides a way to retrieve the models. Those objects are sometimes called "<strong>repository</strong>" depending on the library. So it goes like this:</p>
+
+<ul>
+<li>you inject the UserRepository in the controller (or the Database object, or the EntityManager, or whatever it is)</li>
+<li>you then use that object to fetch whichever user you want inside the controller</li>
+</ul>
+
+<p>Technically, the problem you get here is (I think) PHP-DI trying to create a new User instance (using <code>new</code>) and PHPActiveRecord trying to connect to the database automatically. Since nothing was configured for the database (I guess), PHPActiveRecord fails.</p>
+
+<p>So in short, what to do?</p>
+
+<ul>
+<li>keep the initialization of PHPActiveRecord out of PHP-DI since it needs to be executed on each request</li>
+<li>create/fetch/â¦ models through PHPActiveRecord's way, i.e. static methods. PHP-DI can't help there</li>
+</ul>
+
+<p>If you want to dump PHPActiveRecord, maybe have a look at Doctrine (which is more complex) or <a href="http://propelorm.org/" rel="nofollow">Propel</a> (which should be closer to what PHPActiveRecord do).</p>

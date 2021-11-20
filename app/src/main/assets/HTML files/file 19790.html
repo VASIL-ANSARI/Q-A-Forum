@@ -1,0 +1,10 @@
+<p>Your problem is that the element is both noncopyable and <code>const</code>.  The <code>const XYZ</code> element behaves as a <code>const XYZ</code> member; by 5.2.5p4 accessing the <code>const XYZ</code> element on an xvalue will yield an xvalue with union cv qualification i.e. having effective type <code>const XYZ &amp;&amp;</code>.  That type is not suitable as an argument to the move constructor of <code>XYZ</code> so the deleted/private copy constructor will be attempted to be called instead.</p>
+
+<p>Another way of looking at it is that a move constructor (e.g. the move constructor of <code>std::tuple&lt;...&gt;</code>) is obliged to ensure that its argument is left in an unspecified but <em>valid</em> state.  By making the element <code>const</code> you've said that the only valid state for that element is the state it's constructed with, so the move constructor is not allowed to move from it, <em>even if</em> it is contained in an xvalue.</p>
+
+<p>A workaround would be to define a <em>const move</em> constructor and <code>const_cast</code> its argument to delegate to the move constructor:</p>
+
+<pre><code>XYZ(const XYZ &amp;&amp;xyz): XYZ(const_cast&lt;XYZ &amp;&amp;&gt;(xyz)) {}
+</code></pre>
+
+<p>Amusingly, with gcc-4.7.2 it's enough to just <em>declare</em> the const move constructor; by RVO the actual call to the const move constructor can be elided.  Don't rely on this.</p>

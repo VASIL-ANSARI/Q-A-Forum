@@ -1,0 +1,25 @@
+<p>You just need to break the logic into parts:</p>
+
+<ul>
+<li>Get the first order date for each user.</li>
+<li>Filter out the users that are too old.</li>
+<li>Join in the activities, paying attention to the dates.</li>
+<li>Count the number of activities per user.</li>
+<li>Filter and count again.</li>
+</ul>
+
+<p>So, one method is a query like this:</p>
+
+<pre><code>select count(*)
+from (select user_id, count(a.user_id) as num_activities
+      from (select po.user_id, min(created_ts) as mints
+            from purchase_orders po
+            group by po.user_id
+            having min(created_ts) &gt;= '2016-08-01'
+           ) o left join
+           activity a
+           on a.user_id = o.user_id and a.created_ts &lt; o.created_ts
+      group by user_id
+     ) u
+where num_activities &lt;= 3;
+</code></pre>

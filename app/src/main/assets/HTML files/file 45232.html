@@ -1,0 +1,41 @@
+<p>The process of determining the function to call based on the arguments is called overload resolution, and the standard lists in which cases it gets used:</p>
+
+<blockquote>
+  <p><strong>13.3 Overload resolution [over.match]</strong></p>
+  
+  <p>2 Overload resolution selects the function to call in seven distinct contexts within the language:</p>
+  
+  <p>(2.1) -- invocation of a function named in the function call syntax (13.3.1.1.1);</p>
+  
+  <p>(2.2) -- invocation of a function call operator, a pointer-to-function conversion function, a reference-to-pointer-to-function conversion function, or a reference-to-function conversion function on a class object named
+  in the function call syntax (13.3.1.1.2);</p>
+  
+  <p>(2.3) -- invocation of the operator referenced in an expression (13.3.1.2);</p>
+  
+  <p>(2.4) -- invocation of a constructor for direct-initialization (8.5) of a class object (13.3.1.3);</p>
+  
+  <p>(2.5) -- invocation of a user-defined conversion for copy-initialization (8.5) of a class object (13.3.1.4);</p>
+  
+  <p>(2.6) -- invocation of a conversion function for initialization of an object of a nonclass type from an expression of class type (13.3.1.5); and</p>
+  
+  <p>(2.7) -- invocation of a conversion function for conversion to a glvalue or class prvalue to which a reference (8.5.3) will be directly bound (13.3.1.6).</p>
+</blockquote>
+
+<p>Of these, the <em>only</em> one that applies to regular functions is 2.1, and that requires a <code>f(args)</code> context which only tells the caller the result.</p>
+
+<p>So, what you ask for cannot be done. Not exactly, anyway.</p>
+
+<p>Now, depending on what you want to accomplish, there are some things that <em>are</em> possible:</p>
+
+<p>It is possible to get a pointer to the function if you know the <em>exact</em> signature: given <code>template &lt;typename T&gt; int hello(A&lt;T&gt; a, A&lt;T&gt; b)</code>, you can obtain the address using that: <code>static_cast&lt;int(*)(A&lt;int&gt;,A&lt;int&gt;)&gt;(hello)</code>. However, for this to work, you need to know the return type (which you might be able to obtain using <code>decltype</code>), and you need to know the parameter types (which may be different from the argument types, and which you aren't able to obtain reliably).</p>
+
+<p>It is also possible to get a pointer to a function that, when called, will have the same effect as <code>hello</code>:</p>
+
+<pre><code>auto callable = +[](A&lt;int&gt; a, A&lt;int&gt; b) { return hello(a, b); };
+</code></pre>
+
+<p>The <code>[](A&lt;int&gt; a, A&lt;int&gt; b) { return hello(a, b); }</code> creates a lambda without any captures, and lambdas without any captures can implicitly be converted to a function pointer of a matching type. The <code>+</code> forces the use of that conversion, without requiring the type to be spelled out.</p>
+
+<p>However, this will not have the same address as <code>hello</code>, so might not be suitable for subsequent comparisons.</p>
+
+<p>That's the best you can get.</p>

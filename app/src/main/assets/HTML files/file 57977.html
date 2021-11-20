@@ -1,0 +1,105 @@
+<p>Recently I write an app for whois lookup and I had this problem too,but finally after checking all possibilities , it worked correctly.</p>
+
+<h3>this is a helpful article for generating self-signed certificates :</h3>
+
+<p><a href="https://www.digitalocean.com/community/tutorials/openssl-essentials-working-with-ssl-certificates-private-keys-and-csrs" rel="nofollow">https://www.digitalocean.com/community/tutorials/openssl-essentials-working-with-ssl-certificates-private-keys-and-csrs</a></p>
+
+<h3>*** Comment's In Code Will Help You  ****</h3>
+
+<h2>index.js Code :</h2>
+
+<pre><code> function checkAvailability(domainParsed) {
+
+        $.ajax({
+            method : "GET",
+            url : "https://localhost:55555/check", // Pay attention To This Line 
+                            "Content-Type" : "application/json",
+            data : {domain : domainParsed , array : postFixesArray } 
+
+            }).done(function(data) {
+                    availableDomanisToShow = data.availableDomains;
+                    registeredDomanisToShow = data.registeredDomains;
+            });
+
+    }
+</code></pre>
+
+<h2>server.js Code :</h2>
+
+<pre><code>var bodyParser = require("body-parser") ;
+var unirest = require('unirest');
+var https = require('https');
+var http = require('http');
+var fs = require('fs');
+var express = require('express');
+var app = express();
+
+var registeredDomains = [];
+var availableDomains = [];
+var counter = 0 , i = 0;
+
+app.use(bodyParser.json({ type: 'application/json'})) ;
+app.use(bodyParser.urlencoded({ extended:true })) ;
+
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*"); // Pay attention To This Line --&gt; Cross domain request
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept"); // Pay attention To This Line --&gt; Cross domain request
+    next();
+});
+
+app.use("/check",function(req,resp,next) {
+
+   var fqdn,postfix;
+
+   availableDomains = [];
+   registeredDomains = []
+
+   while( i &lt; req.query.array.length) {
+            fqdn = req.query.domain + req.query.array[i];
+            postfix = req.query.array[i];
+            checkAvailability(fqdn,postfix,req.query.array.length);
+            console.log(req.query.array.length)
+            i++;
+   }
+
+   function checkAvailability(domain,postfix,length) {
+        unirest.get('https://jsonwhois.com/api/v1/whois').headers({
+                'Accept': 'application/json',
+                'Authorization': 'Token token=238d7da7fac57882a176cb14411d781a'
+            }).query({
+                "domain" :  domain
+            }).end(function(response) {
+                console.log(domain , response.body['available?']);
+                if(true != response.body['available?']) {
+                    registeredDomains.push(postfix);
+                    counter++;
+                    if(counter == length) {
+                            counter = 0 ;
+                            i = 0;
+                            resp.json( { "registeredDomains" : registeredDomains , "availableDomains" : availableDomains } );                   
+                    }
+                }
+                else  {
+                    availableDomains.push(postfix);
+                    counter++;
+                    if(counter == length) {
+                            counter = 0 ;
+                            i = 0;
+                            resp.json( { "registeredDomains" : registeredDomains , "availableDomains" : availableDomains } );
+                    }
+            }
+       });
+    }
+});
+
+
+
+ https.createServer({
+  key: fs.readFileSync('key.pem'),
+  cert: fs.readFileSync('cert.pem')
+ }, app).listen(55555);
+
+ http.createServer(app).listen(8000);
+ console.log("httpsServer are Listening on " + 55555);
+ console.log("httpServer are Listening on " + 8000);
+</code></pre>

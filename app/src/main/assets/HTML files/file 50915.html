@@ -1,0 +1,51 @@
+<p>Ok, so for lack of finding anything suitable I ended up implementing something myself.  Seems to do the trick.  (I implemented it a bit more generically than shown here in my actual code, so I could reuse it more easily, but this illustrates the concept.)</p>
+
+<pre><code>private readonly ConcurrentQueue&lt;WorkItem&gt; _Items
+    = new ConcurrentQueue&lt;WorkItem&gt;();
+private CancellationTokenSource _CancelSource;
+
+public async Task Submit(IEnumerable&lt;WorkItem&gt; items)
+{
+    var cancel = ReplacePreviousTasks();
+
+    foreach (var item in items)
+    {
+        _Items.Enqueue(item);
+    }
+
+    await Task.Delay(TimeSpan.FromMilliseconds(250), cancel.Token);
+    if (!cancel.IsCancellationRequested)
+    {
+        await RunOperation();
+    }
+}
+
+private CancellationTokenSource ReplacePreviousTasks()
+{
+    var cancel = new CancellationTokenSource();
+    var old = Interlocked.Exchange(ref _CancelSource, cancel);
+    if (old != null)
+    {
+        old.Cancel();
+    }
+    return cancel;
+}
+
+private async Task RunOperation()
+{
+    var items = new List&lt;WorkItem&gt;();
+    WorkItem item;
+    while (_Items.TryDequeue(out item))
+    {
+        items.Add(item);
+    }
+
+    // do the operation on items
+}
+</code></pre>
+
+<p>If multiple submissions occur within 250ms, the earlier ones are cancelled, and the operation executes once on all of the items after the 250ms is up (counting from the latest submit).</p>
+
+<p>If another submit occurs while the operation is running, it will continue to run without cancelling (there's a tiny chance it will steal some of the items from the later call, but that's ok).</p>
+
+<p>(Technically checking <code>cancel.IsCancellationRequested</code> isn't really necessary, since the <code>await</code> above will throw an exception if it was cancelled during the delay.  But it doesn't hurt, and there is a tiny window it might catch.)</p>

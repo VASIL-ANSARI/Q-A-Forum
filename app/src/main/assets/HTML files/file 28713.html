@@ -1,0 +1,64 @@
+<p>Here are the two easiest ways I know of making walls. Both ways work with graph structures and graph search algorithms so you can implement "path-finding" in the future if you wish. This is all off the top of my head so I apologize if any of it is unclear, but I have also provided links to relevant pieces of documentation that you can check out if you are confused. </p>
+
+<h1>Method 1: Tile-Based Maze</h1>
+
+<p>This is probably the easiest method to generate maps in because it can by done simply by making an array of ASCII characters and processing them in Python to make square "wall" objects.</p>
+
+<p>Take this grid for example:</p>
+
+<pre><code>###########
+#         #
+#  ###### #
+#S #F     #
+###########
+</code></pre>
+
+<p>'S' denotes the starting point and 'F' denotes the finish point. Yes this is probably the easiest "maze" to solve in the world but it's just an example. Imagine that each character in my horrible ASCII array represents a square tile of size N x N. The spaces represent the characters the tile can walk on and the hash characters represent walls '#'. </p>
+
+<p>In this type of game, walls are game entities themselves. Specifically in the context of Pygame, they inherit from the <a href="http://www.pygame.org/docs/ref/sprite.html" rel="nofollow">Sprite class</a>. Sprite classes are special classes which represent entities, or basically existing objects in your game. They are very special because they can represent obstacles, walls, floors, ceilings, players, enemies, you name it. Basically every object in your game can inherit from the Sprite class.</p>
+
+<p>So what makes Sprite classes so special? Well for one, you mentioned that you were having conceptual difficulty understanding wall-collision. Each sprite in Pygame has its own <a href="http://www.pygame.org/docs/ref/rect.html" rel="nofollow">Rect attribute</a>. A rect attribute is basically just an invisible rectangle that is used to determine things like collision detection, and drawing sprites. By definition, in a pure tile-based map, a "collision" between entities is defined as follows: Two entities are colliding if their rectangles overlap each other. Then there is a method of the Sprite class called <a href="http://www.pygame.org/docs/ref/sprite.html#pygame.sprite.collide_rect" rel="nofollow"><code>pygame.sprite.groupcollide()</code></a>. Each wall in the ASCII map above has a width, height, and location determined by their position in the array. Thus each hashtag character directly represents a rectangle that is also a square and has a square "surface" image.</p>
+
+<p>Have your player inherit from the sprite class and place him in one sprite group, the "player group". Have your wall entities inherit from the sprite class and place them in another sprite group, call this the "obstacle group" or something similar.  All you have to do then is call <a href="http://www.pygame.org/docs/ref/sprite.html#pygame.sprite.collide_rect" rel="nofollow"><code>pygame.sprite.groupcollide()</code></a> in every frame of your game loop and use the dictionary it returns to tell if the player is colliding with any sprites. I've provided links to the documentation if any of this is unclear. Reading the Pygame documentation will probably help you understand this better than my answer can.</p>
+
+<p>So anyways what you end up with in the end of all this is a <em>dictionary</em>. I'll make a direct quote from the documentation to explain my point:</p>
+
+<pre><code>groupcollide(group1, group2, dokill1, dokill2, collided = None) -&gt; Sprite_dict
+This will find collisions between all the Sprites in two groups. Collision is
+determined by comparing the Sprite.rect attribute of each Sprite or by using the 
+collided function if it is not None.
+
+Every Sprite inside group1 is added to the return dictionary. The value 
+for each item is the list of Sprites in group2 that intersect.
+</code></pre>
+
+<p>You would call this function directly in every iteration of your game loop <em>after</em> you update the player's movement and <em>before</em> you draw all your entities using the player's group as the <code>group1</code> argument, and the obstacles group as your <code>group2</code> argument. Then you end up with a dictionary of the following form:</p>
+
+<pre><code>{player_in_group1: [&lt;list of obstacles from group2 that collide with player&gt;] }
+</code></pre>
+
+<p>So what do you do with that list? Well its recommended that you define your own local function (you can also make it a method of player class if you wish) for dealing with this. Here is my extremely high-level pseudo code implementation which is not close to actual code at all:</p>
+
+<pre><code>def handle_collisions(sprite_dict):
+    '''given sprite dict, moves all entities in group1 out of group2's
+       rectangle area'''
+    for p in sprite_dict:
+        for o in sprite_dict[p]:
+            # move p in such a way that its rectangle is no longer overlapping
+            # with the rectangle of o with the additional constraint that p must
+            # be moved **as minimally as possible.**
+</code></pre>
+
+<p>I'm not going to implement the function for you since I feel it would be better to leave the challenge to you. :) I will warn you that the logic is not that simple, however.</p>
+
+<p>Incidentally this type of maze/map structure is used in many popular games including Legend of Zelda, Pacman, Bomberman, Tetris, etc, etc. I couldn't possibly name them all but you get the point. This is a <em>proven</em> method since it seamlessly integrates itself with game design. But don't take my word for it, there is <a href="http://www.tonypa.pri.ee/tbw/tut00.html" rel="nofollow">an entire website which explains why tile-based games are so powerful.</a></p>
+
+<h1>Method 2: Vertex-Edge Based Maze</h1>
+
+<p>Note this method is much harder to implement. It's purely <a href="http://en.wikipedia.org/wiki/Graph_%28mathematics%29" rel="nofollow">Graph based.</a> Each space in the graph is a node which the player can traverse. What determines whether an entity is allowed to move between two nodes (in other words...collision based on the principle of <em>restriction</em>) is whether or not an <em>edge</em> exists between those two nodes in the underlying undirected (or directed, if you wish) graph. </p>
+
+<p>I'm not really going to explain this in detail because it's just too difficult to cover in one answer. You'll just have to do your own research if you want to use this method but keep in mind it's a lot harder since Pygame doesn't actually support you much for this strategy. If you're really interested in this, the best place to start is probably <a href="http://google.com" rel="nofollow">Google</a>.</p>
+
+<hr>
+
+<p>And that's it! Make an attempt with the information I've given you and if you have any trouble with this, you can ask another question here or on <a href="http://gamedev.stackexchange.com/">The GameDev StackExchange</a>. In the future when you ask a question on SO, try and make sure that it is a <em>specific programming question</em> or you will very likely get lots of downvotes.</p>

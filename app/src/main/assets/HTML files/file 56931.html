@@ -1,0 +1,77 @@
+<p>Assuming the fact that the <em>connection.php</em> page has the basic <code>mysqli</code> connection things, the answer to your question would be as follows.</p>
+
+<h2>Answer:</h2>
+
+<p>First of all, use <a href="https://en.wikipedia.org/wiki/Singleton_pattern" rel="nofollow">Singleton pattern</a> to enforce <strong>only one connection</strong> to MySQL server. So change your <em>connection.php</em> page in the following way.</p>
+
+<p><strong>connection.php</strong></p>
+
+<pre><code>class Connection{
+    // Database credentials
+    private static $host = "YOUR_HOSTNAME";
+    private static $user = "YOUR_USERNAME";
+    private static $password = "YOUR_PASSWORD";
+    private static $database_name = "YOUR_DATABASE_NAME";
+
+    // $dbInstance is your connection handler.
+    // It holds an instance of mysqli class
+    private static $dbInstance;
+
+    // Since it's constructor method is private
+    // it prevents objects from being created from 
+    // outside of the class
+    private function __construct(){}
+
+    // It creates an object if not previously created
+    // and returns the same object everytime this 
+    // function is called
+    public static function openConnection() {
+        if(!isset(self::$dbInstance)){
+            self::$dbInstance = new mysqli(self::$host, self::$user, self::$password, self::$database_name);
+        }
+        return self::$dbInstance;
+    }
+
+    // It closes the database connection
+    // and unsets $dbInstance property
+    public static function closeConnection(){
+        if(isset(self::$dbInstance)){
+            self::$dbInstance-&gt;close();
+            self::$dbInstance = null;   
+        }
+    }
+}
+
+$connect = Connection::openConnection();
+</code></pre>
+
+<p>Second, don't use <code>global</code> in your code, <a href="http://stackoverflow.com/a/5166527/5517143">Globals are evil</a>. Instead pass the connection handler <code>$connect</code> to your <code>insertarPedido()</code> function as an argument, like this:</p>
+
+<pre><code>require 'connection.php';
+
+if($_SERVER["REQUEST_METHOD"]=="POST"){
+    insertarPedido($connect);
+}
+
+function insertarPedido($connect){
+
+    $id_comida = $_POST["id_comida"];
+    $num_mesa = $_POST["num_mesa"];
+    $unidades = $_POST["unidades"];
+
+    // your code
+
+    Connection::closeConnection();
+}
+</code></pre>
+
+<p>And finally, your queries are susceptible to SQL injection. Always <strong>prepare</strong>, <strong>bind</strong> and <strong>execute</strong> your queries to prevent any kind of SQL injection. <a href="http://stackoverflow.com/questions/60174/how-can-i-prevent-sql-injection-in-php">And this is how you can prevent SQL injection in PHP</a>.</p>
+
+<hr />
+
+<p><strong>NOTE:</strong> </p>
+
+<ol>
+<li>Don't forget to change the database credentials i.e. change those <code>private static</code> properties in <code>Connection</code> class.</li>
+<li>I've used the object oriented style of <code>mysqli</code>, so change the rest of your code accordingly.</li>
+</ol>

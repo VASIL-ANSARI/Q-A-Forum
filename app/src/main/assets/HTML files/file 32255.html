@@ -1,0 +1,43 @@
+<p>Julia has separate fixed-size integer types, plus a BigInt type. The default type is <code>Int64</code>, which is of course 64 bits.</p>
+
+<p>Since 100! takes about 526 bits, it obviously overflows an <code>Int64</code>.</p>
+
+<p>You can solve this problem by just doing <code>fact(BigInt(100))</code> (assuming you've <code>require</code>d it), or of course you can do the conversion in the <code>fact</code> function.</p>
+
+<hr>
+
+<p>Python used to be the same, once upon a time. It had separate types <code>int</code>, which was 16 or 32 or 64 bits depending on your machine, and <code>long</code>, which was arbitrary-length. If you ran your program on Python 1.5, it would either wrap around just like Julia, or raise an exception. The solution would be to call <code>fact(100L)</code>, or to do the conversion to <code>long</code> inside the <code>fact</code> function.</p>
+
+<p>However, at some point in the 2.x series, Python tied the two types together, so any <code>int</code> that overflows automatically becomes a <code>long</code>. And then, in 3.0, it merged the two types entirely, so there is no separate <code>long</code> anymore.</p>
+
+<hr>
+
+<p>So, why does Julia just overflow instead of raising an error?</p>
+
+<p>The FAQ actually explains <a href="http://docs.julialang.org/en/latest/manual/faq/#why-does-julia-use-native-machine-integer-arithmetic">Why does Julia use native machine integer arithmetic</a>. Which includes the wraparound behavior on overflow.</p>
+
+<hr>
+
+<p>By "native machine arithmetic", people generally mean "what C does on almost all 2s-complement machines". Especially in languages like Julia and Python that were originally built on top of C, and stuck pretty close to the metal. In the case of Julia, this is not just a "default", but an intentional choice.</p>
+
+<p>In C (at least as it was at the time), it's actually up to the implementation what happens if you overflow a signed integer type like <code>int64</code>â¦ but on almost any platform that natively uses 2's complement arithmetic (which is almost any platform you'll see today), the exact same thing happens: it just truncates everything above the top 64 bits, meaning you wrap around from positive to negative. In fact, <em>unsigned</em> integer types are <em>required</em> to work this way in C. (C, meanwhile, works this way because that's how most CPUs work.)</p>
+
+<p>In C (<em>unlike</em> most CPUs' machine languages), there is no way to detect that you've gotten an overflow after the fact. So, if you want to raise an <code>OverflowError</code>, you have to write some logic that detects that the multiplication will overflow before doing it. And you have to run that logic on every single multiplication. You may be able to optimize this for some platforms by writing inline assembly code. Or you can cast to a larger type, but (a) that tends to make your code slower, and (b) it doesn't work if you're already using the largest type (which <code>int64</code> is on many platforms today).</p>
+
+<p>In Python, making each multiplication up to 4x slower (usually less, but it can be that high) is no big deal, because Python spends more time fetching the bytecode and unboxing the integer objects than multiplying anyway. But Julia is meant to be faster than that.</p>
+
+<p>As John Myles White explains in <a href="http://www.johnmyleswhite.com/notebook/2013/01/03/computers-are-machines/">Computers are Machines</a>:</p>
+
+<blockquote>
+  <p>In many ways, Julia sets itself apart from other new languages by its attempt to recover some of the power that was lost in the transition from C to languages like Python. But the transition comes with a substantial learning curve.</p>
+</blockquote>
+
+<hr>
+
+<p>But there's another reason for this: overflowing signed arithmetic is actual useful in many cases. Not nearly as many as overflowing <em>unsigned</em> arithmetic (which is why C has defined unsigned arithmetic to work that way since before the first ANSI spec), but there are use cases.</p>
+
+<p>And, even though you probably want type conversions more often than you want rollover, it is a lot <em>easier</em> to do the type conversions manually than the rollover. If you've ever done it in Python, picking the operand for <code>%</code> and getting the signs right is certainly easy to get wrong; casting to <code>BigInt</code> is pretty hard to screw up. </p>
+
+<hr>
+
+<p>And finally, in a strongly-typed language, like both Python and Julia, type stability is important. One of the reasons Python 3 exists was that the old <code>str</code> type magically converting to <code>unicode</code> caused problems. It's far less common for your <code>int</code> type magically converting to <code>long</code> to cause problems, but it can happen (e.g., when you're grabbing a value off the wire, or via a C API, and expect to write the result out in the same format). Python's dev team argued over this when doing the <code>int</code>/<code>long</code> unification, quoting "practicality beats purity" and various other bits of the Zen, and ultimately deciding that the old behavior caused more problems than the new behavior would. Julia's designed made the opposite decision.</p>

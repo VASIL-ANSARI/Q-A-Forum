@@ -1,0 +1,35 @@
+<p>I think the problem is, that you <code>@Inject</code> a <code>@Dependent</code> scoped <code>ExecutorService</code> into a <code>@Stateless</code> bean.<br>
+<code>@Stateless</code> beans can be pooled and reused, while <code>@Dependent</code> CDI beans are stored by reference and therefore are not recreated when the <code>@Stateless</code> bean is reused.  </p>
+
+<p>Without knowing the implementation of your <code>ExecutorService</code>, I guess that it creates contextual threads during the first run and reused them in the second run without adjusting the context.</p>
+
+<p>You could "force" your <code>ProjectService</code> to create a new ExecutorService by encapsulating it into a <code>@RequestScoped</code> bean:</p>
+
+<pre><code>@RequestScoped
+public class ESHolder {
+    @Inject
+    @Dedicated
+    ExecutorService eS;
+
+    public ExecutorService getES() {
+        return eS;
+    }
+}
+
+
+@Stateless
+public ProjectService() {
+    // ...
+
+    @Inject        
+    ESHolder esHolder;
+
+    public void performAsynchAction(List&lt;String&gt; taskIds, ...rest of args...) {
+        taskIds.stream().forEach(t -&gt; {
+            // ...
+
+            esHolder.getES().submit(runner); 
+        });
+    }
+}
+</code></pre>

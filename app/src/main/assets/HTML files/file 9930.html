@@ -1,0 +1,77 @@
+<p>The easiest way would be to use the Google Directions API to get the directions, this gives you a list of all the points along the route (and the total distance). </p>
+
+<p>Check out : <a href="http://code.google.com/apis/maps/documentation/directions/">http://code.google.com/apis/maps/documentation/directions/</a></p>
+
+<p>If your not sure how to do this let me know and i'll post some code for you which will get the directions from google and extract the data you need.</p>
+
+<p>UPDATE - CODE AS REQUESTED</p>
+
+<pre><code>private void GetDistance(GeoPoint src, GeoPoint dest) {
+
+    StringBuilder urlString = new StringBuilder();
+    urlString.append("http://maps.googleapis.com/maps/api/directions/json?");
+    urlString.append("origin=");//from
+    urlString.append( Double.toString((double)src.getLatitudeE6() / 1E6));
+    urlString.append(",");
+    urlString.append( Double.toString((double)src.getLongitudeE6() / 1E6));
+    urlString.append("&amp;destination=");//to
+    urlString.append( Double.toString((double)dest.getLatitudeE6() / 1E6));
+    urlString.append(",");
+    urlString.append( Double.toString((double)dest.getLongitudeE6() / 1E6));
+    urlString.append("&amp;mode=walking&amp;sensor=true");
+    Log.d("xxx","URL="+urlString.toString());
+
+    // get the JSON And parse it to get the directions data.
+    HttpURLConnection urlConnection= null;
+    URL url = null;
+
+    url = new URL(urlString.toString());
+    urlConnection=(HttpURLConnection)url.openConnection();
+    urlConnection.setRequestMethod("GET");
+    urlConnection.setDoOutput(true);
+    urlConnection.setDoInput(true);
+    urlConnection.connect();
+
+    InputStream inStream = urlConnection.getInputStream();
+    BufferedReader bReader = new BufferedReader(new InputStreamReader(inStream));
+
+    String temp, response = "";
+    while((temp = bReader.readLine()) != null){
+        //Parse data
+        response += temp;
+    }
+    //Close the reader, stream &amp; connection
+    bReader.close();
+    inStream.close();
+    urlConnection.disconnect();
+
+    //Sortout JSONresponse 
+    JSONObject object = (JSONObject) new JSONTokener(response).nextValue();
+    JSONArray array = object.getJSONArray("routes");
+        //Log.d("JSON","array: "+array.toString());
+
+    //Routes is a combination of objects and arrays
+    JSONObject routes = array.getJSONObject(0);
+        //Log.d("JSON","routes: "+routes.toString());
+
+    String summary = routes.getString("summary");
+        //Log.d("JSON","summary: "+summary);
+
+    JSONArray legs = routes.getJSONArray("legs");
+        //Log.d("JSON","legs: "+legs.toString());
+
+    JSONObject steps = legs.getJSONObject(0);
+            //Log.d("JSON","steps: "+steps.toString());
+
+    JSONObject distance = steps.getJSONObject("distance");
+        //Log.d("JSON","distance: "+distance.toString());
+
+            String sDistance = distance.getString("text");
+            int iDistance = distance.getInt("value");
+
+}
+</code></pre>
+
+<p>This will return the distance between the two points, you can change the function to return it as a string or as an integer, just return either sDistance or iDistance.</p>
+
+<p>Hope this helps you, let me know if you need any more help.</p>

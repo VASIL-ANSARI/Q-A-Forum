@@ -1,0 +1,20 @@
+<p>When you use <code>shell=True</code>, first a subprocess is spawned which runs the shell. Then the shell spawns a subprocess which runs <code>myScript2.sh</code>. The subprocess running the shell can be terminated without terminating the <code>myScript2.sh</code> subprocess.</p>
+
+<p>If you can avoid using <code>shell=True</code>, then that would be one way to avoid this problem. If using user input to form the command, <code>shell=True</code> should definitely be avoided, since it is a <a href="https://docs.python.org/2/library/subprocess.html#subprocess.call" rel="nofollow">security risk</a>.</p>
+
+<p>On Unix, by default, the subprocess spawned by <code>subprocess.Popen</code> is <em>not</em> a <a href="http://unix.stackexchange.com/q/18166/3330">session leader</a>. When you send a signal to a session leader, it is propagated to all processes with the same session id. So to have the shell pass the <code>SIGTERM</code> to <code>myScript2.sh</code>, make the shell a session leader.</p>
+
+<p>For Python versions &lt; 3.2 on Unix, that can be done by having the shell process run <code>os.setsid()</code>:</p>
+
+<pre><code>import os
+subp_2 =  subprocess.Popen('./myScript2.sh %s %s' % (arg0, arg1), 
+                           shell=True, 
+                           preexec_fn=os.setsid)
+
+# To send SIGTERM to the process group:
+os.killpg(subp_2.pid, signal.SIGTERM)
+</code></pre>
+
+<p>For Python versions >= 3.2 on Unix, pass <code>start_new_session=True</code> to <code>Popen</code>.</p>
+
+<p>For Windows, see <a href="http://stackoverflow.com/a/13256908/190597">J.F. Sebastian's solution</a>.</p>

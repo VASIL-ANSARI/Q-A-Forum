@@ -1,0 +1,29 @@
+<p>From the <a href="http://docs.mongodb.org/manual/core/indexes/" rel="nofollow">index documentation</a>:</p>
+
+<blockquote>
+  <p>Every query, including update operations, uses one and only one index. </p>
+</blockquote>
+
+<p>In other words, <a href="https://jira.mongodb.org/browse/SERVER-3071" rel="nofollow">MongoDB doesn't support index intersection</a>. Thus, creating a huge number of indexes is pointless unless there are queries that use this index and this index only. Also, make sure you're calling the correct <code>Count()</code> method here. If you call the linq-to-object extensions (<code>IEnumerable</code>'s <code>Count()</code> extension rather than <code>MongoCursor</code>'s <code>Count</code>, it will actually have to fetch and hydrate all objects).</p>
+
+<p>It is probably easier to throw these in a single <a href="http://docs.mongodb.org/manual/core/indexes/#multikey-indexes" rel="nofollow">mutli-key index</a> like this:</p>
+
+<pre><code>{ 
+    "References" : [ { id: new ObjectId("..."), "_t" : "OemReference", ... }, 
+                     { id: new ObjectId("..."), "_t" : "CrossReferences", ...} ],
+    ...
+}
+</code></pre>
+
+<p>where <code>References.id</code> is indexed. Now, a query <code>db.foo.find({"References.id" : new ObjectId("...")})</code> will automatically search for any match in the array of references. Since I assume the different types of references must be distinguished, it makes sense to use a discriminator so the driver can support polymorphic deserialization. In C#, you'd declare this like</p>
+
+<pre><code>[BsonDiscriminator(Required=true)]
+[BsonKnownTypes(typeof(OemReference), typeof(...), ...)]
+class Reference { ... }
+
+class OemReference : Reference { ... }
+</code></pre>
+
+<p>The driver will automatically serialize the type name in a field called <code>_t</code>. That behaviour can be adjusted to your needs, if required.</p>
+
+<p>Also note that shortening the property names will decrease storage requirements, but won't affect index size.</p>

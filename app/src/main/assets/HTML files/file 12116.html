@@ -1,0 +1,48 @@
+<p>I'm teaching myself security and found myself in a similar situation, here's what I did: </p>
+
+<p>*<em>Disclaimer</em> I'm no security pro but I felt this was better than nothing..</p>
+
+<ol>
+<li>Make sure there's a post</li>
+<li>Check for the xmlhttprequest header</li>
+<li>I then validated the HTTP_REFERER</li>
+<li><p>I then checked the token I generated a part of their session (example below)</p>
+
+<pre><code>session_start();
+$token = md5(uniqid(rand(), TRUE));
+$_SESSION['token'] = $token;
+
+if (isset($_SESSION['token']) &amp;&amp; $_POST['token'] == $_SESSION['token'])
+{
+    /* Valid Token */
+}
+</code></pre></li>
+<li><p>I checked the $_POST keys against a whitelist to make sure I had everything I needed</p></li>
+</ol>
+
+<p>Here's an example</p>
+
+<pre><code>// No post no dice!
+if( empty($_POST) )
+    die('error no post');
+
+// Check for xmlhttprequest header
+// I want to make sure this post came from an ajax call.
+if( empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) != 'xmlhttprequest')
+    die('error invalid ajax request');
+
+// Check to make sure the ajax request came from yourdomainhere.com
+if( strpos($_SERVER['HTTP_REFERER'], 'yourdomainhere') === FALSE )
+    die('error invalid http ref');
+
+// DIE, if no token is present or token isn't equal to $_SESSION token.
+if (!isset($_POST['token']) || $_POST['token'] != $_SESSION['token'])
+    die('error invalid token');
+
+// Check to make sure all POST array keys I need exist for my script
+$vars_needed = array("input_name", "input_email", "input_organization", "input_title", "input_phone", "input_comments");
+foreach($vars_needed as $need) {
+    if(!array_key_exists($need, $_POST))
+        die('error invalid post');
+}
+</code></pre>

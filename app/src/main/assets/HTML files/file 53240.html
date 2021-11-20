@@ -1,0 +1,50 @@
+<p>here is a small sample for decoding barcodes in a windows universal app. It is in vb.net but you can convert it to c# ... or ask me at work ...</p>
+
+<pre><code>Imports Windows.Media.Capture
+Imports Windows.Storage.Streams
+Imports Windows.Media.MediaProperties
+
+Public NotInheritable Class MainPage
+    Inherits Page
+
+    Private capture As MediaCapture
+
+    Private Async Function TakePhoto() As Task
+        Try
+            capture = New MediaCapture
+            Await capture.InitializeAsync
+            captureElementPreview.Source = capture
+            Await capture.StartPreviewAsync
+            Dim res As VideoEncodingProperties = capture.VideoDeviceController.GetMediaStreamProperties(MediaStreamType.VideoPreview)
+            Dim iep As ImageEncodingProperties = ImageEncodingProperties.CreateBmp
+            iep.Height = res.Height
+            iep.Width = res.Width
+            Dim barcodereader As New ZXing.BarcodeReader With {.AutoRotate = True}
+            Dim wb As New WriteableBitmap(res.Width, res.Height)
+            Dim result As ZXing.Result = Nothing
+            While result Is Nothing
+                Using stream = New InMemoryRandomAccessStream()
+                    Await capture.CapturePhotoToStreamAsync(iep, stream)
+                    stream.Seek(0)
+                    Await wb.SetSourceAsync(stream)
+                    result = barcodereader.Decode(wb)
+                End Using
+            End While
+            Scanresult.Text = result.Text
+            Await capture.StopPreviewAsync
+            Debug.WriteLine(Scanresult.Text)
+        Catch ex As Exception
+            Debug.WriteLine("Exception when taking a photo: {0}", ex.ToString())
+        End Try
+    End Function
+
+    Private Async Sub buttonCapture_Click(sender As Object, e As RoutedEventArgs)
+        Await TakePhoto()
+    End Sub
+
+End Class
+</code></pre>
+
+<p>You need to import the zxing.winrt.dll from the subfolder \winrt of the zxing library. I take this code from another post in stackoverflow. Many things can be better but it works for the first steps ...</p>
+
+<p>Greetings Frank </p>

@@ -1,0 +1,131 @@
+<p>First of all create a file <code>MultipartRequest</code> as follows:</p>
+
+<pre><code>public class MultipartRequest extends Request&lt;String&gt; {
+private MultipartEntityBuilder entity = MultipartEntityBuilder.create();
+private final Response.Listener&lt;String&gt; mListener;
+private final File file;
+private final HashMap&lt;String, String&gt; params;
+
+public MultipartRequest(String url, Response.Listener&lt;String&gt; listener, Response.ErrorListener errorListener, File file, HashMap&lt;String, String&gt; params)
+{
+    super(Method.POST, url, errorListener);
+
+    mListener = listener;
+    this.file = file;
+    this.params = params;
+    buildMultipartEntity();
+    buildMultipartEntity2();
+
+}
+
+
+
+private void buildMultipartEntity()
+{
+    entity.addBinaryBody(KEY_IMAGE, file, ContentType.create("image/jpeg"), file.getName());
+    entity.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+    entity.setLaxMode().setBoundary("xx").setCharset(Charset.forName("UTF-8"));
+
+    try
+    {
+        for ( String key : params.keySet() ) {
+            entity.addPart(key, new StringBody(params.get(key)));
+        }
+    }
+    catch (UnsupportedEncodingException e)
+    {
+        VolleyLog.e("UnsupportedEncodingException");
+    }
+}
+
+@Override
+public String getBodyContentType()
+{
+    return entity.build().getContentType().getValue();
+}
+@Override
+public Map&lt;String, String&gt; getHeaders() throws AuthFailureError {
+    Map&lt;String, String&gt; headers = super.getHeaders();
+
+    if (headers == null
+            || headers.equals(Collections.emptyMap())) {
+        headers = new HashMap&lt;String, String&gt;();
+    }
+
+    headers.put("Accept", "application/json");
+
+    return headers;
+}
+
+@Override
+public byte[] getBody() throws AuthFailureError
+{
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    try
+    {
+        entity.build().writeTo(bos);
+    }
+    catch (IOException e)
+    {
+        VolleyLog.e("IOException writing to ByteArrayOutputStream");
+    }
+    return bos.toByteArray();
+}
+/**
+ * copied from Android StringRequest class
+ */
+@Override
+protected Response&lt;String&gt; parseNetworkResponse(NetworkResponse response) {
+    String parsed;
+    try {
+        parsed = new String(response.data, HttpHeaderParser.parseCharset(response.headers));
+    } catch (UnsupportedEncodingException e) {
+        parsed = new String(response.data);
+    }
+    return Response.success(parsed, HttpHeaderParser.parseCacheHeaders(response));
+}
+
+@Override
+protected void deliverResponse(String response) {
+    mListener.onResponse(response);
+}}
+</code></pre>
+
+<p>In your activity just make Multipart Request as follows:</p>
+
+<pre><code> public void uploadImage()
+{
+    try {
+        pDialog = new ProgressDialog(getActivity());
+        pDialog.setMessage("Loading...");
+        pDialog.show();
+
+           HashMap params = new HashMap&lt;String, String&gt;();
+
+            params.put(KEY_NAME, name);
+        MultipartRequest sr = new MultipartRequest( UPLOAD_URL, new Response.Listener&lt;String&gt;() {
+
+            @Override
+            public void onResponse(String response) {
+                if ((pDialog != null) &amp;&amp; pDialog.isShowing()) {
+                    pDialog.dismiss();
+                }
+                Log.d("file", f + "");
+                Log.d("", ".......response====" + response.toString());
+
+                ////////
+                try {
+                    JSONObject object = new JSONObject(response);
+                    String serverCode = object.getString("code");
+                    if (serverCode.equalsIgnoreCase("0")) {
+
+                    }
+                    if (serverCode.equalsIgnoreCase("1")) {
+                        try {
+
+                            if ("1".equals(serverCode)) {
+                                JSONObject object1 = object.getJSONObject("data");
+
+                            }
+                        }
+</code></pre>

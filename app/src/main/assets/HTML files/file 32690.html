@@ -1,0 +1,55 @@
+<p>In general, you shouldn't change anything that's part of the UI from outside the FX Application Thread. I haven't worked much with MediaPlayers, but I believe they play by the same rules.</p>
+
+<p>You can probably simplify this a lot by using the Animation API. A <code>PauseTransition</code> can be used to manage each pause, and you can "play" these in sequence using a <code>SequentialTransition</code>. This will basically manage all the threading for you. Something like (this is not tested...)</p>
+
+<pre><code>public class Audio{
+public static void crossfade(MediaPlayer mp1, MediaPlayer mp2)
+{
+    double currentVol = mp1.getVolume();
+    mp2.setVolume(0);
+    mp2.play();
+    SequentialTransition crossfade = new SequentialTransition();
+    for (int i=0; i&lt;20 i++) {
+        PauseTransition pause = new PauseTransition(Duration.millis(100));
+        pause.setOnFinished(event -&gt; {
+               mp1.setVolume(mp1.getVolume()-currentVol/20);
+               mp2.setVolume(mp2.getVolume()+currentVol/20);
+        });
+        crossfade.getChildren().add(pause);
+    }
+    crossfade.setOnFinished(event -&gt; mp1.stop());
+    crossfade.play();
+}
+}
+</code></pre>
+
+<p>Of course, if you're going to use the Animation API, then you may as well use it in a way that does everything "smoothly", instead of in discrete steps:</p>
+
+<pre><code>public class Audio {
+public static void crossfade(MediaPlayer mp1, MediaPlayer mp2) {
+    final double currentVolume = mp1.getVolume();
+    mp2.setVolume(0);
+    mp2.play();
+    Timeline crossfade = new Timeline(new KeyFrame(Duration.seconds(2), 
+            new KeyValue(mp1.volumeProperty(), 0), 
+            new KeyValue(mp2.volumeProperty(), currentVolume)));
+    crossfade.setOnFinished(event -&gt; mp1.stop());
+    crossfade.play();
+}
+}
+</code></pre>
+
+<p>Update: If you are still using JavaFX 2.2, replace the lambda expression (<code>crossfade.setOnFinished(event -&gt; mp1.stop());</code>) with an inner class:</p>
+
+<pre><code>crossfade.setOnFinished(new EventHandler&lt;ActionEvent&gt;() {
+    @Override
+    public void handle(ActionEvent event) {
+        mp1.stop();
+    }
+});
+</code></pre>
+
+<p>You will also need to declare <code>mp1</code> as <code>final</code>:</p>
+
+<pre><code>public static void crossfade(final MediaPlayer mp1, final MediaPlayer mp2) { ... }
+</code></pre>

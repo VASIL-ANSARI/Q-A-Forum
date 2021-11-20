@@ -1,0 +1,67 @@
+<p><strong><a href="http://sqlfiddle.com/#!9/fc66b/35" rel="nofollow">SqlFiddle Demo</a></strong></p>
+
+<pre><code>SELECT m.*, CASE 
+                WHEN sender &lt;= recipient THEN concat(sender,'-',recipient)
+                ELSE concat(recipient,'-', sender)
+            END as conversation
+FROM message m
+ORDER BY conversation, id
+</code></pre>
+
+<p><strong>OUTPUT</strong></p>
+
+<pre><code>| id |  sender | recipient |    conversation |
+|----|---------|-----------|-----------------|
+|  6 |   denis |     julie |     denis-julie |
+| 10 |   denis |     julie |     denis-julie |
+|  9 |   denis |      marc |      denis-marc |
+|  4 |   julie | georgette | georgette-julie |
+|  2 |  gÃ©pÃ©to |   sylvain |  gÃ©pÃ©to-sylvain |
+|  8 | sylvain |    gÃ©pÃ©to |  gÃ©pÃ©to-sylvain |
+|  7 |   julie |      rÃ©mi |      julie-rÃ©mi |
+|  1 |    marc |      rÃ©mi |       marc-rÃ©mi |
+|  3 |    rÃ©mi |      marc |       marc-rÃ©mi |
+|  5 |    rÃ©mi |      marc |       marc-rÃ©mi |
+</code></pre>
+
+<p>This is first aproach, if you need <code>marc-rÃ©mi</code> be first you need include another select to get <code>MIN()</code> for each conversation.</p>
+
+<p>Exact solution <strong><a href="http://sqlfiddle.com/#!9/fc66b/37" rel="nofollow">SqlFiddleDemo</a></strong></p>
+
+<pre><code>SELECT conversation_id, T.id, T.sender, T.recipient, T.conversation
+FROM (
+    SELECT CASE 
+               WHEN sender &lt;= recipient THEN concat(sender,'-',recipient)
+               ELSE concat(recipient,'-', sender)
+           END as conversation,
+           MIN(id) as conversation_id
+    FROM message m
+    GROUP BY conversation    
+    ) as convesation_start
+JOIN (
+    SELECT m.*, CASE 
+                    WHEN sender &lt;= recipient THEN concat(sender,'-',recipient)
+                    ELSE concat(recipient,'-', sender)
+                END as conversation
+    FROM message m
+    ) as T
+  ON 
+  convesation_start.conversation = T.conversation
+ORDER BY conversation_id, T.id
+</code></pre>
+
+<p><strong>OUTPUT</strong></p>
+
+<pre><code>| conversation_id | id |  sender | recipient |    conversation |
+|-----------------|----|---------|-----------|-----------------|
+|               1 |  1 |    marc |      rÃ©mi |       marc-rÃ©mi |
+|               1 |  3 |    rÃ©mi |      marc |       marc-rÃ©mi |
+|               1 |  5 |    rÃ©mi |      marc |       marc-rÃ©mi |
+|               2 |  2 |  gÃ©pÃ©to |   sylvain |  gÃ©pÃ©to-sylvain |
+|               2 |  8 | sylvain |    gÃ©pÃ©to |  gÃ©pÃ©to-sylvain |
+|               4 |  4 |   julie | georgette | georgette-julie |
+|               6 |  6 |   denis |     julie |     denis-julie |
+|               6 | 10 |   denis |     julie |     denis-julie |
+|               7 |  7 |   julie |      rÃ©mi |      julie-rÃ©mi |
+|               9 |  9 |   denis |      marc |      denis-marc |
+</code></pre>

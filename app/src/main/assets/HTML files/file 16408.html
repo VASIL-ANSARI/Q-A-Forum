@@ -1,0 +1,28 @@
+<p>The underlying reasons this works is a combination of:</p>
+
+<p>[1] Objective-C (and C) is not strongly typed at compile time. While warnings may be produced by the compiler they can usually be silenced by (sometimes type unsafe) casts. Your assignment in this case is invalid as you are assigning a block reference which declares it <em>requires</em> an argument value compatible with <code>NSNumber *</code> to another block reference which only declares it requires an argument value compatible with <code>id</code>. This is type unsafe and will produce <em>runtime</em> errors sometimes, see below.</p>
+
+<p>[2] Objective-C runtime message passing is dynamic, that is the target code for a message is determined as the code runs. This means as all your uses of <code>number</code> in the block are non-specific to <code>NSNumber</code> when you pass an <code>NSDate</code> at runtime suitable methods are still located dynamically. However change your <code>bar</code> to:</p>
+
+<pre><code>void (^bar)(NSNumber *) = ^(NSNumber *number)
+{
+   NSLog(@"Value is %@, class is %@, int value is %d.", number, [number class], [number intValue]);
+};
+</code></pre>
+
+<p>and you will see <em>runtime</em> errors.</p>
+
+<p>[3] Both <code>[NSNumber numberWithInt:10]</code> and <code>[NSDate date</code>] are declared to return values of type <code>id</code>, not <code>NSNumber *</code> &amp; <code>NSDate *</code> as you might expect. This means you don't need <code>foo</code>, you can just type:</p>
+
+<pre><code>bar([NSDate date]);
+</code></pre>
+
+<p>and get the same result without any warnings... As a further example consider this:</p>
+
+<pre><code>NSNumber *num = [NSNumber numberWithInt:3];
+NSDate *date = num;         // produces a warning
+id erase = num;             // erase type info and do...
+date = erase;               // effectively the same assignment, no warning
+</code></pre>
+
+<p><strong>Take way</strong>: Objective-C is <strong>not</strong> a type safe language, the compiler will in many cases warn you about potential problems, but it will <strong>not do so</strong> in all cases.</p>

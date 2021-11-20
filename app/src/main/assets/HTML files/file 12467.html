@@ -1,0 +1,55 @@
+<p>Are you expecting lines like this to return a string from the DB?</p>
+
+<pre><code>athlete_array.athlete_name = [[NSString alloc] initWithFormat:@"%d",
+                              sqlite3_column_int(selectStmt, 2)];
+</code></pre>
+
+<p>If so, you might want to look into sqlite3_column_text or text16</p>
+
+<p>See: <a href="http://www.sqlite.org/capi3ref.html#sqlite3_column_blob" rel="nofollow">http://www.sqlite.org/capi3ref.html#sqlite3_column_blob</a> </p>
+
+<p>You also may want to use this since it returns a const char *:</p>
+
+<pre><code>[[NSString alloc] initWithUTF8String:(const char *) sqlite3_column_text(...)
+</code></pre>
+
+<p>For example, here's a similar snippet from one of my samples:</p>
+
+<pre><code>contact = [[Contact alloc] init];
+while (sqlite3_step(statement) == SQLITE_ROW)
+{
+    int idx = 0;
+
+    NSNumber *idField = [NSNumber numberWithLongLong:sqlite3_column_int64(statement, idx++)];
+    [contact setId:idField];
+
+    NSString *nameField = [[NSString alloc] initWithUTF8String:
+                           (const char *) sqlite3_column_text(statement, idx++)];
+    [contact setName:nameField];
+
+    NSString *addressField = [[NSString alloc] initWithUTF8String:
+                            (const char *) sqlite3_column_text(statement, idx++)];
+    [contact setAddress:addressField];
+
+    NSString *phoneField = [[NSString alloc] initWithUTF8String:
+                            (const char *) sqlite3_column_text(statement, idx)];
+    [contact setPhone:phoneField];
+
+    NSLog(@"id: %@", [contact id]);
+    NSLog(@"name: %@", [contact name]);            
+    NSLog(@"address: %@", [contact address]);
+    NSLog(@"phone: %@", [contact phone]);
+
+    // Code to do something with extracted data here
+
+    [nameField release];
+    [phoneField release];
+    [addressField release];
+}
+</code></pre>
+
+<p>Also, look into saving off your compiled statement &amp;selectStmt and calling sqlite3_reset to use again.  It's compiled into byte code at that point and you don't need to parse and compile your sql statement over and over.</p>
+
+<p>See: <a href="http://www.sqlite.org/capi3ref.html#sqlite3_prepare" rel="nofollow">http://www.sqlite.org/capi3ref.html#sqlite3_prepare</a> </p>
+
+<p>When you're done with the statement (completely if you save it off), don't forget to call sqlite3_finalize.</p>

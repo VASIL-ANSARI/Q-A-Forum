@@ -1,0 +1,73 @@
+<p>There is no direct equivalent. However, one can fake it by returning a "generator" object. Basically, the <em>continuation code</em> is moved into the <code>next()</code> of the generator.</p>
+
+<p>Consider this <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/New_in_JavaScript/1.7?redirectlocale=en-US&amp;redirectslug=JavaScript%2FNew_in_JavaScript%2F1.7#Generators" rel="nofollow">fib-generator example on MDN</a>:</p>
+
+<pre><code>function fib() {
+  var i = 0, j = 1;
+  while (true) {
+    yield i;
+    var t = i;
+    i = j;
+    j += t;
+  }
+}
+
+var g = fib();
+for (var i = 0; i &lt; 10; i++) {
+  console.log(g.next());
+}
+</code></pre>
+
+<p>And re-written using a fake generator:</p>
+
+<pre><code>function fib() {
+  var i = 0, j = 1;
+  return {
+      'next': function () {
+          var yieldRet = i;
+          // These haven't occurred before the `yield` in the above generator,
+          // but it makes it easier to do it in the same order here.
+          // Just make sure there are no OBSERVABLE side-effects.
+          var t = i; 
+          i = j;
+          j += t;
+          return yieldRet;
+      }
+  };
+}
+
+var g = fib();
+for (var i = 0; i &lt; 10; i++) {
+  console.log(g.next());
+}
+</code></pre>
+
+<p>Now, this does become a bit trickier with the addition of <em>observable mutable state</em>; the given example could still be expressed as a state machine. Note that each <code>next</code> can "advance" the state.</p>
+
+<pre><code>var currentNode;
+function yield1 () {
+    var y = { next: st0 };
+    return y;
+    function st0 () {
+        if (currentNode) {
+            y.next = st1;
+            return currentNode;
+        } else {
+            y.next = stZ;
+        }
+    }
+    function st1 () {
+        y.next = stZ;
+        currentNode = null; // observable side-effect!
+    }
+    function stZ () {
+    }
+}
+
+var g = yield1();
+currentNode = "x";
+console.log(g.next());    // "x"
+console.log(currentNode); // still "x"
+g.next();
+console.log(currentNode); // null
+</code></pre>

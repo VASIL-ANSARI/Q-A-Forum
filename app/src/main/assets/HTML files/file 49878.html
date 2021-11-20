@@ -1,0 +1,53 @@
+<p>I think you'd be better off running a <code>while</code> loop to determine the parent level category name. Then you can match it against the different parent categories you want to display differently. </p>
+
+<p><strong>edit</strong> <code>lab5_template_include()</code> should use <code>is_product_category()</code> instead of <code>is_product_taxonomy()</code> which returns true on product category <em>and</em> tag archives.</p>
+
+<pre><code>function lab5_template_include( $template ) {
+
+    if( is_product_category()){ 
+
+        $slug = get_query_var('product_cat');
+
+        $cat = get_term_by( 'slug', $slug, 'product_cat' ); 
+
+        $catParent = so_top_product_category_slug($cat);
+
+        // locate the new templates
+        if ( 'collectie' == $catParent ) {
+            $new_template = locate_template( array( 'woocommerce/archive-product-collectie.php' ) );
+        } elseif ( 'shop' == $catParent ) ) {
+            $new_template = locate_template( array( 'woocommerce/archive-product-shop.php' ) );
+        } 
+
+        // set the new template if found
+        if ( '' != $new_template ) {
+            $template = $new_template ;
+        }
+
+    }
+
+    return $template;
+}
+add_filter('template_include', 'lab5_template_include', 20 );
+</code></pre>
+
+<p><strong>edit</strong> bug fixes and improved efficiency of <code>so_top_product_category_slug()</code>. Now tested and working. </p>
+
+<pre><code>// get the top-level parent product category from a term object or term slug
+function so_top_product_category_slug($cat) {
+    if( is_object( $cat ) ){
+        $catid = $cat-&gt;term_id;
+    } else {
+        $cat = get_term_by( 'slug', $cat, 'product_cat' );
+        $catid = $cat-&gt;term_id;
+    }
+    $parentId = $cat-&gt;parent;
+    $parentSlug = $cat-&gt;slug;
+    while ($parentId &gt; 0) {
+        $cat = get_term_by( 'id', $parentId, 'product_cat' );
+        $parentId = $cat-&gt;parent; // assign parent ID (if exists) to $catid
+        $parentSlug = $cat-&gt;slug;
+    }
+    return $parentSlug;
+}
+</code></pre>

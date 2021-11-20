@@ -1,0 +1,22 @@
+<p>You should use <a href="https://developer.mozilla.org/en/XPCOM_Interface_Reference/nsIDNSService" rel="nofollow">nsIDNSService</a> to resolve the host name in Firefox. Along these lines:</p>
+
+<pre class="lang-js prettyprint-override"><code>var threadManager = Components.classes["@mozilla.org/thread-manager;1"]
+                              .getService(Components.interfaces.nsIThreadManager);
+var dnsService = Components.classes["@mozilla.org/network/dns-service;1"]
+                           .createInstance(Components.interfaces.nsIDNSService);
+var listener = {
+  onLookupComplete: function(request, record, status)
+  {
+    if (Components.isSuccessCode(status))
+      alert("Host IP address: " + record.getNextAddrAsString());
+    else
+      alert("Lookup failed");
+  }
+};
+dnsService.asyncResolve("www.google.com", 0, listener,
+                        threadManager.currentThread);
+</code></pre>
+
+<p>This is usually a very fast operation because the host name is already cached. Note: if you use the Add-on SDK then you will have to <a href="https://addons.mozilla.org/en-US/developers/docs/sdk/1.6/dev-guide/tutorials/chrome.html" rel="nofollow">use chrome authority</a> and replace access to <code>Components</code> properties by the respective aliases.</p>
+
+<p>As to Chrome, I doubt that you can solve this problem properly there. As Korvin Szanto notes in his comment, <em>any</em> host name could point to a local address. And Chrome won't let you get the IP address that it talks to.</p>

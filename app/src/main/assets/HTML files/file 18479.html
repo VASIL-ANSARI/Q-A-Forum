@@ -1,0 +1,29 @@
+<p>This looks like the classic "creating Handler in a non-<a href="http://developer.android.com/reference/android/os/Looper.html" rel="nofollow">Looper</a> thread" exception. Basically, you're creating a Handler that's to receive location messages to your LocationListener object which was created in it's own thread.  Threads that run <code>doInBackground()</code> die as soon as the method returns.  Thus, the LocationManager is sending data to a dead object in a dead thread and you get an exception.</p>
+
+<p>A good sample on Loopers is here:</p>
+
+<p><a href="http://stackoverflow.com/questions/7597742/android-what-is-the-purpose-of-looper-and-how-to-use-it">android: What is the purpose of Looper and how to use it?</a></p>
+
+<p>You can continue to use the AsyncTask if you put <code>Looper.prepare()</code> at the top of <code>doInBackground()</code> and <code>Looper.loop()</code> at the bottom.  <code>Looper.loop()</code> is just an empty while loop that will keep your thread open forever. </p>
+
+<p>In order for it to die, <strong>you must call Looper.myLooper().quit() in your thread to kill it.</strong>  The easiest way to do that is immediately after <code>Looper.prepare()</code>, save the Looper by calling Looper.myLoop().  Then kill it in a method that is to be called when you want to stop the updates.</p>
+
+<pre><code>class LooperAsyncTask extends AsyncTask&lt;Void, Void, Void&gt; {
+
+    private mThreadLooper;
+
+    @Override
+    protected String doInBackground(String... params) {
+      Looper.prepare();
+      mThreadLooper = Looper.myLooper();
+      **setup code**
+      Looper.loop();
+    }
+
+    public void stopUpdates() {
+      **cleanup code**
+      if(mThreadLooper != null)
+        mThreadLooper.quit();
+    }
+}
+</code></pre>

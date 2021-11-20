@@ -1,0 +1,59 @@
+<p>FOR MS SQL SERVER: i have tried your one part with one table i hope you will execute in for second table also
+for dynamic query we have to put out statement in one variable and replace some string from that variable then execute it </p>
+
+<pre><code>declare @ds  nvarchar(22);
+declare @qry  nvarchar(max);
+set @ds = 'KaamKaaj';
+
+set @qry = N' SELECT '''+ @ds + ''' as DBName , T.name AS [TABLE NAME], 
+       I.rows AS [ROWCOUNT] 
+FROM   @ds.sys.tables AS T 
+       INNER JOIN @ds.sys.sysindexes AS I 
+               ON T.object_id = I.id 
+                  AND I.indid &lt; 2 
+ORDER  BY I.rows DESC';
+
+SET @qry    =   REPLACE(@qry, '@ds', @ds)
+print @qry;
+
+declare @TableList TABLE(Id int IDENTITY(1,1),DataBaseName VARCHAR(100),TableName VARCHAR(100),RecordCount INT,NameOfIndex VARCHAR(100),TypeOfIndex VARCHAR(100))
+
+INSERT INTO @TableList(DataBaseName,TableName,RecordCount)
+exec(@qry
+);
+
+declare @qry2  nvarchar(max);
+
+set @qry2 =  N'SELECT 
+     '''+ @ds + ''' as DBName,
+     t.name,
+     ind.name,
+     ind.type_desc
+FROM 
+     @ds.sys.indexes ind 
+INNER JOIN 
+     @ds.sys.index_columns ic ON  ind.object_id = ic.object_id and ind.index_id = ic.index_id 
+INNER JOIN 
+     @ds.sys.columns col ON ic.object_id = col.object_id and ic.column_id = col.column_id 
+INNER JOIN 
+     @ds.sys.tables t ON ind.object_id = t.object_id 
+WHERE 
+     ind.is_primary_key = 0 
+     AND ind.is_unique = 0 
+     AND ind.is_unique_constraint = 0 
+     AND t.is_ms_shipped = 0 
+ORDER BY 
+     t.name, ind.name, ind.index_id, ic.index_column_id 
+
+     ';
+SET @qry2   =   REPLACE(@qry2, '@ds', @ds)
+
+declare @TableListWithIndex TABLE(Id int IDENTITY(1,1),DataBaseName VARCHAR(100),TableName VARCHAR(100),NameOfIndex VARCHAR(100),TypeOfIndex VARCHAR(100))
+INSERT INTO @TableListWithIndex(DataBaseName,TableName,NameOfIndex,TypeOfIndex)
+exec(@qry2
+);
+
+
+select * from @TableList
+select * from @TableListWithIndex
+</code></pre>

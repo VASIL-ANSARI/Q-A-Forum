@@ -1,0 +1,97 @@
+<blockquote>
+  <p>I need help with getting this variable back from the stored procedure.</p>
+</blockquote>
+
+<p>you need to move the <code>SET @output = @@ROWCOUNT</code> just after the <code>MERGE</code> statement and remove other statement setting the variable <code>@output</code>. Something like this.</p>
+
+<p><a href="http://sqlfiddle.com/#!6/99e0b/5" rel="nofollow">http://sqlfiddle.com/#!6/99e0b/5</a></p>
+
+<pre><code>create procedure dbo.Payment (@output int output, @XmlDocument XML)
+as
+begin
+Create Table #TempTable(IntComp VARCHAR(10), PaymentCode VARCHAR(10), PaymentDays int, [Text] VARCHAR(30), FreeMonth tinyint, PaymentCode2 VARCHAR(10))
+Declare @Identity as INT
+SET @Identity = (SELECT max ((etPayment.ID) + 1) from dbo.etPayment)
+IF @Identity IS NULL
+    SET @Identity = 1
+
+BEGIN TRY
+WITH XMLNAMESPACES('http://bla.bla.Payment' AS ns0)
+INSERT INTO #TempTable (IntComp, PaymentCode, PaymentDays, [Text], FreeMonth, PaymentCode2)     
+            SELECT 
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/IntComp[1]', 'VARCHAR(10)') IntComp,
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/PaymentCode[1]', 'VARCHAR(10)') PaymentCode,
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/PaymentDays[1]', 'int') PaymentDays,
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/Text[1]', 'VARCHAR(30)') [Text],
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/FreeMonth[1]', 'tinyint') FreeMonth,
+                    @xmldocument.value('/ns0:Payment[1]/Payment[1]/PaymentCode2[1]', 'VARCHAR(10)') PaymentCode2;
+
+
+MERGE dbo.etPayment AS Target
+USING 
+(
+
+SELECT 
+IntComp,
+PaymentCode,
+PaymentDays,
+[Text],
+FreeMonth,
+PaymentCode2
+FROM #TempTable) AS Source
+ON (Target.IntComp = Source.IntComp and Target.PaymentCode = Source.PaymentCode)
+WHEN MATCHED 
+THEN UPDATE SET 
+Target.PaymentDays = Source.PaymentDays,
+Target.[Text] = Source.[Text],
+Target.FreeMonth = Source.FreeMonth,
+Target.PaymentCode2 = Source.PaymentCode2
+
+WHEN NOT MATCHED BY TARGET 
+THEN INSERT(
+ID,
+IntComp,
+PaymentCode,
+PaymentDays,
+[Text],
+FreeMonth,
+PaymentCode2
+)
+
+VALUES(
+@Identity,
+Source.IntComp,
+Source.Paymentcode,
+Source.PaymentDays,
+Source.Text,
+Source.FreeMonth,
+Source.PaymentCode2
+);
+SET @output = @@ROWCOUNT;
+END TRY
+BEGIN CATCH
+SET @output = 0;
+SELECT @output
+END CATCH
+DROP TABLE #TempTable;
+end
+</code></pre>
+
+<p>You can call the procedure like this and get the @output</p>
+
+<pre><code>DECLARE @output int,@XmlDocument XML= '&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;ns0:Payment  xmlns:ns0="http://bla.bla.Payment"&gt;
+    &lt;Payment&gt;
+        &lt;IntComp&gt;asasc&lt;/IntComp&gt;
+        &lt;PaymentCode&gt;P&lt;/PaymentCode&gt;
+        &lt;PaymentDays&gt;20&lt;/PaymentDays&gt;
+        &lt;FreeMonth&gt;1&lt;/FreeMonth&gt;
+        &lt;PaymentCode2&gt;P&lt;/PaymentCode2&gt;
+        &lt;Text&gt;TEXT&lt;/Text&gt;
+        &lt;/Payment&gt;
+    &lt;/ns0:Payment&gt;'
+
+EXEC dbo.Payment @output output,@XmlDocument
+
+SELECT @output as output,* FROM etPayment;
+</code></pre>

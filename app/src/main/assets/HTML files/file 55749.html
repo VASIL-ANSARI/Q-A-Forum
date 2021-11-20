@@ -1,0 +1,43 @@
+<p>Your object file compilation is incorrect:</p>
+
+<pre><code>tcpserver.o: tcpserver.cpp tcpserver.hpp
+    g++ -std=c++11 tcpserver.hpp
+
+main.o  : main.cpp tcpserver.hpp
+    g++ -std=c++11 main.cpp -lpthread
+</code></pre>
+
+<p>These rules don't indicate that you're building object files, they both say that they're independently building and linking applications. That's why you're getting linker errors - you're not actually linking the result of compiling <code>main.cpp</code> with <code>tcpserver.o</code>. </p>
+
+<p>You need to provide <code>-c</code> to tell gcc that you don't want to link, that you're <em>just</em> compiling. You also need to provide <code>-o</code> to tell it where to output the results. Lastly, you're trying to compile <code>tcpserver.hpp</code> instead of <code>tcpserver.cpp</code>:</p>
+
+<pre><code>tcpserver.o: tcpserver.cpp tcpserver.hpp
+    g++ -std=c++11 -c tcpserver.cpp -o tcpserver.o
+
+main.o  : main.cpp tcpserver.hpp
+    g++ -std=c++11 -c main.cpp -o main.o
+</code></pre>
+
+<p>Or, shorter:</p>
+
+<pre><code>%.o : %.cpp tcpserver.hpp
+    g++ -std=c++11 -c $&lt; -o $@
+</code></pre>
+
+<hr />
+
+<p>Also, this rule is bad:</p>
+
+<pre><code>all :  main.o tcpserver.o
+    g++ -std=c++11 -o tcpserver main.o tcpserver.o
+</code></pre>
+
+<p>The target of the rule is <code>all</code>, but it's actually making a file named <code>tcpserver</code>. So if you keep rerunning <code>make</code>, it'll keep rebuilding <code>tcpserver</code> since the file <code>all</code> will continue to not exist. Change the target to match the actual target. And this is where your linker flags go:</p>
+
+<pre><code>tcpserver :  main.o tcpserver.o
+    g++ -std=c++11 -o tcpserver $^ -lpthread
+</code></pre>
+
+<hr />
+
+<p>Additionally, the include guard you're using (<code>__TCP_SERVER_HPP_INCLUDED__</code>) is a reserved name for the C++ standard library. Any name which contains a double underscore or starts with an underscore followed by a capital letter should not be used in your code. </p>

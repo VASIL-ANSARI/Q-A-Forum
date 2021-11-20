@@ -1,0 +1,46 @@
+<p>The error is very appropriate, what it is trying to say is that request connection method should be called once the session is open. 
+Now your </p>
+
+<pre><code>[FBSession openActiveSessionWithReadPermissions:permissions
+                                   allowLoginUI:YES
+                              completionHandler:^(FBSession *session,
+                                                  FBSessionState status,
+                                                  NSError *error) {
+                              }];
+</code></pre>
+
+<p>method returns BOOL value true or false to specify you wether session is open or not(it tries to open synchronously). So first check the result of this call and the put it inside the code for fetching info. For eg.</p>
+
+<pre><code> if (FBSession.activeSession.isOpen)
+{
+[FBRequestConnection startForMeWithCompletionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
+    NSLog(@"%@", [result objectForKey:@"gender"]);
+    NSLog(@"%@", [result objectForKey:@"hometown"]);
+    NSLog(@"%@", [result objectForKey:@"birthday"]);
+    NSLog(@"%@", [result objectForKey:@"email"]);
+}];
+
+}
+</code></pre>
+
+<p>This should remove your error, but you still may not get the results.You may or may not get result on the very first call to this code but whenever the code for completion handler will be called, this method FBRequestConnection will also get called and at that time you'll get the results as it is an asynchronous call.</p>
+
+<p>If it still doesn't work try this </p>
+
+<pre><code> if (FBSession.activeSession.isOpen)
+    {
+        [[FBRequest requestForMe] startWithCompletionHandler:^(FBRequestConnection *connection, NSDictionary&lt;FBGraphUser&gt; *user, NSError *error) {
+            if (error)
+            {
+                NSLog(@"error:%@",error);
+
+            }
+            else
+            {
+                // retrive user's details at here as shown below
+                NSLog(@"FB user first name:%@",user.first_name);
+                NSLog(@"FB user last name:%@",user.last_name);
+                NSLog(@"FB user birthday:%@",user.birthday);
+            }
+}];
+</code></pre>

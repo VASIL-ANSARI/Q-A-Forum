@@ -1,0 +1,58 @@
+<p>Do you have Facebook App installed on your device? The Share dialog only works if you have the Facebook app installed.</p>
+
+<p>From the Share dialog documentation :</p>
+
+<blockquote>
+  <p>Tip 1: What if people don't have the Facebook app installed? </p>
+  
+  <blockquote>
+    <p>The Share dialog can't be displayed if people don't have the Facebook app installed. Apps can detect this by calling <code>[FBDialogs canPresentShareDialogWithParams:nil];</code> and may disable or hide a sharing button or fall back to the Feed dialog to share on the web. See the HelloFacebookSample included with the iOS SDK for an example.</p>
+  </blockquote>
+</blockquote>
+
+<p>From what I saw, iOS 6 will return <code>NO</code> for <code>+ canPresentShareDialogWithParams:</code>. It only responds to <code>+ canPresentOSIntegratedShareDialogWithSession:</code>. But I could be wrong here.</p>
+
+<p><b>Anyways, this is how I do it -</b>
+1. For sharing links :</p>
+
+<pre><code>if ([FBDialogs canPresentShareDialogWithParams:nil]) {
+
+    NSURL* url = [NSURL URLWithString:link.url];
+    [FBDialogs presentShareDialogWithLink:url
+                              handler:^(FBAppCall *call, NSDictionary *results, NSError *error) {
+                 if(error) {
+                       NSLog(@"Error: %@", error.description);
+                 } else {
+                       NSLog(@"Success");
+                 }
+     }];
+}
+</code></pre>
+
+<p>2.For OpenGraph calls :</p>
+
+<pre><code>id&lt;FBGraphObject&gt; pictureObject =
+    [FBGraphObject openGraphObjectForPostWithType:@"your_namespace:picture"
+                                            title:image.title
+                                            image:image.thumbnailUrl
+                                              url:image.url
+                                      description:@""];
+
+    id&lt;FBOpenGraphAction&gt; action = (id&lt;FBOpenGraphAction&gt;)[FBGraphObject graphObject];
+    [action setObject:pictureObject forKey:@"picture"];
+
+    [FBDialogs presentShareDialogWithOpenGraphAction:action
+                                          actionType:@"your_namespace:action_name"
+                                 previewPropertyName:@"picture"
+                                             handler:^(FBAppCall *call, NSDictionary *results, NSError *error) {
+                                                 if(error) {
+                                                     NSLog(@"Error: %@", error.description);
+                                                 } else {
+                                                     NSLog(@"Success");
+                                                 }
+                                             }];
+</code></pre>
+
+<p>Check out other ways to share on iOS <a href="https://developers.facebook.com/docs/howtos/share-dialogs-ios-sdk/" rel="nofollow">here</a></p>
+
+<p>Hope this helps.</p>

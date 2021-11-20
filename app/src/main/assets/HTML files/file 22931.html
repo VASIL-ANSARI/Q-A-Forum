@@ -1,0 +1,36 @@
+<p>Disclaimer: I'm no expert on (My)SQL performance at all, just commenting on the AWS aspects of your use case.</p>
+
+<p>With that out of the way, there are several questions to address, first and foremost:</p>
+
+<blockquote>
+  <p>Would moving MySQL data to ephemeral storage (/mnt) improve this?</p>
+</blockquote>
+
+<p>I've provided an answer for the identical question <a href="http://stackoverflow.com/a/10120863/45773">Will moving data from EBS to ephemeral storage improve MySQL query performance?</a>, please check it out for some important details - TL;DR: You most definitely don't want to do that if you have any durability needs (except if you exactly know what you are doing), and performance gains via ephemeral storage claimed in the past are also dubious at best, if not plain wrong from today's perspective.</p>
+
+<blockquote>
+  <p>Would using Provisioned IOPS help with?</p>
+</blockquote>
+
+<p>Absolutely, <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html#EBSVolumeTypes_piops">Provisioned IOPS Volumes</a> are specifically <em>designed to meet the needs of I/O-intensive workloads, particularly database workloads, that are sensitive to storage performance and consistency in random access I/O throughput</em>, see the post <a href="http://aws.typepad.com/aws/2012/08/fast-forward-provisioned-iops-ebs.html">Fast Forward - Provisioned IOPS for EBS Volumes</a> for a general introduction.</p>
+
+<ul>
+<li><p>Please note that these ideally (but not necessarily) go hand in hand with <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html#EBSOptimized">EBS-Optimized Instances</a>, which use <em>an optimized configuration stack and provides additional, dedicated capacity for EBS I/O. This optimization provides the best performance for your EBS volumes by minimizing contention between EBS I/O and other traffic from your Amazon EC2 instance.</em></p></li>
+<li><p>Specifically you'll want to read through the dedicated section <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSPerformance.html">Increasing EBS Performance</a>, which addresses how to <em>look at the I/O performance you require and your options for increasing EBS performance to meet those requirements</em> with RAID and/or <em>Provisioned IOPS</em> depending on your use case.</p></li>
+</ul>
+
+<blockquote>
+  <p>My question: > 500 ms, > 1000ms is a reasonable latency for a query that just retrieves rows by PRIMARY KEY? Even in a 42M table? Even when all rows are in disk? It seems too much for me.</p>
+</blockquote>
+
+<p>As mentioned I can't judge the values as such, however, given your specification you seem to have memory contention, insofar the m2.2xlarge instance features 'only' 34.2 GiB of memory and you are allocating ~30GB for the <code>innodb_buffer_pool_size</code> already - this seem to be a bit high to me given other memory requirements of the OS and/or MySQL, so there might already be swapping involved, which would perfectly explain the cache/memory warming behavior you are experiencing.</p>
+
+<ul>
+<li>As a general recommendation for database workloads it seems to be the biggest bang for the buck by far these days to simply ensure your dataset fits entirely into RAM, which is easier than ever with the plethora of instance types (if at all feasible in the first place).</li>
+</ul>
+
+<p>Finally I recommend to read the very recent post about <a href="http://blog.2ndquadrant.com/postgresql_performance_on_ec2/">Improving PostgreSQL performance on AWS EC2</a> - the recommendations there primarily address the AWS side of things as well and do apply to MySQL too accordingly; section <em>Durable databases</em> pretty much summarizes my suggestions above:</p>
+
+<blockquote>
+  <p>For a durable database where you care about your data, what you want instead of a high I/O instance is an <a href="http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/instance-types.html#EBSOptimized">EBS Optimized instance</a>, which has guaranteed network bandwidth to the EBS storage servers. Use EBS volumes with <a href="http://docs.amazonwebservices.com/AmazonRDS/latest/UserGuide/Scenarios.PIOPS.html">provisioned IOPs</a> and, for best results, stripe a group of EBS volumes into a RAID10 array. See <a href="http://docs.amazonwebservices.com/AWSEC2/latest/UserGuide/EBSPerformance.html">increasing EBS performance</a>.</p>
+</blockquote>

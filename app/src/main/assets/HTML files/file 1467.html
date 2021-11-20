@@ -1,0 +1,76 @@
+<p>To get the questions and the choices for each question:</p>
+
+<pre><code>SELECT question, choice_text
+FROM questions
+JOIN choices
+ON questions.question_id = choices.question_id
+</code></pre>
+
+<p>Add LEFT before JOIN if you also want questions that have no choices.</p>
+
+<p>To get the counts for each answer you could do this:</p>
+
+<pre><code>SELECT question, choice_text, COUNT(answers.choice_id)
+FROM questions
+JOIN choices
+    ON questions.question_id = choices.question_id
+LEFT JOIN answers
+    ON questions.question_id = answers.question_id
+    AND choices.choice_id = answers.choice_id
+GROUP BY questions.question_id, choices.choice_id
+ORDER BY questions.question_id, choices.choice_id
+</code></pre>
+
+<p>To get the number of people that selected each answer as a percentage (per question) use the following query:</p>
+
+<pre><code>SELECT question, choice_text, COUNT(answers.choice_id) * 100 / questiontotal
+FROM questions
+JOIN (
+        SELECT questions.question_id, COUNT(answers.choice_id) AS questiontotal
+        FROM questions
+        LEFT JOIN answers ON questions.question_id = answers.question_id
+        GROUP BY questions.question_id
+    ) AS answercounts
+    ON questions.question_id = answercounts.question_id
+JOIN choices ON questions.question_id = choices.question_id
+LEFT JOIN answers
+    ON questions.question_id = answers.question_id
+    AND choices.choice_id = answers.choice_id
+GROUP BY questions.question_id, choices.choice_id
+ORDER BY questions.question_id, choices.choice_id;
+</code></pre>
+
+<p>Here's the testdata I used:</p>
+
+<pre><code>CREATE TABLE questions (question_id int, question nvarchar(100));
+INSERT INTO questions (question_id, question) VALUES
+(1, 'Foo?'),
+(2, 'Bar?');
+
+CREATE TABLE choices (choice_id int, question_id int, choice_text nvarchar(100));
+INSERT INTO choices (choice_id, question_id, choice_text) VALUES
+(1, 1, 'Foo1'),
+(2, 1, 'Foo2'),
+(3, 1, 'Foo3'),
+(4, 2, 'Bar1'),
+(5, 2, 'Bar2');
+
+CREATE TABLE answers (answer_id int, question_id int, choice_id int);
+INSERT INTO answers (answer_id, question_id, choice_id) VALUES
+(1, 1, 1),
+(2, 1, 1),
+(3, 1, 3),
+(4, 2, 4),
+(4, 2, 5);
+</code></pre>
+
+<p>And the output I get with the last query on this data:</p>
+
+<pre><code>'Foo?', 'Foo1', 66.6667
+'Foo?', 'Foo2', 0.0000
+'Foo?', 'Foo3', 33.3333
+'Bar?', 'Bar1', 50.0000
+'Bar?', 'Bar2', 50.0000
+</code></pre>
+
+<p>In the update to your question you say you want to return all the values for one question on one row. I would recommend that you do <em>not</em> try to do this, and instead use the method I have given you above. If you need to present the data in one row to your end-user, this can be done using PHP.</p>

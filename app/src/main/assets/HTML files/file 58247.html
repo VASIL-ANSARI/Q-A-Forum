@@ -1,0 +1,52 @@
+<p>Yes, the result is deterministic, not (compiler's) implementation defined. Here follows the motivation for C++11 (it should be possible to do the same for other), following the document <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3337.pdf" rel="nofollow">here</a> (link suggested <a href="http://stackoverflow.com/questions/81656/where-do-i-find-the-current-c-or-c-standard-documents/4653479#4653479">here</a>)</p>
+
+<p>It's necessary to combine all of the following:</p>
+
+<blockquote>
+  <p>5.9 Relational operators</p>
+  
+  <ol>
+  <li><p>[...]</p></li>
+  <li><p>The <em>usual arithmetic conversions</em> are performed on operands of arithmetic or enumeration type. </p></li>
+  </ol>
+</blockquote>
+
+<p>To find the <em>usual arithmetic conversion</em> we need to go to the incipit of Chapter 5, paragraph 9:</p>
+
+<blockquote>
+  <p>Many binary operators that expect operands of arithmetic or enumeration type cause conversions and yield
+  result types in a similar way. The purpose is to yield a common type, which is also the type of the result.
+  This pattern is called <strong>the usual arithmetic conversions</strong>, which are defined as follows:</p>
+  
+  <ul>
+  <li>[...] (Enumeration and floating point types)</li>
+  <li><p>Otherwise, the <strong>integral promotions (4.5) shall be performed on both</strong>
+  <strong>operands</strong>.[59] Then the following rules shall be applied to the <em>promoted</em>
+  operands: </p>
+  
+  <ul>
+  <li>If both operands have the same type, no further conversion is needed.</li>
+  <li>[...]</li>
+  </ul></li>
+  </ul>
+</blockquote>
+
+<p>So, integral promotion, citing from 4.5:</p>
+
+<blockquote>
+  <p>A prvalue of an integer type <em>other than</em> bool, char16_t, char32_t, or wchar_t whose integer conversion
+  rank (4.13) is less than the rank of int can be converted to a prvalue of type int if int can represent all
+  the values of the source type; otherwise, the source prvalue can be converted to a prvalue of type unsigned
+  int.</p>
+</blockquote>
+
+<p>So:<br/>
+We have a relational operator, the usual arithmetic conversions will be used. These <em>oblige</em> to apply integral promotion. An integral promotion for <code>uint8_t</code> and <code>int8_t</code> is possible to <code>int</code>, so it is <em>obligatorily</em> applied.</p>
+
+<p><strong>Therefore the comparison between a <code>uint8_t</code> and <code>int8_t</code> is transformed by the compiler into a comparison between 2 <code>int</code>. There is no undeterministic behaviour.</strong></p>
+
+<p>There was a similar Q/A <a href="http://stackoverflow.com/q/23635240/2436175">here</a> (about <code>short</code> type though), which led me to the right path.</p>
+
+<p><strong>Note the following contradiction though</strong>: Relational operators return a boolean value (5.9.1), yet they use the usual arithmetic conversions which is used to obtain 2 operands of the same type. But, here lays the problem, the definition of usual arithmetic conversion says that the common type will be also the type of the result, which isn't the case for relational operators!!</p>
+
+<p>The contradiction is not there for C11, where the result returned by relational operators is indeed an <code>int</code>. (Thanks chux)</p>

@@ -1,0 +1,22 @@
+<p>You need so-called eager loading for this task. It will involve two queries, but it will be way better than one. </p>
+
+<p>You have to select your people first, then get people ids and query comments table for the comments. And finally you will have to combine the two arrays together. </p>
+
+<p>I will use PDO as it will take 5 times less code to write, <a href="https://phpdelusions.net/pdo#fetchall" rel="nofollow">thanks to some neat PDO features</a>.</p>
+
+<pre><code>$stmt = $conn-&gt;prepare("SELECT * FROM people WHERE name LIKE ?");
+$stmt-&gt;execute(["%$data%"]);
+$people = $stmt-&gt;fetchAll(PDO::FETCH_UNIQUE);
+
+$ids  = array_keys($people);
+$in   = str_repeat('?,', count($ids) - 1) . '?';
+$stmt = $db-&gt;prepare("SELECT people_id, * FROM comments WHERE people_id IN ($in)");
+$stmt-&gt;execute($ids);
+$comments = $stmt-&gt;fetchAll(PDO::FETCH_GROUP);
+
+foreach($people as $id=&gt;$row)
+{
+    $row['comments'] = $comments[$id];
+    $people[$id] = $row;
+}
+</code></pre>

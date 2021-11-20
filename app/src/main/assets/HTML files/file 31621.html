@@ -1,0 +1,19 @@
+<p>You can speed it up by getting rid of <code>date</code> function and by using <code>pluck</code> instead of iterating over all records (assuming <code>value</code> is a column on <code>Info</code> model). To do this, create a scope on <code>Info</code> model:</p>
+
+<pre><code>scope :created_at, -&gt;(dates) { where(created_at: Array.wrap(dates).map {|date| date..(date + 1.day)}) }
+</code></pre>
+
+<p>Then you can call:</p>
+
+<pre><code>data = @product.objects
+data.infos.created_at(dates).where(product_id: @product.id).pluck(:value)
+</code></pre>
+
+<p>UPDATE:</p>
+
+<p>Since those two columns are on separate tables, you will need to use <code>joins</code> method. This makes it slightly trickier to use the scope defined above - we need to use merge. ALso pluck do not allows to get more than one column at the time, so we need to use nice <code>select_all</code> trick:</p>
+
+<pre><code>data = @product.objects
+query = data.joins(:infos).merge(Info.created_at(dates)).where(product_id: @product.id).select([:name, :value])
+ActiveRecord::Base.connection.select_all(query)
+</code></pre>

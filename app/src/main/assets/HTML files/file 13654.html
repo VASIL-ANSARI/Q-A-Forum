@@ -1,0 +1,7 @@
+<p>Yes, this is normal.  The benefit you get out of Invoke() is that it <em>blocks</em> the worker thread.  When you use BeginInvoke() the thread keeps motoring and issues invoke requests at a rate higher than the UI thread can handle.  It depends on what you ask the UI thread to do but it starts to become a problem around 1000 invokes per second.</p>
+
+<p>The UI thread stops being responsive in this scenario, it is constantly finding another invoke request back while it pumps the message loop and doesn't get around doing its regular duties anymore.  Input and paint requests no longer get processed.</p>
+
+<p>The clear source of the problem is the invoke request on <em>every single line</em> of output retrieved from the process.  It is just generating them too quickly.  You need to fix this by lowering the rate at which you invoke.  There's a simple rule for that, you are only trying to keep a human occupied, invoking more than 25 times per second turns whatever you produce in but a blur to the eye.  So buffer the lines and measure the amount of time that has passed since the last invoke call.</p>
+
+<p>Also note that using Invoke() is an easy workaround but it isn't exactly guaranteed to work.  It is a <em>race</em>, the worker thread could potentially always call the next Invoke() a wee bit earlier than the main thread re-entering the message loop and reading the next message.  In which case you will still have the exact same problem.</p>

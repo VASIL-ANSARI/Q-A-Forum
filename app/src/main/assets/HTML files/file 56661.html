@@ -1,0 +1,53 @@
+<p>You defined input parameter's name as <code>Parent_ID</code> which is a column in table <code>test</code>, this is reason that you did not get what you expected.</p>
+
+<p>Try following;)</p>
+
+<pre><code>CREATE PROCEDURE `get_parent_child_hierarchy`(pid INT)
+BEGIN
+
+DECLARE `rowcount` INT DEFAULT 1;
+
+DROP TABLE IF EXISTS Temp;
+
+CREATE TABLE Temp(ParentID INT, ChildID INT, Stage INT);
+
+
+INSERT INTO Temp(ParentID, ChildID, Stage)
+SELECT pid, pid, 2;
+
+WHILE rowcount &gt; 0 DO
+
+    UPDATE Temp
+    SET Stage = 1
+    WHERE Stage = 2;
+    COMMIT;
+
+    INSERT INTO Temp(ParentID, ChildID, Stage)
+    SELECT pid, id, 2
+    FROM test T
+    WHERE parent_id IN (SELECT ChildID
+                        FROM Temp 
+                        WHERE Stage = 1
+                        AND Temp.ChildID &lt;&gt; T.id);
+
+
+    UPDATE Temp
+    SET Stage = 0
+    WHERE Stage = 1;
+    COMMIT;
+
+    SET rowcount = (SELECT COUNT(ChildID)
+                    FROM Temp
+                    WHERE Stage = 2);
+
+END WHILE;
+
+
+SELECT *
+FROM Temp
+WHERE pid &lt;&gt; ChildID;
+
+DROP TABLE IF EXISTS Temp;
+
+END
+</code></pre>

@@ -1,0 +1,41 @@
+<blockquote>
+  <p>How often will you take per second?</p>
+</blockquote>
+
+<p>.</p>
+
+<blockquote>
+  <p>it could be a thousand times a second</p>
+</blockquote>
+
+<p>1000 lock operations per second are absolutely nothing. This will consume almost no time at all.</p>
+
+<blockquote>
+  <p>my colleague has already tried using locks and lists and he deemed it too slow</p>
+</blockquote>
+
+<p>In all likelihood this means that the locked region was too big. My guess is it went something like that:</p>
+
+<pre><code>lock (...) {
+ var item = TakeFromQueue();
+ Process(item);
+ DeleteFromQueue(item);
+}
+</code></pre>
+
+<p>This does not work because <code>Process</code> is too slow. It must be:</p>
+
+<pre><code>lock (...)
+ var item = TakeFromQueue();
+
+ Process(item);
+
+lock (...)
+ DeleteFromQueue(item);
+</code></pre>
+
+<p>You will not have any perf problems with that at all.</p>
+
+<p>You can now pick any data structure that you like. You are no longer bound by the capabilities of the built-in concurrent data structures. Besides picking a data structure that you like you also can perform any operation on it that you like such as taking multiple items atomically.</p>
+
+<p>I have not fully understood your needs but it sounds like <code>SortedList</code> might go in the right direction.</p>

@@ -1,0 +1,28 @@
+<p>I think your Option#1 is the best route. Otherwise you get into the business of trying to reconcile create and update actions - which you would need to do to handle Option #2.</p>
+
+<p>You could override the setter for domain name and then perform custom logic, like so:</p>
+
+<p>In your Model:</p>
+
+<pre><code>def domain=(the_domain)
+ raise ValidOwnerRequired if verified? &amp;&amp; domain != the_domain
+ # if we got here then the this record is new and this is a creation attempt
+ @require_domain_verification = true 
+ # do other stuff here..
+end
+
+def require_domain_verification?
+  @require_domain_verification == true
+end
+</code></pre>
+
+<p>And then have an observer for that model:</p>
+
+<pre><code>def after_save(record)
+  if record.require_domain_verification?
+    SomeMailer.deliver_domain_verification(record)
+  end
+end
+</code></pre>
+
+<p>Something like that...</p>

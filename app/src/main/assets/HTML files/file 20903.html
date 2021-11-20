@@ -1,0 +1,46 @@
+<p>EF mapping conventions try to infer a one-to-one relationship between <code>User.CreatedBy</code> and <code>User.LastUpdatedBy</code>. This fails because both navigation properties are represented with foreign keys that are not primary keys at the same time and because EF only supports shared primary key one-to-one relationships.</p>
+
+<p>Anyway, this is not important because you don't want a one-to-one relationship but actually two one-to-many relationships: A user can create many other users and a user can modify many other users.</p>
+
+<p>To achieve this you must override the conventions by explicitly defining the two relationships with Fluent API:</p>
+
+<pre><code>modelBuilder.Entity&lt;User&gt;()
+    .HasRequired(u =&gt; u.CreatedBy)  // this could be a problem, see below
+    .WithMany()
+    .HasForeignKey(u =&gt; u.CreatedByUserId);
+
+modelBuilder.Entity&lt;User&gt;()
+    .HasOptional(u =&gt; u.LastUpdatedBy)
+    .WithMany()
+    .HasForeignKey(u =&gt; u.LastUpdatedByUserId);
+</code></pre>
+
+<p>It might be necessary to make <code>CreatedBy</code> optional, i.e. <code>CreatedByUserId</code> must be of type <code>int?</code> and in the mapping above you must replace <code>HasRequired</code> by <code>HasOptional</code>, because otherwise you could not create the very first user without violating the FK constraint. </p>
+
+<p>Possibly you could apply a trick, like creating the first user directly in the DB with <code>CreatedByUserId</code> allowing <code>NULL</code> values, assigning this user then as his own creator and then changing the DB schema so that <code>NULL</code> is forbidden.</p>
+
+<p><strong>Edit</strong></p>
+
+<p>More details about "<em>EF mapping conventions try to infer a one-to-one relationship between <code>User.CreatedBy</code> and <code>User.LastUpdatedBy</code>.</em>":</p>
+
+<p>When EF analyzes your model classes during startup it uses</p>
+
+<ol>
+<li>your configuration with Fluent API, </li>
+<li>your applied data annotations,</li>
+<li>a set of certain conventions to infer relationships from navigation properties and property names.</li>
+</ol>
+
+<p>Those set of cenventions gets applied unless otherwise explitly specified with Fluent API or data annotations. You can find the full set of conventions here: <a href="http://msdn.microsoft.com/en-us/library/system.data.entity.modelconfiguration.conventions(v=vs.103).aspx">http://msdn.microsoft.com/en-us/library/system.data.entity.modelconfiguration.conventions(v=vs.103).aspx</a></p>
+
+<p>In case of your original <code>User</code> class it is the <a href="http://msdn.microsoft.com/en-us/library/system.data.entity.modelconfiguration.conventions.associationinversediscoveryconvention%28v=vs.103%29.aspx"><strong><code>AssociationInverseDiscoveryConvention</code></strong></a> that is applied for your model and detects a one-to-one relationship. The documentation says:</p>
+
+<blockquote>
+  <p>Convention to detect navigation properties to be inverses of each
+  other when only one pair of navigation properties exists between the
+  related types.</p>
+</blockquote>
+
+<p>The "only one" pair of navigation properties is <code>CreatedBy</code> in <code>User</code> that refers to <code>User</code> - and in <code>User</code> is a second navigation property <code>LastUpdatedBy</code> that refers back to <code>User</code>. (It's just a bit confusing because the "related types" are the same - <code>User</code> and <code>User</code>, but the convention applies here the same way as between different types.) Because both are references (and not collections) EF assumes that the relationship must be one-to-one (and not one-to-many or many-to-many).</p>
+
+<p>Sometimes conventions don't infer the relationship as you want it. Then you must override the mapping conventions with Fluent API or data annotations. (Annotations are not sufficient in your example, you must use Fluent API here.)</p>

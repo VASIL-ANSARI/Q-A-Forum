@@ -1,0 +1,20 @@
+<p>The post is not being updated as you expect as it is being captured inside of the async block. If I remember correctly, instance variables are copied once passed into a block, so changes to them aren't reflected outside of the async block unless they have the <code>__block</code> modifier.</p>
+
+<p>Try this,</p>
+
+<pre><code>- (void)fetchPosts
+{
+    __block NSArray *blockPosts = posts;
+Â  Â  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+Â  Â  Â  Â  NSData* data = [NSData dataWithContentsOfURL:[NSURL URLWithString: @"http://website.com/app/"]];
+
+Â  Â  Â  Â  NSError* error;
+
+Â  Â  Â  Â  blockPosts = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&amp;error];
+
+Â  Â  Â  Â  dispatch_async(dispatch_get_main_queue(), ^{
+Â  Â  Â  Â  Â  Â  [self.collectionView reloadData];
+Â  Â  Â  Â  });
+Â  Â  });
+}
+</code></pre>

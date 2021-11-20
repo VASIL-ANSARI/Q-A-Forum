@@ -1,0 +1,50 @@
+<p>There are a mistake in your view. First of all, it's common practice to pass the model as parameter when you create a new view: </p>
+
+<pre><code>var view = new SettingsView({ "el": "body", "model": new Settings() });
+</code></pre>
+
+<p>now you can access your model by <code>this.model</code> in your view.</p>
+
+<p>Next thing is the use of the variable <code>view</code> in your view. Using Backbone's View means you can have multiple instances of one View class. So calling <code>new SettingsView()</code> creates an instance of your view. Let's think about having two instances of your view:</p>
+
+<pre><code>var view = new SettingsView({ "el": "body", "model": new Settings() });
+var view1 = new SettingsView({ "el": "body", "model": new Settings() });
+</code></pre>
+
+<p>Whenever you call <code>view.settings.save();</code> in one of your instances it will always call the method in the first view instance because it's bound the variable name "view". So all you have to do use <code>this</code> instead of <code>view</code>:</p>
+
+<p>SettingsView = Backbone.View.extend({</p>
+
+<pre><code>    tagName: 'li',
+
+    events: {
+        'click #update-settings': 'updateSettings'
+    },
+
+    initialize: function () {
+        this.settings = new Settings;
+        this.settings.fetch({ success: _.bind(function () {
+        //to get this work here we have to bind "this", 
+        //otherwise "this" would be the success function itself 
+            this.render(view.settings);
+        }, this)
+        });
+
+    },
+
+    updateSettings: function () {
+        this.model.replaceServiceUrlAttr($('#settings-service-url').val());
+        this.model.replaceTimeoutAttr($('#settings-timeout').val());
+        this.model.save();
+    },
+
+    render: function () {
+        $('#settings-wisdom-service-url').val(this.model.get("WisdomServiceUrl"));
+        $('#settings-timeout').val(this.model.get("Timeout"));
+    }
+});
+</code></pre>
+
+<p>Using both settings methods in your model doesn't make much sense at the moment as they just call set. So you could call set on the model directly.</p>
+
+<p>Also using <code>tagName: 'li'</code> and inserting an element will not work as you expected. Using tagName only has an effect if you don't insert an element into the constructor. In this case backbone will create a new element using the tagName. Otherwise the element of the view is the one you passed into the constructor.</p>

@@ -1,0 +1,74 @@
+<p>I've had to deal with this recently, and here's what I ended up doing to get SVM to work for images.</p>
+
+<p>To train your SVM on a set of images, first you have to construct the training matrix for the SVM. This matrix is specified as follows: each row of the matrix corresponds to one image, and each element in that row corresponds to one feature of the class -- in this case, the color of the pixel at a certain point. Since your images are 2D, you will need to convert them to a 1D matrix. The length of each row will be the area of the images (note that the images must be the same size).</p>
+
+<p>Let's say you wanted to train the SVM on 5 different images, and each image was 4x3 pixels. First you would have to initialize the training matrix. The number of rows in the matrix would be 5, and the number of columns would be the area of the image, 4*3 = 12.</p>
+
+<pre><code>int num_files = 5;
+int img_area = 4*3;
+Mat training_mat(num_files,img_area,CV_32FC1);
+</code></pre>
+
+<p>Ideally, <code>num_files</code> and <code>img_area</code> wouldn't be hardcoded, but obtained from looping through a directory and counting the number of images and taking the actual area of an image.</p>
+
+<p>The next step is to "fill in" the rows of <code>training_mat</code> with the data from each image. Below is an example of how this mapping would work for one row. </p>
+
+<p><img src="http://i.stack.imgur.com/scvHP.png" alt="Convert 2D image matrix to 1D matrix"></p>
+
+<p>I've numbered each element of the image matrix with where it should go in the corresponding row in the training matrix. For example, if that were the third image, this would be the third row in the training matrix.</p>
+
+<p>You would have to loop through each image and set the value in the output matrix accordingly. Here's an example for multiple images:</p>
+
+<p><img src="http://i.stack.imgur.com/20p5v.png" alt="Training matrix with multiple images"></p>
+
+<p>As for how you would do this in code, you could use <a href="http://opencv.willowgarage.com/documentation/cpp/basic_structures.html#cv-reshape"><code>reshape()</code></a>, but I've had issues with that due to matrices not being continuous. In my experience I've done something like this:</p>
+
+<pre><code>Mat img_mat = imread(imgname,0); // I used 0 for greyscale
+int ii = 0; // Current column in training_mat
+for (int i = 0; i&lt;img_mat.rows; i++) {
+    for (int j = 0; j &lt; img_mat.cols; j++) {
+        training_mat.at&lt;float&gt;(file_num,ii++) = img_mat.at&lt;uchar&gt;(i,j);
+    }
+}
+</code></pre>
+
+<p>Do this for every training image (remembering to increment <code>file_num</code>). After this, you should have your training matrix set up properly to pass into the SVM functions. The rest of the steps should be very similar to examples online.</p>
+
+<p>Note that while doing this, you also have to set up labels for each training image. So for example if you were classifying eyes and non-eyes based on images, you would need to specify which row in the training matrix corresponds to an eye and a non-eye. This is specified as a 1D matrix, where each element in the 1D matrix corresponds to each row in the 2D matrix. Pick values for each class (e.g., -1 for non-eye and 1 for eye) and set them in the labels matrix.</p>
+
+<pre><code>Mat labels(num_files,1,CV_32FC1);
+</code></pre>
+
+<p>So if the 3rd element in this <code>labels</code> matrix were -1, it means the 3rd row in the training matrix is in the "non-eye" class. You can set these values in the loop where you evaluate each image. One thing you could do is to sort the training data into separate directories for each class, and loop through the images in each directory, and set the labels based on the directory.</p>
+
+<p>The next thing to do is set up your SVM parameters. These values will vary based on your project, but basically you would declare a <code>CvSVMParams</code> object and set the values:</p>
+
+<pre><code>CvSVMParams params;
+params.svm_type = CvSVM::C_SVC;
+params.kernel_type = CvSVM::POLY;
+params.gamma = 3;
+// ...etc
+</code></pre>
+
+<p>There are several examples online on how to set these parameters, like in the link you posted in the question.</p>
+
+<p>Next, you create a <code>CvSVM</code> object and train it based on your data!</p>
+
+<pre><code>CvSVM svm;
+svm.train(training_mat, labels, Mat(), Mat(), params);
+</code></pre>
+
+<p>Depending on how much data you have, this could take a long time. After it's done training, however, you can save the trained SVM so you don't have to retrain it every time.</p>
+
+<pre><code>svm.save("svm_filename"); // saving
+svm.load("svm_filename"); // loading
+</code></pre>
+
+<p>To test your images using the trained SVM, simply read an image, convert it to a 1D matrix, and pass that in to <code>svm.predict()</code>:</p>
+
+<pre><code>svm.predict(img_mat_1d);
+</code></pre>
+
+<p>It will return a value based on what you set as your labels (e.g., -1 or 1, based on my eye/non-eye example above). Alternatively, if you want to test more than one image at a time, you can create a matrix that has the same format as the training matrix defined earlier and pass that in as the argument. The return value will be different, though.</p>
+
+<p>Good luck!</p>

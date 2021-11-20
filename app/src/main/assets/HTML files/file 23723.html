@@ -1,0 +1,118 @@
+<p>Here is my approach for a MVVM scenario, using a converter which creates a DataView which can be bound to the grids <code>ItemsSource</code>. It's for a special Matrix datatype which holds doubles, but you'll be able to modify it yourself for your requirements:</p>
+
+<pre><code>public class MatrixToDataViewConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var array = value as Matrix;
+        if (array == null) return null;
+
+        //var array = ILMath.rand(3, 5);
+
+        var rows = array.Dimensions[0];
+        var columns = array.Dimensions[1];
+
+        var t = new DataTable();
+        for (var c = 0; c &lt; columns; c++)
+        {
+            t.Columns.Add(new DataColumn(c.ToString()));
+        }
+
+        for (var r = 0; r &lt; rows; r++)
+        {
+            var newRow = t.NewRow();
+            for (var c = 0; c &lt; columns; c++)
+            {
+                var v = array[r, c];
+
+                // Round if parameter is set
+                if (parameter != null)
+                {
+                    int digits;
+                    if (int.TryParse(parameter.ToString(), out digits))
+                        v = Math.Round(v, digits);
+                }
+
+                newRow[c] = v;
+            }
+
+            t.Rows.Add(newRow);
+        }
+
+
+        return t.DefaultView;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+</code></pre>
+
+<p>Define a resource for the converter:</p>
+
+<pre><code>&lt;converter:MatrixToDataViewConverter x:Key="MatrixToDataViewConverter" /&gt;
+</code></pre>
+
+<p>And use it like this:</p>
+
+<pre><code>&lt;DataGrid ItemsSource="{Binding Matrix, Converter={StaticResource MatrixToDataViewConverter}, ConverterParameter=1}"/&gt;
+</code></pre>
+
+<p>It doesn't allow two way binding, though...</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>Here's the version for an array bool[][]:</p>
+
+<pre><code>public class BoolArrayToDataViewConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var array = value as bool[,];
+        if (array == null) return null;
+
+        var rows = array.GetLength(0);
+        if (rows == 0) return null;
+
+        var columns = array.GetLength(1);
+        if (columns == 0) return null;
+
+        var t = new DataTable();
+
+        // Add columns with name "0", "1", "2", ...
+        for (var c = 0; c &lt; columns; c++)
+        {
+            t.Columns.Add(new DataColumn(c.ToString()));
+        }
+
+        // Add data to DataTable
+        for (var r = 0; r &lt; rows; r++)
+        {
+            var newRow = t.NewRow();
+            for (var c = 0; c &lt; columns; c++)
+            {
+                newRow[c] = array[r, c];
+            }
+            t.Rows.Add(newRow);
+        }
+
+        return t.DefaultView;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+</code></pre>
+
+<p>and the usage:</p>
+
+<pre><code>&lt;DataGrid ItemsSource="{Binding Matrix, Converter={StaticResource BoolArrayToDataViewConverter}}"/&gt;
+</code></pre>
+
+<p>And this is what it looks like in the very raw version. You can then style the DataGrid and edit it's templates, but this is another question...</p>
+
+<p><img src="http://i.stack.imgur.com/y5RjL.png" alt="UI"></p>

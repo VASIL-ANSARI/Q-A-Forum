@@ -1,0 +1,47 @@
+<p>This is what I did. First of all edited all my class-library projects csproj file OutPath to,</p>
+
+<pre><code>&lt;PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' "&gt; 
+    ..................................
+    &lt;OutputPath&gt;bin\Debug\&lt;/OutputPath&gt;
+    ..................................
+
+
+&lt;PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' "&gt; 
+    ..................................
+    &lt;OutputPath&gt;bin\Release\&lt;/OutputPath&gt;
+    ..................................
+</code></pre>
+
+<p>Next add this to my MVC application csproj file bottom(before <code>&lt;/Project&gt;</code>),</p>
+
+<pre><code>  &lt;Target Name="AfterBuild"&gt;
+    &lt;ItemGroup&gt;
+      &lt;_CustomFiles Include="..\Project1\bin\$(Configuration)\**\*;..\Project2\bin\$(Configuration)\**\*" /&gt;
+        ................................................................
+    &lt;/ItemGroup&gt;
+    &lt;Copy SourceFiles="@(_CustomFiles)" DestinationFiles="@(_CustomFiles-&gt;'bin\%(Filename)%(Extension)')" SkipUnchangedFiles="true" /&gt;
+  &lt;/Target&gt;
+</code></pre>
+
+<p>Finally add this to my Azure.pubxml(you can find it in <code>Properties/PublishProfiles</code>) file bottom(before <code>&lt;/Project&gt;</code>),</p>
+
+<pre><code>  &lt;Target Name="CustomCollectFiles"&gt;
+    &lt;ItemGroup&gt;
+         &lt;_CustomFiles Include="..\Project1\bin\$(Configuration)\**\*;..\Project2\bin\$(Configuration)\**\*" /&gt;
+            ................................................................
+      &lt;FilesForPackagingFromProject Include="%(_CustomFiles.Identity)"&gt;
+        &lt;DestinationRelativePath&gt;bin\%(RecursiveDir)%(Filename)%(Extension)&lt;/DestinationRelativePath&gt;
+      &lt;/FilesForPackagingFromProject&gt;
+    &lt;/ItemGroup&gt;
+  &lt;/Target&gt;
+  &lt;PropertyGroup&gt;
+    &lt;CopyAllFilesToSingleFolderForPackageDependsOn&gt;
+      CustomCollectFiles;
+      $(CopyAllFilesToSingleFolderForPackageDependsOn);
+    &lt;/CopyAllFilesToSingleFolderForPackageDependsOn&gt;
+    &lt;CopyAllFilesToSingleFolderForMsdeployDependsOn&gt;
+      CustomCollectFiles;
+      $(CopyAllFilesToSingleFolderForPackageDependsOn);
+    &lt;/CopyAllFilesToSingleFolderForMsdeployDependsOn&gt;
+  &lt;/PropertyGroup&gt;
+</code></pre>

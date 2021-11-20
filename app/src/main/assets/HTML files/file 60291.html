@@ -1,0 +1,90 @@
+<p>You are correct that this is happening because <code>Exception</code> implements <a href="https://msdn.microsoft.com/en-us/library/system.runtime.serialization.iserializable(v=vs.110).aspx" rel="nofollow"><code>ISerializable</code></a> and Json.NET <a href="http://www.newtonsoft.com/json/help/html/serializationguide.htm#ISerializable" rel="nofollow">supports this interface</a>.  Specifically, from the reference source, in the method <a href="https://referencesource.microsoft.com/#mscorlib/system/exception.cs,549" rel="nofollow"><code>Exception.GetObjectData(SerializationInfo info, StreamingContext context)</code></a>, the <code>Exception</code> type serializes the underlying <em>field</em>, not the property:</p>
+
+<pre><code>        info.AddValue("Message", _message, typeof(String));
+</code></pre>
+
+<p>Microsoft may have done this because the <code>Message</code> property has a default value if the underlying field is not set:</p>
+
+<pre><code>    public virtual String Message {
+           get {  
+            if (_message == null) {
+                if (_className==null) {
+                    _className = GetClassName();
+                }
+                return Environment.GetResourceString("Exception_WasThrown", _className);
+
+            } else {
+                return _message;
+            }
+        }
+    }
+</code></pre>
+
+<p>By serializing the field, not the property, an exception with the default message will have its visible message automatically shown in the <code>CurrentUICulture</code> of the receiving system when deserialized.</p>
+
+<p>Thus, if you want the value of the message property to appear in the JSON, instead of the underlying field, you're going to need to override <a href="https://msdn.microsoft.com/en-us/library/system.runtime.serialization.iserializable.getobjectdata(v=vs.110).aspx" rel="nofollow"><code>GetObjectData()</code></a>.  And, since <a href="https://msdn.microsoft.com/en-us/library/akebc4z9(v=vs.110).aspx" rel="nofollow"><code>AddValue()</code></a> throws an exception if you try to add a value with the same name as a pre-existing value, and <a href="https://msdn.microsoft.com/en-us/library/system.runtime.serialization.serializationinfo(v=vs.110).aspx" rel="nofollow"><code>SerializationInfo</code></a> has no <code>SetValue()</code> method to replace a current value, you're going to need to do something with a bit of code smell:</p>
+
+<pre><code>public class GrossException : Exception
+{
+    public GrossException() : base("Eww, gross") { }
+
+    protected GrossException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+}
+
+public class BarfException : GrossException
+{
+    public BarfException() : base() { }
+
+    protected BarfException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    public override string Message { get { return "BARF!!"; } }
+
+    public override void GetObjectData(SerializationInfo info, StreamingContext context)
+    {
+        var tempInfo = new SerializationInfo(GetType(), new FormatterConverter());
+        base.GetObjectData(tempInfo, context);
+        foreach (SerializationEntry entry in tempInfo)
+        {
+            if (entry.Name != "Message")
+            {
+                info.AddValue(entry.Name, entry.Value, entry.ObjectType);
+            }
+        }
+        info.AddValue("Message", Message);
+    }
+}
+</code></pre>
+
+<p>As you can see, this solution violates the design of your inheritance hierarchy since the value of the underlying <code>_message</code> field is no longer the value <em>required</em> by the base class <code>GrossException</code>.  But at least the JSON is pretty.</p>
+
+<p>A better solution would be to modify the <code>GrossException</code> type to have a protected constructor in which the message can be specified:</p>
+
+<pre><code>public class GrossException : Exception
+{
+    public GrossException() : base("Eww, gross") { }
+
+    protected GrossException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    protected GrossException(string message) : base(message) { }
+}
+</code></pre>
+
+<p>Or, if you just want to <em>see</em> the overridden message in the JSON for debugging purposes (say, because you're logging exceptions), you could just add it to the serialization stream like so:</p>
+
+<pre><code>public class BarfException : GrossException
+{
+    public BarfException() : base() { }
+
+    protected BarfException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    public override string Message { get { return "BARF!!"; } }
+
+    public override void GetObjectData(SerializationInfo info, StreamingContext context)
+    {
+        base.GetObjectData(info, context);
+        info.AddValue("OverriddenMessage", Message);
+    }
+}
+</code></pre>
+
+<p>Either solution avoids the code smell.</p>

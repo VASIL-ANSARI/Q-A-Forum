@@ -1,0 +1,27 @@
+<p>When you're generating the sound wave, you are writing out the data in 16-bit samples. However, when you're reading the data back in again, you are processing the data one byte at a time (but still dividing the value by <code>Short.MAX_VALUE</code>) which doesn't seem right.</p>
+
+<p>What is the audio data format of the <code>AudioRecord</code> object - <code>ENCODING_PCM_8BIT</code> or <code>ENCODING_PCM_16BIT</code>? If it's 8-bit then you should surely be dividing by 127 (<code>Byte.MAX_VALUE</code>). If it's 16-bit, then you should assumedly be processing two bytes at a time and converting them to a short.</p>
+
+<p><strong>Update</strong></p>
+
+<p>If the <code>buffer</code> variable is actually a short array rather than a byte array, then your read code is probably fine as it is and you can ignore my comments above. However, I've just noticed something strange in your write code. In this section:</p>
+
+<pre><code>   if(!cBuf.hasRemaining()){
+        cBuf.putShort((short) (Short.MAX_VALUE * Math.sin(2 * Math.PI * time)));
+        time += samplingInterval;
+   }else{
+        line.write(cBuf.array(), 0, cBuf.position());
+        cBuf.clear();
+        cBuf.putShort((short) (Short.MAX_VALUE * Math.sin(2 * Math.PI * time)));
+        time += samplingInterval;
+   }
+</code></pre>
+
+<p>Assumedly the condition in that <code>if</code> should just be <code>cBuf.hasRemaining()</code> without the <code>!</code> operator. If the buffer has space remaining you want to write to it. If not, you want to flush what has already been accumulated in the buffer and then clear it before trying to write.</p>
+
+<p>However, as soon as you fix that, I expect you'll get a BufferOverflowException. As I mentioned in the comments, you're using a <code>ByteBuffer</code> with a size that is an odd number of bytes, but writing out two bytes at a time. Assumedly the declaration should really be:</p>
+
+<pre><code>ByteBuffer cBuf = ByteBuffer.allocate(Constants.BLOCK_SIZE*2);
+</code></pre>
+
+<p>I'm not sure that any of this is the cause of your other problems, but it's worth fixing to see if it makes any difference.</p>

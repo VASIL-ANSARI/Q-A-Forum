@@ -1,0 +1,67 @@
+<p>Let's suppose you have two tables finance_grdps_exp and finance_grdps_inc of following structure:</p>
+
+<pre>date_on | amount</pre>
+
+<ol>
+<li><p>If there are no two rows with same year and month encoded in date_on in one table, date_on contains only year and month i.e. other fields (day and time) are same for all rows.</p>
+
+<p>You can combine them with INNER JOIN construction:</p>
+
+<pre><code>SELECT finance_grdps_exp.date_on AS date_on,
+       finance_grdps_exp.amount AS exp_amount,
+       finance_grdps_inc.amount AS inc_amount
+FROM finance_grdps_exp INNER JOIN finance_grdps_inc
+ON finance_grdps_exp.date_on = finance_grdps_inc.date_on
+</code></pre>
+
+<p>Resulting structure is:</p>
+
+<pre>date_on | exp_amount | inc_amount</pre>
+
+<p>Then let's apply your idea to resulting structure:</p>
+
+<pre><code>SELECT date_on,
+       MONTHNAME(FROM_UNIXTIME(finance_grdps_exp_and_inc.date_on)) as expmonth,
+       YEAR(FROM_UNIXTIME(finance_grdps_exp_and_inc.date_on)) as expyear,
+       SUM(finance_grdps_exp_and_inc.exp_amount) as exp_total,
+       SUM(finance_grdps_exp_and_inc.inc_amount) as inc_total
+
+FROM (SELECT finance_grdps_exp.date_on AS date_on,
+             finance_grdps_exp.amount AS exp_amount,
+             finance_grdps_inc.amount AS inc_amount
+FROM finance_grdps_exp INNER JOIN finance_grdps_inc
+ON finance_grdps_exp.date_on = finance_grdps_inc.date_on) AS finance_grdps_exp_and_inc
+
+GROUP BY expyear, expmonth ORDER BY date_on DESC
+</code></pre>
+
+<p>mysql_query gives us:</p>
+
+<pre><code>    [
+      expmonth,
+      expyear,
+      exp_total /* expense per month */,
+      inc_total /* income per month */
+    ]
+</code></pre>
+
+<p>To be sure in maximum performance of INNER JOIN statement 
+create index for date_on fields in both tables.</p></li>
+<li><p>Other case (using UNION SELECT).</p>
+
+<pre><code>SELECT MONTHNAME(FROM_UNIXTIME(finance_grdps_exp_and_inc.date_on)) as expmonth,
+       YEAR(FROM_UNIXTIME(finance_grdps_exp_and_inc.date_on)) as expyear,
+       SUM(finance_grdps_exp_and_inc.exp_amount) as exp_total,
+       SUM(finance_grdps_exp_and_inc.inc_amount) as inc_total
+FROM(SELECT finance_grdps_exp.date_on AS date_on,
+       finance_grdps_exp.amount AS exp_amount,
+       0 AS inc_amount 
+       FROM finance_grdps_exp
+     UNION 
+     SELECT finance_grdps_inc.date_on AS date_on,
+       0 AS exp_amount,
+       finance_grdps_inc.amount AS inc_amount
+       finance_grdps_inc) AS finance_grdps_exp_and_inc
+GROUP BY expyear, expmonth ORDER BY date_on DESC
+</code></pre></li>
+</ol>

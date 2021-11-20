@@ -1,0 +1,65 @@
+<p>There is at present no way to make the parse tag things in a way that it regards as "too weird".  If it regards a tag for a word as impossible, you can't make it possible, but you can specify what it should use within the range of what it regards as possible.  Normally this is enough.  It should be enough here.  Here's an example.  As you note, it often gets imperatives wrong unaided (partly because they're not well-evidenced in the training data.  It doesn't always get them wrong, but it commonly does, and I chose 3 that it does get wrong:</p>
+
+<pre><code>$ cat imper.txt
+Use care when opening.
+Brush your hair!
+Shut the door.
+$ java -cp stanford-parser.jar edu.stanford.nlp.parser.lexparser.LexicalizedParser englishPCFG.ser.gz imper.txt 2&gt; /dev/null
+(ROOT
+  (S
+    (NP (NNP Use))
+    (VP (VBP care)
+      (SBAR
+        (WHADVP (WRB when))
+        (S
+          (VP (VBG opening)))))
+    (. .)))
+
+(ROOT
+  (NP
+    (NP (NNP Brush))
+    (NP (PRP$ your) (NN hair))
+    (. !)))
+
+(ROOT
+  (NP
+    (NP (NNP Shut))
+    (NP (DT the) (NN door))
+    (. .)))
+</code></pre>
+
+<p>But with tokenized and partly tagged text like this:</p>
+
+<pre><code>$ cat imper.tok
+Use_VB care when opening .
+Brush_VB your hair !
+Shut_VB the door .
+</code></pre>
+
+<p>all is fixed:</p>
+
+<pre><code>$ java -cp stanford-parser.jar edu.stanford.nlp.parser.lexparser.LexicalizedParser -tokenized -tagSeparator _ englishPCFG.ser.gz imper.tok 2&gt; /dev/null
+(ROOT
+  (S
+    (VP (VB Use)
+      (NP (NN care))
+      (SBAR
+        (WHADVP (WRB when))
+        (S
+          (VP (VBG opening)))))
+    (. .)))
+
+(ROOT
+  (S
+    (VP (VB Brush)
+      (NP (PRP$ your) (NN hair)))
+    (. !)))
+
+(ROOT
+  (S
+    (VP (VB Shut)
+      (NP (DT the) (NN door)))
+    (. .)))
+</code></pre>
+
+<p>But you do have to use the right tags.  It won't tag "Using" as a VB.  That counts as too weird.  "Using" as a verb should be a VBG.  It's the present participle form, not the bare verb used in imperatives.</p>

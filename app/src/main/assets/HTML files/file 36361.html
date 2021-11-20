@@ -1,0 +1,65 @@
+<p>After some playing with the code, I was able to accomplish this by defining the line and bar charts separately and then calling them in the compose method of the composite chart.</p>
+
+<pre><code>var issuedOnTimeLineChart = dc.lineChart(chartScorecardComposite)
+        .dimension(chartIssuedJobsCountDim)
+        .group(chartIssuedOnTimeGroup)
+        .valueAccessor(function (d) {
+            return d.value.onTimePercent;
+        })
+        .colors(["#808080"])
+        .brushOn(false)
+        .y(d3.scale.linear().domain([0, 120]))
+        .x(d3.time.scale().domain([minDate, maxDate]))
+
+    var issuedJobsBarChart = dc.barChart(chartScorecardComposite)
+        .dimension(chartIssuedJobsCountDim)
+        .group(chartIssuedJobsCountGroup)
+        .valueAccessor(function (d) {
+            return d.value.jobCount;
+        })
+        .title(function(d) {
+            return (d.key.getMonth() + 1) + "/" + d.key.getFullYear()
+            + "\n# of Jobs: "
+            + d.value.jobCount;
+        })
+        .renderTitle(true)
+        .centerBar(true)
+        .gap(5)
+        .colors(["#79BAEC"])
+        .brushOn(false)
+        .useRightYAxis(true)
+        .x(d3.time.scale().domain([minDate, maxDate]))
+        .xUnits(d3.time.months)
+
+
+    //Define the composite chart
+    var chartScorecardComposite = dc.compositeChart("#regionMarketChart")
+        .width(1002)
+        .height(300)
+        .margins({top: 30, right: 50, bottom: 50, left: 40})
+        .dimension(chartIssuedJobsCountDim)
+        .yAxisLabel("Issued on Time %")
+        .rightYAxisLabel("Jobs Issued")
+        .shareTitle(false)
+        .x(d3.time.scale().domain([minDate, maxDate]))
+        .y(d3.scale.linear().domain([0, 120]))
+        .xUnits(d3.time.months)
+        .compose([
+            issuedJobsBarChart,
+            issuedOnTimeLineChart
+        ])
+        .elasticY(true)
+        .renderHorizontalGridLines(true)
+        .brushOn(false)
+        .renderlet(function (chart) { // Rotate the x-axis labels 45 degrees
+            chart.selectAll("g.x text")
+              .attr('dx', '-25')
+              .attr('dy', '7')
+              .attr('transform', "rotate(-45)");
+        })
+        .xAxis().ticks(d3.time.months).tickFormat(function(d) {
+            return (d.getMonth() + 1) + "/" + d.getFullYear()
+        })
+</code></pre>
+
+<p>This allowed any filters that were applied to the dimension to render and update properly</p>

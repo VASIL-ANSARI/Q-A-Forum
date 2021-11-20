@@ -1,0 +1,119 @@
+<p>Firstly, handling the errors during the development is very important so we check if our post are present, we check if we connected to the database, we check if our query passed and is OK to run, we check the parameters we are giving to the query and we finally execute the query.</p>
+
+<p>After that you can use <code>bind_result</code> to name a variable to receive the fields from your query, like I have done.</p>
+
+<p>Notice how on my query I am using ? that is a prepared statement that we define using the <code>bind_param</code> this is to avoid SQL injection, in your current code, SQL Injection is still possible since you're not sanitizing your variables.</p>
+
+<p>Another mistake I believe you're doing is storing passwords as plain text that is VERY VERY WRONG, you should always encrypt the password to protect your users and yourself. That's why I do not include the password on my MySQL query, I first use only the user, if the user is found I then use the password he posted to match the retrieved password from the database, in this case I am using <code>bcrypt</code> to do the task which is a very secure encryption library.</p>
+
+<p><a href="http://stackoverflow.com/questions/4795385/how-do-you-use-bcrypt-for-hashing-passwords-in-php"><strong>See here how to use <code>bcrypt</code>.</strong></a></p>
+
+<p>Only after I see that the password is valid I am then placing the data into the session and redirecting the user.</p>
+
+<p><strong>Besides all the errors I have pointed out at the bottom of my answer, here is how I would write your code.</strong></p>
+
+<pre><code>&lt;?php
+session_start();
+include_once('bcrypt.php');
+// Your database info
+$db_host = '';
+$db_user = '';
+$db_pass = '';
+$db_name = '';
+
+if (!isset($_POST['Username']))
+{
+    echo 'Fill in the username...';
+    exit;
+}
+
+if (!isset($_POST['Password']))
+{
+    echo 'Fill in your password...';
+    exit;
+}
+
+$con = new mysqli($db_host, $db_user, $db_pass, $db_name);
+if ($con-&gt;connect_error)
+{
+    die('Connect Error (' . $con-&gt;connect_errno . ') ' . $con-&gt;connect_error);
+}
+
+$sql = "SELECT Username, Password FROM `Members` WHERE Username = ?";
+if (!$result = $con-&gt;prepare($sql))
+{
+    die('Query failed: (' . $con-&gt;errno . ') ' . $con-&gt;error);
+}
+
+if (!$result-&gt;bind_param('s', $_POST['Username']))
+{
+    die('Binding parameters failed: (' . $result-&gt;errno . ') ' . $result-&gt;error);
+}
+
+if (!$result-&gt;execute())
+{
+    die('Execute failed: (' . $result-&gt;errno . ') ' . $result-&gt;error);
+}
+
+$result-&gt;store_result();
+if ($result-&gt;num_rows == 0)
+{
+    die('No username found...');
+}
+
+$result-&gt;bind_result($db_username, $db_password);
+$result-&gt;fetch();
+$result-&gt;close();
+$con-&gt;close();
+
+$bcrypt = new Bcrypt(15);
+if ($bcrypt-&gt;verify($password, $db_password))
+{
+    $_SESSION['Username'] = $db_username;
+    header('location:login_success.php');
+    exit;
+}
+else
+{
+    echo 'Wrong Username or Password';
+}
+</code></pre>
+
+<p><strong>NOTE: The above code is merely an example and was not tested, if you notice any error with it let me know.</strong></p>
+
+<p>Some of the errors I have noticed on the code you have posted:</p>
+
+<p>You're missing the closing <code>;</code> over here:</p>
+
+<pre><code>$sql = "SELECT * FROM $Members WHERE Username = '$Username' and Password = '$Password'"
+</code></pre>
+
+<p>Also on your query you have <code>$Members</code> but you have no <code>$Members</code> variable defined anywhere in your code, did you perhaps meant to say <code>Members</code> instead, as in:</p>
+
+<pre><code>$sql = "SELECT * FROM `Members` WHERE Username = '$Username' and Password = '$Password'";
+</code></pre>
+
+<p>Shouldn't this </p>
+
+<pre><code>$count = mysql_num_rows($result);
+</code></pre>
+
+<p>Be</p>
+
+<pre><code>$count = mysqli_num_rows($result);â
+</code></pre>
+
+<p>And </p>
+
+<pre><code>$result=mysqli_query($sql); 
+</code></pre>
+
+<p>Be</p>
+
+<pre><code>$result=mysqli_query($sql_connection, $sql);
+</code></pre>
+
+<p>You have no query on the below part of the <code>mysqli_query</code></p>
+
+<pre><code>if (!mysqli_query($sql_connection)) 
+</code></pre>

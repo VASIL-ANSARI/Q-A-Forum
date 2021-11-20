@@ -1,0 +1,34 @@
+<p>Due to <a href="http://en.cppreference.com/w/c/language/operator_precedence" rel="nofollow">*operator precedence</a> the expression <code>*ListWord[i]</code> doesn't do what you think it does. In fact you should be getting errors or warnings from the code you have.</p>
+
+<p>The compiler thinks that <code>*ListWord[i]</code> means <code>*(ListWord[i])</code>, which is not right. You need to use <code>(*ListWord)[i]</code>.</p>
+
+<hr>
+
+<p>Unfortunately that's only the start of your problems. A bigger problem is that the pointer you pass to the function <code>GetInput</code> is not a pointer to what could become an array of strings, but a pointer to a single string.</p>
+
+<p>For a dynamic allocated array of strings, you need a pointer to a pointer to begin with, and then emulate pass-by-reference on that, i.e. you need to become a <em>three star programmer</em> which is something you should avoid.</p>
+
+<p>Instead of trying to pass in the array to be allocated as an argument, have the <code>GetInput</code> <em>return</em> the array instead. Something like</p>
+
+<pre><code>char **GetInput(void)
+{
+    // Allocate ten pointers to char, each initialized to NULL
+    char **ListWords = calloc(10, sizeof(char *));
+    if (ListWords == NULL)
+        return NULL;
+
+    char word[31];
+    for (int i = 0; i &lt; 10 &amp;&amp; scanf("%30s", word) == 1; ++i)
+    {
+        ListWords[i] = strdup(word);
+    }
+
+    return ListWords;
+}
+</code></pre>
+
+<p>The above code adds some security checks, so you will not go out of bounds of either the temporary array you read into, or the <code>ListWords</code> array. It also makes sure the <code>ListWords</code> array is initialized, so if you read less then 10 words, then the remaining pointers will be <code>NULL</code>.</p>
+
+<hr>
+
+<p>Of course you need to change your <code>main</code> function accordingly, and also your <code>Print</code> function, because now it only takes a single string as argument, not an array of strings. You also of course need to <code>free</code> every single string in the array because freeing the array.</p>

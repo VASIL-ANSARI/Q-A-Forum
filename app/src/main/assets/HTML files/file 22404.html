@@ -1,0 +1,151 @@
+<p>Your second approach looks about right to me. Where you have:</p>
+
+<pre><code>FreePointerHandler(pointerToArray.ToPointer());
+</code></pre>
+
+<p>I think you can just:</p>
+
+<pre><code>FreePointerHandler(pointerToArray);
+</code></pre>
+
+<p>I'm writing a test and will post an edit.</p>
+
+<h3><code>ref</code> vs. <code>out</code></h3>
+
+<p>As far as <code>ref</code> vs. <code>out</code>, this doesn't map exactly to C++ reference. When C# call C#, an <code>out</code> parameter is required to be set by the called function. With an an interop call this can't be enforced, for documentation value, I prefer <code>out</code> in this case.</p>
+
+<h3>The real problem</h3>
+
+<p>The real problem is if you don't have experience with .Net pinvoke, it's hard to have confidence when calling functions without any immediate, visible side effects.</p>
+
+<p>@Hans Passant recommended "test it by calling it a million times" in order to make any memory leak apparent. While this approach is probably simplest in this case, it doesn't generalize to the case where there's not an associated memory resource and if it fails it doesn't give any additional information. I prefer to debug through the pinvoke call if I have the source code for the .dll or to write a mock API implementation if I don't. That way when you're trying out a new pinvoke feature you can see exactly what's going on. And if there's a problem, tracing in the debugger can help you see where you went wrong.</p>
+
+<h3>A full pinvoke example</h3>
+
+<p>Here's a full example based on the original question. The return values were not documented, nor the details of myFunction. The example just fills an allocated array of length 3 with (0, 1, 2).</p>
+
+<p>Here's the DLL's header file:</p>
+
+<pre><code>// testlib.h
+
+#ifdef TESTLIB_EXPORTS
+#define TESTLIB_API __declspec(dllexport)
+#else
+#define TESTLIB_API __declspec(dllimport)
+#endif
+
+extern "C" {
+    TESTLIB_API int myFunction(int someNumber, int &amp;arraySize, signed char *&amp;array);
+    TESTLIB_API int freePointer(void* myPointer);
+}
+</code></pre>
+
+<p>The .DLL's .cpp source file:</p>
+
+<pre><code>// testlib.cpp : Defines the exported functions for the DLL application.
+//
+
+#include "stdafx.h"
+#include "testlib.h"
+#include &lt;iostream&gt;
+
+using namespace std;
+
+
+TESTLIB_API int myFunction(int someNumber, int &amp;arraySize, signed char *&amp;array)
+{
+    #ifdef _DEBUG
+        cout &lt;&lt; "myFunction enter " &lt;&lt; someNumber &lt;&lt; ", " &lt;&lt; arraySize &lt;&lt; ", 0x"  &lt;&lt; &amp;array &lt;&lt; endl;
+    #endif
+    arraySize = 3;
+
+    array = (signed char*)malloc(arraySize);
+
+    #ifdef _DEBUG
+        cout &lt;&lt; "myFunction array: 0x" &lt;&lt; (void *)array &lt;&lt; endl;
+    #endif
+
+    for (int i = 0; i &lt; arraySize; ++i)
+    {
+        array[i] = i;
+    }
+
+    #ifdef _DEBUG
+        cout &lt;&lt; "myFunction exit " &lt;&lt; someNumber &lt;&lt; ", " &lt;&lt; arraySize &lt;&lt; ", 0x"  &lt;&lt; &amp;array &lt;&lt; endl;
+    #endif
+
+    return 0;
+}
+
+TESTLIB_API int freePointer(void* myPointer)
+{
+    #ifdef _DEBUG
+        cout &lt;&lt; "freePointer: 0x" &lt;&lt; myPointer &lt;&lt; endl;
+    #endif
+
+    free(myPointer);
+    return 0;
+}
+</code></pre>
+
+<p>The C# source:</p>
+
+<pre><code>using System;
+using System.Runtime.InteropServices;
+
+namespace InteropTest
+{
+    class InteropTest
+    {
+        [DllImport("testlib.dll")]
+        private static extern int myFunction(int someNumber, out int arraySize, out IntPtr array);
+
+        [DllImport("testlib.dll")]
+        public static extern int freePointer(IntPtr pointer);
+
+        public static byte[] myFunction(int myNumber)
+        {
+            int myArraySize;
+            IntPtr pointerToArray;
+            int iRet = myFunction(myNumber, out myArraySize, out pointerToArray);
+            // should check iRet and if needed throw exception
+
+            #if (DEBUG)
+                Console.WriteLine();
+                Console.WriteLine("InteropTest.myFunction myArraySize: {0}", myArraySize);
+                Console.WriteLine();
+            #endif
+
+            byte[] myArray = new byte[myArraySize];
+            Marshal.Copy(pointerToArray, myArray, 0, myArraySize);
+            freePointer(pointerToArray);
+
+            #if (DEBUG)
+               Console.WriteLine();
+            #endif
+
+            return myArray;
+        }
+
+        static void Main(string[] args)
+        {
+            #if (DEBUG)
+                Console.WriteLine("Start InteropTest");
+                Console.WriteLine();
+            #endif
+            int myNumber = 123;
+
+            byte[] myArray = myFunction(myNumber);
+
+            for (int i = 0; i &lt; myArray.Length; ++i)
+            {
+                Console.WriteLine("InteropTest myArray[{0}] = {1}", i, myArray[i]);
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>The debug build prints status messages. They show <code>myFunction</code>'s <code>array</code> value is what's passed to <code>freePointer</code>.</p>
+
+<p>I've also created an C# interface function for <code>myFunction</code>. When a pinvoke call is non trivial, you usually want to work out the details once and encapsulate it into a function for reuse.</p>

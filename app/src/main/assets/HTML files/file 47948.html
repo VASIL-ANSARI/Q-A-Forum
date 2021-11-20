@@ -1,0 +1,36 @@
+<p><a href="http://stackoverflow.com/questions/31591241/what-does-numpy-array-wrap-do">What does (numpy) __array_wrap__ do?</a></p>
+
+<p>talks about <code>ndarray</code> subclasses and hooks like <code>__array_wrap__</code>.  <code>np.array</code> takes <code>copy</code> parameter, forcing the result to be a copy, even if it isn't required by other considerations.  <code>ravel</code> returns a view, <code>flatten</code> a copy.  So it is probably possible, and maybe not too difficult, to construct a <code>ndarray</code> subclass that forces a copy.  It may involve modifying a hook like <code>__array_wrap__</code>.  </p>
+
+<p>Or maybe modifying the <code>.__getitem__</code> method.   Indexing as in <code>slice_of_arr = arr[0:6]</code> involves a call to <code>__getitem__</code>.  For <code>ndarray</code> this is compiled, but for a masked array, it is python code that you could use as an example:</p>
+
+<pre><code>/usr/lib/python3/dist-packages/numpy/ma/core.py
+</code></pre>
+
+<p>It may be something as simple as</p>
+
+<pre><code>def __getitem__(self, indx):
+    """x.__getitem__(y) &lt;==&gt; x[y]
+    """
+    # _data = ndarray.view(self, ndarray) # change to:
+    _data = ndarray.copy(self, ndarray)
+    dout = ndarray.__getitem__(_data, indx)
+    return dout
+</code></pre>
+
+<p>But I suspect that by the time you develop and fully test such a subclass, you might fall in love with the default no-copy approach.  While this view-v-copy business bites many new comers (especially if coming from MATLAB), I haven't seen complaints from experienced users.  Look at other numpy SO questions; you won't see a lot <code>copy()</code> calls.</p>
+
+<p>Even regular Python users are used asking themselves whether a reference or slice is a copy or not, and whether something is mutable or not.</p>
+
+<p>for example with lists:</p>
+
+<pre><code>In [754]: ll=[1,2,[3,4,5],6]
+In [755]: llslice=ll[1:-1]
+In [756]: llslice[1][1:2]=[10,11,12]
+In [757]: ll
+Out[757]: [1, 2, [3, 10, 11, 12, 5], 6]
+</code></pre>
+
+<p>modifying an item an item inside a slice modifies that same item in the original list.  In contrast to <code>numpy</code>, a list slice is a copy.  But it's a shallow copy.  You have to take extra effort to make a deep copy (<code>import copy</code>).</p>
+
+<p><code>/usr/lib/python3/dist-packages/numpy/lib/index_tricks.py</code> contains some indexing functions aimed at making certain indexing operations more convenient.  Several are actually classes, or class instances, with custom <code>__getitem__</code> methods.  They may also serve as models of how to customize your slicing and indexing.</p>

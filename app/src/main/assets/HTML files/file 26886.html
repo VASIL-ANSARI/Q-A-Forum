@@ -1,0 +1,36 @@
+<p>If you want to sort elements within each struct, then your qsort call will operate on the array of floats.</p>
+
+<pre><code>qsort(((ROW*)-&gt;value), 20, sizeof(float), comparefloats);
+</code></pre>
+
+<p>Then the comparison is just between two floats.</p>
+
+<pre><code>int comparefloats(const void *left, const void *right) {
+    float lt = *(float *)left;
+    float rt = *(float *)right;
+    return (fabs(lt - rt) &lt; 0.0001)? 0:
+                              lt - rt &gt; 0? 1: -1;
+}
+</code></pre>
+
+<p>Sorting the rows themselves, if there's a larger array of them, will involve a less-straightforward notion of comparing two arrays.</p>
+
+<p>As you say, you want to sort "by columns", in that case, unfortunately <code>qsort</code> is not your friend. It's not a <em>stable</em> sort, you see. So you can't just sort row by row in increasing order of priority. </p>
+
+<p>To sort columns, one at a time (or sequentially, if you find a stable-sort with the same interface),
+you'll need a different comparison function for each column, or a comparison with different behavior each time it's called. The obvious way would be with a global variable.</p>
+
+<pre><code>int column_to_compare;
+int comparefloatcolumn(const void *left, const void *right) {
+    float lt = (*(ROW *)left).value[ column_to_compare ];
+    float rt = (*(ROW *)right).value[ column_to_compare ];
+    return (fabs(lt - rt) &lt; 0.0001)? 0:
+                              lt - rt &gt; 0? 1: -1;
+}
+</code></pre>
+
+<p>Then you need to set the column before each call to qsort.</p>
+
+<pre><code>column_to_compare = 0;
+qsort(rowarray, 100, sizeof(ROW), comparefloatcolumn);
+</code></pre>

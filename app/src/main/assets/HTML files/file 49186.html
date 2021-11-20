@@ -1,0 +1,50 @@
+<p>You can use <code>CHARINDEX</code> and <code>LEFT/RIGHT</code>:</p>
+
+<pre><code>CREATE TABLE #tab(col VARCHAR(1000));
+
+INSERT INTO #tab VALUES ('812330/50110/0-0'),('812330/50110/BDG001-0'),
+('812330/50110/0-X001');
+
+WITH cte AS
+(
+  SELECT 
+    col,
+    r = RIGHT(col, CHARINDEX('/', REVERSE(col))-1)
+  FROM #tab
+)
+SELECT col, 
+        r,
+        sub1 = LEFT(r, CHARINDEX('-', r)-1),
+        sub2 = RIGHT(r, LEN(r) - CHARINDEX('-', r))
+FROM cte;
+</code></pre>
+
+<p><kbd><strong><a href="https://data.stackexchange.com/stackoverflow/query/386861" rel="nofollow"><code>LiveDemo</code></a></strong></kbd></p>
+
+<p><strong>EDIT:</strong></p>
+
+<p>or even simpler:</p>
+
+<pre><code>SELECT 
+  col
+  ,sub1 = SUBSTRING(col,
+              LEN(col) - CHARINDEX('/', REVERSE(col)) + 2,
+               CHARINDEX('/', REVERSE(col)) -CHARINDEX('-', REVERSE(col))-1)
+  ,sub2 = RIGHT(col, CHARINDEX('-', REVERSE(col))-1)
+FROM #tab;
+</code></pre>
+
+<p><kbd><strong><a href="https://data.stackexchange.com/stackoverflow/query/386881" rel="nofollow"><code>LiveDemo2</code></a></strong></kbd></p>
+
+<p><strong>EDIT 2:</strong></p>
+
+<p>Using <code>PARSENAME</code> <strong>SQL SERVER 2012+</strong> (if your data does not contain <code>.</code>):</p>
+
+<pre><code>SELECT 
+  col,
+  sub1 = PARSENAME(REPLACE(REPLACE(col, '/', '.'), '-', '.'), 2),
+  sub2 = PARSENAME(REPLACE(REPLACE(col, '/', '.'), '-', '.'), 1)
+FROM #tab;
+</code></pre>
+
+<p><kbd><strong><a href="https://data.stackexchange.com/stackoverflow/query/386884" rel="nofollow"><code>LiveDemo3</code></a></strong></kbd></p>

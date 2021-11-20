@@ -1,0 +1,47 @@
+<p>If you want to use results.php to do both things (i.e. display the usernames as well as respond to the JSON query) then you will need to split the file into two branches. Use a _GET variable to specify which branch. So for example, you would run .getJSON on results.php?json=true instead of just results.php. Now inside results.php have an if branch that checks for the existence of this _GET variable, and if so, grab the data you need, echo it in a json-encoded string, <strong>and then exit()</strong>. Do all this before anything else in results.php, even before the <code>&lt;script&gt;</code> tag .</p>
+
+<p>Edited to provide code: (edited from OP's question)</p>
+
+<pre><code>&lt;?php
+    $link = mysql_connect('localhost', 'root', '');
+    if (!$link) {
+        die('Could not connect: ' . mysql_error());
+    }
+
+    $db_selected = mysql_select_db('test', $link);
+    if (!$db_selected) {
+        die ('Can\'t use test : ' . mysql_error());
+    }
+
+    $result = mysql_query("SELECT user_name FROM users");
+    if (!$result) {
+        die('Invalid query: ' . mysql_error());
+    }
+
+    $names = array();
+
+    while ($row = mysql_fetch_assoc($result)) {
+
+        foreach ($row as $key =&gt; $val) {
+
+            $names[][$key] = $val;
+        }
+    }
+
+    if (isset($_GET['json'])) {
+        echo json_encode($names);
+        exit();
+    }
+
+    ?&gt;
+    &lt;script type="text/javascript" src="jquery-1.7.1.min.js"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript"&gt; 
+        $.getJSON("http://localhost/test/results.php?json=true", function(json){
+            alert("JSON Data: " + json);
+        });
+    &lt;/script&gt;
+
+
+
+    &lt;div&gt;&lt;/div&gt;
+</code></pre>

@@ -1,0 +1,20 @@
+<p>Unfortunately this makes no sense at all.</p>
+
+<p>Firstly, this can't be a method, as it doesn't have <code>self</code> as the first parameter.</p>
+
+<p>Secondly, it seems to be taking the class, not an instance. You can't save the class itself, only an instance of it.</p>
+
+<p>Thirdly, <code>post_save</code> is not a method of the model (unless you've defined one yourself). It's a signal, and you don't call a signal, you attach a signal handler to it and do logic there. You can't return data from a signal to a method, either.</p>
+
+<p>And finally, the profile instance that you add 2 to will not necessarily be the same as the one you save in the second line, because Django model instances don't have identity. Get it once and put it into a variable, then save that.</p>
+
+<p>The Comments framework defines <a href="http://docs.djangoproject.com/en/1.2/ref/contrib/comments/signals/" rel="nofollow">its own signals</a> that you can use instead of the generic post_save. So, what you actually need is to register a signal handler on comment_was_posted. Inside that handler, you'll need to get the user's profile, and update that.</p>
+
+<pre><code>def comment_handler(sender, comment, request, **kwargs):
+    profile = request.user.get_profile()
+    profile.points += 2
+    profile.save()
+
+from django.contrib.comments.signals import comment_was_posted
+comment_was_posted.connect(comment_handler, sender=Comment)
+</code></pre>

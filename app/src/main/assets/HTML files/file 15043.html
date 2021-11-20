@@ -1,0 +1,50 @@
+<p>I did something similar (but not for this reason) which required updating the manifest at build time. The way I accomplished this was by making a second AndroidManifest and putting it under a directory named config.
+So in config/AndroidManifest you could have something like this:</p>
+
+<pre><code>&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"
+      package="@CONFIG.APP_PACKAGE_NAME@"
+      android:versionCode="@CONFIG.APP_VERSION_CODE@"
+      android:versionName="@CONFIG.APP_VERSION@"&gt;
+
+
+&lt;!-- EVERYTHING ELSE GOES HERE --&gt;
+
+
+&lt;/manifest&gt;
+</code></pre>
+
+<p>Then you can use the regular bare bones build.xml ant script with just a few modifications (no need to copy the whole script from the android build system as they added some hooks for you to use without reinventing the wheel). 
+The build script should be reading local.properties by default, but if not add (or uncomment) a line like this:</p>
+
+<pre><code>&lt;property file="local.properties" /&gt;
+</code></pre>
+
+<p>In your build script you should see a task called "-pre-build", change it like this:</p>
+
+<pre><code>&lt;target name="-pre-build"&gt;
+     &lt;copy file="config/AndroidManifest.xml" todir="." overwrite="true" encoding="utf-8"&gt;
+       &lt;filterset&gt;
+          &lt;filter token="CONFIG.APP_PACKAGE_NAME" value="${app.packagename}" /&gt;
+          &lt;filter token="CONFIG.APP_VERSION" value="${app.version}" /&gt;
+          &lt;filter token="CONFIG.APP_VERSION_CODE" value="${app.versioncode}" /&gt;
+       &lt;/filterset&gt;
+     &lt;/copy&gt;           
+&lt;/target&gt;
+</code></pre>
+
+<p>Then your local.properties file you would put the package name, version name/code like so:</p>
+
+<pre><code>app.version=1.0
+app.versioncode=1
+app.packagename=com.mypackage.name
+</code></pre>
+
+<p>Now you just need to make sure in your manifest that you fully qualify all of your activities/services/broadcast listeners etc.. That means you always specify the full package of your source code. If you want the package for your own source code to be dynamic you could replace out each of the prefixes to each class.. But that seems kind of silly.. It is easy enough to package your code up under your own package name and they can use it from any project by simply including the source or a jar in their project.</p>
+
+<p>-- UPDATE --
+Oh and one other thing you can do to notify the user that they must define a package name is use the fail tag in your build xml like this:</p>
+
+<pre><code>&lt;fail message="app.packagename is missing. This must be defined in your local.properties file" unless="app.packagename" /&gt;
+</code></pre>
+
+<p>Put this after the line which reads the local.properties file</p>

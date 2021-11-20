@@ -1,0 +1,23 @@
+<p>When returning CLR types Web API attempts to serialize the object based on either Xml or Json serializers.  Neither of these are what you want.  You want to return the raw stream of bytes.  Try this.</p>
+
+<pre><code>    [HttpGet]
+    public HttpResponseMessage DownloadData(string serverUrlAddress, string path)
+    {
+        if (string.IsNullOrWhiteSpace(serverUrlAddress) || string.IsNullOrWhiteSpace(path))
+            return null;
+
+    // Create a new WebClient instance
+    using (WebClient client = new WebClient())
+    {
+        // Concatenate the domain with the Web resource filename.
+        string url = string.Concat(serverUrlAddress, "/", path);
+        if (url.StartsWith("http://") == false)
+            url = "http://" + url;
+
+        byte[] data = client.DownloadData(url);
+        return new HttpResponseMessage() { Content = new StreamContent(data) };
+    }
+} 
+</code></pre>
+
+<p>By returning a HttpResponseMessage you have more control over exactly how Web API returns the response.  By default StreamContent will set the Content-Type header to be <code>application/octet-stream</code>.  You may want to change that to  'application/pdf' if you are always returning PDF files.</p>

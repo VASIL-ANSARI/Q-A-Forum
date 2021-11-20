@@ -1,0 +1,52 @@
+<p>First of all, I would suggest not using the old asyncore module but to look into more
+modern and more efficient solutions: <a href="http://www.gevent.org" rel="nofollow">gevent</a>, or going along the asyncio module (Python 3.4),
+which has been backported somehow to Python 2.</p>
+
+<p>If you want to use asyncore, then you have to know:</p>
+
+<ul>
+<li><p>be careful when using sockets created in one thread (the main thread, in your case), and dispatched by another thread (managed by "onethread", in your case), sockets cannot be shared like this between threads it is not threadsafe objects by themselves</p></li>
+<li><p>for the same reason, you can't use the global map created by default in asyncore module, you have to create a map by thread</p></li>
+<li><p>when connecting to a server, connection may not be immediate you have to wait for it to be connected (hence your "sleep 5"). When using asyncore, "handle_write" is called when
+socket is ready to send data.</p></li>
+</ul>
+
+<p>Here is a newer version of your code, hopefully it fixes those issues:</p>
+
+<pre><code>import socket, threading, time, asyncore
+
+class Client(threading.Thread, asyncore.dispatcher):
+    def __init__(self, host, port):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self._thread_sockets = dict()
+        asyncore.dispatcher.__init__(self, map=self._thread_sockets)
+
+        self.host = host
+        self.port = port
+        self.output_buffer = []
+        self.start()
+
+    def run(self):
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect((self.host, self.port))
+        asyncore.loop(map=self._thread_sockets)
+
+    def send(self, data):
+        self.output_buffer.append(data)
+
+    def handle_write(self):
+        all_data = "".join(self.output_buffer)
+        bytes_sent = self.socket.send(all_data)
+        remaining_data = all_data[bytes_sent:]
+        self.output_buffer = [remaining_data]
+
+mysocket = Client("",8888)
+mysocket.send("asfas\n")
+</code></pre>
+
+<p>If you have only 1 socket by thread (i.e a dispatcher's map with size 1), there is no
+point using asyncore at all. Just use a normal, blocking socket in your threads. The
+benefit of async i/o comes with a lot of sockets.</p>
+
+<p><em>EDIT</em>: answer has been edited following comments.</p>

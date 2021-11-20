@@ -1,0 +1,85 @@
+<p>There are many ways to get this done.</p>
+
+<p>I prefer using the <code>LocalBroadcastManager</code>.</p>
+
+<p>How this will work: instead of having the activity ask for information, let <code>ConnectionChangeReceiver</code> <em>deliver</em> it - <em>as and when it is available</em>. Once <code>ConnectionChangeReceiver</code> is done with processing the received <code>intent</code>, it sends out a <code>local</code> broadcast. If your activity is alive and listening, it reacts to this.</p>
+
+<pre><code>// Snippet from your `ConnectionChangeReceiver # onReceive(...)` method
+if (connectionInfo != null) {
+    newSsid = connectionInfo.getSSID();
+    if ((newSsid != null) &amp;&amp; (s_ssid != null) &amp;&amp; (newSsid.compareTo(s_ssid) != 0)) {
+        Log.d(TAG, "ssid changed from s_ssid=" + s_ssid + " to newSsid=" + newSsid);
+        mHasWifiChanged = true;
+
+        // We can send a local broadcast now
+        // Note that the String `"com.my.app.wifi.WIFI_RELATED_CHANGE"` can be 
+        // customized to your preference
+        Intent localIntent = new Intent("com.my.app.wifi.WIFI_RELATED_CHANGE");
+
+        // Including this extra is redundant here since `mHasWifiChanged` will
+        // always be true at this point. I am including it for example sake.
+        // Again, notice that the key `"com.my.app.wifi.WIFI_HAS_CHANGED"` can
+        // be customized
+        localIntent.putExtra("com.my.app.wifi.WIFI_HAS_CHANGED", mHasWifiChanged);
+
+        // Broadcasts the Intent to receivers in this app
+        LocalBroadcastManager.getInstance(context).sendBroadcast(localIntent);
+    }
+}
+</code></pre>
+
+<p>On the activity side: create a <code>BroadcastReceiver</code> in your activity and set it to listen for action <code>"com.my.app.wifi.WIFI_RELATED_CHANGE"</code>. This String value must be the same as the one used when sending the broadcast from your <code>ConnectionChangeReceiver # onReceive(...)</code>:</p>
+
+<pre><code>// Declared as a class member in your Activity
+BroadcastReceiver wifiRelatedChangeListener = new BroadcastReceiver() {
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+
+        String action = intent.getAction();
+        if (action.equals("com.my.app.wifi.WIFI_RELATED_CHANGE")) {
+            // In your current setup, `mHasWifiChanged` will always be true
+            // Act on it
+        }
+    }
+};
+</code></pre>
+
+<p>You should declare the <code>BroadcastReceiver</code> as a class member. This will allow you to register and unregister the <code>BroadcastReceiver</code> appropriately: register in <code>onResume()</code> and unregister in <code>onPause()</code>. </p>
+
+<p>In <code>onResume()</code> of your activity, register this receiver to listen for action <code>com.my.app.wifi.WIFI_RELATED_CHANGE</code>:</p>
+
+<pre><code>@Override
+public void onResume() {
+    super.onResume();
+
+    // Activity has come to foreground. Register to listen for changes to wifi state.
+
+    // Create an IntentFilter with action `com.my.app.wifi.WIFI_RELATED_CHANGE`
+    IntentFilter intentFilter = new IntentFilter("com.my.app.wifi.WIFI_RELATED_CHANGE");
+
+    // Register your broadcastreceiver to receive broadcasts 
+    // with action `com.my.app.wifi.WIFI_RELATED_CHANGE`
+    LocalBroadcastManager.getInstance(this)
+                         .registerReceiver(wifiRelatedChangeListener, intentFilter);
+}
+</code></pre>
+
+<p>Unregister the reciever in <code>onPause()</code>:</p>
+
+<pre><code>@Override
+public void onPause() {
+    super.onPause();
+
+    // Activity is going to background. No need to listen anymore
+    LocalBroadcastManager.getInstance(this).unregisterReceiver(wifiRelatedChangeListener);
+}
+</code></pre>
+
+<p>Note that you can declare a receiver such as <code>wifiRelatedChangeListener</code> in however many activities. The broadcast is sent once from <code>ConnectionChangeReceiver # onReceive(...)</code>. Whichever activity is in the foreground/listening at that point, will receive this broadcast and act upon it.</p>
+
+<blockquote>
+  <p>By that time its too late</p>
+</blockquote>
+
+<p>This issue will not be present in the solution discussed above. </p>

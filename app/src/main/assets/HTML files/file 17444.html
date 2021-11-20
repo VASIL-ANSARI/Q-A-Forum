@@ -1,0 +1,26 @@
+<p><a href="http://stackoverflow.com/questions/7690954/how-do-i-control-the-apppool-used-for-deploy-through-vs-msdeploy-settings">It's not possible using MSBuild</a>, but it's possible using MSDeploy.</p>
+
+<p>MSDeploy won't let you specify the settings directly, but it will let you back up an app pool and apply it to another server (it will modify differences in settings if there are any).</p>
+
+<p>First, you need to backup your settings and commit them to SVN:</p>
+
+<pre><code>msdeploy -verb:sync 
+         -source:appPoolConfig="name of your apppool"
+         -dest:package="apppool.zip"
+</code></pre>
+
+<p>During compilation time, you need to sync the output package <em>into</em> the appppol package, since a manifest provider can't include a package/archivedir provider:</p>
+
+<pre><code>msdeploy -verb:sync
+         -source:ApplicationPackage.zip
+         -dest:appool.zip
+         -skip:skipAction:Delete
+</code></pre>
+
+<p>(The skip prevents the deploy from deleting the appPoolConfig provider from the target package)</p>
+
+<p><em>NOTE: Don't do this the other way around (apppool.zip into ApplicationPackage.zip) as it will delete all your declared parameters and I'm not sure how to skip that.</em></p>
+
+<p>It's probably possible to copy apppool.zip "underneath" ApplicationPackage.zip before it's generated (via <code>MsDeploySourceManifest</code>) so it actually merges in one step, but I'll leave that as an exercise for you until I get the time to test it.</p>
+
+<p><em>NOTE: You could also use dest:archivedir if you'd rather have files in a directory than a zip</em></p>

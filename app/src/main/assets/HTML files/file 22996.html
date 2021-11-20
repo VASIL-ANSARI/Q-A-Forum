@@ -1,0 +1,66 @@
+<p>OK, so I have managed to do this, at least for my needs. Please be warned however, as other comments have spoke of, this doesn't allow you to check if an element will be visible (on screen) for the end user.</p>
+
+<p>The approach I have taken simple checks some basic rules: An element is "not visible" if the style attribute for the element contains <code>display:none</code> or <code>visibility:hidden</code>, OR an ancestor element has the same style rules.</p>
+
+<p>With that in mind, here is my code that does the job for me:</p>
+
+<pre><code>private static bool IsNodeVisible(HtmlAgilityPack.HtmlNode node)
+{
+    var attribute = node.Attributes["style"];
+
+    bool thisVisible = false;
+
+    if (attribute == null || CheckStyleVisibility(attribute.Value))
+        thisVisible = true;
+
+    if (thisVisible &amp;&amp; node.ParentNode != null)
+        return IsNodeVisible(node.ParentNode);
+
+    return thisVisible;
+}
+
+private static bool CheckStyleVisibility(string style)
+{
+    if (string.IsNullOrWhiteSpace(style))
+        return true;
+
+    var keys = ParseHtmlStyleString(style);
+
+    if (keys.Keys.Contains("display"))
+    {
+        string display = keys["display"];
+        if (display != null &amp;&amp; display == "none")
+            return false;
+    }
+
+    if (keys.Keys.Contains("visibility"))
+    {
+        string visibility = keys["visibility"];
+        if (visibility != null &amp;&amp; visibility == "hidden")
+            return false;
+    }
+
+    return true;
+}
+
+public static Dictionary&lt;string, string&gt; ParseHtmlStyleString(string style)
+{
+    Dictionary&lt;string, string&gt; result = new Dictionary&lt;string, string&gt;();
+
+    style = style.Replace(" ", "").ToLowerInvariant();
+
+    string[] settings = style.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+    foreach (string s in settings)
+    {
+        if (!s.Contains(':'))
+            continue;
+        string[] data = s.Split(':');
+        result.Add(data[0], data[1]);
+    }
+
+    return result;
+}
+</code></pre>
+
+<p>The entry point for this is <code>IsNodeVisible</code> and will check the visibility of the <code>HtmlNode</code> passed to it.</p>

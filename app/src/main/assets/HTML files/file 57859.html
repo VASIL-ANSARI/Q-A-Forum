@@ -1,0 +1,36 @@
+<p>Ok, this took some time, but it seems to be working. First, let's identify that what you describe as a donut chart can also be rendered as a series of bars â using the exact same data. So I started from there and eventually worked it into a donut chart, but left the bar implementation in there as well. The other thing is that a generic solution should be able to wrap the segments at any value, not just 100, so I included a slider that lets you vary that wrapping value. Finally â and this is easier to explain in a bars rather than donut implementation â rather than always having the bars wrap left-to-right, like text, it may be desirable to zigzag, i.e. alternate wrapping left-to-right then right-to-left and so on. The effect this has is that when an amount is broken up into two segments on two separate lines, the zigzag approach will keep those two segments next to each other. I added a checkbox to turn on/off this zigzag behavior.</p>
+
+<p><strong>Here's a <a href="https://jsfiddle.net/meetamit/aazhp2x6/" rel="nofollow">working jsFiddle</a></strong> and <a href="https://jsfiddle.net/meetamit/aazhp2x6/1/" rel="nofollow">another iteration</a> of it.</p>
+
+<p>Here are the important bits:</p>
+
+<p>There's a function <code>wrap(data, wrapLength)</code> which takes an array of <code>data</code> values and a <code>wrapLength</code> at which to wrap these values. That function figures out which data values have to be split up into sub-segments and returns a new array of them, with each segment's object having <code>x1</code>, <code>x2</code> and <code>y</code> values. <code>x1</code> and <code>x2</code> are the start and end of each bar, and <code>y</code> is the row of the bar. In a donut chart those values are equivalently start angle (<code>x1</code>), end angle (<code>x2</code>) and radius (<code>y</code>) of each arc.</p>
+
+<p>The function <code>wrap()</code> doesn't know how to account for negative vs positive values, so <code>wrap()</code> has to be called twice â once with all the negatives and then all the positives. From there, some processing is applied selectively to just the negatives and then more processing is applied to the combination of the two sets. The entire set of transformations described in the last 2 paragraphs is captured by following snippet. I'm not including the implementation of <code>wrap()</code> here, just the code that calls it; also not including the rendering code, which is pretty straightforward once <code>segments</code> is generated.</p>
+
+<pre><code>// Turn N data points into N + x segments, as dictated by wrapLength. Do this separately
+// for positive and negative values. They'll be merged further down, after we apply
+// a specific transformation to just the negatives
+var positiveSegments = wrap(data.filter(function(d) { return d.value &gt; 0; }), wrapLength);
+var negativeSegments = wrap(data.filter(function(d) { return d.value &lt; 0; }), wrapLength);
+
+// Flip and offset-by-one the y-value of every negative segment. I.e. 0 becomes -1, 1 becomes -2
+negativeSegments.forEach(function(segment) { segment.y = -(segment.y + 1); });
+
+// Flip the order of the negative segments, so that their sorted from negative-most y-value and up
+negativeSegments.reverse()
+
+// Combine negative and positive segments
+segments = negativeSegments.concat(positiveSegments);
+
+if(zigzag) {
+  segments.forEach(function(segment) {
+    if(Math.abs(segment.y) % 2 == (segment.y &lt; 0 ? 0 : 1)) { flipSegment(segment, wrapLength); }
+  });
+}
+
+// Offset the y of every segment (negative or positive) so that the minimum y is 0
+// and goes up from there
+var maxNegativeY = negativeSegments[0].y * -1;
+segments.forEach(function(segment) { segment.y += maxNegativeY; });
+</code></pre>

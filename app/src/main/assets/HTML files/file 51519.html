@@ -1,0 +1,95 @@
+<p>Here's a short demo of doing hex search &amp; replace in a binary file. I took a 32 byte excerpt of your data; here's its hex dump (produced using hd on Linux).</p>
+
+<pre class="lang-none prettyprint-override"><code>00000000  00 00 00 00 00 00 00 00  77 8a 1c 22 00 00 00 21  |........w.."...!|
+00000010  03 00 83 37 ee fb 00 08  00 00 00 b8 3d 00 00 00  |...7........=...|
+00000020
+</code></pre>
+
+<p>Here's the code:</p>
+
+<pre class="lang-python prettyprint-override"><code>fname = 'qdata'
+with open(fname, 'r+b') as f:
+    #save position of the start of the data block
+    fprev = f.tell()
+    stringdata = f.read(32)
+    print stringdata.encode('hex')
+
+    #replace the first occurence of \x77\x8a with \xe1\x8a
+    newdata = stringdata.replace('\x77\x8a', '\xe1\x8a')
+    print newdata.encode('hex')
+
+    #rewind file to the start of the data block
+    f.seek(fprev)
+    f.write(newdata)
+</code></pre>
+
+<p>Note that file mode is <code>'r+b'</code>. This lets us read the file and also modify it. If you open it with a <code>w</code> mode the file is truncated, i.e., its previous contents get wiped out, and the file size is reset to zero. If you open it in an <code>a</code> mode the file pointer is positioned at the end of the file to allow data to be appended.</p>
+
+<p>Here's the output that the above code prints:</p>
+
+<pre class="lang-none prettyprint-override"><code>0000000000000000778a1c220000002103008337eefb0008000000b83d000000
+0000000000000000e18a1c220000002103008337eefb0008000000b83d000000
+</code></pre>
+
+<p>We don't <em>need</em> to do those <code>.encode('hex')</code> and<code>print</code> steps, they're purely informational, so we can see what the program's doing.</p>
+
+<p>Here's the hexdump of the modified file:</p>
+
+<pre class="lang-none prettyprint-override"><code>00000000  00 00 00 00 00 00 00 00  e1 8a 1c 22 00 00 00 21  |..........."...!|
+00000010  03 00 83 37 ee fb 00 08  00 00 00 b8 3d 00 00 00  |...7........=...|
+00000020
+</code></pre>
+
+<p>In the above code I read the entire file contents into RAM; that's certainly not necessary, you can scan it block by block, or however you see fit. But you <strong>must</strong> do a file <code>.seek()</code> call in between file <code>.read()</code> and <code>.write()</code> operations.</p>
+
+<p>Also, be <em>very</em> careful that you get the positioning correct. And don't accidentally write the wrong data length. It won't change the file length, but it can still make a mess of your file if your replacement data isn't the length you think it is.</p>
+
+<hr>
+
+<p>Here's a function that modifies file data at a given offset. Because its action is potentially dangerous the function prompts the user to make sure that the correct data is being overwritten. In the test code I use the same 32 byte file as before, overwriting the 3 bytes <code>'\x83\x37\xee'</code> at offset 0x12.</p>
+
+<pre><code>def binedit(fname, offset, newdata):
+    with open(fname, 'r+b') as f:
+        #Show current contents
+        f.seek(offset)
+        stringdata = f.read(len(newdata))
+        print 'Current data:'
+        print '%08X: %s\n' % (offset, stringdata.encode('hex'))
+
+        prompt = 'Replace with %s ? (y/N) ' % newdata.encode('hex')
+        s = raw_input(prompt)
+        if s != 'y':
+            print 'Aborting'
+            return
+
+        #Replace data at offset with newdata
+        f.seek(offset)
+        f.write(newdata)
+
+
+fname = 'qdata'
+offset = 0x12
+newdata = 'dead42'.decode('hex')
+binedit(fname, offset, newdata)
+</code></pre>
+
+<p><strong>output</strong></p>
+
+<pre class="lang-none prettyprint-override"><code>Current data:
+00000012: 8337ee
+
+Replace with dead42 ? (y/N) y
+</code></pre>
+
+<p>The "before" and "after" hex dumps:</p>
+
+<pre class="lang-none prettyprint-override"><code>00000000  00 00 00 00 00 00 00 00  77 8a 1c 22 00 00 00 21  |........w.."...!|
+00000010  03 00 83 37 ee fb 00 08  00 00 00 b8 3d 00 00 00  |...7........=...|
+00000020
+
+00000000  00 00 00 00 00 00 00 00  77 8a 1c 22 00 00 00 21  |........w.."...!|
+00000010  03 00 de ad 42 fb 00 08  00 00 00 b8 3d 00 00 00  |....B.......=...|
+00000020
+</code></pre>
+
+<p>Disclaimer: If you destroy valuable data using this code it's not my fault!</p>

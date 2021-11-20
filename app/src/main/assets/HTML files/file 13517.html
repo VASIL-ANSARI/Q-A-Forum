@@ -1,0 +1,27 @@
+<p>I find that the best way to assign a random number is via a pseudo-random number generator:</p>
+
+<ol>
+<li>Enumerate each row</li>
+<li>Calculate a formula to get a pseudo-random number</li>
+<li>Use this to select the appropriate range</li>
+</ol>
+
+<p>For your case:</p>
+
+<pre><code>SELECT t.*, 
+       ( CASE 
+           WHEN Mod(rownum * 71 + 107, 257) &lt; .5 * 257 THEN 6 
+           WHEN Mod(rownum * 63 + 107, 257) BETWEEN 0.5 * 257 AND 0.95 * 257 
+         THEN 7 
+           ELSE 8 
+         END ) AS val 
+FROM   (SELECT t.*, 
+               Row_number() 
+                 OVER ( 
+                   partition BY NULL) AS rownum 
+        FROM   t) t 
+</code></pre>
+
+<p>The idea is that multiplying by one prime, adding another, and taking the remainder via a third is a pretty good approximation of a random number.  Not perfect, but good enough for most purposes.</p>
+
+<p>Also, the percentages here are approximations.</p>

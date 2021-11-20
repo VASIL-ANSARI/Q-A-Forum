@@ -1,0 +1,42 @@
+<p>It seems to me that it might be easier to use the <a href="https://github.com/mongodb/node-mongodb-native" rel="nofollow"><code>mongodb</code></a> driver instead of Mongoose (the latter implements an extra layer on top of MongoDB documents, which is great but usually works better when the database is being populated by Mongoose as well).</p>
+
+<p>An example on how to query the data using <code>mongodb</code> (make sure to run <code>npm install mongodb</code> before running the script):</p>
+
+<pre><code>var MongoClient = require('mongodb').MongoClient;
+
+var url = 'mongodb://localhost:27017/gtfs';
+
+// Connect to the database.
+MongoClient.connect(url, function(err, db) {
+
+  // If an error occurred during connect, exit the script by
+  // throwing an exception.
+  if (err) throw err;
+
+  // Get a reference to the collection.
+  var routes = db.collection('routes');
+
+  // Run a query against the `routes` collection.
+  var cursor = routes.find({ route_id : '6182' });
+
+  // Read all the results from the cursor and turn them into a JS array.
+  cursor.toArray(function(err, documents) {
+    if (err) throw err;
+
+    // Output the results as JSON.
+    console.log('%j', documents);
+
+    // Close the connection.
+    db.close();
+  });
+
+});
+</code></pre>
+
+<p>Inserting a document <a href="https://github.com/mongodb/node-mongodb-native#inserting-a-document" rel="nofollow">is documented here</a>.</p>
+
+<p>One thing to consider with pretty much any Node code is that all I/O operations (network/database/file system/etc) are asynchronous, which means that you pass a function that will be called when the I/O operation has completed (or an error occurred).</p>
+
+<p>These calls don't block; in other words, you are merely telling Node to schedule an I/O operation and get back to you when it has finished. However, any code following the code where you tell Node to perform the operation will be executed right after, and not just when the operation has completed.</p>
+
+<p>That's why the code above nests functions in functions.</p>

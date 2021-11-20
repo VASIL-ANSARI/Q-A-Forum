@@ -1,0 +1,171 @@
+<p>You cannot avoid throwing the expectation failure when using the expectation parser. It's the purpose of this operator.</p>
+
+<p>Use <code>operator&gt;&gt;</code> for "back-trackable expectations" (i.e. alternatives).</p>
+
+<p>When you do use expectation points (<code>operator&gt;</code>) just handle the exception tooÂ¹.</p>
+
+<blockquote>
+  <p><strong>Note</strong> This looks like a typo</p>
+
+<pre><code>('(' &gt; -lvalue_list &gt; '&gt;')
+</code></pre>
+  
+  <p>should probably be</p>
+
+<pre><code>('(' &gt; -lvalue_list &gt; ')')
+</code></pre>
+</blockquote>
+
+<p>Also <code>return one end</code> doesn't match <code>"begin" &gt;&gt; statements &gt;&gt; "end"</code> regardless of what <code>statements</code> is defined as...</p>
+
+<p>Fixing things:</p>
+
+<p><strong><a href="http://coliru.stacked-crooked.com/a/5ab7de188dc272bd" rel="nofollow">Live With Rule Debugging</a></strong> (c++14 only)</p>
+
+<pre><code>#define BOOST_SPIRIT_X3_DEBUG
+#include &lt;iostream&gt;
+#include &lt;boost/spirit/home/x3.hpp&gt;
+
+namespace SO {
+    namespace x3 = boost::spirit::x3;
+
+    x3::symbols&lt;char&gt; const keyword = []{
+        x3::symbols&lt;char&gt; kw;
+        kw += "for","begin","end","function","while","break","switch";
+        return kw;
+    }();
+
+    x3::rule&lt;struct symbol_tag&gt;      const symbol     ("symbol");
+    x3::rule&lt;struct identifier_tag&gt;  const identifier ("identifier");
+    x3::rule&lt;struct lvalue_list_tag&gt; const lvalue_list("lvalue_list");
+    x3::rule&lt;struct statements_tag&gt;  const statements ("statements");
+    x3::rule&lt;struct rule_tag&gt;        const rule       ("rule");
+
+    auto symbol_def      = x3::lexeme[x3::alnum &gt;&gt; *(x3::alnum | '_')];
+    auto identifier_def  = (!(x3::lexeme[keyword &gt;&gt; !(x3::alnum | '_')]) &gt;&gt; symbol);
+    auto lvalue_list_def = identifier % ',';
+    auto statements_def  = *identifier;
+    auto rule_def        = "function"
+                     &gt;&gt; identifier
+                     &gt;&gt; ('(' &gt; -lvalue_list &gt; ')')
+                     &gt;&gt; ("begin" &gt; statements &gt; "end")
+                     ;
+
+    BOOST_SPIRIT_DEFINE(symbol, identifier, lvalue_list, statements, rule)
+}
+
+int main() {
+    std::string const sample = "function a() begin return one end";
+    auto f = sample.begin(), l = sample.end();
+
+    bool ok = phrase_parse(f, l, SO::rule, SO::x3::space);
+    if (ok)
+        std::cout &lt;&lt; "Parse success\n";
+    else
+        std::cout &lt;&lt; "Parse failed\n";
+
+    if (f!=l)
+        std::cout &lt;&lt; "Remaining unparsed: '" &lt;&lt; std::string(f,l) &lt;&lt; "'\n";
+}
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>&lt;rule&gt;
+  &lt;try&gt;function a() begin r&lt;/try&gt;
+  &lt;identifier&gt;
+    &lt;try&gt; a() begin return on&lt;/try&gt;
+    &lt;symbol&gt;
+      &lt;try&gt; a() begin return on&lt;/try&gt;
+      &lt;success&gt;() begin return one &lt;/success&gt;
+    &lt;/symbol&gt;
+    &lt;success&gt;() begin return one &lt;/success&gt;
+  &lt;/identifier&gt;
+  &lt;lvalue_list&gt;
+    &lt;try&gt;) begin return one e&lt;/try&gt;
+    &lt;identifier&gt;
+      &lt;try&gt;) begin return one e&lt;/try&gt;
+      &lt;symbol&gt;
+        &lt;try&gt;) begin return one e&lt;/try&gt;
+        &lt;fail/&gt;
+      &lt;/symbol&gt;
+      &lt;fail/&gt;
+    &lt;/identifier&gt;
+    &lt;fail/&gt;
+  &lt;/lvalue_list&gt;
+  &lt;statements&gt;
+    &lt;try&gt; return one end&lt;/try&gt;
+    &lt;identifier&gt;
+      &lt;try&gt; return one end&lt;/try&gt;
+      &lt;symbol&gt;
+        &lt;try&gt; return one end&lt;/try&gt;
+        &lt;success&gt; one end&lt;/success&gt;
+      &lt;/symbol&gt;
+      &lt;success&gt; one end&lt;/success&gt;
+    &lt;/identifier&gt;
+    &lt;identifier&gt;
+      &lt;try&gt; one end&lt;/try&gt;
+      &lt;symbol&gt;
+        &lt;try&gt; one end&lt;/try&gt;
+        &lt;success&gt; end&lt;/success&gt;
+      &lt;/symbol&gt;
+      &lt;success&gt; end&lt;/success&gt;
+    &lt;/identifier&gt;
+    &lt;identifier&gt;
+      &lt;try&gt; end&lt;/try&gt;
+      &lt;fail/&gt;
+    &lt;/identifier&gt;
+    &lt;success&gt; end&lt;/success&gt;
+  &lt;/statements&gt;
+  &lt;success&gt;&lt;/success&gt;
+&lt;/rule&gt;
+Parse success
+</code></pre>
+
+<h2>Without Debug</h2>
+
+<p>It gets a lot simpler:</p>
+
+<p><strong><kbd><a href="http://coliru.stacked-crooked.com/a/c07c14085ebc6d90" rel="nofollow">Live On Coliru</a></kbd></strong> (g++/clang++)</p>
+
+<pre><code>#include &lt;boost/spirit/home/x3.hpp&gt;
+#include &lt;iostream&gt;
+
+int main() {
+    namespace x3 = boost::spirit::x3;
+
+    x3::symbols&lt;char&gt; keyword;
+    keyword += "for","begin","end","function","while","break","switch";
+
+    static auto symbol      = x3::lexeme[x3::alnum &gt;&gt; *(x3::alnum | '_')];
+    static auto identifier  = (!(x3::lexeme[keyword &gt;&gt; !(x3::alnum | '_')]) &gt;&gt; symbol);
+    static auto lvalue_list = identifier % ',';
+    static auto statements  = *identifier;
+    static auto rule        = "function"
+                            &gt;&gt; identifier
+                            &gt;&gt; ('(' &gt; -lvalue_list &gt; ')')
+                            &gt;&gt; ("begin" &gt; statements &gt; "end")
+                            ;
+
+    std::string const sample = "function a() begin return one end";
+    auto f = sample.begin(), l = sample.end();
+
+    bool ok = phrase_parse(f, l, rule, x3::space);
+    if (ok)
+        std::cout &lt;&lt; "Parse success\n";
+    else
+        std::cout &lt;&lt; "Parse failed\n";
+
+    if (f!=l)
+        std::cout &lt;&lt; "Remaining unparsed: '" &lt;&lt; std::string(f,l) &lt;&lt; "'\n";
+}
+</code></pre>
+
+<p>Just prints</p>
+
+<pre><code>Parse success
+</code></pre>
+
+<hr>
+
+<p>Â¹ And just to show you <strong>can</strong> handle the expectation failure just fine: <a href="http://coliru.stacked-crooked.com/a/c6461f997d4b1c8b" rel="nofollow">Expectation Failure Handling</a></p>

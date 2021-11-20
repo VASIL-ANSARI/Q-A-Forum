@@ -1,0 +1,34 @@
+<p>The browser DOM and events are notoriously bad at consistent and predictable performance - particularly when handling keyboard or mouse events. My suggestion would be to re-architect the idea somewhat... otherwise you will just end up chasing issues like this for a long time.</p>
+
+<p>After looking at your demo, I am not quite sure what to recommend. Having a single text box that handles the input (it could even be invisible/hidden) and just dispatch the events from there - maybe hooking the 'change' event rather than an individual key press would probably be more reliable, though it might be too much of a departure from what you are trying to do. And it certainly would add additional complexity to allow for editing individual cells (hooking the blur event).</p>
+
+<p>Another idea I had was to make the keyup event return as fast as possible - wrap the majority of the body into an anonymous function that is passed into a setTimeOut() invocation. It would probably be beneficial to precompute the next cell in advance as well so you could skip over all that logic. I don't know as though that would solve the performance problem though... warning I didn't test this code - I present it as an idea. There may be a problem with the closure around the $(this) call particularly.</p>
+
+<pre><code>$("input.BoggleGridCell")
+.focus(function () {
+    $(this).select();
+})
+.keyup(function (event) {
+    var code = (event.keyCode ? event.keyCode : event.which);
+    if ((code &gt;= 65 &amp;&amp; code &lt;= 90) || (code &gt;= 97 &amp;&amp; code &lt;= 122)) {
+        setTimeOut(function(){
+          var currentId = $(this).attr('id');
+          var leftDigit = currentId.substring(1, 2);
+          var rightDigit = currentId.substring(2, 3);
+          if (leftDigit != 3 || rightDigit != 3) {
+              if (rightDigit == 3) {
+                  rightDigit = 0;
+                  leftDigit++;
+              } else {
+                rightDigit++;
+              }
+              var moveToId = 'c' + leftDigit + rightDigit;
+              var newCell = document.getElementById(moveToId);
+              if (newCell)
+                newCell.focus();
+          } else {
+            $("#solve").focus();
+        }, 1);
+    }
+});
+</code></pre>

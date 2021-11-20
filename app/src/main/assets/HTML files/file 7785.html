@@ -1,0 +1,77 @@
+<p>The easiest way is to:</p>
+
+<ol>
+<li>keep a database of all URLs</li>
+<li>when you insert a new URL into the database, find out the id of the auto-incrementing integer primary key.</li>
+<li>encode that integer into base 36 or 62 (digits + lowercase alpha or digits + mixed-case alpha). Voila! You have a short url!</li>
+</ol>
+
+<p>Encoding to base 36/decoding from base 36 is simple in Ruby:</p>
+
+<pre><code>12341235.to_s(36)
+#=&gt; "7cik3"
+
+"7cik3".to_i(36)
+#=&gt; 12341235
+</code></pre>
+
+<p>Encoding to base 62 is a bit tricker. Here's one way to do it:</p>
+
+<pre><code>module AnyBase
+  ENCODER = Hash.new do |h,k|
+    h[k] = Hash[ k.chars.map.with_index.to_a.map(&amp;:reverse) ]
+  end
+  DECODER = Hash.new do |h,k|
+    h[k] = Hash[ k.chars.map.with_index.to_a ]
+  end
+  def self.encode( value, keys )
+    ring = ENCODER[keys]
+    base = keys.length
+    result = []
+    until value == 0
+      result &lt;&lt; ring[ value % base ]
+      value /= base
+    end
+    result.reverse.join
+  end
+  def self.decode( string, keys )
+    ring = DECODER[keys]
+    base = keys.length
+    string.reverse.chars.with_index.inject(0) do |sum,(char,i)|
+      sum + ring[char] * base**i
+    end
+  end
+end
+</code></pre>
+
+<p>...and here it is in action:</p>
+
+<pre><code>base36 = "0123456789abcdefghijklmnopqrstuvwxyz"
+db_id = 12341235
+p AnyBase.encode( db_id, base36 )
+#=&gt; "7cik3"
+p AnyBase.decode( "7cik3", base36 )
+#=&gt; 12341235
+
+base62 = [ *0..9, *'a'..'z', *'A'..'Z' ].join
+p AnyBase.encode( db_id, base62 )
+#=&gt; "PMwb"
+p AnyBase.decode( "PMwb", base62 )
+#=&gt; 12341235
+</code></pre>
+
+<p><strong>Edit</strong></p>
+
+<p>If you want to avoid URLs that happen to be English words (for example, four-letter swear words) you can use a set of characters that does not include vowels:</p>
+
+<pre><code>base31 = ([*0..9,*'a'..'z'] - %w[a e i o u]).join
+base52 = ([*0..9,*'a'..'z',*'A'..'Z'] - %w[a e i o u A E I O U]).join
+</code></pre>
+
+<p>However, with this you still have problems like <code>AnyBase.encode(328059,base31)</code> or <code>AnyBase.encode(345055,base31)</code> or <code>AnyBase.encode(450324,base31)</code>. You may thus want to avoid vowel-like numbers as well:</p>
+
+<pre><code>base28 = ([*'0'..'9',*'a'..'z'] - %w[a e i o u 0 1 3]).join
+base49 = ([*'0'..'9',*'a'..'z',*'A'..'Z'] - %w[a e i o u A E I O U 0 1 3]).join
+</code></pre>
+
+<p><em>This will also avoid the problem of "Is that a 0 or an O?" and "Is that a 1 or an I?".</em></p>

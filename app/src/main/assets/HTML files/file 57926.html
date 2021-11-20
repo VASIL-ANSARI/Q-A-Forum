@@ -1,0 +1,27 @@
+<p>I know this is several years late, but as this worked great for me, I'm posting this in the hopes that it helps someone.</p>
+
+<p>Most Android devices I've seen (excluding emulators) require you to call <code>Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)</code> or you can get some weird results. This way allows you to clear the screen, but still get the trail effect to work by doing your drawing to a frame buffer object (FBO), which doesn't get cleared by glClear(), and then drawing the FBO to the screen.</p>
+
+<ul>
+<li><p>Create an FBO: <code>FrameBuffer fbo;</code></p></li>
+<li><p>Create a SpriteBatch to draw the FBO: <code>SpriteBatch batch;</code></p></li>
+<li><p>In create(): <code>fbo = new FrameBuffer(Pixmap.Format.RGBA8888, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false);
+batch = new SpriteBatch();</code></p></li>
+<li><p>In render(): <code>Gdx.gl.glClearColor(0, 0, 0, 1);
+Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+Gdx.gl.glEnable(GL20.GL_BLEND);
+Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+fbo.begin(); //This must be called before your drawing code
+shapeRenderer.begin();
+shapeRenderer.setColor(0, 0, 0, 0.2f); //You can change the trail length by changing the alpha
+shapeRenderer.rect(0, 0, screenWidth, screenHeight);    //Draw a translucent rectangle to the FBO.
+... Your drawing code goes here ...
+shapeRenderer.end();
+fbo.end(); //Make sure this is called after shapeRenderer.end() or shapeRenderer.flush();
+batch.begin();
+batch.draw(fbo.getColorBufferTexture(), 0, 0); //Draw the FBO
+batch.end();
+Gdx.gl.glDisable(GL20.GL_BLEND);
+</code></p></li>
+<li><p>Remember to call <code>fbo.dispose()</code> in your application's dispose() method;</p></li>
+</ul>

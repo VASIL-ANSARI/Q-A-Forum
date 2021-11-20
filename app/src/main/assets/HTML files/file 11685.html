@@ -1,0 +1,42 @@
+<p>My opinion is that you need two Threads. </p>
+
+<p>The first thread is to execute the service call and the second thread should be scheduled to interrupt the first.</p>
+
+<p>First Thread:</p>
+
+<pre><code>public class ServiceCall implements Runnable {
+
+    public void run() {
+       serviceClient.callOperation();
+    }
+
+}
+</code></pre>
+
+<p>Second Thread:</p>
+
+<pre><code>public class Interruptor implements Runnable {
+
+
+public Interruptor(Future&lt;?&gt; future) {
+serviceCallFuture = future;
+}
+
+
+private Future&lt;?&gt; serviceCallFuture;
+
+public void run() {
+serviceCallFuture.cancel(false);
+}
+
+
+}
+</code></pre>
+
+<p>Now the main logic:</p>
+
+<pre><code>ScheduledExecutorService executor = Executors.newScheduledThreadPool(2);
+Future&lt;?&gt; future = executor.submit(new ServiceCall());
+// Schedule interruptor to cancel the thread after 10 seconds
+executor.schedule(new Interruptor(future), 10, TimeUnit.SECONDS);
+</code></pre>

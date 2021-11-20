@@ -1,0 +1,73 @@
+<p>If it's just array-based ordering that you want (you really do want the spaceship operator) and you want to find the 'biggest' by sorting, then:</p>
+
+<pre><code>Hand = Struct.new(:score)
+
+hands = [
+ Hand.new([9,3,0,4]),
+ Hand.new([8,8,8,8]),
+ Hand.new([5,10,12,12]),
+ Hand.new([1,99,99,99])
+]
+
+biggest = hands.sort_by(&amp;:score).last
+p biggest
+#=&gt; #&lt;struct Hand score=[9, 3, 0, 4]&gt;
+</code></pre>
+
+<p>If you really only need to find the largest hand, however, the following will be more efficient than ordering the entire array:</p>
+
+<pre><code>biggest = hands.inject do |max,hand|
+  if (max.score &lt;=&gt; hand.score) == -1
+    hand
+  else
+    max
+  end
+end
+p biggest
+#=&gt; #&lt;struct Hand score=[9, 3, 0, 4]&gt;
+</code></pre>
+
+<p><strong>Edit</strong>: Reading your comment, if you really need multiple values that match, I would do this:</p>
+
+<pre><code>Hand = Struct.new(:name,:score) do 
+  MAX_SCORE_PART = 13 # 13 ranks in a suit
+  def numeric_score
+    value = 0
+    score.each_with_index do |part,i|
+      value += part.to_i * MAX_SCORE_PART**(score.length-i-1)
+    end
+    value
+  end
+end
+
+hands = [
+  Hand.new('Bob', [9,3,nil,4] ),
+  Hand.new('Jim', [8,8,8,8]   ),
+  Hand.new('Foo', [5,10,12,12]),
+  Hand.new('Sam', [1,13,13,13]),
+  Hand.new('Zak', [9,3,0,4]   ),
+]
+
+require 'pp'
+by_score = hands.group_by(&amp;:numeric_score)
+pp by_score
+#=&gt; {20284=&gt;
+#=&gt;   [#&lt;struct Hand name="Bob", score=[9, 3, nil, 4]&gt;,
+#=&gt;    #&lt;struct Hand name="Zak", score=[9, 3, 0, 4]&gt;],
+#=&gt;  19040=&gt;[#&lt;struct Hand name="Jim", score=[8, 8, 8, 8]&gt;],
+#=&gt;  12843=&gt;[#&lt;struct Hand name="Foo", score=[5, 10, 12, 12]&gt;],
+#=&gt;  4576=&gt;[#&lt;struct Hand name="Sam", score=[1, 13, 13, 13]&gt;]}
+
+pp by_score[by_score.keys.max]
+#=&gt; [#&lt;struct Hand name="Bob", score=[9, 3, nil, 4]&gt;,
+#=&gt;  #&lt;struct Hand name="Zak", score=[9, 3, 0, 4]&gt;]
+</code></pre>
+
+<p><em>For an <code>inject</code>-based implementation:</em></p>
+
+<pre><code>def numeric_score
+  score.enum_for(:inject,0).with_index do |(val,part),i|
+    val += part.to_i * MAX_SCORE_PART**(score.length-i-1)
+  end
+end
+</code></pre>

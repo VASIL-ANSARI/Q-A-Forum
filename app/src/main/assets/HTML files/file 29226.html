@@ -1,0 +1,29 @@
+<p>Well I figured out the problem on my own. I think part of it was putting the username &amp; password in the URL (which was just a temporary measure) because I found that method provided the same results in mobile Safari and desktop Chrome.
+So I added <a href="http://blog.mugunthkumar.com/ios-components/mknetworkkit/" rel="nofollow">MKNetworkKit</a> to my project that provided a simple way to add authentication to my request, and found I had to make a specific request to POST the data, then reloaded the page the to see the changes.</p>
+
+<p>In the <code>(BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType</code> method, I check if <code>([request.HTTPMethod isEqualToString:@"POST"])</code> and do this: </p>
+
+<pre><code>NSString *sPostData = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+
+NSArray *aPostData = [sPostData componentsSeparatedByString:@"&amp;"];
+
+NSMutableDictionary *dPostData = [[NSMutableDictionary alloc] init];
+
+//i don't know if this is the best way to set a dictionary, but it works
+for (id apd in aPostData)
+{
+    NSString *key = [apd componentsSeparatedByString:@"="][0];
+    NSString *val = [apd componentsSeparatedByString:@"="][1];
+    [dPostData setValue:val forKey:key];
+}
+
+MKNetworkEngine *engine = [[MKNetworkEngine alloc] init];
+
+MKNetworkOperation *op = [engine operationWithURLString:[request.URL description] params:dPostData httpMethod:@"POST"];
+
+[op setUsername:@"myUserName" password:@"myPassword" basicAuth:YES];
+
+self.postedRequest = TRUE; //a bool I set so, when it comes to webViewDidFinishLoad, I reload the current page
+
+[op start]; //send POST operation
+</code></pre>

@@ -1,0 +1,49 @@
+<blockquote>
+  <p><code>show global variables like 'open%';</code> in MySQL</p>
+</blockquote>
+
+<p>Apart from MySQL, your OS might impose limits, too. For linux, have a look at <a href="https://easyengine.io/tutorials/linux/increase-open-files-limit/" rel="nofollow"><code>/etc/security/limits.conf</code></a>, on Windows, <a href="http://stackoverflow.com/a/870224/1312382">this</a> answer might help you out.</p>
+
+<p>However, if you need one and the same connection that often one after another time, it might be a better choice to open it once and keep it open until your program terminates. This will additionally give you better performance - and you can improve performance even more using a prepared statement instead. I added this to the example below already...
+</p>
+
+<pre><code>class DB
+{
+    std::unique_ptr &lt;sql::Connection&gt; con;
+    std::unique_ptr &lt;sql::PreparedStatement&gt; stmt;
+public:
+    DB();
+    double query1(std::string const&amp; pair);
+};
+
+DB::DB()
+    : con(get_driver_instance()-&gt;connect("localhost", "root", "nlpgroup"))
+{
+    con-&gt;setSchema("em_im");
+    // you might prefer a prepared statement
+    stmt.reset(con-&gt;prepareStatement("SELECT prob FROM em WHERE pair = ?"));
+}
+
+double DB::query1(std::string const&amp; pair)
+{
+    double get_prob = 0.0;
+    try
+    {
+        stmt-&gt;setString(1, pair);
+        std::unique_ptr &lt; sql::ResultSet &gt; res(stmt-&gt;execute());
+        while (res-&gt;next())
+        {
+            get_prob = atof(res-&gt;getString(1).c_str());
+        }
+    }
+    catch(sql::SQLException&amp; e)
+    {
+        /* ... */
+    }
+    return get_prob;
+}
+</code></pre>
+
+<p>Usage of <code>std::unique_ptr</code> assures that all objects are deleted correctly even in case of an exception - which, by the way, your code did not. I did not call <code>close</code> explicitely - it will be called in the objects' destructors anyway, so this is fine.</p>
+
+<p>Be aware that now the constructor can throw an exception, too, so you need a try - catch in the main function, too. Depending on your needs, you then could leave out the try - catch in the query functions. This changes behaviour, however: Leaving as is results in all the queries being executed, even if one fails in between, whereas dropping it results in aborting the loop.</p>

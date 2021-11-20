@@ -1,0 +1,42 @@
+<p>The "problem" with the displaytag is that it tries to do <em>in memory</em> pagination. It means that you are going to store everything in the session. Using displaytag you could do something called <strong>partial list support</strong>. In that case you have to send a list of <code>PaginatedList</code> as the doc says:</p>
+
+<p><em>If the object passed to the displaytag as a list is in fact an instance of org.displaytag.pagination.PaginatedList (and not a collection), displaytag will assume that the list is externally sorted and paginated. Implementing this interface is trivial, and an adapter over existing classes can easily be written. See the org.displaytag.pagination.PaginatedList javadocs for more details.</em></p>
+
+<p>you will have urls like this</p>
+
+<p><a href="http://foo.bar.com/context/requestUri?sort=name&amp;dir=asc&amp;page=5&amp;originalParameters=originalValues" rel="nofollow">http://foo.bar.com/context/requestUri?sort=name&amp;dir=asc&amp;page=5&amp;originalParameters=originalValues</a></p>
+
+<p>for further details take a look at the doc: </p>
+
+<p><a href="http://www.displaytag.org/1.2/tut_externalSortAndPage.html" rel="nofollow">http://www.displaytag.org/1.2/tut_externalSortAndPage.html</a></p>
+
+<p>If you don't want to use this technique you could use another alternative with more freedom. You could fetch directly what you want from the db. Take a look at this page (it is not exactly as you wanted it), it will give a basic idea of how to do it: <code>http://theopentutorials.com/examples/java-ee/jsp/pagination-in-servlet-and-jsp/</code> . The main points are:</p>
+
+<ol>
+<li><p>Having  parameter that tells you in which page you are:</p>
+
+<p>if(request.getParameter("page") != null)
+  page = Integer.parseInt(request.getParameter("page"));</p></li>
+<li><p>With that parameter you fetch the proper data</p>
+
+<p>List list = dao.viewAllEmployees((page-1)*recordsPerPage,
+                             recordsPerPage);
+int noOfRecords = dao.getNoOfRecords();
+int noOfPages = (int) Math.ceil(noOfRecords * 1.0 / recordsPerPage);
+request.setAttribute("employeeList", list);
+request.setAttribute("noOfPages", noOfPages);
+request.setAttribute("currentPage", page);</p></li>
+<li><p>Then, in your jsp you controls your links for navigation<br>
+to the previous page<pre>
+<code>&lt;c:if test="${currentPage != 1}"&gt;
+    &lt;td&gt;&lt;a href="employee.do?page=${currentPage - 1}"&gt;Previous&lt;/a&gt;&lt;/td&gt;
+&lt;/c:if&gt;</code> </pre></p></li>
+</ol>
+
+<p>the rendering of the table is exactly as you had it before: 
+   <code>&lt;display:table ...&gt; &lt;/display:table&gt;</code> </p>
+
+<p>and the 'next one' link <pre>
+    <code>&lt;c:if test="${currentPage lt noOfPages}"&gt;
+        &lt;td&gt;&lt;a href="employee.do?page=${currentPage + 1}"&gt;Next&lt;/a&gt;&lt;/td&gt;
+    &lt;/c:if&gt;</code></pre></p>

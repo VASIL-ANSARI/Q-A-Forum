@@ -1,0 +1,24 @@
+<p>You may want to look at <code>pyresample</code> for this and other similar geographical interpolation problems.  It provides multiple methods for interpolation, works well with lat/lon data, and incorporates <code>basemap</code> support.  I suggest this package because you can also create <code>AreaDefinition</code> objects that define a domain using Proj4 definitions, then register data to the <code>AreaDefinition</code>.</p>
+
+<p>For your specific problem, I would do the following (note, the interpolation step is not complete, see below):</p>
+
+<pre><code>from pyresample.geometry import SwathDefinition
+from pyresample.kd_tree import resample_nearest
+
+def interp_b_to_a(a, b):
+    '''Take in two dictionaries of arrays and interpolate the second to the first.
+    The dictionaries must contain the following keys: "data", "lats", "lons"
+    whose values must be numpy arrays.
+    '''
+    def_a = SwathDefinition(lons=a['lons'], lats=a['lats'])
+    def_b = SwathDefinition(lons=b['lons'], lats=b['lats'])
+
+    interp_dat = resample_nearest(def_b, b['data'], def_a, ...)
+    new_b = {'data':interp_dat,
+             'lats':copy(a['lats']),
+             'lons':copy(a['lons'])
+            }
+    return new_b
+</code></pre>
+
+<p>Note that the interpolation step where <code>resample_nearest</code> is called is not complete.  You will also need to specify the <code>radius_of_influence</code> which is the search radius to use around each point in meters.  This is dependent on the resolution of your data.  You may also want to specify <code>nprocs</code> to speed things up and <code>fill_value</code> if you are using masked data.</p>

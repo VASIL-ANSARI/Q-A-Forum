@@ -1,0 +1,48 @@
+<p>I fixed it in Webstorm. The correct remote url for the html folder in run configurations is:</p>
+
+<pre><code>http://myapp.app:8000/js/html
+</code></pre>
+
+<p>Pretty weird, but Webstorm thinks that /js/html is a folder and that the source files are inside there.</p>
+
+<p><strong>EDIT 1</strong> :Let me edit this answer. It turns out that the snippet above wasn't giving me all of the source maps. When inspecting the map file, the sources were being listed as <code>js</code> files and not <code>ts</code> files, which meant that the debugger wouldn't catch break points.</p>
+
+<p>Here is the working gulp task, which watches any Typescript file for changes (as long as it's a dependency of <code>main.ts</code> and triggers browserify and the new sourcemaps. It requires the <a href="https://www.npmjs.com/package/tsify" rel="nofollow">tsify</a> plugin.</p>
+
+<pre><code>'use strict';
+
+var watchify = require('watchify');
+var browserify = require('browserify');
+var gulp = require('gulp');
+var source = require('vinyl-source-stream');
+var buffer = require('vinyl-buffer');
+var gutil = require('gulp-util');
+var sourcemaps = require('gulp-sourcemaps');
+var assign = require('lodash.assign');
+
+// add custom browserify options here
+var customOpts = {
+    entries: ['./html/js/main.ts'],
+    debug: true
+};
+var opts = assign({}, watchify.args, customOpts);
+var b = watchify(browserify(opts));
+gulp.task('bundle', bundle); // so you can run `gulp js` to build the file
+b.on('update', bundle); // on any dep update, runs the bundler
+b.on('log', gutil.log); // output build logs to terminal
+b.plugin('tsify')
+
+function bundle() {
+    return b.bundle()
+        // log errors if they happen
+        .on('error', gutil.log.bind(gutil, 'Browserify Error'))
+        .pipe(source('bundle.js'))
+        // optional, remove if you don't need to buffer file contents
+        .pipe(buffer())
+        // optional, remove if you dont want sourcemaps
+        .pipe(sourcemaps.init({loadMaps: true})) // loads map from browserify file
+        // Add transformation tasks to the pipeline here.
+        .pipe(sourcemaps.write({includeContent: false, sourceRoot: './'})) // writes .map file
+        .pipe(gulp.dest('./html/js'));
+}
+</code></pre>

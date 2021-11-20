@@ -1,0 +1,76 @@
+<p>Not sure that I understood you correctly. But looks like you want to save the state your View independently from Activity instance and be able to restore it. 
+You can use retained fragments for this.</p>
+
+<ul>
+<li>Extend the Fragment class and declare references to your stateful
+objects. </li>
+<li>Call setRetainInstance(boolean) when the fragment is    created.</li>
+<li>Add the fragment to your activity.</li>
+<li><p>Use FragmentManager to    retrieve the fragment when the activity is
+restarted.</p>
+
+<pre><code>public class RetainedFragment extends Fragment {
+
+// data object we want to retain
+private MyDataObject data;
+
+// this method is only called once for this fragment
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    // retain this fragment
+    setRetainInstance(true);
+}
+
+public void setData(MyDataObject data) {
+    this.data = data;
+}
+
+public MyDataObject getData() {
+    return data;
+}
+</code></pre>
+
+<p>}</p></li>
+</ul>
+
+<p>To restore saved object you can use FragmentManager.</p>
+
+<pre><code>    public class MyActivity extends Activity {
+
+    private RetainedFragment dataFragment;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+
+        // find the retained fragment on activity restarts
+        FragmentManager fm = getFragmentManager();
+        dataFragment = (DataFragment) fm.findFragmentByTag(âdataâ);
+
+        // create the fragment and data the first time
+        if (dataFragment == null) {
+            // add the fragment
+            dataFragment = new DataFragment();
+            fm.beginTransaction().add(dataFragment, âdataâ).commit();
+            // load the data from the web
+            dataFragment.setData(loadMyData());
+        }
+
+        // the data is available in dataFragment.getData()
+        ...
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // store the data in the fragment
+        dataFragment.setData(collectMyLoadedData());
+    }
+}
+</code></pre>
+
+<p>Here you can find more information about that: <a href="http://developer.android.com/guide/topics/resources/runtime-changes.html" rel="nofollow">http://developer.android.com/guide/topics/resources/runtime-changes.html</a></p>
+
+<p>Hope this helps.</p>

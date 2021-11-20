@@ -1,0 +1,21 @@
+<p>You've asked a few questions. I have tried to answer them in isolation, but I may have misunderstood the whole scenario. If you provided some example code, it might help to clarify.</p>
+
+<blockquote>
+  <p>With my new PCollection the plan is to use a Comparator DoFn to look at the max last update date and returning the given row. I'm unsure if I should be using a filter transform or if I should be doing a Group by key and then using a filter?</p>
+</blockquote>
+
+<p>Based on your description, it seems that you want to take a <code>PCollection</code> of elements and for each <code>customerID</code> (the key) find the most recent update to that customer's record. You can use the provided transforms to accomplish this via <code>Top.largestPerKey(1, timestampComparator)</code> where you set up your <code>timestampComparator</code> to look only at the timestamp.</p>
+
+<blockquote>
+  <p>Is it possible to have a key value pair that is the entire row of the PCollection?</p>
+</blockquote>
+
+<p>A <code>KV&lt;K, V&gt;</code> can have any type for the key (<code>K</code>) and value (<code>V</code>). If you want to group by key, then the coder for the keys needs to be deterministic. <code>TableRowJsonCoder</code> is not deterministic, because it may contain arbitrary objects. But it sounds like you want to have the <code>customerID</code> for the key and the entire <code>TableRow</code> for the value.</p>
+
+<blockquote>
+  <p>is it possible to apply these Pardo's on the third PCollection without creating a fourth?</p>
+</blockquote>
+
+<p>When you apply a <code>PTransform</code> to a <code>PCollection</code>, it results in a new <code>PCollection</code>. There is no way around that, and you don't need to try to minimize the number of <code>PCollections</code> in your pipeline.</p>
+
+<p>A <code>PCollection</code> is a conceptual object; it does not have intrinsic cost. Your pipeline is going to be heavily optimized so that many intermediate <code>PCollections</code> - especially those in a sequence of <code>ParDo</code> transforms - will never be materialized anyhow.</p>

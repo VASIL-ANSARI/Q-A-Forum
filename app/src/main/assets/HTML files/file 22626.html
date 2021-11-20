@@ -1,0 +1,26 @@
+<p>You could first save the QByteArray to a <a href="http://qt-project.org/doc/qt-5.0/qtcore/qtemporaryfile.html" rel="nofollow">QTemporaryFile</a> and then load it with QPluginLoader</p>
+
+<pre class="lang-cpp prettyprint-override"><code>void load_plugin_from_bytearray(const QByteArray &amp;array) {
+  QTemporaryFile file;
+  file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+  if (file.open()) {
+    qint64 bytes_written = file.write(array);
+    if (bytes_written != array.size()) {
+      throw std::runtime_error("Writing to temporary file failed");
+    }
+  } else {
+    throw std::runtime_error("Could not open temporary file");
+  }
+  QPluginLoader loader(file.fileName());
+  QObject *plugin = loader.instance();
+  if (plugin) {
+    do_something_with_plugin(plugin);
+  } else {
+    throw std::runtime_error(loader.errorString().toStdString());
+  }
+}
+</code></pre>
+
+<p>Unfortunately this might not work if you have more than one plugin and need to run our function <strong>load_plugin_from_bytearray</strong> multiple times, as QTemporaryFile might by chance be reusing the same file path for the temporary files and QPluginLoader is caching its loaded plugins. I need to investigate this more. Anyway, you could circumvent that problem by making the temporary file paths unique by providing a different <code>templateName</code> for each QTemporaryFile</p>
+
+<p><code>QTemporaryFile::QTemporaryFile(const QString &amp; templateName)</code></p>

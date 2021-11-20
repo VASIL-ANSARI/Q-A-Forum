@@ -1,0 +1,24 @@
+<p>You're seeing the results of a race condition caused by <em>asynchronous execution</em>, as the JavaScript code is <strong>not</strong> doing the same thing as your Google Apps Script test function, despite your effort to ensure each <code>setText()</code> and <code>getText()</code> function call is synchronous. (For anyone not familiar with these concepts, there's a great general explanation here: <a href="http://stackoverflow.com/questions/748175/asynchronous-vs-synchronous-execution-what-does-it-really-mean">Asynchronous vs synchronous execution, what does it really mean?</a>)</p>
+
+<p>The thing is, there is another level of asynchronicity involved here, as each "user" of the Google Document you're accessing gets <em>their own copy</em>, which is (conceptually, at least) synchronized with a master copy.</p>
+
+<p>The <code>test()</code> function runs in the context of a single Google Apps Script execution instance. That instance gets associated with one copy of the document, and all subsequent reads and writes are to that copy. The net effect is that your script sees the changes it makes immediately after they are made.</p>
+
+<p>Contrast this with the behaviour of the JavaScript running in the client browser. There, each <code>google.script.run</code> call creates a new, <em>unique</em> Google Apps Script execution instance on Google's servers, with its own <em>unique</em> copy of the Google Document. When <code>setText()</code> gets invoked, it modifies its copy of the document, which then synchronizes with the master document. When <code>getText()</code> runs, it gets a copy of the <em>current</em> master document, and retrieves content from that. If the synchronization of the previous <code>setText()</code> change has completed, you get the output you expect. If that synchronization isn't complete - well, you get what you get.</p>
+
+<p><strong>What can you do about that?</strong> With minimal code change, you could just delay <code>getText()</code> calls from the JavaScript client, for as long as you think necessary to guarantee success. The caveat there is that a delay that is sufficient today may not be tomorrow, so it's unreliable.</p>
+
+<pre><code>function receive() {
+    setTimeout(
+        google.script.run.withSuccessHandler(function(text) {
+            log("Received " + text);
+            i++;
+            if(i &lt; 10)
+                insert();
+        }).getText(),
+        2000         // 2 second delay before calling getText()
+    );
+}
+</code></pre>
+
+<p>To guarantee synchronicity, you would need to devise a more complex system, for example some "server" process that remains running always, with a single copy of the document to manipulate.</p>

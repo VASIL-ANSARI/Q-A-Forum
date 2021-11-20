@@ -1,0 +1,27 @@
+<p>I have found a solution. The problem is due to Python version mismatch inside Boost. I decided to compile everything in Python 3 and it solves the problem. I proceeded as follows:</p>
+
+<ol>
+<li><p>I uncommented the following line to the auto-generated <code>user-config.jam</code> located in <code>$BOOST_ROOT/tools/build/example/</code></p>
+
+<p>using python : 3.5 : /usr/bin/python3 : /usr/include/python3.5 : /usr/lib;</p></li>
+<li><p>Boost.Python was built from scratch using the commands (executed in sudo to gain permission to <code>/usr/local</code>)</p>
+
+<p>$BOOST_ROOT : ./b2 --with-python --clean
+$BOOST_ROOT : ./b2 --with-python --install</p></li>
+</ol>
+
+<p>I verified that the libraries are indeed Python 3 using</p>
+
+<pre><code>$BOOST_ROOT : nm -D stage/lib/libboost_python-3.so | grep PyClass_Type
+</code></pre>
+
+<p>No output should be given. If the library was compiled with Python 2, then <code>U PyClass_Type</code> would show up.</p>
+
+<ol start="3">
+<li><p>The <code>CMakeLists.txt</code> file in the sample project was slightly modified:</p>
+
+<p>set(Python_ADDITIONAL_VERSIONS 3.5) // uncommented
+find_package(Boost 1.61.0 COMPONENTS python3 REQUIRED) // python3 instead of python
+add_compile_options("-lboost_python") // removed</p></li>
+<li><p>Now <code>python3</code> (not <code>python</code>) should be able to link against the compiled <code>libbridge.so</code> library.</p></li>
+</ol>

@@ -1,0 +1,31 @@
+<p>1) Yes, the above code will <code>copy()</code> the entire file into the string buffer <code>outStr</code>. According to the <a href="http://www.boost.org/doc/libs/release/libs/iostreams/doc/functions/copy.html">description of copy</a></p>
+
+<blockquote>
+  <p>The function template copy reads data from a given model of Source and writes it to a given model of Sink until the end of stream is reached. </p>
+</blockquote>
+
+<p>2) switch from <code>filtering_istreambuf</code> to <code>filtering_istream</code> and std::getline() will work:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;boost/iostreams/filtering_stream.hpp&gt;
+#include &lt;boost/iostreams/filter/gzip.hpp&gt;
+int main()
+{
+    std::ifstream file("file.gz", std::ios_base::in | std::ios_base::binary);
+    try {
+        boost::iostreams::filtering_istream in;
+        in.push(boost::iostreams::gzip_decompressor());
+        in.push(file);
+        for(std::string str; std::getline(in, str); )
+        {
+            std::cout &lt;&lt; "Processed line " &lt;&lt; str &lt;&lt; '\n';
+        }
+    }
+    catch(const boost::iostreams::gzip_error&amp; e) {
+         std::cout &lt;&lt; e.what() &lt;&lt; '\n';
+    }
+}
+</code></pre>
+
+<p>(you can <code>std::cout &lt;&lt; file.tellg() &lt;&lt; '\n';</code> inside that loop if you want proof. It will increase in sizeable chunks, but it won't be equal the length of the file from the start)</p>

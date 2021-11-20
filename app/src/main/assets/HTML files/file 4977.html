@@ -1,0 +1,28 @@
+<p>If I understand correctly you receive a 16*16 pixel block as a capture, and in the example above you are then updating the writeable bitmap on each of these updates.</p>
+
+<p>This looks like a lot of churn as a render is being triggered on each block. </p>
+
+<p>Would it not be better to:</p>
+
+<ul>
+<li>Maintain a single byte buffer that represents an entire frame.</li>
+<li>Update the buffer with your 16*16 blocks as you receive them.</li>
+<li>When you have received all blocks for a frame, write the buffer to the bitmap. </li>
+<li>Re-use the frame buffer for the next frame by over-writing it.</li>
+</ul>
+
+<p>In this way you will have far less churn on rendering as you will not trigger a render for each block you receive, but only for each frame.</p>
+
+<p><strong>Update 1</strong></p>
+
+<p>I would also consider using Bgr24 as your pixel format if you are not using an alpha channel. That way you will have 3 bytes per pixel, instead of 4, so quite a lot less overhead.</p>
+
+<p><strong>Update 2</strong></p>
+
+<p>If things are still too slow for larger frame sizes, you could also consider the following which adds complexity though.</p>
+
+<p>Consider maintaining and flipping two frame buffers. In this way you could composite frames on a background thread and then blit the finished frame on the UI thread. Whist the UI thread is rendering the frame, you can continue compositing on the alternative buffer.</p>
+
+<p><strong>Update 3</strong></p>
+
+<p>If your pixel colour info array from your capture is in the correct format, you could try using <a href="http://msdn.microsoft.com/en-us/library/system.buffer.blockcopy(VS.90).aspx" rel="nofollow">Buffer.BlockCopy</a> to bulk copy the source pixel array into the frame buffer array. You would have to keep your bitmap format as bgr32 though. This low level array copying technique could yield some performance gains.</p>

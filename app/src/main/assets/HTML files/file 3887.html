@@ -1,0 +1,80 @@
+<p>It can be done in code by looking up the default button style in the resources :</p>
+
+<pre><code>    private static object GetValueFromStyle(object styleKey, DependencyProperty property)
+    {
+        Style style = Application.Current.TryFindResource(styleKey) as Style;
+        while (style != null)
+        {
+            var setter =
+                style.Setters
+                    .OfType&lt;Setter&gt;()
+                    .FirstOrDefault(s =&gt; s.Property == property);
+
+            if (setter != null)
+            {
+                return setter.Value;
+            }
+
+            style = style.BasedOn;
+        }
+        return null;
+    }
+
+    ...
+
+    this.Background = GetValueFromStyle(typeof(Button), BackgroundProperty) as Brush;
+</code></pre>
+
+<p>If you need to do it in XAML, you can easily create a markup extension from the code above:</p>
+
+<pre><code>public class ValueFromStyleExtension : MarkupExtension
+{
+    public ValueFromStyleExtension()
+    {
+    }
+
+    public object StyleKey { get; set; }
+    public DependencyProperty Property { get; set; }
+
+    public override object ProvideValue(IServiceProvider serviceProvider)
+    {
+        if (StyleKey == null || Property == null)
+            return null;
+        object value = GetValueFromStyle(StyleKey, Property);
+        if (value is MarkupExtension)
+        {
+            return ((MarkupExtension)value).ProvideValue(serviceProvider);
+        }
+        return value;
+    }
+
+    private static object GetValueFromStyle(object styleKey, DependencyProperty property)
+    {
+        Style style = Application.Current.TryFindResource(styleKey) as Style;
+        while (style != null)
+        {
+            var setter =
+                style.Setters
+                    .OfType&lt;Setter&gt;()
+                    .FirstOrDefault(s =&gt; s.Property == property);
+
+            if (setter != null)
+            {
+                return setter.Value;
+            }
+
+            style = style.BasedOn;
+        }
+        return null;
+    }
+}
+</code></pre>
+
+<p><strong>XAML</strong></p>
+
+<pre><code>Background="{util:ValueFromStyle StyleKey={x:Type Button}, Property=Control.Background}"&gt;
+</code></pre>
+
+<hr>
+
+<p>EDIT: fixed <code>ValueFromStyleExtension</code> for the case where the value is defined as a <code>DynamicResource</code> (or another ME)</p>

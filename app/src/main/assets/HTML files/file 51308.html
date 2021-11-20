@@ -1,0 +1,113 @@
+<p>(Note: code available at: <a href="http://lpaste.net/145213" rel="nofollow">http://lpaste.net/145213</a>)</p>
+
+<p>First of all I would represent the percentages as integer values to avoid floating point roundoff errors.</p>
+
+<p>Secondly, the most efficient method will use bounding to avoid looking at portfolios which cannot possibly satisfy the == 1 constraint.</p>
+
+<p>The loop you want to write will operate like this:</p>
+
+<pre><code>def portfolios():
+  for us_bonds in [ 10, 15, 20, 25, 30 ]:
+    if us_bonds &gt; 100: break
+    for us_equaties in [ 25, 30, 35, 40, 45, 50 ]:
+      if us_bonds + us_equaties &gt; 100: break
+      for euro_bonds in [ 10, 15, 20 ]:
+        if us_bonds + us_equaties + euro_bonds &gt; 100: break
+        for euro_equaties in [ 20, 25, 30, 35, 40, 45, 50 ]:
+          if us_bonds + us_equaties + euro_bonds + euro_equaties &gt; 100: break
+          cash = 100 - (us_bonds + us_equaties + euro_bonds + euro_equaties)
+          yield [us_bonds, us_equaties, euro_bonds, euro_equaties, cash]
+</code></pre>
+
+<p>This defines a generator which you can use in a <code>for</code> loop like this:</p>
+
+<pre><code>for x in portfolios(): print x
+</code></pre>
+
+<p>This approach is efficient because it avoids constructing portfolios which would exceed the == 100 constraint.</p>
+
+<p>Note, also, that we've taken advantage of the fact that the "Cash" percentage basically can be anything - so it just takes up the difference between 100 percent and the total of the other investment categories.</p>
+
+<p>The following function generalizes this loop for an arbitrary number of investment categories:</p>
+
+<pre><code>def gen_portfolio(categories):
+  n = len(categories)
+  tarr = [0] * (n+1)
+  parr = [0] * (n+1)
+  karr = [0] * (n+1)
+  marr = [ len(c) for c in categories ]
+  i = 0
+  while True:
+    while True:
+      if i &lt; n:
+        p = categories[i][ karr[i] ]
+        t = tarr[i] + p
+        if t &lt;= 100:
+          parr[i] = p
+          tarr[i+1] = t
+          i += 1
+          karr[i] = 0
+          continue
+        else:
+          break                   # backup
+      else:
+        parr[n] = 100 - tarr[n]   # set the Cash percentage
+        yield parr[:]             # yield a copy of the array parr
+        break
+    # backup
+    while True:
+      if i &gt; 0:
+        i -= 1
+        karr[i] += 1
+        if karr[i] &lt; marr[i]: break
+      else:
+        return  # done!
+
+def portfolios2():
+  cats = [ [ 10, 15, 20, 25, 30 ], [ 25, 30, 35, 40, 45, 50 ], [ 10, 15, 20 ], [ 20, 25, 30, 35, 40, 45, 50 ] ]
+  return gen_portfolio(cats)
+</code></pre>
+
+<p>And here is a test to show that they generate the same results:</p>
+
+<pre><code>def compareTest():
+  ports1 = [ x for x in portfolios() ]
+  ports2 = [ x for x in portfolios2() ]
+  print "ports1 length:", len(ports1)
+  print "ports2 length:", len(ports2)
+  for x in ports1:
+    if x not in ports2: print "not in ports2:", x
+  for x in ports2:
+    if x not in ports1: print "not in ports1:", x
+</code></pre>
+
+<p><strong>Update</strong></p>
+
+<p>Here is an example which demonstrates the difference between this method and itertools.product.</p>
+
+<p>Suppose there are 10 investment categories and the percentages are [90,91,..,99] for each category. The nested loops with the break statements will proceed as follows:</p>
+
+<pre><code>start the loop: for p1 in [90,91,..,99]
+
+  set p1 = 90
+  p1 &lt; 100 so continue
+
+  start the loop: for p2 in [90,91,..,99]
+    set p2 = 90
+    p1 + p2 &gt; 100, so break out of the p2 loop
+
+  set p1 = 91
+
+  p1 &lt; 100 so continue
+  start the loop: for p2 in [90,91,..,99]
+    set p2 = 90
+    p1 + p2 &gt; 100, so break out of the p2 loop
+  set p1 = 92
+  ...
+</code></pre>
+
+<p>So the nested loops with break statements only looks at 10 cases - p1 = 90, 91, .., 99 and p2 = 90. p2 never gets any bigger than 90 and it never tries to assign anything to p3,p4, ..., p10.</p>
+
+<p>On the other hand, itertools.product will generate all 100 cases and then you have to filter out those combinations whose sum is > 100.</p>
+
+<p>For some inputs itertools.product may be <em>faster</em> since it is written in C, but it doesn't do any pruning of cases based on the sum of the current selections.</p>

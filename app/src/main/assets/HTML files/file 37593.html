@@ -1,0 +1,54 @@
+<p>The problem is because the javascript is executed while the HTML is still being rendered. This cause the javascript code cannot find the  with corresponding id.</p>
+
+<p>I use $timeout service in AngularJS to execute the JS code after HTML finished rendering:</p>
+
+<p>The HTML is still the same:</p>
+
+<pre><code>&lt;div class="panel-body no-padding"&gt;
+    &lt;div class="row" style="text-align:center"&gt;&lt;!-- /.row --&gt;
+    &lt;!-- /.map-col --&gt;
+        &lt;div class="col-lg-6 col-md-12" ng-repeat="map in maps"&gt;
+            &lt;h2&gt;{{map.title}}&lt;/h2&gt;
+            &lt;div id="leaflets[{{$index}}]" style="height:300px"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;&lt;!-- /.row --&gt;
+&lt;/div&gt;&lt;!-- /.panel-body --&gt;
+</code></pre>
+
+<p>The JS now use timeout:</p>
+
+<pre><code>.controller('EngCtrl', function ($timeout, $scope, $location, $http, $templateCache, $filter) {
+
+...
+...
+
+var initMap = function () {
+  for ( var i = 0; i &lt; $scope.maps.length; i++ ) { 
+    try{
+      $scope.leaflets[i] = L.map('leaflets[' + i + ']', {
+        maxZoom: 4,
+        minZoom: 1,
+        crs: L.CRS.Simple
+      }).setView([0, 0], 1);
+      // dimensions of the image
+      var w = 1080,
+      h = 855,
+      imageUrl = $scope.maps[i].url;
+      var southWest = $scope.leaflets[i].unproject([0, h], $scope.leaflets[i].getMaxZoom()-1);
+      var northEast = $scope.leaflets[i].unproject([w, 0], $scope.leaflets[i].getMaxZoom()-1);
+      var bounds = new L.LatLngBounds(southWest, northEast);
+      L.imageOverlay(imageUrl, bounds).addTo($scope.leaflets[i]);
+      // tell leaflet that the map is exactly as big as the image
+      $scope.leaflets[i].setMaxBounds(bounds);
+      var dataPoints = $scope.maps[i].dataPoints;
+      var heat = L.heatLayer(dataPoints, {
+        radius: 40, maxZoom: 4
+      }).addTo($scope.leaflets[i]);
+    }
+    catch(err) {
+    }
+  }
+}
+
+$timeout(initMap, 0);
+</code></pre>

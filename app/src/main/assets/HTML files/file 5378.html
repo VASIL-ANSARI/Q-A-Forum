@@ -1,0 +1,32 @@
+<p>A scene graph normally lives in the View layer of an MVC system.  After all, <em>scene</em> sort of implies the part you see.  Typically one would, after setting the proper OpenGL context (or whatever drawing api your using defines as the equivalent), you would call some "render" method on the root node of the scene graph, and it then recursively renders all of its descendants.  </p>
+
+<p>Scene graphs do not often represent other kinds of state.  For instance in a game with physics simulation, you would keep a scene graph around to perform rendering, but a list of physics objects is maintained separately by the physics engine, and it follows a very separate structure.  Physics engines work best if objects that are physically near each other are also traversed in a local manner.  Rendering works best if objects with similar rendering characteristics (made from the same textures) are traversed in a local manner. </p>
+
+<p>Thus, a node on the scene graph would know how to look up the position of the model instance it represents, emit that to the renderer and then emit the drawing primitives for that object type.</p>
+
+<hr>
+
+<p>with that out of the way, actually implementing such a thing probably means thinking about the kinds of interactions, at a global level, the root node of the scene graph must respond to.  In the typical case, that probably means rendering. </p>
+
+<pre><code>class SceneNode
+{
+  public:
+    virtual void render() = 0;
+};
+</code></pre>
+
+<p>The most obvious thing to do from there is to make a node that has children, so that we actually have a tree of nodes.</p>
+
+<pre><code>class ListSceneNode : public SceneNode
+{
+  private:
+    typedef std::vector&lt;std::shared_ptr&lt;SceneNode&gt; &gt; ChildList;
+    ChildList children;
+
+  public:
+    void render() { 
+      for(ChildList::iterator i = children.begin() ; i != children.end(); ++i)
+        i-&gt;render();
+    }
+};
+</code></pre>

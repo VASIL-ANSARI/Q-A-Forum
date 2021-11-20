@@ -1,0 +1,86 @@
+<p>I had the same problem, especially under iOS 8. After many hours of testing I believe that iOS keeps track of where it thinks <code>self.center</code> of the annotation is during the time that the state is <code>MKAnnotationViewDragStateDragging</code>. You need to use extreme caution if you animate <code>self.center</code> when handling <code>MKAnnotationViewDragStateEnding</code>. Read that as "I couldn't get that to work, ever."</p>
+
+<p>Instead, I kept <em>Daniel</em>'s original code when handling states <code>MKAnnotationViewDragStateStarting</code> and <code>MKAnnotationViewDragStateCanceling</code>, I animated <code>self.center</code>.  When handling <code>MKAnnotationViewDragStateEnding</code> I animated <code>self.transform</code> instead of <code>self.center</code>.  This maintains the actual location of the annotation and just changes how it is rendered.</p>
+
+<p>This works well for me running either iOS 7.1 and iOS 8.0.  Also fixed a bug in <code>hitTest</code>, and added some code to reselect the annotation after dragging or canceling.  I think that is the default behavior of <code>MKPinAnnotationView</code>.</p>
+
+<pre><code>- (void)setDragState:(MKAnnotationViewDragState)newDragState animated:(BOOL)animated
+{
+    if(mapView){
+        id&lt;MKMapViewDelegate&gt; mapDelegate = (id&lt;MKMapViewDelegate&gt;)mapView.delegate;
+        [mapDelegate mapView:mapView annotationView:self didChangeDragState:newDragState fromOldState:dragState];
+    }
+
+    // Calculate how much to lift the pin, so that it's over the finger, not under.
+    CGFloat liftValue = -(fingerPoint.y - self.frame.size.height - kFingerSize);
+
+    if (newDragState == MKAnnotationViewDragStateStarting)
+    {
+        CGPoint endPoint = CGPointMake(self.center.x,self.center.y-liftValue);
+        [UIView animateWithDuration:0.2
+                         animations:^{
+                             self.center = endPoint;
+                         }
+                         completion:^(BOOL finished){
+                             dragState = MKAnnotationViewDragStateDragging;
+                         }];
+
+    }
+    else if (newDragState == MKAnnotationViewDragStateEnding)
+    {
+        CGAffineTransform theTransform = CGAffineTransformMakeTranslation(0, -liftValue);
+        [UIView animateWithDuration:0.2
+                         animations:^{
+                             self.transform = theTransform;
+                         }
+                         completion:^(BOOL finished){
+                             CGAffineTransform theTransform2 = CGAffineTransformMakeTranslation(0, 0);
+                             [UIView animateWithDuration:0.2
+                                              animations:^{
+                                                  self.transform = theTransform2;
+                                              }
+                                              completion:^(BOOL finished){
+                                                  dragState = MKAnnotationViewDragStateNone;
+                                                  if(!mapView)
+                                                      [[NSNotificationCenter defaultCenter] postNotificationName:DPAnnotationViewDidFinishDrag object:nil userInfo:[NSDictionary dictionaryWithObject:self.annotation forKey:DPAnnotationViewKey]];
+                                                  // Added this to select the annotation after dragging.
+                                                  // This is the behavior for MKPinAnnotationView
+                                                  if (mapView)
+                                                      [mapView selectAnnotation:self.annotation animated:YES];
+                                              }];
+                         }];
+    }
+    else if (newDragState == MKAnnotationViewDragStateCanceling)
+    {
+        // drop the pin and set the state to none
+        CGPoint endPoint = CGPointMake(self.center.x,self.center.y+liftValue);
+
+        [UIView animateWithDuration:0.2
+                         animations:^{
+                             self.center = endPoint;
+                         }
+                         completion:^(BOOL finished){
+                             dragState = MKAnnotationViewDragStateNone;
+                             // Added this to select the annotation after canceling.
+                             // This is the behavior for MKPinAnnotationView
+                             if (mapView)
+                                 [mapView selectAnnotation:self.annotation animated:YES];
+                         }];
+    }
+}
+
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event
+{
+    // When the user touches the view, we need his point so we can calculate by how 
+    // much we should life the annotation, this is so that we don't hide any part of
+    // the pin when the finger is down.
+
+    // Fixed a bug here.  If a touch happened while the annotation view was being dragged
+    // then it screwed up the animation when the annotation was dropped.
+    if (dragState == MKAnnotationViewDragStateNone)
+    {
+        fingerPoint = point;
+    }
+    return [super hitTest:point withEvent:event];
+}
+</code></pre>

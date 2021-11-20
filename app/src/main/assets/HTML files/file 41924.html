@@ -1,0 +1,32 @@
+<p>You could use reflection and dynamic types to generate an object with only the specified fields/properties.</p>
+
+<p>Below is a simple way of doing this. You can do optimizations, like having a type cache for the reflection. But this should work for simple fields/properties.</p>
+
+<pre><code>public static object DynamicProjection(object input, IEnumerable&lt;string&gt; properties)
+{
+    var type = input.GetType();
+    dynamic dObject = new ExpandoObject();
+    var dDict = dObject as IDictionary&lt;string, object&gt;;
+
+    foreach (var p in properties)
+    {
+        var field = type.GetField(p);
+        if (field != null)
+            dDict [p] = field.GetValue(input);
+
+        var prop = type.GetProperty(p);
+        if (prop != null &amp;&amp; prop.GetIndexParameters().Length == 0)
+            dDict[p] = prop.GetValue(input, null);
+    }
+
+    return dObject;
+}
+</code></pre>
+
+<p>Usage:</p>
+
+<pre><code>//...
+var names = new[] { "Id", "Name", "Tracks" };
+var projection = collection.Select(x =&gt; DynamicProjection(x, names));
+//...
+</code></pre>

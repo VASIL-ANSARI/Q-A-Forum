@@ -1,0 +1,48 @@
+<p>Here is an example for how to deal with wrapping async functions</p>
+
+<pre><code>// This simply calls the callback with some data after a second
+// Could be an AJAX call for example
+var doSomethingAsync = function (callback) {
+  setTimeout(function () {
+    callback({ some: 'data' });
+  }, 1000);
+};
+
+var fnThatMakesAsyncCall = function () {
+  // From the outside there is no way to change this callback
+  // But what if we need to intercept the async function to change the data given to it, or monitor it?
+  // Then we'd have to wrap the async function to wrap the callback.
+  var callback = function (data) {
+    console.log('Original', data); 
+  };
+
+  doSomethingAsync(callback);
+};
+
+// Function to wrap another function and return the wrapper
+var wrapFn = function (fn) {
+  // Create the wrapped function.
+  // Notice how it has the same signature with `callback` as the first argument
+  var wrapped = function (callback) {
+    // Here we get the original callback passed in
+    // We will instead wrap that too and call the original function with our new callback
+    var newCb = function (data) {
+      // This will run once the async call is complete
+      // We will as an example mutate the data in the return data of the callback
+      data.some = 'Wrapped it';
+      // Call the original callback with the changed data
+      callback.call(this, data);
+    };
+    // Run the function we wrap with the new callback we supply
+    fn.call(this, newCb);
+  };
+  // Return wrapped function
+  return wrapped;
+};
+
+// Will log Original {some: "data"} 
+fnThatMakesAsyncCall();
+doSomethingAsync = wrapFn(doSomethingAsync);
+// Will log Original {some: "Wrapped it"} 
+fnThatMakesAsyncCall();
+</code></pre>

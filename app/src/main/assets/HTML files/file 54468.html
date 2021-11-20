@@ -1,0 +1,84 @@
+<p>I took an example from <code>view_as_blocks</code>, and tried your style of reshape:</p>
+
+<pre><code>A = np.arange(4*4).reshape(4,4)
+B = view_as_blocks(A, block_shape=(2, 2))
+print(A.__array_interface__)
+print(B.__array_interface__)
+
+C = B.reshape((2*2,2,2))
+print(C.__array_interface__)
+</code></pre>
+
+<p>producing:</p>
+
+<pre><code>{'typestr': '&lt;i4', 'data': (153226600, False), 'shape': (4, 4),
+ 'descr': [('', '&lt;i4')], 'version': 3, 'strides': None}
+{'typestr': '&lt;i4', 'data': (153226600, False), 'shape': (2, 2, 2, 2),
+ 'descr': [('', '&lt;i4')], 'version': 3, 'strides': (32, 8, 16, 4)}
+{'typestr': '&lt;i4', 'data': (150895960, False), 'shape': (4, 2, 2),
+ 'descr': [('', '&lt;i4')], 'version': 3, 'strides': None}
+</code></pre>
+
+<p>The <code>data</code> pointer for <code>A</code> and <code>B</code> is the same; <code>B</code> is a view on <code>A</code>.</p>
+
+<p>But the pointer for <code>C</code> is different.  It is a copy.  That explains why it takes so long in your case.</p>
+
+<hr>
+
+<p>Lets do that a little differently:</p>
+
+<pre><code>A = np.arange(4*4).reshape(4,4)
+B = view_as_blocks(A, block_shape=(2, 2))
+print(A.__array_interface__)
+print(B.__array_interface__)
+
+C = B.reshape((2*2,1,2,2))
+print(C.__array_interface__)
+
+D = as_strided(B, shape=(2*2,1,2,2))
+print(D.__array_interface__)
+
+print(B[1,1,:,:])
+print(C[3,0,:,:])
+print(D[3,0,:,:])
+</code></pre>
+
+<p>producing</p>
+
+<pre><code>1254:~/mypy$ python3 skshape.py 
+{'strides': None, 'typestr': '&lt;i4', 'version': 3, 
+ 'data': (154278744, False), 'shape': (4, 4), 'descr': [('', '&lt;i4')]}
+{'strides': (32, 8, 16, 4), 'typestr': '&lt;i4', 'version': 3, 
+ 'data': (154278744, False), 'shape': (2, 2, 2, 2), 'descr': [('', '&lt;i4')]}
+{'strides': None, 'typestr': '&lt;i4', 'version': 3, 
+ 'data': (155705400, False), 'shape': (4, 1, 2, 2), 'descr': [('', '&lt;i4')]}
+{'strides': (32, 8, 16, 4), 'typestr': '&lt;i4', 'version': 3, 
+ 'data': (154278744, False), 'shape': (4, 1, 2, 2), 'descr': [('', '&lt;i4')]}
+
+[[10 11]
+ [14 15]]
+[[10 11]
+ [14 15]]
+[[  154561960 -1217783696]
+ [         48        3905]]
+</code></pre>
+
+<p>Again the reshape creates a copy.  The 2nd <code>as_strides</code> returns a view, but the striding is screwed up.  It is looking at memory outside the original data buffer (that's part of why playing with strides on your own is dangerous).</p>
+
+<hr>
+
+<p>In my example, look at the first corner value of each block</p>
+
+<pre><code>print(B[:,:,0,0])
+print(C[:,0,0,0])
+
+[[ 0  2]
+ [ 8 10]]
+[ 0  2  8 10]
+</code></pre>
+
+<p>For <code>B</code>, the rows increase by 8, columns by 2; that's reflected in the <code>(32,8)</code> (4*8,4*2) striding.</p>
+
+<p>But in <code>C</code> the steps are (2,6,2) - striding can't do that.</p>
+
+<p>From this I conclude that the reshape is impossible without copy.</p>

@@ -1,0 +1,46 @@
+<p>You can use <code>@user.update_without_password(user_params)</code> method to update your other fields.</p>
+
+<p>For example, I have this in my custom users_controller.rb. I update with remote call (ajax). </p>
+
+<pre><code>#users_controller.rb
+
+def update
+  respond_to do |format|
+    if needs_password?(@user, user_params)
+      if @user.update_with_password(user_params_password_update)
+        flash[:success] = 'User was successfully updated. Password was successfully updated'
+        format.js {render 'update'}
+      else
+        error = true
+      end
+    else
+      if @user.update_without_password(user_params)
+        flash[:success] = 'User was successfully updated.'
+        format.js {render 'update'}
+      else
+        error = true
+      end
+    end
+
+    if error
+      flash[:error] = @user.errors.full_messages.join(', ')
+      format.js {render json: @user.errors.full_messages, status: :unprocessable_entity}
+    end
+  end
+end
+
+private
+
+def needs_password?(user, user_params)
+  !user_params[:password].blank?
+end
+
+def user_params
+  params[:user].permit(:email, :password, :password_confirmation, :username, :full_name)
+end
+
+#Need :current_password for password update
+def user_params_password_update
+  params[:user].permit(:email, :password, :password_confirmation, :current_password, :username, :full_name)
+end
+</code></pre>

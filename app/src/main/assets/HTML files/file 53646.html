@@ -1,0 +1,90 @@
+<p>Given your schema, you could use a double join:</p>
+
+<pre><code>SELECT base_rel.id AS base_id,
+       sub_rel.id AS sub_id,
+       sub_sub_rel.id AS sub_sub_id
+
+FROM sub_sub_rel
+
+INNER JOIN sub_rel
+ON sub_rel.id = sub_sub_rel.sub_id
+
+INNER JOIN base_rel
+ON base_rel.id = sub_rel.base_id;
+</code></pre>
+
+<p>With whatever <code>WHERE</code> clause makes sense in your particular case.</p>
+
+<p>Note this query starts at the <em>descendants</em> and works up to the root, which means that root elements without children or grandchildren are not included in the result set.</p>
+
+<p>If you want to start at the root and work your way down, particularly in cases where there may not be two levels of descendants, you need to select <code>FROM base_rel</code> and <code>LEFT OUTER JOIN</code> the other two tables:</p>
+
+<pre><code>SELECT base_rel.id AS base_id,
+       sub_rel.id AS sub_id,
+       sub_sub_rel.id AS sub_sub_id
+
+FROM base_rel
+
+LEFT OUTER JOIN sub_rel
+ON sub_rel.base_id = base_rel.id
+
+LEFT OUTER JOIN sub_sub_rel
+ON sub_sub_rel.sub_id = sub_rel.id;
+</code></pre>
+
+<p>If all of the tables otherwise have the same schema (apart from the ID columns) then you could instead use one table with a self-referential column:</p>
+
+<pre><code>CREATE TABLE thing (
+    id SERIAL PRIMARY KEY,
+    parent_id INTEGER NULL REFERENCES thing(id)
+);
+</code></pre>
+
+<p>Using PostgreSQL's recursive query support, you can still fetch all of the rows in a generational relationship in one query, but you will have to use application-side logic to build them into a tree if this is desired.</p>
+
+<p>For example, to select a particular row by ID but also include all ancestor rows:</p>
+
+<pre><code>WITH RECURSIVE thing_ancestors AS (
+    SELECT thing.* FROM thing WHERE id = ?
+    UNION
+    SELECT thing.* FROM thing_ancestors
+    INNER JOIN thing ON thing.id = thing_ancestors.parent_id
+)
+SELECT * FROM thing_ancestors;
+</code></pre>
+
+<p>You can use recursive queries to effectively aggregate data along the path to either the root or the leaf (depending on which direction your query goes).  Consider the following tree:</p>
+
+<pre><code>1
++- 2
++- 3
+   +- 4
+5
++- 6
+7
+</code></pre>
+
+<p>This would be represented in the following data:</p>
+
+<pre><code>INSERT INTO thing VALUES
+  (1,NULL),
+    (2,1),
+    (3,1),
+      (4,3),
+  (5,NULL),
+    (6,5),
+  (7,NULL);
+</code></pre>
+
+<p>Now we can obtain the path to the item with <code>id = 4</code> using the following recursive query, which starts at the leaf and progresses towards the root, leaving the final path on the root node (the row where <code>parent_id IS NULL</code>).</p>
+
+<pre><code>WITH RECURSIVE thing_ancestors AS (
+    SELECT thing.*, thing.id || '' AS path FROM thing WHERE id = 4
+    UNION
+    SELECT thing.*, thing.id || '/' || path AS path FROM thing_ancestors
+    INNER JOIN thing ON thing.id = thing_ancestors.parent_id
+)
+SELECT path FROM thing_ancestors WHERE parent_id IS NULL;
+</code></pre>
+
+<p>Which results in a single row with a single value of <code>"1/3/4"</code> -- perfect!  (<a href="http://sqlfiddle.com/#!15/5cd84/4" rel="nofollow">See sqlfiddle</a>)</p>

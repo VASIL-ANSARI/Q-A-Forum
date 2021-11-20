@@ -1,0 +1,45 @@
+<p>So what is happening here is that you are calling <code>startDiscoveryProcess()</code> 50 seconds after screen is turned off and <code>startDiscoveryProcess()</code> is calling itself every 50 seconds. How to stop that process?  You listen for <code>Intent.ACTION_SCREEN_ON</code> and if screen is on, we don't send the broadcast to start discovery again.</p>
+
+<pre><code>boolean screenOn = true;
+
+BroadcastReceiver screenReceiver = new BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if(intent.getAction().equals(Intent.ACTION_SCREEN_OFF) || intent.getAction().equals("MY_ACTION_WHEN_SCREEN_IS_OFF")) {
+            screenOn = false;
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    // start discovery process again
+                    startDiscoveryProcess();
+                }
+            }, 50000);
+        }  else if(intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+            screenOn = true;
+        }
+    }
+};
+</code></pre>
+
+<p>In <code>onCreate()</code> of your service, register the receiver:</p>
+
+<pre><code>IntentFilter filters = new IntentFilter();
+filters.addAction(Intent.ACTION_SCREEN_OFF);
+filters.addAction(Intent.ACTION_SCREEN_ON);
+filters.addAction("MY_ACTION_WHEN_SCREEN_IS_OFF");
+registerReceiver(screenReceiver, filters);
+</code></pre>
+
+<p>Then just make sure to have the method we called above:</p>
+
+<pre><code>void startDiscoveryProcess() {
+    //start discovery process
+    // do something...
+
+    // then send the broadcast yourself to do this every 50 seconds because discovery stops at 60 seconds
+    if(!screenOn) {
+        Intent intent = new Intent("MY_ACTION_WHEN_SCREEN_IS_OFF");
+        sendBroadcast(intent);
+    }
+}
+</code></pre>

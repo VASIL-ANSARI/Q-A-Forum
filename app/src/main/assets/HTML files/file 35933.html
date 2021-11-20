@@ -1,0 +1,21 @@
+<p>I was struggling with what I think was the same problem as you:</p>
+
+<ul>
+<li>My WebAPI method was returning a valid SAS URL to FineUploader;</li>
+<li>FineUploader would attempt to upload the file to my local server instead of to the SAS URL.</li>
+<li>Curiously, the SAS URL was showing up somewhere in the URL that FineUpload was ultimately using.</li>
+</ul>
+
+<p>The problem turned out to be that WebAPI was automatically serializing the SAS URL as JSON. This resulted in the SAS URL being malformed -- a few extra characters were being added -- and FineUploader was confused by the resonse. In your case, it looks like the SAS URL is being serialized as XML, based on the <em>schemas.microsoft.com</em> text that's present.</p>
+
+<p>With that understanding I bypassed WebAPI's automatic serialization. Below is a working implementation of my <code>GET /api/sas</code> method. Note: <code>GetSasForBlob</code> is pulled directly from the <a href="https://github.com/Widen/fine-uploader-server/blob/master/C%23/azure/FineUploaderAzureServer.cs" rel="nofollow">Sample Azure Server</a>.</p>
+
+<pre><code>public HttpResponseMessage Get(string bloburi, string _method)
+{
+   var accountAndKey = new StorageCredentials(STORAGE_ACCOUNT_NAME, STORAGE_ACCOUNT_KEY);
+   var sas = GetSasForBlob(accountAndKey, bloburi, _method);
+
+   var content = new StringContent(sas);
+   return new HttpResponseMessage {Content = content};
+}
+</code></pre>

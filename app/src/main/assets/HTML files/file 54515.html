@@ -1,0 +1,130 @@
+<p>I hate answering my own question, but I decided to create another project to see if it was in how I was encoding the SKSpriteNode. It turns out that there's something wrong with my <code>SaveData</code> class.</p>
+
+<p>Note: I used <a href="https://www.raywenderlich.com/63235/how-to-save-your-game-data-tutorial-part-1-of-2" rel="nofollow">Ray Wenderlich's solution</a> to create that class and modified it for my own uses.</p>
+
+<p>I couldn't figure out which line of code was off, mainly because I didn't really come up with the code in the first place and I only have a partial understanding of how it all functions (I get the gist of it).</p>
+
+<p>Here's what the working version of SaveData looks like just in case this helps anyone else in the future. Perhaps someone can tell me what the discrepancy is between the broken one (up top) and this version.</p>
+
+<p><strong>SaveData.h</strong></p>
+
+<pre><code>#import &lt;Foundation/Foundation.h&gt;
+
+@interface SaveData : NSObject &lt;NSCoding&gt;
+
+//persistent data
+@property (strong, nonatomic) NSMutableArray *treeData;
+
++(instancetype)sharedSaveData;
+-(void)save;
+-(void)reset;
+
+@end
+</code></pre>
+
+<p><strong>SaveData.m</strong></p>
+
+<pre><code>#import "SaveData.h"
+
+@interface SaveData()
+
+
+@end
+
+@implementation SaveData
+
+
+static NSString * const SaveDataTreeDataKey = @"treedata";
+
+-(instancetype) initWithCoder:(NSCoder *)decoder {
+    self = [self init];
+    if (self) {
+        _treeData = [decoder decodeObjectForKey:SaveDataTreeDataKey];
+
+        if (_treeData == nil)
+            _treeData = [NSMutableArray array];
+    }
+    return self;
+}
+
++(instancetype) sharedSaveData {
+    static id sharedInstance = nil;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&amp;onceToken, ^{
+        sharedInstance = [self loadInstance];
+    });
+
+    return sharedInstance;
+}
+
++(instancetype) loadInstance {
+    NSData* decodedData = [NSData dataWithContentsOfFile: [SaveData filePath]];
+    if (decodedData) {
+        SaveData* saveData = [NSKeyedUnarchiver unarchiveObjectWithData:decodedData];
+        return saveData;
+    }
+
+    //this happens if the game save file doesn't exist (first run of game)
+    SaveData *data = [[SaveData alloc] init];
+
+    if (data.treeData == nil) {
+        data.treeData = [NSMutableArray array];
+    }
+    return data;
+}
+
+
+-(void) encodeWithCoder:(NSCoder *)encoder {
+    [encoder encodeObject:self.treeData forKey:SaveDataTreeDataKey];
+}
+
++(NSString*) filePath {
+    static NSString* filePath = nil;
+    if (!filePath) {
+        filePath =
+        [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject]
+         stringByAppendingPathComponent:@"gamedata"]; //saves in the Documents folder (might have to change this later)
+    }
+    return filePath;
+}
+
+-(void) save {
+    NSData* encodedData = [NSKeyedArchiver archivedDataWithRootObject: self];
+    [encodedData writeToFile:[SaveData filePath] atomically:YES];
+}
+
+-(void) reset {
+    _treeData = [NSMutableArray array];
+    [self save];
+}
+
+@end
+</code></pre>
+
+<p>One more thing. To encode the SKSpriteNode, I created two methods in my SKSpriteNode subclass as follows:</p>
+
+<p>From SKSpriteNode .m file</p>
+
+<pre><code>- (id)initWithCoder:(NSCoder *)decoder {
+    if (self = [super init]) {
+        self.name = [decoder decodeObjectForKey:@"name"];
+
+        NSValue *decodedValue = [decoder decodeObjectForKey:@"position"];
+        CGPoint point;
+        [decodedValue getValue:&amp;point];
+        self.position = point;
+    }
+    return self;
+}
+
+- (void)encodeWithCoder:(NSCoder *)encoder {
+    [encoder encodeObject:self.name forKey:@"name"];
+
+    CGPoint point = self.position;
+    NSValue *pointValue = [NSValue value:&amp;point withObjCType:@encode(CGPoint)];
+    [encoder encodeObject:pointValue forKey:@"position"];
+}
+</code></pre>
+
+<p>The above code encodes the name of the sprite and its position. Just encode all instance variables necessary to preserve the object.</p>

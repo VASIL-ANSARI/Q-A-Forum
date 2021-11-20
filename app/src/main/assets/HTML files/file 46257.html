@@ -1,0 +1,33 @@
+<p>The <code>order by</code> would go after the <code>group by</code>:</p>
+
+<pre><code>SELECT q.id, q.hits, q.type, q.title, q.date, q.author, q.wfurl
+FROM ((SELECT id AS id, hits AS hits, type AS type, title AS title, date AS date, author AS author, wfurl AS wfurl, status AS status
+       FROM articles
+       WHERE status = 1
+      ) UNION
+      (SELECT id, hits, type, title, published, author_id, url, status
+       FROM new_articles 
+       WHERE status = 1
+      )) q
+GROUP BY q.id
+ORDER BY type;
+</code></pre>
+
+<p>If you know that the two tables have no duplicates, then you should use <code>UNION ALL</code> instead of <code>UNION</code>.  <code>UNION</code> incurs overhead by removing duplicates.  It is also redundant to assign a table alias that is the same as the name, so <code>hits as hits</code> is unnecessary (and so on).</p>
+
+<p>EDIT:</p>
+
+<p>If you want an efficient query, the following is probably faster and probably does what you want:</p>
+
+<pre><code>select a.*
+from articles a
+where status = 1
+union all
+select na.*
+from new_articles na
+where status = 1 and
+      not exists (select 1 from articles a where a.id = na.id)
+order by type;
+</code></pre>
+
+<p>This eliminates the overhead for the <code>union</code>.  If an <code>id</code> is present in both tables, it takes the value from the first one (you can reverse the order of the logic to get the values from the second).  The only real overhead is the <code>order by</code> at the end, whereas your version has overhead for the <code>union</code>, <code>group by</code>, and <code>order by</code>.</p>

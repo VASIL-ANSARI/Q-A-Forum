@@ -1,0 +1,80 @@
+<p>In order to treat <code>BattingOrder</code> objects the same on certain fields (but still determine who has better ranking)</p>
+
+<p>You must override the <code>equals</code> method as well as the <code>hashCode</code> as well as put an <code>identifier</code></p>
+
+<pre><code>/** 
+ *  Different BattingOrders who share these 3 fields
+ *  will get the same identifier
+ */
+public String identifier() {
+    return game_ID +"-" + team_ID + "-" + battingOrder;
+}
+
+@Override
+public boolean equals(Object obj) {
+    if (obj instanceof BattingOrder) {
+        BattingOrder b = (BattingOrder) obj;
+        if (this.game_ID.equals(game_ID) &amp;&amp; this.team_ID.equals(b.team_ID) &amp;&amp; this.battingOrder.equals(b.battingOrder)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+@Override
+public int hashCode() {
+    int hash = 5;
+    hash = 59 * hash + Objects.hashCode(this.game_ID);
+    hash = 59 * hash + Objects.hashCode(this.team_ID);
+    hash = 59 * hash + Objects.hashCode(this.battingOrder);
+    return hash;
+}
+</code></pre>
+
+<p>Also I made <code>BattingOrder</code> implement <code>Comparable</code></p>
+
+<pre><code>@Override
+public int compareTo(BattingOrder o) {
+    if (this.identifier().equals(o.identifier())) {
+        return this.subOrder.compareTo(o.subOrder);
+    } else if (this.game_ID.equals(o.game_ID) &amp;&amp; this.team_ID.equals(o.team_ID)) {
+        return this.battingOrder.compareTo(o.battingOrder);
+    } else {
+        return o.team_ID.compareTo(this.team_ID);
+    }
+}
+</code></pre>
+
+<p>Now in your <code>main</code> you set up some <code>Set</code> Collection where you keep track of your <code>BattingOrder</code> objects</p>
+
+<p>I am using:</p>
+
+<pre><code>HashMap&lt;String,BattingOrder&gt; players = new HashMap&lt;&gt;();
+</code></pre>
+
+<p>Where the <strong>Key</strong> is the BattingOrder's <code>identifier</code> and the <strong>Value</strong> is the BattingOrder</p>
+
+<p>Now <code>for-each line you are reading</code> do the following:</p>
+
+<pre><code> String[] parsedData = s.split(",");
+ BattingOrder bo = new BattingOrder(parsedData[0], parsedData[1],parsedData[2], parsedData[3], parsedData[4], parsedData[5]);
+ if(players.containsKey(bo.identifier())) {
+     BattingOrder inMap = players.get(bo.identifier());
+     if(bo.compareTo(inMap) &gt; 0) {
+         players.put(bo.identifier(), bo);
+     }
+ } else {
+     players.put(bo.identifier(), bo);
+ }
+</code></pre>
+
+<p>Once you have read all the lines:</p>
+
+<p>Convert your <code>HashMap</code> into a <code>List</code></p>
+
+<pre><code>List&lt;BattingOrder&gt; battingOrderList = new ArrayList&lt;&gt;(players.values());
+Collections.sort(battingOrderList);
+</code></pre>
+
+<p>Here is <a href="http://pastebin.com/abCwqL1g" rel="nofollow">the code and main tester</a></p>

@@ -1,0 +1,77 @@
+<p>In this rare case, not using automatic attribute propation.</p>
+
+<p>Instead, I'd make a conversion function and call it from a semantic action.</p>
+
+<pre><code>#define BOOST_SPIRIT_USE_PHOENIX_V3
+#include &lt;boost/phoenix.hpp&gt;
+#include &lt;boost/spirit/include/qi.hpp&gt;
+
+namespace qi  = boost::spirit::qi;
+
+struct header_t
+{
+    header_t(uint16_t i1=0, uint16_t i2=0, uint16_t i3=0, uint16_t i4=0) : int1(i1), int2(i2), int3(i3), int4(i4) { }
+
+    static header_t make(uint16_t w1, uint16_t w2, uint16_t w3)
+    {
+#define BITS(n) ((1ul &lt;&lt; (n)) - 1u)
+        return header_t(
+                (w1 &amp; BITS(6u)),  // 6
+                (w1 &gt;&gt; 6u),       // 10
+                (w2 &amp; BITS(14u)), // 14
+                                  // 2+14
+                (((w3 &amp; BITS(14)) &lt;&lt; 2) | (w2 &gt;&gt; 14u) ));
+    }
+
+    uint16_t int1; // 6
+    uint16_t int2; // 10
+    uint16_t int3; // 14
+    uint16_t int4; // 2+14
+};
+
+typedef const char* parse_iter_t;
+
+int main()
+{
+    using qi::big_word;
+
+    parse_iter_t iter = "\xff\x3e"
+                        "\x44\x77"
+                        "\x35\x19";
+    //parse_iter_t iter = "\xff\xff"
+                        //"\xff\xff"
+                        //"\xff\xff";
+
+    parse_iter_t iter_end = iter + std::strlen(iter);
+
+    qi::rule&lt;parse_iter_t, header_t()&gt; header_rule;
+
+    header_rule = (big_word &gt;&gt; big_word &gt;&gt; big_word)
+                        [ qi::_val = boost::phoenix::bind(header_t::make, qi::_1, qi::_2, qi::_3) ];
+
+    header_t result;
+    bool ok = qi::parse(iter, iter_end, header_rule, result);
+
+    if (ok)
+    {
+        std::cout &lt;&lt; "int1: " &lt;&lt; std::dec &lt;&lt; result.int1 &lt;&lt; " " &lt;&lt; std::hex &lt;&lt; std::showbase &lt;&lt; result.int1 &lt;&lt; "\n";
+        std::cout &lt;&lt; "int2: " &lt;&lt; std::dec &lt;&lt; result.int2 &lt;&lt; " " &lt;&lt; std::hex &lt;&lt; std::showbase &lt;&lt; result.int2 &lt;&lt; "\n";
+        std::cout &lt;&lt; "int3: " &lt;&lt; std::dec &lt;&lt; result.int3 &lt;&lt; " " &lt;&lt; std::hex &lt;&lt; std::showbase &lt;&lt; result.int3 &lt;&lt; "\n";
+        std::cout &lt;&lt; "int4: " &lt;&lt; std::dec &lt;&lt; result.int4 &lt;&lt; " " &lt;&lt; std::hex &lt;&lt; std::showbase &lt;&lt; result.int4 &lt;&lt; "\n";
+    }
+
+    assert(ok);
+}
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>int1: 62 0x3e
+int2: 1020 0x3fc
+int3: 1143 0x477
+int4: 54373 0xd465
+</code></pre>
+
+<p>See it <strong><a href="http://coliru.stacked-crooked.com/a/5f93d2e2f42b21f7" rel="nofollow">Live on Coliru</a></strong></p>
+
+<p>Alternatively you can specialize the attribute transformation traits for <code>header_t</code>.</p>

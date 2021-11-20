@@ -1,0 +1,38 @@
+<p>A good way to structure this is to split your query into two parts: the first part manages the filtering of rows so that you get only your latest client product levels. The second part uses a standard <code>has_many</code> association to connect <code>Client</code> with <code>ClientProductLevel</code>.</p>
+
+<p>Starting with your <code>ClientProductLevel</code> model, you can create a scope to do the latest filtering:</p>
+
+<pre><code>class ClientProductLevel &lt; ActiveRecord::Base
+  scope :latest, -&gt; {
+    select("distinct on(product_id) client_product_levels.product_id,
+                                    client_product_levels.*").
+    order("product_id, created_at desc")
+  }
+end
+</code></pre>
+
+<p>You can use this scope anywhere that you have a query that returns a list of ClientProductLevel objects, e.g., <code>ClientProductLevel.latest</code> or <code>ClientProductLevel.where("created_at &lt; ?", 1.week.ago).latest</code>, etc.</p>
+
+<p>If you haven't already done so, set up your <code>Client</code> class with a <code>has_many</code> relationship:</p>
+
+<pre><code>class Client &lt; ActiveRecord::Base
+  has_many :client_product_levels
+end
+</code></pre>
+
+<p>Then in your ActiveModelSerializer try this:</p>
+
+<pre><code>class ClientSerializer &lt; ActiveModel::Serializer
+  has_many :client_product_levels
+
+  def client_product_levels
+    object.client_product_levels.latest
+  end
+end
+</code></pre>
+
+<p>When you invoke the <code>ClientSerializer</code> to serialize a <code>Client</code> object, the serializer sees the <code>has_many</code> declaration, which it would ordinarily forward to your <code>Client</code> object, but since we've got a locally defined method by that name, it invokes that method instead. (Note that this <code>has_many</code> declaration is not the same as an ActiveRecord <code>has_many</code>, which specifies a relationship between tables: in this case, it's just saying that the serializer should present an array of serialized objects under the key `client_product_levels'.)</p>
+
+<p>The <code>ClientSerializer#client_product_levels</code> method in turn invokes the <code>has_many</code> association from the client object, and then applies the <code>latest</code> scope to it. The most powerful thing about ActiveRecord is the way it allows you to chain together disparate components into a single query. Here, the <code>has_many</code> generates the `where client_id = $X' portion, and the scope generates the rest of the query. Et voila!</p>
+
+<p>In terms of simplification: ActiveRecord doesn't have native support for <code>distinct on</code>, so you're stuck with that part of the custom sql. I don't know whether you need to include <code>client_product_levels.product_id</code> explicitly in your select clause, as it's already being included by the <code>*</code>. You might try dumping it.</p>

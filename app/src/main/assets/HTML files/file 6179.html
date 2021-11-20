@@ -1,0 +1,38 @@
+<p>Some points:</p>
+
+<p>1.- socket_recvfrom could return FALSE if there is any error, you can check the error with false === socket_recvfrom.
+2.- If you are using a windows server add b to the open mode: $file = fopen("temp" . $_SESSION['ID_Membre'] . ".flac", 'ab'); (you are writing a binary file).
+3.- Use as third argument of the fputs function the value returned by the socket_recvfrom function (if this value !== FALSE).
+4.- You are using the value 12 (MSG_DONTROUTE | MSG_EOR), try to use 0 or MSG_WAITALL (of course socket_recvfrom is going to wait to receive 1024 bytes).</p>
+
+<p>Your reception loop must be:</p>
+
+<pre><code>$reclen = 0;
+while( ($reclen !== FALSE) &amp;&amp; ($length &lt; $lengthTotal) )
+{
+    $reclen = socket_recvfrom( $socket, $buf, 1024, 12, $from, $port );
+    if ($reclen === FALSE)
+    {
+        echo "ERREUR";
+        break;
+    }
+    $length += $reclen;
+    if( $length &gt; 2048 &amp;&amp; !$started )
+    {
+        ?&gt;
+        &lt;script type="text/javascript"&gt;
+        &lt;!--
+            alert("Lecture...");
+        //-&gt;
+        &lt;/script&gt;
+        &lt;?php
+        $started = true;
+    }
+
+    fputs($file, $buf, $length);
+
+    flush();
+}
+</code></pre>
+
+<p>The problem is that you are adding the value returned by socket_recvfrom to $length if the return value is FALSE is going to add 0 to $length, that is the reason why you have to add an additional variable ($reclength).</p>

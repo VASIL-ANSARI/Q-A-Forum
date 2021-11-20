@@ -1,0 +1,51 @@
+<p>First, these attributes are not hidden. Assuming you have "django.contrib.auth" and "django.contrib.contenttypes" in your <code>INSTALLED_APPS</code>, then you have access to the <code>User</code> model as it is defined in your link. See <a href="https://docs.djangoproject.com/en/1.10/topics/auth/default/#user-objects" rel="nofollow">here</a> for the documentation on how to use/access it.</p>
+
+<p>However, since you specified <em>extending</em> the <code>User</code> model, I expect you wanted to add some of your own fields to it (even though your example <code>registration_date</code> exists and is accessible via <code>myuser.date_joined</code>).</p>
+
+<hr>
+
+<p>The older, more stable and more common way of doing this is similar to what you have. The only difference is to use a <code>OneToOneField(User)</code> instead of a <code>ForeignKey(User)</code>. This makes the relationship bidirectional and more convenient by forcing one. You do need to make sure and create a <code>Registration</code> object for every <code>User</code> created.</p>
+
+<p>In fact, there is <a href="https://docs.djangoproject.com/en/1.10/ref/models/fields/#ref-onetoone" rel="nofollow">an example</a> of exactly what you want in the docs for the OneToOneField.</p>
+
+<pre><code>from django.db import models
+from django.contrib.auth.models import User
+
+class Registration(models.Model):
+    user = models.OneToOneField(User)
+    registration_date = models.DateTimeField(auto_now_add=True)
+
+&gt;&gt;&gt; user = User.objects.get(pk=1)
+&gt;&gt;&gt; registration = Registration.objects.create(user=user)
+&gt;&gt;&gt; user.registration.registration_date
+# Should give the current time
+&gt;&gt;&gt; user.get_full_name()
+# Should also have all those *hidden* attributes linked above
+</code></pre>
+
+<hr>
+
+<p>As of Django 1.5, you can use your own custom User model fairly easily. The documentation for this feature is <a href="https://docs.djangoproject.com/en/1.10/topics/auth/customizing/#substituting-a-custom-user-model" rel="nofollow">here</a>. If you are just adding some extra fields, then you can subclass the User model and add your own fields.</p>
+
+<pre><code>from django.db import models
+from django.contrib.auth.models import AbstractUser
+
+class MyUser(AbstractUser):
+    # We inherit all those nifty things from AbstractUser
+    registration_date = models.DateTimeField(auto_now_add=True)
+</code></pre>
+
+<p>Then enable it in your settings.py by adding <code>AUTH_USER_MODEL = 'myapp.MyUser'</code>. We now have to access the user model a little differently</p>
+
+<pre><code>&gt;&gt;&gt; from django.contrib.auth import get_user_model()
+&gt;&gt;&gt; Users = get_user_model()
+&gt;&gt;&gt; user = Users.objects.get(pk=1)
+&gt;&gt;&gt; user.registration_date
+# Should give the current time
+&gt;&gt;&gt; user.get_full_name()
+# Should have those 'hidden' attributes
+</code></pre>
+
+<hr>
+
+<p>All this is available under <a href="https://docs.djangoproject.com/en/1.10/topics/auth/customizing/#extending-user" rel="nofollow">extending</a> and <a href="https://docs.djangoproject.com/en/1.10/topics/auth/customizing/#auth-custom-user" rel="nofollow">substituting</a> the User model in the documentation.</p>

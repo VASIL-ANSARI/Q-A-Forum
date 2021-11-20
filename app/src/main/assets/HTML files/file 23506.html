@@ -1,0 +1,101 @@
+<p>I see two possible reasons:</p>
+
+<ul>
+<li>Valgrind is using a different stack unwind method than GDB</li>
+<li>The address space layout is different while running your program under the two environments and you're only hitting stack corruption under Valgrind.</li>
+</ul>
+
+<p>We can gain more insight by using Valgrind's builtin gdbserver.</p>
+
+<p>Save this Python snippet to <strong>thread-frames.py</strong></p>
+
+<pre><code>import gdb
+
+f = gdb.newest_frame()
+while f is not None:
+    f.select()
+    gdb.execute('info frame')
+    f = f.older()
+</code></pre>
+
+<p><strong>t.gdb</strong></p>
+
+<pre><code>set confirm off
+file MY-PROGRAM
+break function
+commands
+silent
+end
+run
+source thread-frames.py
+quit
+</code></pre>
+
+<p><strong>v.gdb</strong></p>
+
+<pre><code>set confirm off
+target remote | vgdb
+file MY-PROGRAM
+break function
+commands
+silent
+end
+continue
+source thread-frames.py
+quit
+</code></pre>
+
+<p>(Change <strong>MY-PROGRAM</strong>, <strong>function</strong> in the scripts above and the commands below as required)</p>
+
+<p>Get details about the stack frames under GDB:</p>
+
+<pre><code>$ gdb -q -x t.gdb
+Breakpoint 1 at 0x80484a2: file valgrind-unwind.c, line 6.
+Stack level 0, frame at 0xbffff2f0:
+ eip = 0x80484a2 in function (valgrind-unwind.c:6); saved eip 0x8048384
+ called by frame at 0xbffff310
+ source language c.
+ Arglist at 0xbffff2e8, args: 
+ Locals at 0xbffff2e8, Previous frame's sp is 0xbffff2f0
+ Saved registers:
+  ebp at 0xbffff2e8, eip at 0xbffff2ec
+Stack level 1, frame at 0xbffff310:
+ eip = 0x8048384 in main (valgrind-unwind.c:17); saved eip 0xb7e33963
+ caller of frame at 0xbffff2f0
+ source language c.
+ Arglist at 0xbffff2f8, args: 
+ Locals at 0xbffff2f8, Previous frame's sp is 0xbffff310
+ Saved registers:
+  ebp at 0xbffff2f8, eip at 0xbffff30c
+</code></pre>
+
+<p>Get the same data under Valgrind:</p>
+
+<pre><code>$ valgrind --vgdb=full --vgdb-error=0 ./MY-PROGRAM
+</code></pre>
+
+<p>In another shell:</p>
+
+<pre><code>$ gdb -q -x v.gdb
+relaying data between gdb and process 574
+0x04001020 in ?? ()
+Breakpoint 1 at 0x80484a2: file valgrind-unwind.c, line 6.
+Stack level 0, frame at 0xbe88e2c0:
+ eip = 0x80484a2 in function (valgrind-unwind.c:6); saved eip 0x8048384
+ called by frame at 0xbe88e2e0
+ source language c.
+ Arglist at 0xbe88e2b8, args: 
+ Locals at 0xbe88e2b8, Previous frame's sp is 0xbe88e2c0
+ Saved registers:
+  ebp at 0xbe88e2b8, eip at 0xbe88e2bc
+Stack level 1, frame at 0xbe88e2e0:
+ eip = 0x8048384 in main (valgrind-unwind.c:17); saved eip 0x4051963
+ caller of frame at 0xbe88e2c0
+ source language c.
+ Arglist at 0xbe88e2c8, args: 
+ Locals at 0xbe88e2c8, Previous frame's sp is 0xbe88e2e0
+ Saved registers:
+  ebp at 0xbe88e2c8, eip at 0xbe88e2dc
+</code></pre>
+
+<p>If GDB can successfully unwind the stack while connecting to "<strong>valgrind --gdb</strong>" then it's a problem with Valgrind's stack unwind algorithm. You can inspect the "<strong>info frame</strong>" output carefully for inline and tail call frames or some other reason that could throw Valgrind off. Otherwise it's probably stack corruption.</p>

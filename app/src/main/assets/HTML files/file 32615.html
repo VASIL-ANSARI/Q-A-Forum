@@ -1,0 +1,323 @@
+<p>Posting this answer was way overdue, but here it is.</p>
+
+<p>The use of the local <code>clientFD</code> variable in the <code>WorkRoutine</code> function was interfering with the logic of the thread synchronization... I was using that variable temporarily for legibility and I overlooked the fact that it could interfere with the correct operation of the threads. I replaced it with direct use of the thread structure FD variable and it is now working (<code>threadData-&gt;m_ClientFD</code>).</p>
+
+<p>I present the final code below:</p>
+
+<pre><code>static void *WorkRoutine(void *args) {
+// Easier access of thread-local data.
+ThreadData * const threadData = (ThreadData*) args;
+pthread_mutex_t * const tMutex = &amp;(threadData-&gt;m_Mutex);
+const unsigned int tIndex = threadData-&gt;m_Index;
+
+threadData-&gt;m_StatIndex = 0;
+threadData-&gt;m_StatCount = BASE_TASK_COUNT;
+threadData-&gt;m_OutputDir = NULL;
+threadData-&gt;errorFileName = (char*) calloc(FILE_BUFFER, sizeof(char));
+
+char *logName = (char*) calloc(FILE_BUFFER, sizeof(char));
+const char *baseName = "./log-t";
+size_t baseNameSize = strlen(baseName);
+memcpy(logName, baseName, baseNameSize);
+sprintf(logName + baseNameSize, "%u", threadData-&gt;m_Index);
+threadData-&gt;m_Log = stdout;
+#if defined LOGGING
+threadData-&gt;m_Log = fopen(logName, "w");
+#endif
+
+
+fprintf(threadData-&gt;m_Log, "&gt; Slave %u: log file %s at pointer %p.\n", tIndex, logName, threadData-&gt;m_Log);
+
+// Each thread initializes its own mutex.
+int rc = pthread_mutex_init(tMutex, NULL);
+if (!rc)
+    fprintf(threadData-&gt;m_Log, "&gt; Slave %u: mutex %p initialization was successful!\n", tIndex, tMutex);
+if (rc != 0 &amp;&amp; rc != PTHREAD_BARRIER_SERIAL_THREAD) {
+    fprintf(threadData-&gt;m_Log, "&gt; Slave %u: failed mutex initialization!\n", tIndex);
+    perror("pthread_mutex_init");
+    exit(-1);
+}
+
+// Each thread will also need to find out its own clock id.
+int clkStatus = pthread_getcpuclockid(threadData-&gt;m_Thread, &amp;(threadData-&gt;m_CID));
+if (clkStatus != 0)
+    handle_error_en(clkStatus, "pthread_getcpuclockid");
+
+
+// Synchronization point: all threads including the master thread wait for all slave mutexes to be initialized.
+rc = pthread_barrier_wait(&amp;g_StartBarrier);
+if (rc != 0 &amp;&amp; rc != PTHREAD_BARRIER_SERIAL_THREAD) {
+    fprintf(threadData-&gt;m_Log, "&gt; Slave %u: failed initial barrier synchronization!\n", tIndex);
+    perror("pthread_barrier_wait");
+    exit(-1); 
+}
+
+while (1) { 
+    threadData-&gt;m_OutputDir = NULL;
+
+    // Check if server was ordered to shutdown.
+    rc = pthread_mutex_lock(&amp;g_ShutdownLock);
+    if(!rc) {
+        if(g_ShutdownOrdered) {
+            pthread_mutex_unlock(&amp;g_ShutdownLock);
+            break;
+        }
+        else {
+            pthread_mutex_unlock(&amp;g_ShutdownLock);
+        }
+    }
+    else {
+        fprintf(threadData-&gt;m_Log, "&gt; Slave %u: failed on mutex lock of shutdown lock: %i\n", tIndex, rc);
+        perror("slave: pthread_mutex_lock");
+    }
+
+
+    rc = pthread_mutex_lock(tMutex);
+    if (!rc) {
+        if (!threadData-&gt;m_Task &amp;&amp; threadData-&gt;m_ClientFD == -1) {
+            rc = pthread_mutex_unlock(tMutex);
+            int yieldStatus = sched_yield();
+            if (yieldStatus) {
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: error while attempting to yield!\n", tIndex);
+                perror("sched_yield()\n");
+            }
+            continue;
+            //printf("&gt; Slave %u: yielding.\n", tIndex);
+        }
+        else if (!threadData-&gt;m_Task &amp;&amp; threadData-&gt;m_ClientFD != -1) {
+            // Read client request.
+            threadData-&gt;m_Task = (char*) calloc(FILE_BUFFER, sizeof(char)); 
+            memset(threadData-&gt;m_Task, 0, FILE_BUFFER * sizeof(char));
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: going to read from %i into %p\n", tIndex, threadData-&gt;m_ClientFD, threadData-&gt;m_Task);
+
+            MessageHeader h;
+            GetHeader(&amp;h, threadData-&gt;m_ClientFD);
+
+
+            // In case we received an order to kill the server.
+            if(h.m_ID == CloseServer) {
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: got order to close server!\n", tIndex);
+                rc = pthread_mutex_lock(&amp;g_ShutdownLock);
+                if(!rc) {
+                    g_ShutdownOrdered = 1;
+                    free(threadData-&gt;m_Task);
+                    pthread_mutex_unlock(&amp;g_ShutdownLock);
+                    // Reset thread-local data.
+                    threadData-&gt;m_Task = NULL;
+                    close(threadData-&gt;m_ClientFD);
+                    threadData-&gt;m_ClientFD = -1;
+                    break;
+                }
+                else {
+                    fprintf(threadData-&gt;m_Log, "&gt; Slave %u: failed locking of shutdown lock: %i", tIndex, rc);
+                    perror("pthread_mutex_lock");
+                }
+            }
+
+            if (h.m_ID != BeginSession) {
+                //protocol implementation error
+                exit(-1);
+            }
+
+
+            clock_gettime(threadData-&gt;m_CID, &amp;(threadData-&gt;m_PrevTime));
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: expecting client command of length %i\n", tIndex, h.m_ContentSize);
+            int n = GetContent((void*) threadData-&gt;m_Task, h.m_ContentSize * sizeof(char), threadData-&gt;m_ClientFD);
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: client of file descriptor %i sent [%s] at a total of %i bytes\n", tIndex, threadData-&gt;m_ClientFD, threadData-&gt;m_Task, n);
+
+            int baseArgvSize = 10;
+            char **argv = (char**) calloc(baseArgvSize, sizeof(char*)); 
+            int argc = CmdToTable(threadData-&gt;m_Task, &amp;argv, &amp;baseArgvSize, threadData-&gt;m_Log);
+
+            int localLen = strlen("local");
+            int remoteLen = strlen("remote");
+
+            if(!strncmp(threadData-&gt;m_Task, "remote", remoteLen)) {
+                g_Workers[tIndex].m_Networking = 1;
+            }
+            else if(!strncmp(threadData-&gt;m_Task, "local", localLen)) {
+                g_Workers[tIndex].m_Networking = 0;
+                g_Workers[tIndex].m_OutputDir = (char*) calloc(FILE_BUFFER, sizeof(char));
+
+                MessageHeader hPath;
+                GetHeader(&amp;hPath, threadData-&gt;m_ClientFD);
+                if (hPath.m_ID != SendMessage) {
+                    //protocol implementation error
+                    exit(-1);
+                }
+
+
+                int cnt = GetContent((void*) threadData-&gt;m_OutputDir, hPath.m_ContentSize * sizeof(char), threadData-&gt;m_ClientFD);
+                printf("&gt; Slave %u: I RECEIVED %s AS OUTPUT DIRECTORY!\n\n\n\n\n", tIndex, threadData-&gt;m_OutputDir);
+                threadData-&gt;m_OutputDir[hPath.m_ContentSize * sizeof(char)] = '/';
+
+
+
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: received output directory message with %i bytes.\n", tIndex, cnt);
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: client output going to %s\n", tIndex, threadData-&gt;m_OutputDir);
+            }
+            else {
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: received bogus client command: %s\n", tIndex, threadData-&gt;m_Task);
+                return NULL;
+            }
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: remote mode - %i.\n", tIndex, g_Workers[tIndex].m_Networking);
+            // Debug print the table built from the client command.
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: table has %i entries.\n", tIndex, argc);
+            int i;
+            for (i = 0; i &lt; argc; i++) {
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: argument %i is %s.\n", tIndex, i, argv[i]);
+            }
+            // Prepare the input files the client will send.
+            char**filenames = (char**) calloc(argc, sizeof(char*));
+            FILE**files = (FILE**) calloc(argc, sizeof(FILE*));
+            unsigned int reqIDIndex = 0;
+            unsigned int reqIDLen = strlen(argv[reqIDIndex]);
+            threadData-&gt;m_REQ = argv[reqIDIndex];
+            if(threadData-&gt;m_Networking) {
+                // Check which files need to be sent from the client.
+                for (i = reqIDIndex + 1; i &lt; argc; i++) {
+                    unsigned int argSize = strlen(argv[i]);
+                    if (strstr(argv[i], FILETYPE_SEPARATOR) != NULL
+                            &amp;&amp; strstr(argv[i], INDEX_FILETYPE) == NULL) {
+                        // If the current argument has a file type and isn't an index type.
+                        filenames[i] = calloc(reqIDLen + argSize + 2, sizeof(char)); // +2 to account for terminator char and hyphen between reqID and filename
+
+                        fprintf(threadData-&gt;m_Log, "&gt; Slave %u: arg %s check with req %s\n", tIndex, argv[i], argv[reqIDIndex]);
+                        int noReqYet = strncmp(argv[i], argv[reqIDIndex], reqIDLen);
+                        if (noReqYet) {
+                            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: no prepended request yet!\n", tIndex);
+                            strncpy(filenames[i], argv[reqIDIndex], reqIDLen);
+                            filenames[i][reqIDLen] = '-';
+                        }
+                        // If the argument is a path to a file, get the filename and discard the path (that was local to the client).
+                        char*nameStart = strrchr(argv[i], '/'); 
+                        fprintf(threadData-&gt;m_Log, "&gt; Slave %u: going to remove backslash from %s\n", tIndex, argv[i]);
+
+                        if (nameStart != NULL )
+                            nameStart++;
+                        else
+                            nameStart = argv[i];
+
+                        fprintf(threadData-&gt;m_Log, "&gt; Slave %u: got %s after removing backslash\n", tIndex, nameStart);
+                        fprintf(threadData-&gt;m_Log, "noReqYet: %i\n", noReqYet);
+                        if (!noReqYet)
+                            strncpy(filenames[i], nameStart, strlen(nameStart));
+                        else
+                            strncpy(filenames[i] + reqIDLen + 1, nameStart,
+                                    strlen(nameStart)); //+1 to account for the hyphen.
+                        // When freeing the argv table, only need to free(argv). There is no need to free argv[i] elements.
+                        argv[i] = filenames[i];
+                    } else if (strstr(argv[i], FILETYPE_SEPARATOR) != NULL
+                            &amp;&amp; strstr(argv[i], INDEX_FILETYPE) != NULL ) {
+                        // If the current argument is the index type.
+                        char*nameStart = strrchr(argv[i], '/');
+                        if (nameStart != NULL ) {
+                            nameStart++;
+                            argv[i] = nameStart;
+                        }
+                    }
+                }
+
+                // Debug print the needed files.
+                fprintf(threadData-&gt;m_Log, "&gt; Slave %u: awaiting files:", tIndex);
+                for (i = 0; i &lt; argc; i++) {
+                    if (filenames[i] != NULL ) {
+                        fprintf(threadData-&gt;m_Log, " %s", filenames[i]);
+                    }
+                }
+                fprintf(threadData-&gt;m_Log, "\n");
+
+                // Await each input file from the client.
+                for (i = 0; i &lt; argc; i++) {
+                    if (filenames[i] != NULL ) {
+                        files[i] = GetFile(threadData-&gt;m_ClientFD, filenames[i]); // Note: GetFile invokes fclose!
+                        if (files[i])
+                            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: locally stored file %s\n", tIndex, filenames[i]);
+                    }
+                }
+            }
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: going to invoke SatisfyRequest with arguments: ", tIndex);
+            for (i = reqIDIndex; i &lt; argc; i++) {
+                if (argv[i] != NULL )
+                    fprintf(threadData-&gt;m_Log, "%s ", argv[i]);
+            }
+            fprintf(threadData-&gt;m_Log, "\n");
+
+            // Process the request against the index.
+            int res = SatisfyRequest(argc, argv, tIndex, threadData-&gt;m_ClientFD);
+            char success = 0;
+            if(!res)
+                success = 1;
+
+            // Terminate session with the client.
+            SendMsg(EndSession, (void*)&amp;success, sizeof(success), threadData-&gt;m_ClientFD);
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: task result delivered to client of file descriptor %i.\n", tIndex, threadData-&gt;m_ClientFD);
+            close(threadData-&gt;m_ClientFD);
+
+            free(argv);
+            threadData-&gt;m_REQ = NULL;
+            if(!threadData-&gt;m_Networking) {
+                free(threadData-&gt;m_OutputDir);
+                threadData-&gt;m_OutputDir = NULL;
+            }
+
+            // Free received file names and file pointer array.
+            for (i = 0; i &lt; argc; i++) {
+                if (filenames[i]) {
+                    free(filenames[i]);
+                    filenames[i] = NULL;
+                }
+            }
+            free(filenames);
+            free(files);
+            filenames = NULL;
+            files = NULL;
+            // Print out the time it took for the task.
+            struct timespec tempTime;
+            clock_gettime(threadData-&gt;m_CID, &amp;tempTime);
+
+            struct timespec timeDelta;
+            timeDelta.tv_nsec = tempTime.tv_nsec - threadData-&gt;m_PrevTime.tv_nsec;
+            timeDelta.tv_sec = tempTime.tv_sec - threadData-&gt;m_PrevTime.tv_sec;
+
+            if(timeDelta.tv_nsec &lt; 0)
+                timeDelta.tv_nsec *= -1;
+            if(timeDelta.tv_sec &lt; 0)
+                timeDelta.tv_sec *= -1;
+
+            RegisterStat(tIndex, threadData-&gt;m_StatIndex++, timeDelta, threadData-&gt;m_Task);
+
+            fprintf(threadData-&gt;m_Log, "Slave %u: %4ld.%03ld\n", tIndex, timeDelta.tv_sec,timeDelta.tv_nsec / 1000000);
+            memcpy(&amp;(threadData-&gt;m_PrevTime), &amp;tempTime, sizeof(struct timespec));
+
+            // Reset thread-local data.
+            memset(threadData-&gt;m_Task, 0, FILE_BUFFER * sizeof(char));
+            free(threadData-&gt;m_Task);
+            threadData-&gt;m_Task = NULL;
+            threadData-&gt;m_ClientFD = -1;
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: task finished.\n", tIndex);
+            rc = pthread_mutex_unlock(tMutex);
+        }
+        if (rc) {
+            fprintf(threadData-&gt;m_Log, "&gt; Slave %u: mutex unlock returned an error: %i!\n", tIndex, rc);
+            perror("pthread_mutex_unlock()");
+        }
+    } else {
+        fprintf(threadData-&gt;m_Log, "&gt; Slave %u: mutex lock returned an error: %i!\n", tIndex, rc);
+        perror("pthread_mutex_lock()");
+    }
+}
+free(threadData-&gt;errorFileName);
+threadData-&gt;errorFileName = NULL;
+free(logName);
+logName = NULL;
+fprintf(threadData-&gt;m_Log, "&gt; Slave %u: exiting...\n", tIndex);
+
+#if defined LOGGING
+    fclose(threadData-&gt;m_Log);
+#endif
+threadData-&gt;m_Log = NULL;
+
+return 0;
+}
+</code></pre>

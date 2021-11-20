@@ -1,0 +1,56 @@
+<h3>Solution 1</h3>
+
+<p>[Spider2 list] --depends on --> [spider1 list]</p>
+
+<p>How about just make spider2 run after spider1 finished successfully by shell:</p>
+
+<pre><code>#scrapy crawl Spider1 &amp;&amp; scrapy crawl Spider2
+</code></pre>
+
+<h3>Solution 2</h3>
+
+<p>individual [spider 2] --depends on --> [spider 1 item]</p>
+
+<p>and you know the <code>url</code> the individual spider 2 to scrape, when you scraped the spider 1 item.</p>
+
+<p>How about merge two spiders into one?</p>
+
+<p>with the request <code>meta</code> attribute.</p>
+
+<p>spider.py</p>
+
+<pre><code>class MergedSpider(scrapy.Spider):
+    # name, etc..
+    def first_spider_parse(self, response):
+        # your code...
+        item = FirstSpiderItem()
+        # yield the item first, and the pipeline will handle it
+        yield item
+        # then request the spider2 request
+        yield scrapy.Request(secondSpiderItemURL, callback=self.second_spider_parse, dont_filter=True, meta={'firstItem': item})
+
+
+    def second_spider_parse(self, response):
+        item = SecondSpiderItem()
+        firstItem = response.meta['firstItem']
+        return item
+</code></pre>
+
+<p>pipelines.py</p>
+
+<pre><code>class FirstPipeline(object):
+    def process_item(self, item, spider):
+        # or you can isinstance the spider
+        if isinstance(item, FirstSpiderItem):
+            # your code
+            pass
+        return item
+
+
+class SecondPipeline(object):
+    def process_item(self, item, spider):
+        if isinstance(item, SecondSpiderItem):
+            # your code
+            pass
+        return item
+</code></pre>

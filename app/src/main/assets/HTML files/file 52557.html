@@ -1,0 +1,61 @@
+<ul>
+<li><p>Use return $this->morphToMany() instead of belongsToMany, and in the Tag model, write 3 methods with return $this->morphedByMany() for the reverse relationship. </p></li>
+<li><p>You only need polymorphic definitions, no need for the many to many normal ones. The name of the pivot table is with 'able' at the end by the default convention but you can name it anything you want.</p></li>
+<li><p>no, you don't have to have a word with 'able' at the end, it's just a way to define that it's something more general, you can name it anything you want.  </p></li>
+</ul>
+
+<p>Naming is based on some default convention by Laravel.</p>
+
+<p>Update: </p>
+
+<p>You have the following pivot table schema:</p>
+
+<pre><code>Schema::create('entity_tags', function (Blueprint $table) {
+        $table-&gt;increments('id');
+        $table-&gt;integer('tag_id')-&gt;unsigned();;
+        $table-&gt;integer('entity_id')-&gt;unsigned();
+        $table-&gt;string('entity_type');
+        $table-&gt;timestamps();
+        $table-&gt;index('tag_id');
+        $table-&gt;index('entity_id');
+        $table-&gt;index('entity_type');
+});
+</code></pre>
+
+<p>and the tags table:</p>
+
+<pre><code>Schema::create('tags', function (Blueprint $table) {
+    $table-&gt;increments('id');
+    $table-&gt;string('name');
+    $table-&gt;string('slug')-&gt;unique();
+    $table-&gt;timestamps();
+});
+</code></pre>
+
+<p>So you want to create the relationships for blog, video and question tables / models:</p>
+
+<p>Tag.php Model:</p>
+
+<pre><code>public function questions()
+{
+    return $this-&gt;morphedByMany('App\Question', 'entity', 'entity_tags');
+}
+
+public function blogs()
+{
+    return $this-&gt;morphedByMany('App\Blog', 'entity', 'entity_tags');
+}
+
+public function videos()
+{
+    return $this-&gt;morphedByMany('App\Video', 'entity', 'entity_tags');
+}
+</code></pre>
+
+<p>Question.php / Blog.php / Video.php </p>
+
+<pre><code>public function tags()
+{
+    return $this-&gt;morphToMany('App\Tag', 'entity', 'entity_tags');
+}
+</code></pre>

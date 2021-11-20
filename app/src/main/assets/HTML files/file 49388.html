@@ -1,0 +1,42 @@
+<p>Take the version that works first:</p>
+
+<pre><code>void aFunction(void** ptr) {
+    //Option 1
+    Type_t* o1 = (Type_t*) (*ptr);
+
+    //Option 2
+    Type_t* o2 = *((Type_t**) ptr);
+}
+</code></pre>
+
+<p>Note that I've changed <code>ptr</code> to <code>void**</code>.</p>
+
+<p>Option 1 reads the value pointed to by <code>ptr</code>. It then converts that value to <code>Type_t*</code>. It is equivalent to <code>Type_t* o1 = *ptr;</code> and if possible should be written in this form.</p>
+
+<p>Option 2 tells the compiler that <code>ptr</code> doesn't really point to a <code>void*</code>, but to a <code>Type_t*</code>, and then reads that value.</p>
+
+<p>Now change it to what doesn't work, by changing <code>ptr</code> back to <code>void*</code>:</p>
+
+<p>Option 1 cannot read the value pointed to by <code>ptr</code>, because it doesn't know what kind of value it is dealing with. Since it isn't able to read a value, it then cannot convert it to <code>Type_t*</code>.</p>
+
+<p>Option 2 tells the compiler that <code>ptr</code> points to a <code>Type_t*</code>, and then reads that value.</p>
+
+<p>That's why option 1 can't work in this case.</p>
+
+<p>However, beware that telling the compiler that <code>ptr</code> points to a <code>Type_t*</code> when it doesn't actually point to a <code>Type_t*</code> can cause all kinds of hard-to-debug problems, because when you call the function as</p>
+
+<pre><code>void* p = 0;
+aFunction(&amp;p);
+</code></pre>
+
+<p>the compiler may at some point see "oh, I don't know what <code>ptr</code> points to, but the programmer told me it points to a <code>Type_t*</code>, so I know it can't point to <code>p</code>." And may optimise based on that assumption, for instance by not initialising <code>p</code> yet since it has determined that <code>p</code> does not get accessed. Or at least not in a way that the compiler allows. If this is how <code>aFunction</code> is called, then the correct way of accessing the value of <code>p</code> is <code>Type_t* o1 = *((void**)ptr);</code>: this tells the compiler that <code>ptr</code> really points to a <code>void*</code>, which it does. It then dereferences <code>ptr</code>, reading a <code>void*</code>, and converts that <code>void*</code> to a <code>Type_t*</code>.</p>
+
+<p>On the other hand, if <code>ptr</code> really does point to a <code>Type_t*</code>, for instance when calling it as</p>
+
+<pre><code>Type_t** p = 0;
+aFunction(&amp;p);
+</code></pre>
+
+<p>then telling the compiler that <code>ptr</code> really points to a <code>Type_t*</code> is entirely correct.</p>
+
+<p>Which approach you should take depends on how you're calling <code>aFunction</code>.</p>

@@ -1,0 +1,24 @@
+<p>The efficiency of JSON vs BSON depends on the size of the integers you're storing.  There's an interesting point where ASCII takes fewer bytes than actually storing integer types.  64-bit integers, which is how it appears your BSON document, take up 8 bytes.  Your numbers are all less than 10,000, which means you could store each one in ASCII in 4 bytes (one byte for each character up through 9999).  In fact, most of your data look like it's less than 1000, meaning it can be stored in 3 or fewer bytes.  Of course, that deserialization takes time and isn't cheap, but it saves space.  Furthermore, Javascript uses 64-bit values to represent all numbers, so if you wrote it to BSON after converting each integer to a more appropriate dataformat, your BSON file could be much larger.</p>
+
+<p>According to the spec, BSON contains a lot of metadata that JSON doesn't.  This metadata is mostly length prefixes so that you can skip through data you aren't interested in.  For example, take the following data:</p>
+
+<pre><code>["hello there, this is an necessarily long string.  It's especially long, but you don't care about it. You're just trying to get to the next element. But I keep going on and on.",
+ "oh man. here's another string you still don't care about.  You really just want the third element in the array.  How long are the first two elements? JSON won't tell you",
+ "data_you_care_about"]
+</code></pre>
+
+<p>Now, if you're using JSON, you have to parse the entirety of the first two strings to find out where the third one is.  If you use BSON, you'll get markup more like (but not actually, because I'm making this markup up for the sake of example):</p>
+
+<pre><code>[175 "hello there, this is an necessarily long string.  It's especially long, but you don't care about it. You're just trying to get to the next element. But I keep going on and on.",
+ 169 "oh man. here's another string you still don't care about.  You really just want the third element in the array.  How long are the first two elements? JSON won't tell you",
+ 19 "data_you_care_about"]
+</code></pre>
+
+<p>So now, you can read '175', know to skip forward 175 bytes, then read '169', skip forward 169 bytes, and then read '19' and copy the next 19 bytes to your string.  That way you don't even have to parse the strings for delimiters.</p>
+
+<p>Using one versus the other is very dependent on what your needs are.  If you're going to be storing enormous documents that you've got all the time in the world to parse, but your disk space is limited, use JSON because it's more compact and space efficient.
+If you're going to be storing documents, but reducing wait time (perhaps in a server context) is more important to you than saving some disk space, use BSON.</p>
+
+<p>Another thing to consider in your choice is human readability.  If you need to debug a crash report that contains BSON, you'll probably need a utility to decipher it.  You probably don't just know BSON, but you can just read JSON.</p>
+
+<p><a href="http://bsonspec.org/#/faq">FAQ</a></p>

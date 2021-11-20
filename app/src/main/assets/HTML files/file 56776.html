@@ -1,0 +1,56 @@
+<p>Javascript is an asynchronoous language. What happens here is that your <code>getImages</code> function does not wait for your <code>getUrls</code> function to be finished. </p>
+
+<p>You need to use a callback or a promise in your <code>getImages</code> function so it'll wait for <code>getUrls</code>. </p>
+
+<p><a href="http://www.tutorialspoint.com/nodejs/nodejs_callbacks_concept.htm" rel="nofollow">Here</a>'s a little tutorials on callbacks</p>
+
+<p>Callbacks are a really important concept in Javascript and I strongly suggest you learn how it works. It'll make your life easier. Same goes for promises. </p>
+
+<p>Here's an example with your code</p>
+
+<pre><code>const request = require('request');
+const cheerio = require('cheerio');
+
+// callback is the function to be called when this one finishes
+function getUrls(url, callback) {
+    const baseUrl = 'https://unsplash.com';
+    let urls = [];
+    request(url, (err, res, body) =&gt; {
+        if (!err &amp;&amp; res.statusCode === 200) {
+            const $ = cheerio.load(body, { normalizeWhitespace: false, xmlMode: false, decodeEntities: true });
+            $('.photo.qa-photo a').each((i, e) =&gt; {
+                const lnk = $(e).attr('href');
+                if (lnk.indexOf('@') === -1 &amp;&amp; lnk.indexOf('download') === -1) {
+                    urls.push(baseUrl + lnk);
+                }
+            });
+        }
+    });
+    //Notice the call to callback.
+    callback(urls);
+}
+function getImages(arr) {
+    let images = [];
+    for (const url of arr) {
+        request(url, (err, res, body) =&gt; {
+            if (!err &amp;&amp; res.statusCode === 200) {
+                const $ = cheerio.load(body, { normalizeWhitespace: false, xmlMode: false, decodeEntities: true });
+                $('script').each((i, e) =&gt; {
+                    if (i === 4) {
+                        let img = $(e).text();
+                        img = img.substring(img.indexOf('full') + 7, img.indexOf('regular') - 3);
+                        images.push(img);
+                    }
+                });
+            } else {
+                console.log(err, res.statusCode);
+            }
+        });
+    }
+    return images;
+}
+
+console.log(getUrls('https://unsplash.com/search?utf8=%E2%9C%93&amp;keyword=life&amp;button=', function(urls){getImages(urls)}));
+</code></pre>
+
+<p>I haven't tested it but it should work or be close enough. </p>

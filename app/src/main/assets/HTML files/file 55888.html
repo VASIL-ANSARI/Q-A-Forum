@@ -1,0 +1,66 @@
+<p>Using the Add-on SDK <a href="https://developer.mozilla.org/en-US/Add-ons/SDK/High-Level_APIs/context-menu" rel="nofollow"><code>sdk/context-menu</code></a> API, there is no way to directly add an item to anywhere but the bottom of the context menu. There is no convenient way to have it end up at the top. However, you can add it and then move it to the top, or elsewhere in the context menu, if desired. But, the Add-on SDK does not have a way for you to do so through any of the Add-on SDK APIs.</p>
+
+<p>Note: Moving your context menu item to the top of the menu changes what is normally done for context menu items that are added by Firefox add-ons. If I were to load an add-on that assumed its context menu item belonged on the top of the list, I would not be pleased. If it did not, at a minimum, provide the option (<a href="https://developer.mozilla.org/en-US/Add-ons/SDK/High-Level_APIs/simple-prefs" rel="nofollow">simple-prefs</a>) to have the context menu item at the bottom, or a place of my choosing, I might very well write a negative review on AMO. Placing it at the top of the context menu assumes that your add-on will be the most used option in that context menu. This being the case will significantly depend on the user, your add-on and how the user makes use of your add-on. On the other hand, if this was an option I used all the time, I would be glad to see it at the top, and separated from other menu items.</p>
+
+<h2>One way to have your context menu item appear at the top:</h2>
+
+<p>Your current code results in a context menu for links with the added entry, <code>AddonName(d)</code>, at the bottom which looks like:<br>
+<a href="http://i.stack.imgur.com/1rTVN.png" rel="nofollow"><img src="http://i.stack.imgur.com/1rTVN.png" alt="original look of link context menu after addition on bottom"></a></p>
+
+<p>The context menus are part of the XUL DOM which exists for each Firefox Window. It appears that the Add-on SDK <a href="https://developer.mozilla.org/en-US/Add-ons/SDK/High-Level_APIs/context-menu" rel="nofollow"><code>sdk/context-menu</code></a> only permits you to add items to the context menu for elements within the page content area.  Thus, in the XUL DOM the context menu being affected is the <code>menupopup</code> that has <code>id="contentAreaContextMenu"</code>:
+<a href="http://i.stack.imgur.com/zsJkl.png" rel="nofollow"><img src="http://i.stack.imgur.com/zsJkl.png" alt="enter image description here"></a></p>
+
+<p>Once the <code>menuitem</code> for your context menu item exists, you can manipulate the XUL DOM to move it to be the <code>firstChild</code> which will put it at the top of the context menu.  However, the SDK does not insert the <code>menuitem</code> for your context menu item into the XUL DOM until the first time that it will be displayed (or at least not until the first time it <em>might</em> be displayed).  Thus, you can not just call <code>cm.Item()</code> and then immediately change the XUL DOM.</p>
+
+<p>Further complicating this is that the XUL DOM manipulation must occur in your main code while you can only be informed that the context menu is about to be displayed (and thus your <code>menuitem</code> is in the XUL DOM) from a content script.  We must therefore listen for the <code>context</code> event and pass a message to our main script to initiate the XUL DOM manipulation of the context menu.</p>
+
+<p>Keep in mind that the object that is returned by <code>let cmItem = cm.Item()</code> is not actually a reference to the <code>menuitem</code> in the XUL DOM.  The reason for this is that the <code>menuitem</code> in the XUL DOM exists as a separate object in the XUL DOM for each Firefox window. Thus, we have to search through the XUL DOM to find the correct <code>menuitem</code> element. Because it is a separate XUL DOM for each Firefox window we need to make sure that it happens in all windows.  In this case, listening for the <code>context</code> event in a content script results in this change taking place each time the context menu is displayed. As a result, we do not need to specifically make the change in each Firefox window because we make the change every single time the context menu is displayed.</p>
+
+<p>Adding additional complication to searching through the XUL DOM for the correct <code>menuitem</code> is that the Add-on SDK does not provide an <code>id</code> property which is applied to the <code>menuitem</code> created in the XUL DOM. Thus, we have to find the item based on the value of the <code>label</code> property.  This means that you either need to not change that property, or track the changes so you are searching for the correct <code>menuitem</code>. In the example code below, it is assumed that the label does not change.</p>
+
+<p>We now need to use the message passed from the content script for both messages indicating that the context menu is about to be displayed and to send the <code>node.href</code> when the context menu item has been clicked.  In order to do that, what is passed is now an object with a <code>type</code> property indicating the type of message being passed (a <code>click</code>, or a <code>context</code>) and the <code>data</code> from the click.</p>
+
+<p>NOTE: The Add-on SDK also adds a <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XUL/menuseparator" rel="nofollow"><code>menuseparator</code></a> in the context menu above those menu items added by the Add-on SDK.  It may be that a separator is created between each context menu item that is added, or between all those added by each Add-on SDK extension. However, in brief testing it appeared to be that only one separator is added even for multiple Add-on SDK extensions. To make this look clean, you many want to add one to the top of the context menu after your entry.  If you do add one, you will need to make sure you remove it upon your add-on being disabled. Moving this separator would be making the assumption that you are the only Add-on SDK extension adding to any context menu. I have not manipulated this <code>menuseparator</code> in the example code below.</p>
+
+<p>The following code will move the single <code>menuitem</code> created with <code>cm.Item()</code> from wherever it is in the context menu to the top of the context menu:</p>
+
+<pre><code>let cm = require("sdk/context-menu");
+let cmLabel = "AddonName(d)";
+cm.Item({
+    label: cmLabel,
+    context: [ cm.SelectorContext("a[href]") ],
+    contentScript: 'self.on("click", function (node, data) {' +
+               '  self.postMessage({type:"click", data:node.href});' +
+               '});' +
+               'self.on("context", function (node) {' +
+               '  self.postMessage({type:"context"});' +
+               '  return true;' +
+               '});',
+    accessKey: "d",
+    onMessage: function (message) {
+        if(message.type === "click") {
+            console.log("context menu selected on:" + message.data);
+        } else if (message.type === "context") {
+            adjustContextMenuOrder(cmLabel);
+        }
+     }
+});
+
+function adjustContextMenuOrder(label) {
+    curWindow = require('sdk/window/utils').getMostRecentBrowserWindow();
+    let contextMenulist = curWindow.document.getElementById("contentAreaContextMenu");
+    //Get a list of elements with a matching label property.
+    let itemList = contextMenulist.querySelectorAll('[label="' + label + '"]');
+    menuitem = itemList[0]; //Assume the first one found is the one we want.
+    if(menuitem === undefined) {
+        return; //Did not find the menuitem.
+    }
+    let parent = menuitem.parentNode;
+    parent.insertBefore(menuitem, parent.firstChild); //Move found element to the top.
+}
+</code></pre>
+
+<p>The above code results in a context menu for links which looks like:<br>
+<a href="http://i.stack.imgur.com/ToyvN.png" rel="nofollow"><img src="http://i.stack.imgur.com/ToyvN.png" alt="context menu moved to top"></a></p>
+
+<p>Note: Some changes were made to the code in the question for testing or to verify functionality. The <code>context</code> was simplified to make testing easier (removed the restriction to only display on some matching URLs). In addition, the <code>node.href</code> data is used in a <code>console.log()</code>, to verify functionality.</p>

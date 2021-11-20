@@ -1,0 +1,93 @@
+<p>I fixed up your code:</p>
+
+<ol>
+<li>Added required imports.</li>
+<li>Fixed the <code>pprint savetodb</code> line which isn't valid Python.</li>
+<li>Didn't try to iterate over <code>carpark['zasedenost']</code>.</li>
+</ol>
+
+<p>I then added another <code>pprint</code> statement in the <code>for</code> loop to see what's in <code>carpark</code> when the <code>KeyError</code> occurs. From there, the error is clear. (Not all the elements in the array in your JSON contain the <code>'zasedenost'</code> key.)</p>
+
+<p>Here's the code I used:</p>
+
+<pre><code>import datetime
+import json
+from pprint import pprint
+import time
+
+import requests
+
+html = requests.get("http://opendata.si/promet/parkirisca/lpt/")
+
+data = json.loads(html.text)
+
+for carpark in data['Parkirisca']:
+    pprint(carpark)
+    zas = carpark['zasedenost']
+    free_spaces = zas.get('P_kratkotrajniki')
+    last_updated = zas.get('Cas_timestamp')
+
+    parking_type = carpark.get('ID_Parkirisca')
+    if parking_type == "Avtomatizirano":
+        is_automatic = "Yes"
+    else:
+        is_automatic = "No"
+
+    scraped = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+
+    savetodb = {
+        'scraped': scraped,
+        'id': carpark.get("ID_Parkirisca"),
+        'total_spaces': carpark.get("St_mest"),
+        'free_spaces': free_spaces,
+        'last_updated': last_updated,
+        'is_automatic': is_automatic,
+        'lon': carpark.get("KoordinataX_wgs"), 
+        'lat': carpark.get("KoordinataY_wgs")
+    }
+
+    unique_keys = ['id']
+
+    pprint(savetodb)
+</code></pre>
+
+<p>And here's the output on the iteration where the <code>KeyError</code> occurs:</p>
+
+<pre><code>{u'A_St_Mest': None,
+ u'Cena_dan_Eur': None,
+ u'Cena_mesecna_Eur': None,
+ u'Cena_splosno': None,
+ u'Cena_ura_Eur': None,
+ u'ID_Parkirisca': 7,
+ u'ID_ParkiriscaNC': 72,
+ u'Ime': u'P+R Studenec',
+ u'Invalidi_St_mest': 9,
+ u'KoordinataX': 466947,
+ u'KoordinataX_wgs': 14.567929171694901,
+ u'KoordinataY': 101247,
+ u'KoordinataY_wgs': 46.05457609543313,
+ u'Opis': u'2,40 \u20ac /dan',
+ u'St_mest': 187,
+ u'Tip_parkirisca': None,
+ u'U_delovnik': u'24 ur (ponedeljek - petek)',
+ u'U_sobota': None,
+ u'U_splosno': None,
+ u'Upravljalec': u'JP LPT d.o.o.'}
+Traceback (most recent call last):
+  File "test.py", line 14, in &lt;module&gt;
+    zas = carpark['zasedenost']
+KeyError: 'zasedenost'
+</code></pre>
+
+<p>As you can see, the error is quite accurate. There's no key <code>'zasedenost'</code> in the dictionary. If you look through your JSON, you'll see that's true for a number of the elements in that array.</p>
+
+<p>I'd suggest a fix, but I don't know what you want to do in the case where this dictionary key is absent. Perhaps you want something like this:</p>
+
+<pre><code>zas = carpark.get('zasedenost')
+if zas is not None:
+    free_spaces = zas.get('P_kratkotrajniki')
+    last_updated = zas.get('Cas_timestamp')
+else:
+    free_spaces = None
+    last_updated = None
+</code></pre>

@@ -1,0 +1,9 @@
+<p>There are two problems with the code you have provided which explain why you get the results that you get.</p>
+
+<p>The first problem is that your query <code>test.query.filter(url ='.').all()</code> will return an empty list. This will return an empty list simply because you don't have a valid index to be used with the filter you have specified. You do have 2 indexes for that column - a unique index (useful for looking up urls by exact string) and a suffix index (useful for finding urls that end with a certain string) - but neither offer the ability to filter by what would be in the relational world a 'like' query. A prefix index (created with <code>prefix=True</code>) would let you use <code>test.query.like(url='*.')</code>, but that would be very slow (it does an index scan instead of direct lookup[1]).</p>
+
+<p>To help prevent index/query-related issues like this, I have added QueryError exceptions when users attempt to filter their data by indexes that don't exist. I'll be releasing 0.31.4 a bit later tonight with those changes.</p>
+
+<p>The second error you have, which is the cause of the exception, is that you call <code>.count()</code> without an argument. At the point of your <code>h.count()</code> call, <code>type(h) == list</code>, and Python list objects require an argument to count values equal to the provided argument in the list. If you skipped the <code>.all()</code> portion of your original query, you would get a query object back. That query object has a <code>.count()</code> method, and would return a count of matched results.</p>
+
+<p>[1] Not all 'like' queries in rom are slow, but those that are fast require non-wildcard prefixes to limit data ranges to scan/filter.</p>

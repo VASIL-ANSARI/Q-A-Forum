@@ -1,0 +1,43 @@
+<p>I would recommend to let SQL Server handle the auto-incrementing part by using an <code>INT IDENTITY</code> column. Don't do this in your C# code - that's a database task.</p>
+
+<p>For your second column that you want to have in a specific, formatted fashion, use a <strong>computed column</strong> based on that identity column.</p>
+
+<p>Try something like this:</p>
+
+<pre><code>CREATE TABLE dbo.Employee
+(ID INT IDENTITY(1, 1) NOT NULL PRIMARY KEY CLUSTERED,
+ EmpID AS RIGHT('0000' + CAST(ID AS VARCHAR(5)), 5) PERSISTED, 
+
+ .... your other columns here.......
+)
+</code></pre>
+
+<p>That way, when you insert rows into the table, you'll get:</p>
+
+<pre><code>ID    EmpID
+---------------
+ 1    00001
+ 2    00002
+........
+17    00017
+18    00018
+......
+78    00078
+</code></pre>
+
+<p>The <code>ID</code> column is your actual primary and clustering key, it's small, fast, never changes - perfect for a clustering key. And your column <code>EmpID</code> is always automatically generated from the <code>ID</code> and shows the value in the formatted fashion as you wanted.</p>
+
+<p><strong>Update :</strong> as @ta.speot.is rightfully commented: if you don't need that <code>EmpID</code> value in the database for anything, then the best approach would be to just have the <code>ID INT IDENTITY</code> column in the database, and handle the generating of the <code>EmpID</code> in your C# code in the <code>Employee</code> class:</p>
+
+<pre><code>public class Employee
+{
+   [Key]
+   public int ID { get; set; }
+
+   [NotMapped]
+   public string EmpID 
+   { 
+      get { return "0000" + ID.ToString();  }  // do whatever you need to do here!
+   }
+}    
+</code></pre>

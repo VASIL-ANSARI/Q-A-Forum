@@ -1,0 +1,76 @@
+<p>Some high level code will generically just catch <code>std::exception</code> and print the <code>what()</code>. You want to squeeze as much information as possible to this generic mechanism, yet without losing any information. Consider an implementation of some archive library:</p>
+
+<pre><code>archive::archive(const char* filename)
+{
+    ifstream file(filename)
+    file.exceptions(ios_base::badbit);
+    open_archive(file); // throws ios_base::failure, or some other low-level exception.
+}
+</code></pre>
+
+<p>The information available to the archive is not recorded (e.g. filename). Besides you would like to distinguish exceptions that came from the archive class from other exceptions.</p>
+
+<pre><code>archive::archive(const char* filename)
+{
+    try {
+        ifstream file(filename)
+        file.exceptions(ios_base::badbit);
+        open_archive(file); // throws ios_base::failure, or some other low-level exception.
+    } catch(const std::exception&amp; e) {
+        throw archive_exception("Can't open archive", filename, e.what());
+    }
+}
+</code></pre>
+
+<p>Now we added higher-level semantic information that <code>archive</code> class knows, but we also lost the information about the original cause of problem (the type of <code>e</code>). <code>nested_exception</code> is meant to solve this problem:</p>
+
+<pre><code>archive::archive(const char* filename)
+{
+    try {
+        ifstream file(filename)
+        file.exceptions(ios_base::badbit);
+        open_archive(file); // throws ios_base::failure, or some other low-level exception.
+    } catch(...) {
+        throw_with_nested(archive_exception("Can't open archive", filename));
+    }
+}
+</code></pre>
+
+<p>All the available information is recorded. We can now generically retrieve it in the catch site:</p>
+
+<pre><code>void print_exception_info(const std::exception&amp; e)
+{
+    cerr &lt;&lt; e.what() &lt;&lt; "\n";
+    try {
+        rethrow_if_nested(e);
+    } catch(const std::exception&amp; ne) {
+        print_exception_info(ne);
+    } catch(...) { }
+}
+
+int main() {
+    try {
+        run();
+    } catch(const std::exception&amp; e) {
+        print_exception_info(e);
+    }
+}
+</code></pre>
+
+<p>The output will be more descriptive than before. It will describe the problem starting from the high-level to the low-level:</p>
+
+<blockquote>
+  <p>Can't open archive "my_archive.bin"</p>
+  
+  <p>Access is denied.</p>
+</blockquote>
+
+<p>Or perhaps:</p>
+
+<blockquote>
+  <p>Can't open archive "my_archive.bin"</p>
+  
+  <p>Record 'aabb' not found.</p>
+</blockquote>
+
+<p>The functions working with <code>exception_ptr</code> are designed to transfer exceptions between threads, or more generally, store an exception for later use. How they work depends on the implementation. The intention was that <code>exception_ptr</code> will be a shared pointer to the exception object. However when this pointer is created, when throwing the exception or when trying to get an <code>exception_ptr</code> to it, is subject to the implementation. The implementation is still free to copy the exception when you call <code>current_exception()</code>.</p>

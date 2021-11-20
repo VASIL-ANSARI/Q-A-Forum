@@ -1,0 +1,51 @@
+<p>I don't think this can be done in a single query. You may need some plsql to first test what columns contain data and put together a statement based on that information. Of course, if the data in your table changes you have to recreate the statement.</p>
+
+<pre><code>declare
+
+   l_table          varchar2(30) := 'YOUR_TABLE';
+   l_statement      varchar2(32767);
+   l_test_statement varchar2(32767);
+
+   l_contains_value pls_integer;
+
+   -- select column_names from your table
+   cursor c is
+      select column_name
+            ,nullable
+        from user_tab_columns
+       where table_name = l_table;
+
+begin
+   l_statement := 'select ';
+   for r in c
+   loop
+      -- If column is not nullable it will always contain a value
+      if r.nullable = 'N'
+      then
+         -- add column to select list.
+         l_statement := l_statement || r.column_name || ',';
+      else
+         -- check if there is a row that has a value for this column
+         begin
+            l_test_statement := 'select 1 from dual where exists (select 1 from ' || l_table || ' where ' ||
+                                r.column_name || ' is not null)';
+            dbms_output.put_line(l_test_statement);
+            execute immediate l_test_statement
+               into l_contains_value;
+
+
+            -- Yes, add column to select list
+            l_statement := l_statement || r.column_name || ',';
+         exception
+            when no_data_found then
+               null;
+         end;
+
+      end if;
+   end loop;
+
+   -- create a select statement
+   l_statement := substr(l_statement, 1, length(l_statement) - 1) || ' from ' || l_table;
+
+end;
+</code></pre>

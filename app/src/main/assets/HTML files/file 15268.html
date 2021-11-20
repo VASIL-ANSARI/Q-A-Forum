@@ -1,0 +1,36 @@
+<p>Your database schema looks like you can add only one tag for an image, but your using "tags" in your description. Lets asume this is your table schema Image: (ImageId, Name), and Tag(TagId, ImageId, Tag). Make the appropriate modifications if necessary. </p>
+
+<p>Now create the synonyms table as a cached table, that can be updated from as a cron job.</p>
+
+<pre><code>SELECT rel.Tag as related_tag, tag.Tag as tag, COUNT(tag.Tag) as connections 
+FROM tags rel
+LEFT JOIN tags tag ON tag.ImageId = rel.ImageId
+GROUP BY tag.Tag
+WHERE COUNT(tag.Tag) &gt; 5 -- Use $image_count/10 or 100 or other appropriate value
+</code></pre>
+
+<p>And then insert rows into the cached tabled. If you don't have a lot of images you can just call this query each time.</p>
+
+<p>So if your table looks like this</p>
+
+<pre><code>1, 1, baby
+2, 2, car
+3, 1, smile
+4, 1, laugh
+5, 1, child
+6, 2, baby
+7, 2, child
+</code></pre>
+
+<p>Your result will be:
+(tag, related_tag, connections)</p>
+
+<pre><code>baby, smile, 1
+baby, laugh, 1
+baby, child, 2
+smile, baby, 1
+smile, laugh, 1
+...
+</code></pre>
+
+<p>This way you can create a table that shows which tags appear together in 5 images or more.</p>

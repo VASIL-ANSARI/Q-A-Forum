@@ -1,0 +1,33 @@
+<p>This doesn't answer your question directly but this is a workaround using the <a href="http://docs.python.org/library/multiprocessing.html" rel="nofollow">multiprocessing</a> module instead:</p>
+
+<pre><code>from multiprocessing import Pipe, Process
+import urllib
+from tempfile import NamedTemporaryFile
+
+
+def download(conn, sitecodelist):
+    lista = []
+    for k in sitecodelist:
+        url = 'http://waterdata.usgs.gov/nwis/monthly?referred_module=sw&amp;site_no='
+        url += k
+        url += '&amp;PARAmeter_cd=00060&amp;partial_periods=on&amp;format=rdb&amp;submitted_form=parameter_selection_list'
+        tmp = NamedTemporaryFile(delete=False)
+        urllib.urlretrieve(url, tmp.name)
+        print 'loaded Monthly data for sitecode : ',  k
+        lista.append(tmp.name)
+    conn.send(lista)
+
+sitecodelist = ['01046500', '01018500', '01010500', '01034500', '01059000', '01066000', '01100000']
+
+parent, child = Pipe()
+process = Process(target=download, args=(child, sitecodelist))
+process.start()
+
+data = parent.recv()
+print 'Data: ', data
+process.join()
+</code></pre>
+
+<p>And just in case, this a question about using multiprocessing or threading in your Python script: <a href="http://stackoverflow.com/questions/1226584/multiprocess-or-threading-in-python">multiprocess or threading in python?</a></p>
+
+<p>Hope that helps!</p>

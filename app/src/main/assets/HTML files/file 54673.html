@@ -1,0 +1,96 @@
+<p>There area few flaws in your approach.  <code>ValidatorsBase</code> apparently also serves as the <code>ErrorText</code> version, and the <code>RegularExpression</code> Type is not shown.</p>
+
+<ul>
+<li>The property you are extending is of Type <code>ValidatorsBase</code>, but this will not allow you to set the <code>Required</code> nor <code>RegEx</code> text properties for the more specific types.  Those properties exist on <em>other</em> Types.</li>
+<li>If the property is left null for <code>None</code>, the VS IDE wont like it; nor will you because you will have to do lots of <code>If thisCrtl.Validator1 IsNot Nothing Then...</code></li>
+<li>I dont know how these objects are used, but you are not creating any at all, so any designer assignments are lost.</li>
+</ul>
+
+<hr>
+
+<p>If you abstract it a little, it appears there are maybe 3 pieces of info: <strong>Validation Rule</strong> (None, ErrorMsg, Required, RegEx), <strong>Some text</strong> used as either the msg or the RegEx depending on the Rule, <strong>A Boolean</strong> for Required.</p>
+
+<p>So, using a simple class for these, with the basic <code>ExpandableObjectConverter</code> does close to what you want:</p>
+
+<pre><code>' simple, easy TypeConverter to expand the object to reveal the properties
+&lt;TypeConverter(GetType(ExpandableObjectConverter))&gt;
+Public Class Validator
+    Public Property Rule As ControlValidator.ValidationRule
+    Public Property ValidationText() As String
+    &lt;Description("This field is Required By Law")&gt;
+    Public Property Required As Boolean
+
+    Public Sub New()
+
+    End Sub
+
+    Public Sub New(r As ControlValidator.ValidationRule)
+        Rule = r
+    End Sub
+
+    Public Overrides Function ToString() As String
+        Return Rule.ToString()
+    End Function
+End Class
+</code></pre>
+
+<p>Then, the Extender:</p>
+
+<pre><code>&lt;ProvideProperty("Validator", GetType(Control))&gt;
+Public Class ControlValidator
+    Inherits Component
+    Implements IExtenderProvider
+
+    Public Enum ValidationRule
+        None
+        RequiredField
+        RegularExpression
+    End Enum
+
+    Private helpTexts As Dictionary(Of Control, Validator)
+</code></pre>
+
+<p>(Tip: if you limit <code>CanExtend</code> to one control, like <code>TextBox</code> or <code>NumericUpDn</code> initially, you wont have hundreds of lines of designer code invalidated when you change your mind about a name or property type.)</p>
+
+<p>Your Get/Set pair needs to create them:</p>
+
+<pre><code>&lt;Category("Uber Validator"), DisplayName("Validator")&gt;
+&lt;Description("Validation type to apply to this control")&gt;
+Public Function GetValidator(ByVal ctrl As Control) As Validator
+    If helpTexts.ContainsKey(ctrl) Then
+        Return helpTexts(ctrl)
+    Else
+        Return New Validator(ValidationRule.None)
+    End If
+End Function
+
+Public Sub SetValidator(ByVal ctrl As Control, ByVal value As Validator)
+    If helpTexts.ContainsKey(ctrl) Then
+        helpTexts(ctrl) = value
+    Else
+        helpTexts.Add(ctrl, value)
+    End If
+End Sub
+</code></pre>
+
+<p>Decorated as shown, you can change the awful default display for Extended Properties:</p>
+
+<p><a href="http://i.stack.imgur.com/ITPyu.jpg" rel="nofollow"><img src="http://i.stack.imgur.com/ITPyu.jpg" alt="enter image description here"></a></p>
+
+<p><em>So far</em>, VS is able to serialize the <code>Validator</code> for us.  Designer code:</p>
+
+<pre><code>Validator2.Required = False
+Validator2.Rule = ControlValidator.ValidationRule.None
+Validator2.ValidationText = Nothing
+Me.ControlValidator1.SetValidator(Me.nud2, Validator2)
+</code></pre>
+
+<p>As is, my <code>Validator</code> is little more than a holder for the info you appear to need.  This provides a variety of ways to use it though:</p>
+
+<ul>
+<li>That class could implement the validation logic conditionally based on the Rule</li>
+<li>The class could create "real" helper validaters internally </li>
+<li>Your code could fetch the data and create "real" validater objects from it</li>
+</ul>
+
+<p>You might find an all-in-one Validator more useful: For instance, <code>ErrorText</code> might be useful for both <code>RegEx</code> and <code>Required</code> Rules.</p>

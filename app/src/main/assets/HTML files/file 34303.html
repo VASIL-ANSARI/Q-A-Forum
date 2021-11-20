@@ -1,0 +1,46 @@
+<p>Currently to be able to get more information about the logged in user, you need to make a second call to the service to retrieve the user info. You don't really need to ask for additional login scopes (the topic of the post you mentioned) to retrieve the user name, since that is given by default for all the providers.</p>
+
+<p><a href="http://blogs.msdn.com/b/carlosfigueira/archive/2012/10/25/getting-user-information-on-azure-mobile-services.aspx" rel="nofollow">This post</a> should have the code you need to write in the server side (node.js) to get more information about the logged in user. The TL;DR version is given below:</p>
+
+<p>On the server side: add this custom API (I'll call it "<strong>userInfo</strong>"; set the permission of GET to "user", and all others to admin):</p>
+
+<pre><code>exports.get = function(request, response) {
+    var user = request.user;
+    user.getIdentities({
+        success: function(identities) {
+            var accessToken = identities.microsoft.accessToken;
+            var url = 'https://apis.live.net/v5.0/me/?method=GET&amp;access_token=' + accessToken;
+            var requestCallback = function (err, resp, body) {
+                if (err || resp.statusCode !== 200) {
+                    console.error('Error sending data to the provider: ', err);
+                    response.send(statusCodes.INTERNAL_SERVER_ERROR, body);
+                } else {
+                    try {
+                        var userData = JSON.parse(body);
+                        response.send(200, userData);
+                    } catch (ex) {
+                        console.error('Error parsing response from the provider API: ', ex);
+                        response.send(statusCodes.INTERNAL_SERVER_ERROR, ex);
+                    }
+                }
+            }
+            var req = require('request');
+            var reqOptions = {
+                uri: url,
+                headers: { Accept: "application/json" }
+            };
+            req(reqOptions, requestCallback);
+        }
+    });
+}
+</code></pre>
+
+<p>On the client side, after a successful login, call that API:</p>
+
+<pre><code>user = await MobileServices.MobileService
+    .LoginAsync(MobileServiceAuthenticationProvider.MicrosoftAccount);
+var userInfo = await MobileServices.MobileService.InvokeApiAsync(
+    "userInfo", HttpMethod.Get, null);
+</code></pre>
+
+<p><code>userInfo</code> will contain a <code>JObject</code> with the user information. There is an open feature request to make this better at <a href="http://feedback.azure.com/forums/216254-mobile-services/suggestions/5211616-ability-to-intercept-the-login-response" rel="nofollow">http://feedback.azure.com/forums/216254-mobile-services/suggestions/5211616-ability-to-intercept-the-login-response</a>.</p>

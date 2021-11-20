@@ -1,0 +1,72 @@
+<p>I have figured out how to send security header in response.</p>
+
+<p>Lets take an example. I have calling <strong>NotifyTransportRequest</strong> from my soap client.
+By calling client I am passing below header using mentioned code.</p>
+
+<pre><code>//Setting Security Header - Start 
+$authHeader = new stdClass();
+$authHeader-&gt;UsernameToken-&gt;Username = "user";
+$authHeader-&gt;UsernameToken-&gt;Password = "password";
+$authHeader-&gt;Timestamp-&gt;Created = "2013-12-31T07:15:41.135Z";
+$authHeader-&gt;Timestamp-&gt;Expires = "2013-12-31T07:16:41.135Z";
+$Headers[] = new SoapHeader('http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-     wssecurity-secext-1.0.xsd', 'Security', $authHeader,TRUE);
+// Setting Security Header - End
+
+// Setting Security Header for Authentication - Start.
+$Client-&gt;__setSoapHeaders($Headers);
+// Setting Security Header for Authentication - End.
+</code></pre>
+
+<p>by this code it is passing below security header in Soap request.</p>
+
+<pre><code>&lt;s:Header&gt;
+    &lt;o:Security s:mustUnderstand="1" xmlns:o="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"&gt;
+     &lt;u:Timestamp u:Id="_0"&gt;
+       &lt;u:Created&gt;2014-01-16T12:39:31.050Z&lt;/u:Created&gt;
+       &lt;u:Expires&gt;2014-01-16T12:40:31.050Z&lt;/u:Expires&gt;
+     &lt;/u:Timestamp&gt;
+     &lt;o:UsernameToken u:Id="uuid-6065f07d-c852-45c7-8df4-ef9b566b9536-1"&gt;
+        &lt;o:Username&gt;user&lt;/o:Username&gt;
+        &lt;o:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText"&gt;password&lt;/o:Password&gt;
+      &lt;/o:UsernameToken&gt;
+    &lt;/o:Security&gt;
+ &lt;/s:Header&gt;
+</code></pre>
+
+<p>Now when I return from Soap Header, I need to pass below code before returning something.</p>
+
+<pre><code>    $headerStart = strtotime(date('Y-m-d H:i:s')) - (1*60);
+    $headerEnd   = strtotime(date('Y-m-d H:i:s')) + (1*60);
+
+    $authHeader = new stdClass();
+    $authHeader-&gt;UsernameToken-&gt;Username = "user";
+    $authHeader-&gt;UsernameToken-&gt;Password = "password";
+    $authHeader-&gt;Timestamp-&gt;Created = gmdate('Y-m-d\TH:i:s.u\Z', $headerStart);
+    $authHeader-&gt;Timestamp-&gt;Expires = gmdate('Y-m-d\TH:i:s.u\Z', $headerEnd);
+    $Header = new SoapHeader('http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd', 'Security', $authHeader, false);
+
+    $GLOBALS['server']-&gt;addSoapHeader($Header);
+</code></pre>
+
+<p>It will add Soap Header in Response.</p>
+
+<pre><code> &lt;SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:ns2="https://67.231.18.69/~verttest/dispatch/soap/medivan.wsdl"&gt;
+      &lt;SOAP-ENV:Header&gt;
+         &lt;ns1:Security&gt;
+             &lt;UsernameToken&gt;
+                &lt;Username&gt;user&lt;/Username&gt;
+                &lt;Password&gt;password&lt;/Password&gt;
+             &lt;/UsernameToken&gt;
+             &lt;Timestamp&gt;
+                &lt;Created&gt;2014-01-16T12:40:28.000000Z&lt;/Created&gt;
+                &lt;Expires&gt;2014-01-16T12:42:28.000000Z&lt;/Expires&gt;
+             &lt;/Timestamp&gt;
+       &lt;/ns1:Security&gt;
+    &lt;/SOAP-ENV:Header&gt;
+    &lt;SOAP-ENV:Body&gt;
+             .
+             .
+             .
+    &lt;/SOAP-ENV:Body&gt;
+  &lt;/SOAP-ENV:Envelope&gt;
+</code></pre>

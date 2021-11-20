@@ -1,0 +1,81 @@
+<p>My guess is that you'll eventually need to talk to Unity. Game center will use cached credentials when there's no network connectivity to report that it successfully connected to the server and authenticated, even though it didn't. I have a bug open--and an ongoing discussion--with Apple on this. This behavior allows some game types to continue even when there's no network, then sync up later when connection is restored. However, I ran into problems where I assumed I could do things because GC said it was authenticated, but I really couldn't because it really wasn't. :/</p>
+
+<p>This means apps have to handle three cases:</p>
+
+<ul>
+<li>successful authentication with GC</li>
+<li>failed authentication with GC</li>
+<li>failed authentication, but reported as successful based on cached data</li>
+</ul>
+
+<p>It's possible that Unity doesn't handle the third situation. To confirm or refute this, try the following:</p>
+
+<p><strong>Confirm that Unity does cleanly handle authentication failures</strong></p>
+
+<ol>
+<li><p>establish connectivity</p></li>
+<li><p>log out of game center</p></li>
+<li><p>Break connectivity (airplane mode, etc)</p></li>
+<li><p>Retry your app</p></li>
+</ol>
+
+<p>I would expect that <code>success</code> would be false at this point and run cleanly. </p>
+
+<p>If that works as expected, I'd talk to Unity about how they handle Game Center reporting a (cached) success in a disconnected situation.</p>
+
+<p><strong>Edit2:</strong></p>
+
+<p>I had to go back and look at my code to see exactly how I hardened against it. The scenario was: while completely disconnected and/or in airplane mode, Game Center was presenting the "welcome back" message and <code>localPlayer.authenticated</code> was set to <code>YES</code>... BUT, the error code was set and complaining that it couldn't connect.</p>
+
+<p>I opened bug 22232706, "[GKLocalPlayer localPlayer].authenticated always returns true after any authentication handler is set," and which still has an ongoing discussion. Apple confirmed the behavior, but says its intended.</p>
+
+<p>Below is how I hardened my authentication handler to deal with this situation. It won't help you since Unity is handling this for you, but I thought other readers may find this helpful. (The TL;DR version is: always <em>always</em> <strong>always</strong> check the error code first, before you check <code>.authenticated</code> or before you check if <code>viewController</code> is set)</p>
+
+<pre><code>[localPlayer setAuthenticateHandler:^(UIViewController *loginViewController, NSError *error)
+ {
+    //Note: this handler fires once when you call setAuthenticated, and again when the user completes the login screen (if necessary)
+
+     //did we get an error? Could be the result of either the initial call, or the result of the login attempt
+     //Very important: ALWAYS check `error` before checking for a viewController or .authenticated.
+     if (error)
+     {
+         //Here's a fun fact... even if you're in airplane mode and can't communicate to the server,
+         //when this call back fires with an error code, localPlayer.authenticated is sometimes set to YES despite the total failure. &gt;&lt;
+         //combos seen so far:
+         //error.code == -1009 -&gt; authenticated = YES
+         //error.code == 2 -&gt; authenticated = NO
+         //error.code ==3 -&gt; authenticated = YES
+
+         if ([GKLocalPlayer localPlayer].authenticated == YES)
+         {
+             NSLog(@"error.code = %ld but localPlayer.authenticated = %d", (long)error.code, [GKLocalPlayer localPlayer].authenticated);
+         }
+
+         //Do stuff here to disable network play, disable buttons, warn users, etc.
+         return;
+     }
+
+     //if we received a loginViewContoller, then the user needs to log in.
+     if (loginViewController)
+     {
+         //the user isn't logged in, so show the login screen.
+         [rootVC2 presentViewController:loginViewController animated:NO completion:^
+          {
+
+              //was the login successful?
+              if ([GKLocalPlayer localPlayer].authenticated)
+              {
+                    //enable network play, or refresh matches or whatever you need to do...
+              }
+          }];
+     }
+
+     //if there was not loginViewController and no error, then the user is alreay logged in
+     else
+     {
+         //the user is already logged in
+         //refresh matches, leaderboards, whatever you need to do...
+     }
+
+ }];
+</code></pre>

@@ -1,0 +1,95 @@
+<p>Assuming configuration manager is flat, i.e. it looks like this:</p>
+
+<pre><code>interface IConfigurationManager
+{
+    void Get(ConfigurationKey key);
+    void Set(ConfigurationKey key, string value);
+}
+
+public class ConfigurationKey
+{
+    public ConfigurationKey(string name)
+    {
+        Name = name;
+    }
+
+    public string Name { get; private set; }
+}
+</code></pre>
+
+<p>I came up with this approach:</p>
+
+<pre><code>public static class ConfigurationKeys
+{
+    public static class Root
+    {
+        public static class Database
+        {
+            public static ConfigurationKey Host;
+            public static ConfigurationKey Port;
+            public static ConfigurationKey User;
+        }
+
+        public static class X
+        {
+            public static ConfigurationKey Enabled;
+        }
+
+        public static class Y
+        {
+            public static ConfigurationKey Enabled;
+        }
+    }
+
+    public static void Build()
+    {
+        Build(typeof (ConfigurationKeys));
+    }
+
+    private static void Build(Type type)
+    {
+        var configurationKeyFields = type
+            .GetFields()
+            .Where(field =&gt; field.FieldType == typeof (ConfigurationKey));
+
+        foreach (FieldInfo field in configurationKeyFields)
+            field.SetValue(null, CreateConfigurationKey(type, field));
+
+        var nestedClasses = type.GetNestedTypes().Where(nestedType =&gt; nestedType.IsClass);
+        foreach (Type nestedClass in nestedClasses)
+            Build(nestedClass.UnderlyingSystemType);
+    }
+
+    private static ConfigurationKey CreateConfigurationKey(Type type, FieldInfo field)
+    {
+        var parentPath = type.FullName.Substring(typeof (Root).FullName.Length + 1).Replace("+", "/");
+        return new ConfigurationKey(parentPath + "/" + field.Name);
+    }
+}
+</code></pre>
+
+<p>Now it's easy to access it by something like:</p>
+
+<pre><code>ConfigurationKeys.Build();
+var cm = new ConfigurationManager();
+cm.Set(ConfigurationKeys.Root.Database.Host, "localhost");
+
+ConfigurationKeys.Root.Database.Host // == "Database/Host"
+</code></pre>
+
+<p>Pros:</p>
+
+<ul>
+<li>readable</li>
+<li>easy to refactor</li>
+<li>almost no boilerplate</li>
+<li>nested, thus successfully depicting reality and Intellisense-friendly</li>
+</ul>
+
+<p>Cons:</p>
+
+<ul>
+<li>almost impossible to mock it in tests due to static classes and nested types</li>
+<li>difficult to port to other languages due to its reliance on reflection usage</li>
+<li>bogus call to a method like <code>Build()</code>; unfortunately, it cannot be superseded with static constructor because accessing nested types wouldn't fire parent static constructors, and supplying each nested type with static constructor adds boilerplate</li>
+</ul>

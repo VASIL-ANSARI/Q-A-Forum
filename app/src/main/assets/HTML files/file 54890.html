@@ -1,0 +1,18 @@
+<p>It's doable, but might be an overkill (especially if you don't have to keep the history of the request/responses). Imagine a simple scenario with two processes: C (client) and S (server). Create two <code>IndexedChronicles</code>:</p>
+
+<ul>
+<li><code>Q1</code> for sending requests from <code>C</code> to <code>S</code></li>
+<li><code>Q2</code> for sending responses from <code>S</code> to <code>C</code></li>
+</ul>
+
+<p>Server has a thread that is polling (busy spin with back-off) on <code>Q1</code>. When it receives a request (with <code>id=x</code> it does whatever is needed and writes out response to <code>Q2</code> (with <code>id=x</code>. <code>C</code> polls <code>Q2</code> with some policy and reads out responses as they appear. It uses the <code>id</code> to tie responses to requests.</p>
+
+<p>Main task would be in devising a wire-level protocol for serialising your commands (equivalent of the method calls) from the client. This is application specific and can be done efficiently with the Chronicle tools.</p>
+
+<p>Another issues to consider:</p>
+
+<ul>
+<li>what should the client do with the historical responses on startup?</li>
+<li>some heartbeat system so that client knows the server is alive</li>
+<li>archiving of the old queues (<code>VanillaChronicle</code> makes it easier at some cost)</li>
+</ul>

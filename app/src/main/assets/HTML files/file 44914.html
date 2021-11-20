@@ -1,0 +1,65 @@
+<h3>Basic <code>UPDATE</code></h3>
+
+<p>Replace the first query with this much shorter and more efficient single <code>UPDATE</code> command:</p>
+
+<pre><code>UPDATE features
+SET   (x1,x2,x3,x4,x5,x6, y)   
+    = ((x1 - g.avg1) / g.range1
+     , (x2 - g.avg2) / g.range2
+ --  , (x3 - ...
+     , (y  - g.avgy) / g.rangey)
+FROM (
+   SELECT avg(x1) AS avg1, max(x1) - min(x1) AS range1
+        , avg(x2) AS avg2, max(x2) - min(x2) AS range2
+     -- , avg(x3) ...
+        , avg(y) AS avgy, max(y) - min(y) AS rangey
+   FROM   features
+   ) g;
+</code></pre>
+
+<p>About the short <code>UPDATE</code> syntax:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/2763817/sql-update-fields-of-one-table-from-fields-of-another-one/23283792#23283792">SQL update fields of one table from fields of another one</a></li>
+</ul>
+
+<h3>Dynamic function</h3>
+
+<p>Building on the simpler query, here is a dynamic function for any number of columns:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION scale_function_dyn()
+  RETURNS void AS
+$func$
+DECLARE
+   cols text;  -- list of target columns
+   vals text;  -- list of values to insert
+   aggs text;  -- column list for aggregate query
+BEGIN
+   SELECT INTO cols, vals, aggs
+          string_agg(quote_ident(attname), ', ')
+        , string_agg(format('(%I - g.%I) / g.%I'
+                          , attname, 'avg_' || attname, 'range_' || attname), ', ')
+        , string_agg(format('avg(%1$I) AS %2$I, max(%1$I) - min(%1$I) AS %3$I'
+                          , attname, 'avg_' || attname, 'range_' || attname), ', ')
+   FROM   pg_attribute
+   WHERE  attrelid = 'features'::regclass
+   AND    attname NOT IN ('n', 'x0')  -- exclude columns from update
+   AND    NOT attisdropped            -- no dropped (dead) columns
+   AND    attnum &gt; 0;                 -- no system columns
+
+   EXECUTE format('UPDATE features
+                   SET   (%s) = (%s)
+                   FROM  (SELECT %s FROM features) g'
+                 , cols, vals, aggs);
+
+END
+$func$  LANGUAGE plpgsql;
+</code></pre>
+
+<p>Related answer with more explanation:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/15343075/update-multiple-columns-in-a-trigger-function-in-plpgsql/15351196#15351196">Update multiple columns in a trigger function in plpgsql</a></li>
+</ul>
+
+<p><a href="http://www.sqlfiddle.com/#!15/2c695/1" rel="nofollow"><strong>SQL Fiddle.</strong></a></p>

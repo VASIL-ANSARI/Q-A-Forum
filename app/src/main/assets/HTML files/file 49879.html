@@ -1,0 +1,198 @@
+<p>One option would be to manage the infoboxes separately, have a separate array for each set of markers, add those infoboxes associated with the each layer when the layer is displayed or remove them from the map when hidden:</p>
+
+<pre><code>// in the global scope
+var labelArray = [];
+var labelArraySub = [];
+
+
+function newLabel(feature) {
+    labelID = "lb" + feature.getProperty('MGNT_AREA').toString();
+    var LatLong = feature.getGeometry().get();
+    var label = new InfoBox({
+        content: feature.getProperty('MGNT_AREA'),
+        boxStyle: {
+            textAlign: "center",
+            fontSize: "8pt",
+            width: "50px"
+        },
+        disableAutoPan: true,
+        pixelOffset: new google.maps.Size(-25, -24),
+        position: LatLong,
+        closeBoxURL: "",
+        isHidden: false,
+        enableEventPropagation: true
+    });
+    label.open(map);
+    return label;
+}
+
+var areaIcon = function (feature) {
+    labelArray.push(newLabel(feature)); 
+    return ({
+        icon: 'http://maps.google.com/mapfiles/ms/micons/blue.png'
+    });
+};
+var areaIconS = function (feature) {
+    labelArraySub.push(newLabel(feature)); 
+    //return ({ icon: 'labels/num_icon.png' });
+};
+
+var styleFeatures = function (hp, hsp) {
+    harvestPoints.setStyle(hp);
+    harvestSubPoints.setStyle(hsp);
+    toggleFeatures(typeof hsp == "function");
+};
+
+function toggleFeatures(sub) {
+    for (var i = 0; i &lt; labelArray.length; i++) {
+        labelArray[i].setVisible(!sub);
+    }
+    for (var i = 0; i &lt; labelArraySub.length; i++) {
+        labelArraySub[i].setVisible(sub);
+    }
+}
+</code></pre>
+
+<p><a href="https://jsfiddle.net/geocodezip/9jzh41jr/6/" rel="nofollow">proof of concept fiddle</a></p>
+
+<p><strong>code snippet:</strong></p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var map;
+
+var mapOptions = {
+  center: {
+    lat: 49.5,
+    lng: -126.5
+  },
+  zoom: 8,
+  maxZoom: 15,
+  minZoom: 7,
+  scaleControl: true
+};
+
+var labelArray = [];
+var labelArraySub = [];
+
+//initMap initiates all the styles and listeners
+function initMap() {
+
+    map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+    var harvestPoints = new google.maps.Data();
+    harvestPoints.loadGeoJson('https://api.myjson.com/bins/1d9u6');
+
+    var harvestSubPoints = new google.maps.Data();
+    harvestSubPoints.loadGeoJson('https://api.myjson.com/bins/3g2qm');
+
+
+    function newLabel(feature) {
+      labelID = "lb" + feature.getProperty('MGNT_AREA').toString();
+      var LatLong = feature.getGeometry().get();
+      var label = new InfoBox({
+        content: feature.getProperty('MGNT_AREA'),
+        boxStyle: {
+          textAlign: "center",
+          fontSize: "8pt",
+          width: "50px"
+        },
+        disableAutoPan: true,
+        pixelOffset: new google.maps.Size(-25, -24),
+        position: LatLong,
+        closeBoxURL: "",
+        isHidden: false,
+        enableEventPropagation: true
+      });
+      label.open(map);
+      return label;
+    }
+    var areaIcon = function(feature) {
+      labelArray.push(newLabel(feature)); //this does not work for some reason
+      //there is a custom icon I use for the real page. I won't bother with it here.
+      return ({
+        icon: 'http://maps.google.com/mapfiles/ms/micons/blue.png'
+      });
+    };
+    var areaIconS = function(feature) {
+      labelArraySub.push(newLabel(feature)); //this does not work for some reason
+      //there is a custom icon I use for the real page. I won't bother with it here.
+      //return ({ icon: 'labels/num_icon.png' });
+    };
+
+
+    var vFalse = {
+      visible: false
+    };
+
+    var styleFeatures = function(hp, hsp) {
+      harvestPoints.setStyle(hp);
+      harvestSubPoints.setStyle(hsp);
+      toggleFeatures(typeof hsp == "function");
+    };
+
+    function toggleFeatures(sub) {
+      for (var i = 0; i &lt; labelArray.length; i++) {
+        labelArray[i].setVisible(!sub);
+      }
+      for (var i = 0; i &lt; labelArraySub.length; i++) {
+        labelArraySub[i].setVisible(sub);
+      }
+    }
+    styleFeatures(areaIcon, vFalse);
+
+    //global InfoWindow variables to display the detailed status text for the subAreaPoints
+    var infowindow = new google.maps.InfoWindow({
+      maxWidth: 300
+    });
+
+    harvestSubPoints.addListener('click', function(event) {
+      infowindow.setPosition(event.latLng);
+      //the label and the status details are displayed seperated by a ": "
+      infowindow.setContent(event.feature.getProperty('LABEL') + ": " + event.feature.getProperty('Details'));
+      infowindow.open(map);
+    });
+
+    map.addListener('zoom_changed', function(event) {
+      currentZoom = map.getZoom();
+      console.log("currentZoom = " + currentZoom);
+      if (currentZoom &gt; 9) {
+        styleFeatures(vFalse, areaIconS);
+      } else if (currentZoom &lt;= 9) {
+        styleFeatures(areaIcon, vFalse);
+        infowindow.close(map);
+      }
+    });
+
+    harvestSubPoints.setMap(map);
+    harvestPoints.setMap(map);
+    console.log("initMap() finished");
+  } //close the initMap function
+
+google.maps.event.addDomListener(window, 'load', initMap);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+#map {
+  height: 100%;
+  width: 100%;
+}
+.labels {
+  font-family: "Lucida Grande", "Arial", sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  width: 40px;
+  white-space: nowrap;
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://maps.googleapis.com/maps/api/js"&gt;&lt;/script&gt;
+&lt;script src="https://google-maps-utility-library-v3.googlecode.com/svn/trunk/infobox/src/infobox.js"&gt;&lt;/script&gt;
+&lt;title&gt;Label points&lt;/title&gt;
+&lt;div id="map"&gt;&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

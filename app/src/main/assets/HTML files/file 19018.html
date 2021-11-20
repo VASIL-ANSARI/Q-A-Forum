@@ -1,0 +1,33 @@
+<p>You're pretty close. A few pointers:</p>
+
+<ul>
+<li>The outer loop will need to be a <code>foreach</code> loop, as you can't, in general, efficiently access an <code>IEnumerable</code> by index.</li>
+<li><a href="http://msdn.microsoft.com/en-us/library/kyaxdd3x.aspx" rel="nofollow"><code>GetProperties</code></a> requires either <code>BindingFlags.Static</code> or <code>.Instance</code> in order to return anything.</li>
+<li>You get the actual value by calling <a href="http://www.google.co.uk/url?q=http://msdn.microsoft.com/en-us/library/b05d59ty.aspx&amp;sa=U&amp;ei=dBhsUMC_Ooek0QXKs4HICA&amp;ved=0CBUQFjAA&amp;usg=AFQjCNHbXNOOgl7GdLGriwCCRontn673JQ" rel="nofollow"><code>propertyInfos[j].GetValue</code></a>, passing in the <code>T</code>-instance you want to get it from and an array of indexer values - null for regular properties, but if your objects might have indexed properties you'll either need to figure out something to pass here or handle an exception which might be thrown otherwise.</li>
+</ul>
+
+<p>I get something like this:</p>
+
+<pre><code>public object[,] ConvertListToObject&lt;T&gt;(IEnumerable&lt;T&gt; DataSource)
+{
+    int rows = DataSource.Count();
+    //Get array of properties of the type T
+    PropertyInfo[] propertyInfos;
+    propertyInfos = typeof(T).GetProperties(
+        BindingFlags.Public |
+        BindingFlags.Instance); // or .Static
+    int cols = propertyInfos.Length;
+    //Create object array with rows/cols
+    object[,] excelarray = new object[rows, cols];
+    int i = 0;
+    foreach (T data in DataSource) //Outer loop
+    {
+        for (int j = 0; j &lt; cols; j++) //Inner loop
+        {
+            excelarray[i, j] = propertyInfos[j].GetValue(data, null);
+        }
+        i++;
+    }
+    return excelarray;
+}
+</code></pre>

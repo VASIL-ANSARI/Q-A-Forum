@@ -1,0 +1,47 @@
+<p>When you call <code>send_message</code> in your controller, you pass <code>@question</code> as a recipient. It means that the first receipt is indeed built with the <code>question_id</code> as <code>receiver_id</code>. But from what I understand, you want the question's recipient to be sent the message. Simply replace your send_message call with:</p>
+
+<pre><code>current_user.send_message(@question.recipient, @question.question, "You have a question from #{@question.sender_id}") 
+</code></pre>
+
+<p><strong>What's happening behind the scene</strong></p>
+
+<p>The Receipt table from mailboxer can be considered as a proof that a notification has been sent. In your model, by adding</p>
+
+<pre><code>acts_as_messageable
+</code></pre>
+
+<p>You include the <code>Messageable</code> module described in the mailboxer documentation, including the following <code>send_message</code> method:</p>
+
+<pre><code>def send_message(recipients, msg_body, subject, sanitize_text=true, attachment=nil, message_timestamp = Time.now)
+  # message = ...
+  # message building stuff happening
+
+  message.deliver false, sanitize_text
+end
+</code></pre>
+
+<p>When you call that method from your controller, it calls the deliver method on this newly created message. Here's the interesting bits of that method, extracted from the mailboxer documentation:</p>
+
+<pre><code>def deliver(reply = false, should_clean = true)
+  # ... some stuff
+
+  #Receiver receipts
+  temp_receipts = recipients.map { |r| build_receipt(r, 'inbox') }
+
+  #Sender receipt
+  sender_receipt = build_receipt(sender, 'sentbox', true)
+
+  temp_receipts &lt;&lt; sender_receipt
+
+  if temp_receipts.all?(&amp;:save!)
+    # some other stuff
+  end
+  sender_receipt
+end
+</code></pre>
+
+<p>As you can see <code>temp_receipts = recipients.map { |r| build_receipt(r, 'inbox') }</code> builds a receipt for every recipient of the message.</p>
+
+<p>The second interesting line <code>sender_receipt = build_receipt(sender, 'sentbox', true)</code> builds a receipt for <strong>the sender</strong>. Which in your case is the <code>current_user</code>. </p>
+
+<p>Hope it helps.</p>

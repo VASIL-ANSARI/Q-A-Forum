@@ -1,0 +1,43 @@
+<p>This seems irregular certainly. But can you put more code in your question? Is it just that your while loop doesn't have a break if $char or $J is greater than some large number. We can't see what your whole loop is trying to do.</p>
+
+<p>What is the code you are removing? It isn't just these two lines is it? </p>
+
+<p>I would also say that 256M maybe isn't a huge amount of memory. If you up it do you still hit the new limit?</p>
+
+<p>***EDIT following comments below:</p>
+
+<p>Thank you for adding all the code. I'm sure you have analysed your code, but my only comment from here is about how the <code>while</code> loop functions. It seems <code>$char</code> is an integer number presumably counting up from <code>0</code> and you are matching that to a manufacturer label or level. Good, nothing wrong with that plan.</p>
+
+<p>But perhaps <code>$char</code> should be set back to zero at the very start of the <code>foreach</code> loop:</p>
+
+<pre><code>&lt;?php
+    $i=0;
+    $j=0;
+    foreach ($manufacturers as $manufacturer):
+      $char = 0;//or whatever its initial value should be
+      //...
+?&gt;
+</code></pre>
+
+<p>Because if the order of <code>$manufacturer</code> in <code>$manufacturers</code> is not ordered by increasing <code>$manufacturer['label'][0]</code> then the while loop will never stop because on eg the fifth iteration of the <code>foreach</code> loop <code>$char</code> might be <code>8</code> and <code>$manufacturer['label'][0]</code> might be <code>4</code>.</p>
+
+<p>Does that make sense? I don't know your code, but the while loop has no alternative exit and I think even if it is impossible, adding a fail-safe to the while loop would be prudent. Such as:</p>
+
+<pre><code>&lt;?php
+
+    $bailAt = PHP_INT_MAX - 1;//this is a very large number =&gt; wait a long time to bail
+    $bailAt = 32000; //if you have over 32000 manufacturers in Magento you probably have other issues too
+    while( ($manufacturer['label'][0] != $char) &amp;&amp; ($char &lt; $bailAt) ){
+      $char++;
+
+      //...
+    }//end while
+    if ($char==$bailAt){
+       //recover gracefully
+       echo("&lt;!-- there was an error building the manufacturer levels (reached maximum levels) --&gt;");
+       echo("&lt;/ul&gt;"); //you might not need that
+    }//end if
+?&gt;
+</code></pre>
+
+<p>But check the ordering of $manufacturers and reset <code>$char</code> to <code>0</code> at some point and see if it fixes things. If you do need to increase the memory and your system can't use <code>ini_set()</code> then you can edit <code>php.ini</code> file instead and set the memory limit there (and don't forget to restart your web server to apply the php.ini changes).</p>

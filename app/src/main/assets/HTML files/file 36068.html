@@ -1,0 +1,33 @@
+<p>Here's an idea - may still be too slow but I thought I'd share.  First, some dummy data.</p>
+
+<pre><code>df = pd.DataFrame(data={'Timestamp': 17210, 
+                        'Span': np.linspace(-1, 92, num=60000), 
+                        'Elevation': np.linspace(33., 37., num=60000)})
+</code></pre>
+
+<p>Then, take mesh array you created, turn it into a dataframe, and add a shifted entry, so each entry in the dataframe represents one step of the new even Span.</p>
+
+<pre><code>mesh_df = pd.DataFrame(mesh, columns=['Equal_Span'])
+mesh_df['Equal_Span_Prev'] = mesh_df['Equal_Span'].shift(1)
+mesh_df = mesh_df.dropna()
+</code></pre>
+
+<p>Next, I want to join this dataframe with the the larger dataset, based on the entry being between the two <code>Equal_Span</code> columns.  There may be a way in pandas, but cartesian-type joins seem much easier to express in SQL, so first, I'm shipping all the data to an in-memory sqlite database. If you run into memory problems I'd make this a file based db.</p>
+
+<pre><code>import sqlite3
+con = sqlite3.connect(':memory:')
+df.to_sql('df', con, index=False)
+mesh_df.to_sql('mesh_df', con, index=False)
+</code></pre>
+
+<p>Here's the main query.  Took about 1m30s on my test data, so this will likely still take a long time on the full dataset.</p>
+
+<pre><code>join_df = pd.read_sql("""SELECT a.Timestamp, a.Span, a.Elevation, b.Equal_Span
+                         FROM df a, mesh_df b
+                         WHERE a.Span BETWEEN b.Equal_Span_Prev AND b.Equal_Span""", con)
+</code></pre>
+
+<p>But once the data is in this form, it's easy/fast to get the desired mean.</p>
+
+<pre><code>join_df.groupby(['Timestamp','Equal_Span'])['Elevation'].mean()
+</code></pre>

@@ -1,0 +1,35 @@
+<p>The inner loop is equivalent to calling <code>assembly.GetType(classNameWithNameSpace)</code>, so you can skip it completely. This should take care of item 3 from your list.</p>
+
+<p>Item 2 can be solved by ensuring that <code>Assembly</code> does not have <code>IsDynamic</code> flag in .NET 4.0, or checking the namespace prior to 4.0.</p>
+
+<p>This code is suitable for .NET 2.0</p>
+
+<pre><code>IList&lt;Type&gt; matchingTypes = new List&lt;Type&gt;();
+foreach(Assembly a in AppDomain.CurrentDomain.GetAssemblies()) {
+    // Skip dynamic assemblies.
+    if (a.GetType().StartsWith("System.Reflection.Emit.")) {
+        continue;
+    }
+    Type t = a.GetType(classNameWithNameSpace);
+    if (t != null) {
+        matchingTypes.Add(t);
+    }
+}
+</code></pre>
+
+<p>Rewrite with LINQ and <code>IsDynamic</code> after .NET 4.0:</p>
+
+<pre><code>var matchingTypes = AppDomain
+    .CurrentDomain
+    .GetAssemblies()
+    .Where(a =&gt; !a.IsDynamic)
+    .Select(a =&gt; a.GetType(classNameWithNameSpace))
+    .Where(t =&gt; t != null)
+    .ToList();
+</code></pre>
+
+<p>The above gives you a list of all types with <code>classNameWithNameSpace</code>.</p>
+
+<p>Dealing with item #1 is something best left to your application. You need to decide what to do with each of the types on the <code>matchingTypes</code> list.</p>
+
+<p>It is useful to remember about <a href="https://msdn.microsoft.com/en-us/library/ms404275%28v=vs.110%29.aspx?f=255&amp;MSPPError=-2147217396" rel="nofollow"><em>type forwarding</em></a>. The list above will include both types. You can use <a href="https://msdn.microsoft.com/en-us/library/system.runtime.compilerservices.typeforwardedtoattribute(v=vs.110).aspx" rel="nofollow"><code>TypeForwardedToAttribute</code></a> to decide which type you should actually take.</p>

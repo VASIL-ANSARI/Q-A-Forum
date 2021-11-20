@@ -1,0 +1,64 @@
+<p>How is that behaviour not expected?  You are generating a random X position every time you display your cube.  If you re-seed the random number generator using the time, then it will be start a different sequence whenever the time changes (once per second).</p>
+
+<p>Instead, you should pre-generate your cube(s).  How about this:</p>
+
+<pre><code>// Global cube data
+struct Cube {
+    int x;
+    double angle;
+};
+
+vector&lt;Cube&gt; cubes;
+const int num_cubes = 1;
+
+// Example initialisation...
+void InitCubes()
+{
+    cubes.reserve(num_cubes);
+
+    for( int i = 0; i &lt; num_cubes; i++ )
+    {
+        Cube cube;
+        cube.x = rand() % (highv - lowv + 1) + lowv;
+        cube.angle = 0.0;
+        cubes.push_back(cube);
+    }
+}
+</code></pre>
+
+<p>Now the update/display cycles simply need to modify the angle, but not the x-position.</p>
+
+<pre><code>void UpdateCube( Cube &amp; cube )
+{
+    cube.angle += 0.05;
+}
+
+void DisplayCube( Cube &amp; cube )
+{
+    glTranslatef((double)cube.x, 0.0, cube.angle);
+    glRotatef(cube.angle, 90.0, 0.0, 1.0);
+    glutSolidCube(0.25);
+}
+</code></pre>
+
+<p>In your <strong>main</strong> function, call <code>InitCubes()</code> during startup.</p>
+
+<p>In your <strong>display</strong> function, do this:</p>
+
+<pre><code>void display(void)
+{
+    glClearColor(1.0,1.0,1.0,1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+    gluLookAt(cam_eyeX, cam_eyeY, cam_eyeZ, cam_centerX, cam_centerY, cam_centerZ, 0.0, 1.0, 0.0);    
+
+    // Display cubes        
+    for( int i = 0; i &lt; cubes.size(); i++ ) DisplayCube( cubes[i] );
+
+    glutSwapBuffers();
+    glFlush();
+
+    // Update cubes for next render cycle.
+    for( int i = 0; i &lt; cubes.size(); i++ ) UpdateCube( cubes[i] );
+}
+</code></pre>

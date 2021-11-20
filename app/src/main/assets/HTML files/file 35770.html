@@ -1,0 +1,70 @@
+<p>In our work on using OCaml in iOS, we often need to save OCaml closures and call them later (when interfacing to CocoaTouch libraries). So I have code that has been working for years. However, it's too complicated to make a good example (and it's written in Objective C). Here's some code I just wrote that captures the essence of what we're doing.</p>
+
+<p>First some C code that saves some number of closures of type <code>unit -&gt; unit</code> and lets you call them later by chronological index. (It's just an example.)</p>
+
+<pre><code>$ cat saveclo.c
+#include "caml/mlvalues.h"
+#include "caml/memory.h"
+#include "caml/callback.h"
+
+static value saved_closures[10];
+static int saved_closure_count = 0;
+
+
+value save_closure(value clo)
+{
+    CAMLparam1(clo);
+    saved_closures[saved_closure_count] = clo;
+    caml_register_global_root(&amp;saved_closures[saved_closure_count]);
+    saved_closure_count++;
+    CAMLreturn(Val_unit);
+}
+
+
+value call_closure(value index)
+{
+    CAMLparam1(index);
+    int ix = Int_val(index);
+    // For simplicity assume closure : unit -&gt; unit
+    (void) caml_callback(saved_closures[ix], Val_unit);
+    CAMLreturn(Val_unit);
+}
+</code></pre>
+
+<p>Then some OCaml code that exercises these functions:</p>
+
+<pre><code>$ cat clo.ml
+external save_closure : (unit -&gt; unit) -&gt; unit = "save_closure"
+external call_closure : int -&gt; unit = "call_closure"
+
+let save alist =
+    let howlong () =
+        Printf.printf "list length %d\n" (List.length alist)
+    in
+    save_closure howlong
+
+let call () =
+    call_closure 1;
+    call_closure 0
+
+let () =
+    save [1;2;3;4;5];
+    save ['a'; 'b'; 'c'; 'd'; 'e'; 'f'];
+    Gc.full_major();
+    call ()
+</code></pre>
+
+<p>A test run looks like this:</p>
+
+<pre><code>$ cc -I /usr/local/lib/ocaml -c -o saveclo.o saveclo.c
+$ ocamlopt -c clo.ml
+$ ocamlopt -o clo clo.cmx saveclo.o
+$ ./clo
+list length 6
+list length 5
+$ 
+</code></pre>
+
+<p>I think the salient points are (a) the OCaml object representing a closure already contains what you need (a code reference of some kind, and the data). (b) You don't need to copy it, you just need to make sure it doesn't get garbage collected. (c) The call to <code>caml_register_global_root</code> creates a reference to the closure so the GC knows not to collect it.</p>
+
+<p>I hope this is helpful. If anybody sees problems with this code, let me know and I'll be more than happy to correct errors. But I believe it's correct.</p>

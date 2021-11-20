@@ -1,0 +1,60 @@
+<p>You can do that <em>before</em> you sort.  The easiest way to identify duplicates is to use <code>GroupBy</code>.</p>
+
+<p>Since you're using anonymous types you can group by the items themselves:</p>
+
+<pre><code>var data = 
+    new[] {
+        new { A = 3, B = 3 },
+        new { A = 2, B = 2 },
+        new { A = 2, B = 2 },
+        new { A = 1, B = 1 }
+    };
+
+var groups = data.GroupBy(x =&gt; x); // works since we are using anonymous types that use value equality
+
+if(groups.Any(g =&gt; g.Count() &gt; 1)
+{
+   // throw exception
+}
+
+var result = groups.Select(g=&gt;g.Key)
+                   .OrderBy(x =&gt; x.A)
+                   .ThenBy(x =&gt; x.B)
+                   .ToList();
+</code></pre>
+
+<p>If you're not using anonymous types in reality then just group by the properties that you want to use to define "equality".</p>
+
+<p>You can also check for consecutive duplicate "inline" using an extension method:</p>
+
+<pre><code>public static IEnumerable&lt;T&gt; ThrowIfConsecutiveItemsAreEqual&lt;T&gt;(this IEnumerable&lt;T&gt; source)
+{
+    bool isFirst = true;
+    T prev = default(T);
+    foreach(var item in source)
+    {
+        if(!isFirst &amp;&amp; item.Equals(prev))
+            throw new Exception();  // TODO: use a better exception type and message
+
+        yield return item;
+
+        isFirst = false;
+        prev = item;
+    }
+}
+</code></pre>
+
+<p>calling the extension method <em>before</em> <code>ToList</code> to avoid multiple enumerations:</p>
+
+<pre><code>var query = 
+    new[] {
+    new { A = 3, B = 3 },
+    new { A = 2, B = 2 },
+    new { A = 2, B = 2 },
+    new { A = 1, B = 1 }
+}
+.OrderBy(x =&gt; x.A)
+.ThenBy(x =&gt; x.B)
+.ThrowIfConsecutiveItemsAreEqual()
+.ToList();
+</code></pre>

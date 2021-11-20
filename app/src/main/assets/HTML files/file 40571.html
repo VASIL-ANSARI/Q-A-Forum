@@ -1,0 +1,39 @@
+<p>You can use the following configuration:</p>
+
+<pre><code>/* Innermost mapping */
+Mapper.CreateMap&lt;CreateCompanyViewModel, PersonsName&gt;();
+// You don't need the individual member mappings since the names match.
+
+/* Second-level */
+Mapper.CreateMap&lt;CreateCompanyViewModel, Contact&gt;()
+    .ForMember(dest =&gt; dest.ContactName, opt =&gt; opt.MapFrom(src =&gt; src));
+
+/* Top level */
+Mapper.CreateMap&lt;CreateCompanyViewModel, Company&gt;()
+    .ForMember(dest =&gt; dest.MainContact, opt =&gt; opt.MapFrom(src =&gt; src));
+</code></pre>
+
+<p>The idea is that you use the source type (<code>CreateCompanyViewModel</code>) as the source for the nested types as well. You accomplish this using the <code>MapFrom(src =&gt; src)</code> call inside of <code>ForMember</code>.</p>
+
+<p><strong>Example:</strong> <a href="https://dotnetfiddle.net/XBJMba" rel="nofollow">https://dotnetfiddle.net/XBJMba</a></p>
+
+<p>Since the <code>src =&gt; src</code> bit looks a little odd, you could create an extension method that makes what you're doing more straightforward:</p>
+
+<pre><code>public static class AutoMapperExtensions
+{
+    public static void MapFromSelf&lt;TSourceType&gt;(
+        this IMemberConfigurationExpression&lt;TSourceType&gt; expression)
+    {
+        expression.MapFrom(s =&gt; s);
+    }
+}
+</code></pre>
+
+<p>Usage:</p>
+
+<pre><code>Mapper.CreateMap&lt;CreateCompanyViewModel, Contact&gt;()
+    .ForMember(dest =&gt; dest.ContactName, opt =&gt; opt.MapFromSelf());
+
+Mapper.CreateMap&lt;CreateCompanyViewModel, Company&gt;()
+    .ForMember(dest =&gt; dest.MainContact, opt =&gt; opt.MapFromSelf());
+</code></pre>

@@ -1,0 +1,53 @@
+<p>I use the following procedure:</p>
+
+<pre><code>DELIMITER //
+
+DROP PROCEDURE IF EXISTS create_group //
+CREATE PROCEDURE create_group(
+    IN create_group_group_name VARCHAR(150),
+    IN create_group_user_id INT
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION, SQLWARNING
+    BEGIN
+        ROLLBACK;
+    END;
+    START TRANSACTION;
+        INSERT INTO groups (group_name) VALUES (create_group_group_name);
+        INSERT INTO group_members (group_mem_user_id, group_mem_group_id, group_mem_role) VALUES (create_group_user_id, LAST_INSERT_ID(), 2);
+    COMMIT;
+END //
+
+DELIMITER ;
+</code></pre>
+
+<p>In my server I use it like:</p>
+
+<pre><code>JdbcTemplate jt = new JdbcTemplate(DB.getDataSource(DB_USER));
+int i = jt.update("CALL create_group (?,?)", new Object[] {groupName, userId});
+if (i != 1)
+    throw new SQLException("Error creating group with name=" + groupName + " for userid=" + userId);
+</code></pre>
+
+<p><code>i == 1</code> if everything went well. Groups will never be created if the user is not added as a member (fixing the problem with my first iteration below).</p>
+
+<p><strong>OLD</strong></p>
+
+<p>(non-transactional, causes a problem if the second insert fails then the group is created with no members, it might work in some cases which is why I leave it here but it doesn't work for me)</p>
+
+<p>The following procedure works. It does not return anything and I am just using the fact that the procedure completes without error to assume that it was all ok.</p>
+
+<pre><code>DELIMITER //
+
+DROP PROCEDURE IF EXISTS create_group //
+CREATE PROCEDURE create_group(
+    IN create_group_group_name VARCHAR(150),
+    IN create_group_user_id INT
+)
+BEGIN
+    INSERT INTO groups (group_name) VALUES (create_group_group_name);
+    INSERT INTO group_members (group_mem_user_id, group_mem_group_id, group_mem_role) VALUES (create_group_user_id, LAST_INSERT_ID(), 2);
+END //
+
+DELIMITER ;
+</code></pre>

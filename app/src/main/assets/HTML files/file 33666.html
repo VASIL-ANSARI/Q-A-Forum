@@ -1,0 +1,39 @@
+<p>I have a partial answer to my question.</p>
+
+<p>Adding <code>DbLinqProvider=sqlite;</code> to the SqliteConnection query string tells Linq-to-SQL to use SQLite commands, and fixes the <code>"SELECT @@IDENTITY"</code> issue. This code works:</p>
+
+<pre><code>Status data = GetStatusFoo();
+using (SqliteConnection con = new SqliteConnection("Data Source=" + Config.SQLITE_DB_FILE + ";DbLinqProvider=sqlite;"))
+using (DataContext db = new DataContext(con))
+{
+    Table&lt;Status&gt; statuses = db.GetTable&lt;Status&gt;();
+    statuses.InsertOnSubmit(data);
+    db.SubmitChanges();
+}
+</code></pre>
+
+<p>However, I still have to use a <code>SqliteConnection</code> object, because <code>new DataContext("Data Source=" + Config.SQLITE_DB_FILE + ";DbLinqProvider=sqlite;")</code> still throws the "Server does not exist or connection refused" exception.</p>
+
+<p>Edit: Complete answer</p>
+
+<p>It turns out that without a <code>DbLinqConnectionType</code> parameter, the DataContext defaults to using <code>System.Data.SqlClient.SqlConnection</code> for its connection. The connection type has to be an assembly fully qualified name, so the following code works for me:</p>
+
+<pre><code>// in Config
+public static string SQLITE_CONNECTION_CLASS_AQN = typeof(Mono.Data.Sqlite.SqliteConnection).AssemblyQualifiedName
+
+
+// in database class
+static string _connection_string = "Data Source=" + Config.SQLITE_DB_FILE + ";DbLinqProvider=sqlite;DbLinqConnectionType=" + Config.SQLITE_CONNECTION_CLASS_AQN + ";";
+
+
+// in database method
+Status data = GetStatusFoo();
+using (DataContext db = new DataContext(_connection_string))
+{
+    Table&lt;Status&gt; statuses = db.GetTable&lt;Status&gt;();
+    statuses.InsertOnSubmit(data);
+    db.SubmitChanges();
+}
+</code></pre>
+
+<p>For reference, <code>typeof(Mono.Data.Sqlite.SqliteConnection).AssemblyQualifiedName</code> evaluates to <code>"Mono.Data.Sqlite.SqliteConnection, Mono.Data.Sqlite, Version=4.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756"</code>.</p>

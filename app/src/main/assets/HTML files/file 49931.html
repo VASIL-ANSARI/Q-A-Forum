@@ -1,0 +1,106 @@
+<p>After much trial and error worked out a way that seems pretty robust merging the two code samples above so for anyone using the OpenGl framework from Brad Larson you can put this Property in to the GPUImageVideoCamera.h:</p>
+
+<pre><code>@property(readwrite, nonatomic) BOOL discont;
+</code></pre>
+
+<p>and this code in to the in place of the captureoutput function in the GPUImageVideoCamera.m file</p>
+
+<pre><code>- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
+{
+if (!self.captureSession.isRunning)
+{
+    return;
+}
+if (capturePaused)
+{
+    return;
+}
+else if (captureOutput == audioOutput)
+{
+    [self processAudioSampleBuffer:sampleBuffer];
+}
+else
+{
+    if (dispatch_semaphore_wait(frameRenderingSemaphore, DISPATCH_TIME_NOW) != 0)
+    {
+        return;
+    }
+
+if (_discont)
+{
+    _discont = NO;
+    // calc adjustment
+    CMTime pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+    CMTime last = _lastVideo;
+    if (last.flags &amp; kCMTimeFlags_Valid)
+    {
+        if (_timeOffset.flags &amp; kCMTimeFlags_Valid)
+        {
+            pts = CMTimeSubtract(pts, _timeOffset);
+        }
+        CMTime offset = CMTimeSubtract(pts, last);
+        NSLog(@"Adding %f to %f (pts %f)", ((double)offset.value)/offset.timescale, ((double)_timeOffset.value)/_timeOffset.timescale, ((double)pts.value/pts.timescale));
+
+        // this stops us having to set a scale for _timeOffset before we see the first video time
+        if (_timeOffset.value == 0)
+        {
+            _timeOffset = offset;
+        }
+        else
+        {
+            _timeOffset = CMTimeAdd(_timeOffset, offset);
+        }
+
+    }
+    _lastVideo.flags = 0;
+    _lastAudio.flags = 0;
+}
+// retain so that we can release either this or modified one
+CFRetain(sampleBuffer);
+
+if (_timeOffset.value &gt; 0)
+{
+    CFRelease(sampleBuffer);
+    sampleBuffer = [self adjustTime:sampleBuffer by:_timeOffset];
+}
+
+// record most recent time so we know the length of the pause
+CMTime pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+CMTime dur = CMSampleBufferGetDuration(sampleBuffer);
+if (dur.value &gt; 0)
+{
+    pts = CMTimeAdd(pts, dur);
+}
+_lastVideo = pts;
+
+    runAsynchronouslyOnVideoProcessingQueue(^{
+        //Feature Detection Hook.
+        if (self.delegate)
+        {
+            [self.delegate willOutputSampleBuffer:sampleBuffer];
+        }
+
+        [self processVideoSampleBuffer:sampleBuffer];
+
+        CFRelease(sampleBuffer);
+        dispatch_semaphore_signal(frameRenderingSemaphore);
+    });
+}
+}
+</code></pre>
+
+<p>From your main Viewcontroller the code is super simple (listed as button actions but can be put most places) and make sure you list _discont = NO on startup to keep it clean:</p>
+
+<pre><code>- (IBAction)PauseButton:(id)sender 
+{
+[videoCamera pauseCameraCapture];
+videoCamera.discont = YES;
+}
+
+- (IBAction)ResumeButton:(id)sender 
+{
+    [videoCamera resumeCameraCapture];
+}
+</code></pre>
+
+<p>Hope this helps anyone facing the same challenge</p>

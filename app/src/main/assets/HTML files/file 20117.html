@@ -1,0 +1,39 @@
+<p>You're on the right track with <code>intersect</code>, you just need to go a bit further. You need to join the results of it back to the <code>owner_groups2</code> table to find the ids.</p>
+
+<p>You can use the <code>listagg</code> function to convert the groups into comma-separated lists of the names (note - requires 11g). You can then take the intersection of these name lists to find the matches and join this back to the list in <code>owner_groups2</code>. </p>
+
+<p>I've created a simplified example below, in it "Dave, Jill" is the group that is present in both tables. </p>
+
+<pre><code>create table grps (id integer, name varchar2(100));
+create table grps2 (id integer, name varchar2(100));
+
+insert into grps values (1, 'Dave');
+insert into grps values(1, 'Jill');
+
+insert into grps values (2, 'Barry');
+insert into grps values(2, 'Jane');
+
+insert into grps2 values(3, 'Dave');
+insert into grps2 values(3, 'Jill');
+
+insert into grps2 values(4, 'Barry');
+
+with grp1 as (
+ SELECT id, listagg(name, ',') within group (order by name) n 
+ FROM grps
+ group by id
+), grp2 as (
+ SELECT id, listagg(name, ',') within group (order by name) n 
+ FROM grps2
+ group by id
+)
+SELECT * FROM grp2 
+where  n in (
+  -- find the duplicates
+  select n from grp1 
+  intersect
+  select n from grp2
+);
+</code></pre>
+
+<p>Note this will still require a full scan of <code>owner_groups2</code>; I can't think of a way you can avoid this. So your query is likely to remain slow. </p>

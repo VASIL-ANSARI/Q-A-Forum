@@ -1,0 +1,51 @@
+<p>@JonW I read your question, and some of the comment until I got to the TL;DR point :) The short answer is that <em>silent push notifications</em> might be the answer to one of your problems.The other might be <em>PubNub Presence Webhooks</em>. But I would agree with @Paulw11 that a server is the best practice and ultimately, <a href="https://www.pubnub.com/products/blocks/" rel="nofollow">PubNub BLOCKS</a> will be your solution.</p>
+
+<h2>Background Processing with Apple Silent Push Notifications</h2>
+
+<p>To do some short background processing, you can have your RPi publish a message that includes a push notification (as I believe you are already doing). But this push msg should be a <a href="https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/TheNotificationPayload.html#//apple_ref/doc/uid/TP40008194-CH107-SW1" rel="nofollow">silent push notification</a>. The docs say this:</p>
+
+<blockquote>
+  <p>When a silent notification arrives, iOS wakes up your app in the
+  background so that you can get new data from your server or do
+  background information processing.</p>
+  
+  <p>... ensure there is no alert, sound, or badge payload in the aps dictionary</p>
+</blockquote>
+
+<p>The full details are at the link I just provided but here is a sample message payload that you would publish on PubNub with the proper <code>aps</code> format.</p>
+
+<pre><code>{
+    "pn_apns": {
+        "aps": {
+            "content-available": 1,
+            "data": {
+                "temperature": "55",
+                "humidity": "42%"
+            }
+        }
+    },
+    "data": {
+        "info": "This is the full realtime message.",
+        "temperature": "55",
+        "humidity": "42%"
+    }
+}
+</code></pre>
+
+<p><em>WARNING: The silent push notifications are only effective if the app is not in a kill state. In other words, it must be idle in background - not running, but idle. If you force kill the app (swipe up from recent apps list by double tap Home button) or do not start the app after device has been powered off then on again, then silent pushes will be ignored.</em></p>
+
+<p>See this <a href="https://github.com/pubnub/badgeCountDemo" rel="nofollow">Badge Count Demo</a> as a template for getting started. But as @Paulw11 said, regular push notifications every 30 seconds is not a good idea. You should be sending your updates to a server that can send a push notification to the iPhone app when it is necessary to take action.</p>
+
+<h2>Offline Notification with PubNub Presence Webhooks</h2>
+
+<p>Going further down the server process best practice, you can have your server monitor the <em>presence</em> of the RPi on the channel. If the RPi ever <em>leaves</em> the channel by explicit unsubscribe from channel (<code>leave</code> event) or by network disconnect (<code>timeout</code> event), then a message can be <code>POST</code>ed to your server REST endpoint (that you provide us to configure on your PubNub keys). If either of these events happens, then you can publish a message (silent push payload included) to your iPhone app to take appropriate action.</p>
+
+<h2>PubNub BLOCKS - No Server Required (Look mom, no server!)</h2>
+
+<p>So you say you want to avoid using a server. With <a href="https://www.pubnub.com/products/blocks/" rel="nofollow">PubNub BLOCKS</a>, you will be able to avoid using your <em>own</em> server - instead, you will use <em>PubNub servers</em>.</p>
+
+<p>I won't into too much details here, but you will be able to write a small bit of JavaScript in a <em>BLOCK</em> that can determine if a push notification needs to be sent or not and much much more.</p>
+
+<h2>Summary</h2>
+
+<p>For now, I think your prototype with silent push is good to flesh out your use case. But ultimately, you need to have an always on process that can determine when it is necessary to send a push notification. While your iPhone app is active, it can receive the realtime messages from RPi, but when in background, getting a silent push every 30 seconds is not ideal and possibly not allowed by Apple.</p>

@@ -1,0 +1,14 @@
+<p>I think you're thinking too complex here. <code>UploadAsync</code> expects a <code>Stream</code>. <code>MemoryStream</code> is indeed a <code>Stream</code>, but so is <code>FileStream</code>. Getting rid of the extra reader will result in:</p>
+
+<pre><code>var source = "C:\\Users\\Admin\\Desktop\\Test.xlsx";
+var target = "/Excel/FileName.xlsx";
+
+using(var dbx = new DropboxClient("***"))
+using(var fs = new FileStream(source, FileMode.Open, FileAccess.Read))
+{
+    var updated = await dbx.Files.UploadAsync(
+        target, WriteMode.Overwrite.Instance, body: fs);
+}
+</code></pre>
+
+<p>The reason the file will get corrupt is because of reading the data incorrectly. <code>bytes.ToString()</code> will result in <code>System.Byte[]</code>. You're actually uploading <code>System.Byte[]</code> literally instead of the file's contents, which is not a valid Excel document. Also converting a binary file into UTF-8 text doesn't work as expected, because it alters the content being uploaded.</p>

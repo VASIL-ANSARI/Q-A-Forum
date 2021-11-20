@@ -1,0 +1,75 @@
+<p>Well, after more research i have solved my problem.</p>
+
+<p>The next code lets a user press a button which then open the Contact App letting the user choose a contact(showing only contact that have at least one phone number).
+ After choosing a contact a list of all its numbers is open letting the user the option to choose one(not all devices have this option, for example, in some devices the same contact is appearing more then once, one for each of his phone numbers).
+After that the method onActivityResult() is invoked and then(if everything is ok) i am extractig the chosen phone number, the given name and the family name(of the chosen contact):</p>
+
+<pre><code>@Override
+public void onClick(View v) {
+    Intent intent = new Intent(Intent.ACTION_PICK);
+    intent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE);
+    startActivityForResult(intent, CONTACT_PICKER_RESULT);  
+}
+
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (resultCode == RESULT_OK) {  
+        switch (requestCode) {  
+        case CONTACT_PICKER_RESULT:  
+            handleContactSelection(data);
+            break;
+        }
+    }
+}
+
+private void handleContactSelection(Intent data) {
+    if (data != null) {
+        Uri uri = data.getData();
+        if (uri != null) {
+            Cursor cursor = null;
+            Cursor nameCursor = null;
+            try {
+                cursor = getContentResolver().query(uri, new String[]{  
+                        ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        CommonDataKinds.Phone.CONTACT_ID} ,                                
+                        null, null, null);
+
+                String phoneNumber = null;                  
+                String contactId = null;
+                if (cursor != null &amp;&amp; cursor.moveToFirst()) {
+                    contactId = cursor.getString(cursor.getColumnIndex(CommonDataKinds.Phone.CONTACT_ID));
+                    phoneNumber = cursor.getString(cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));                               
+                }
+
+                String givenName = null;///first name.
+                String familyName = null;//last name.
+
+                String projection[] = new String[]{ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+                        ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME};
+                String whereName = ContactsContract.Data.MIMETYPE + " = ? AND " + 
+                        ContactsContract.CommonDataKinds.StructuredName.CONTACT_ID + " = ?";
+                String[] whereNameParams = new String[] { ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE, contactId};
+
+                nameCursor = getContentResolver().query(ContactsContract.Data.CONTENT_URI, 
+                        projection, whereName, whereNameParams, ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME);
+
+                if(nameCursor != null &amp;&amp; nameCursor.moveToNext()) {
+                    givenName = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME));
+                    familyName = nameCursor.getString(nameCursor.getColumnIndex(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME));
+                }
+
+                doSomething(phoneNumber,givenName,familyName);
+
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+
+                if(nameCursor != null){
+                    nameCursor.close();
+                }
+            }
+        }
+    }
+}   
+</code></pre>

@@ -1,0 +1,33 @@
+<p>SQL tables represent <em>unordered</em> sets.  Is there something unclear about this?</p>
+
+<p>When you <code>SELECT</code> from a table, then the results are <em>unordered</em>.  The one exception is when you use an <code>ORDER BY</code> in the outer query.  So, include an <code>ORDER BY</code> and the results will be in order.</p>
+
+<p>EDIT:</p>
+
+<p>You can eliminate the <em>work</em> for the sort by introducing a clustered primary key.</p>
+
+<pre><code>create table #temp (
+    Id int identity(1,1) primary key clustered, 
+    SKU varchar(10),
+    QtyRec int,
+    Expiry date,
+    Rec date
+);
+</code></pre>
+
+<p>Then when you do:</p>
+
+<pre><code>insert into #temp(SKU, QtyRec, Expiry, Rec)
+    select SKU, QtyRec, Expiry, Rec
+    from @Data
+    order by id;
+</code></pre>
+
+<p>The clustered primary key in <code>#temp</code> is guaranteed to be in the order specified by the <code>order by</code>.  Then the query:</p>
+
+<pre><code>select *
+from #temp
+order by id;
+</code></pre>
+
+<p>will return the results in order, using the clustered index.  No sort will be needed.</p>

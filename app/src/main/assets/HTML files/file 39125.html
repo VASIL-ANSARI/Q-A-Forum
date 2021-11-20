@@ -1,0 +1,30 @@
+<p>Sadly it seems that rails does not provide any high level way to set column-level collation so you have to fall back to SQL at least a little. Here's how I did it:</p>
+
+<pre><code>class CreateUsers &lt; ActiveRecord::Migration                                     
+  def change                                                                    
+    create_table :users do |t|                                                  
+      t.string   :password                                                      
+    end                                                                         
+
+    reversible do |dir|                                                         
+      dir.up {                                                                  
+        change_column :users, :password, "VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_bin"
+      }                                                            
+    end                                                                         
+  end                                                                           
+end   
+</code></pre>
+
+<p>The <code>reversible</code> block is there just to enable rollbacks because rails would not know how to revert <code>change_column</code> without the original value.</p>
+
+<p>Then you can check the collation on the mysql cli with:</p>
+
+<pre><code>SHOW TABLE STATUS;
+</code></pre>
+
+<p>you should see your default collation there - probably utf8_unicode_ci. Then do:</p>
+
+<pre><code>SHOW FULL COLUMNS FROM users;
+</code></pre>
+
+<p>And there you should see utf8_bin at the password field.</p>

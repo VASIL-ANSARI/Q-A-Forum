@@ -1,0 +1,205 @@
+<p>well, The problem is your String <code>url_int_details</code> in <code>DetailsActivity</code>  just the same as <code>url_act</code>. What can I see in your <code>DetailsActivity</code> is: you use GET method from the "<a href="http://10.0.2.2/Scripts/details_intervention.php" rel="nofollow">http://10.0.2.2/Scripts/details_intervention.php</a>". And this url is contain a listView as you said but not a detail. So how to solve this problem.
+You should create <code>new_url_int_details</code> like this:</p>
+
+<pre><code>http://10.0.2.2/Scripts/details_intervention.php?id=12
+</code></pre>
+
+<p>Your url has to contain your item's ID. I made something just like your idea, you can learn more from my project.
+This is my Detail_Activity:</p>
+
+<pre><code>public class FMovieDetailsActivity extends Activity {
+ArrayList&lt;CinemaItems&gt; cinemaList;
+String id;
+TextView tvNameF;
+TextView tvLengthF;
+TextView tvIMDbF;
+TextView tvStartF;
+TextView tvDescriptionF;
+TextView tvCatF;
+TextView tvTrailer;
+TextView tvLengthTrailer;
+ListView listView;
+Button btnTrailer;
+
+private Context context;
+
+ImageView f_imageTrailer;
+ImageView f_imageView;
+private static final String TAG_ID = "id";
+private static final String TAG_FUTURE_MOVIE = "future_movie";
+private static final String TAG_NAME_F = "movienameF";
+private static final String TAG_DESCRIPTION_F = "descriptionF";
+private static final String TAG_IMDB_F = "imdbF";
+private static final String TAG_LENGTH_F = "lengthF";
+private static final String TAG_CAT = "cat_name";
+private static final String TAG_IMAGE_F = "m_imageF";
+private static final String TAG_SUCCESS_F = "success";
+private static final String TAG_START_F = "startdateF";
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.moviedetails);
+    cinemaList = new ArrayList&lt;CinemaItems&gt;();
+
+    Intent i = getIntent();
+    id = i.getStringExtra(TAG_ID);
+    new JSONAsyncTask().execute();
+
+    tvNameF = (TextView) findViewById(R.id.tvMovieName);
+    tvLengthF = (TextView) findViewById(R.id.tvLength);
+    tvIMDbF = (TextView) findViewById(R.id.tvIMdb);
+    tvStartF = (TextView) findViewById(R.id.tvStartDate);
+    tvDescriptionF = (TextView) findViewById(R.id.tvDescription);
+    tvCatF = (TextView) findViewById(R.id.tvCategory);
+    f_imageView = (ImageView) findViewById(R.id.imageMovieDetail);
+
+    ActionBar actionBar = getActionBar();
+    actionBar.setDisplayHomeAsUpEnabled(true);
+
+}
+
+class JSONAsyncTask extends AsyncTask&lt;String, String, String&gt; {
+    ProgressDialog dialog;
+
+    @Override
+    protected void onPreExecute() {
+        super.onPreExecute();
+        dialog = new ProgressDialog(FMovieDetailsActivity.this);
+        dialog.setMessage("Loading, please wait");
+        dialog.setTitle("Connecting server");
+        dialog.show();
+        dialog.setCancelable(false);
+    }
+
+    @Override
+    protected String doInBackground(String... urls) {
+        try {
+            List&lt;NameValuePair&gt; params = new ArrayList&lt;NameValuePair&gt;();
+            params.add(new BasicNameValuePair(TAG_ID, id));
+            Log.i("show parse id", id);
+            String paramString = URLEncodedUtils.format(params, "utf-8");
+            //this is your problem, You lack of this url
+            String url = ServicesConfig.SERVICES_HOST + ServicesConfig.SERVICES_GET_FUTURE_DETAILS + "?"
+                    + paramString;
+
+            Log.i("show url", url);
+            HttpGet httpget = new HttpGet(url);
+            HttpClient httpClient = new DefaultHttpClient();
+            HttpResponse respone = httpClient.execute(httpget);
+            HttpEntity entity = respone.getEntity();
+            return EntityUtils.toString(entity, "UTF-8");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    protected void onPostExecute(String respone) {
+        try {
+
+            JSONObject jsono = new JSONObject(respone);
+            int success = jsono.optInt(TAG_SUCCESS_F, 0);
+            if (success == 1) {
+                JSONObject jsonObject = jsono.getJSONObject(TAG_FUTURE_MOVIE);
+                tvNameF.setText(jsonObject.optString(TAG_NAME_F));
+                tvIMDbF.setText("IMDb: " + jsonObject.optString(TAG_IMDB_F));
+                tvLengthF.setText("Duration: " + jsonObject.optString(TAG_LENGTH_F));
+                tvStartF.setText("Start: " + jsonObject.optString(TAG_START_F));
+                tvDescriptionF.setText(jsonObject.optString(TAG_DESCRIPTION_F));
+                tvCatF.setText(jsonObject.optString(TAG_CAT));
+
+                Picasso.with(context).load(ServicesConfig.SERVICES_HOST + jsonObject.optString(TAG_IMAGE_F)).fit()
+                        .into(f_imageView);
+            } else {
+                Toast.makeText(getBaseContext(), "Unable to fetch data from server", Toast.LENGTH_SHORT).show();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        dialog.dismiss();
+    }
+
+}
+
+@Override
+public boolean onOptionsItemSelected(MenuItem item) {
+
+    switch (item.getItemId()) {
+    case android.R.id.home:
+
+        this.finish();
+        return true;
+
+    }
+    return super.onOptionsItemSelected(item);
+}
+</code></pre>
+
+<p>}</p>
+
+<p>This is my php file:</p>
+
+<pre><code>&lt;?php
+$response = array();
+
+require_once __DIR__ . '/db_connect.php';
+
+$db = new DB_CONNECT();
+
+if (isset($_GET["id"])) {
+ $id = $_GET['id'];
+
+ $result = mysql_query("SELECT m.*, c.cat_name FROM future_movie as m inner join category as c on m.cat_id = c.cat_id WHERE m.id = $id");
+ $img = "test_cinema/images/product/";
+if (!empty($result)) {
+
+    if (mysql_num_rows($result) &gt; 0) {
+
+        $result = mysql_fetch_array($result);
+
+        $movie = array();
+        $movie["id"] = $result["id"];
+        $movie["movienameF"] = $result["movienameF"];
+        $movie["descriptionF"] = $result["descriptionF"];
+        $movie["imdbF"] = $result["imdbF"];
+        $movie["lengthF"] = $result["lengthF"];
+        $movie["startdateF"] = $result["startdateF"];
+        $movie["cat_name"] = $result["cat_name"];
+        $movie["m_imageF"] = $img.$result["m_imageF"];
+
+        $response["success"] = 1;
+
+
+        $response["future_movie"] =  $movie;
+
+
+
+
+        echo json_encode($response);
+    } else {
+
+        $response["success"] = 0;
+        $response["message"] = "No movie found";
+
+
+        echo json_encode($response);
+    }
+} else {
+
+    $response["success"] = 0;
+    $response["message"] = "No movie found";
+
+
+    echo json_encode($response);
+}} else {
+
+$response["success"] = 0;
+$response["message"] = "Required field(s) is missing";
+
+
+echo json_encode($response);}?&gt;
+</code></pre>

@@ -1,0 +1,30 @@
+<p>I've been experimenting with the AVQueuePlayer using movies provided by a server. In this particular test I set up a queuePlayer with AVPlayerItems initialized with URL's to two different video assets of different types. One is an .mp4-file (progressive download), the other one an .m3u8 http-streaming file. It does act a bit funky, I must say. </p>
+
+<p>Depending on the order in which I queue the files I get quite different behavior. If I start with the .mp4-file, the AVPlayerLayer goes blank and silent when the nextItem starts player (the .m3u8-file). If I change the order and start with the m3u8-file, the AVPlayerLayer goes blank but the audio from the second file plays fine.</p>
+
+<p>My impression, from what I've seen so far, is that the AVQueuePlayer does <strike>NOT</strike> start downloading the next AVPlayerItem before the current AVPlayerItem has finished playing. But I might be wrong.</p>
+
+<p>To be continued I guess...</p>
+
+<p>Edit: Ok, so I've done some more testing and it seems the next items starts downloading before the last item finishes playing. See post below. Stroke the "NOT"...</p>
+
+<p>Edit2: Adding my explanation here instead, since the comment left me with no formatting options. (Best practice for this is welcome, if this is a bad way to handle answer updates)</p>
+
+<p>Anyhow, I iterated through my itemsArray adding observation of the status property using KVO...</p>
+
+<pre><code>[playerItem addObserver: self forKeyPath:@"status" options: 0 context: NULL];
+</code></pre>
+
+<p>I also set my controller as the observer of the AVPlayerItem Notification <strong>AVPlayerItemDidPlayToEndTimeNotification</strong>:</p>
+
+<pre><code>[[NSNotificationCenter defaultCenter] addObserver: self
+                                         selector: @selector(playerItemDidReachEnd:) 
+                                             name: AVPlayerItemDidPlayToEndTimeNotification 
+                                           object: nil];
+</code></pre>
+
+<p>Now I could log the status change of the AVPlayerItem, and it turns out the next AVPlayerItem in the queue is logged with a status change <strong>AVPlayerItemStatusReadyToPlay</strong> before the current item ends playing back.</p>
+
+<p>My conclusion is therefor that the next item in line starts downloading prior to the current item ends.</p>
+
+<p><strong>However!</strong> <em>I create an array with AVPlayerItems which I use to create my player. Reading the AVFoundation docs on AVAssets, I get the impression that these download their assets asynchronously, but I'm still uncertain when these downloads are being initiated by the IAPlayerItem. I still have some funky behavior when I add the .m3u8-file to the queue, which makes me wonder if these assets begin downloading at the time of creation (seems a bit strange to me though).</em></p>

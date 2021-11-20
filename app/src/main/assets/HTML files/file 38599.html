@@ -1,0 +1,183 @@
+<p>The TransparencyKey approach, discussed <a href="http://msdn.microsoft.com/en-us/library/6k15y9et.aspx" rel="nofollow">here on MSDN</a> is the simplest way to do this. You set your form's <code>BackgroundImage</code> to an image mask. The image mask has the regions to be transparent filled with a certain colorâfuchsia is a popular choice, since no one actually uses this horrible color. Then you set your form's <code>TransparencyKey</code> property to this color, and it is essentially masked out, rendering those portions as transparent.</p>
+
+<p>But I guess in a color picker, you want fuchsia to be available as an option, even if no one ever selects it. So you'll have to create custom-shaped forms the other wayâby setting a custom region. Basically, you create a <a href="http://msdn.microsoft.com/en-us/library/system.drawing.region.aspx" rel="nofollow"><code>Region</code> object</a> (which is basically just a polygon) to describe the desired shape of your form, and then assign that to the form's <a href="http://msdn.microsoft.com/en-us/library/system.windows.forms.control.region.aspx" rel="nofollow"><code>Region</code> property</a>.</p>
+
+<p>Do note that you are changing the shape of the <em>entire window</em> when you do this, not just the client area, so your design needs to account for that. Also, regions cannot be anti-aliased, so the result tends to be pretty ugly if you're using a shape that does not have straight edges.</p>
+
+<p>And another caveatâ¦I strongly recommend <strong><em>not</em></strong> doing this. It takes quite a bit of work to get it right, and even once you get finished, the result is usually gaudy and user-hostile. Even when everything goes just right, you'll end up with something that looks like <a href="http://i.stack.imgur.com/3RB1k.gif" rel="nofollow">this</a>âand no one wants that. Users are quite accustomed to boring old rectangular application windows. Applications shouldn't try to be exact digital replicas of real-world widgets. It <em>seems</em> like that would make them intuitive or easy to use, but it really doesn't. The key to good design is identifying the user's mental model for your application and figuring out a good way of meshing that with the standards set by your target windowing environment.</p>
+
+<hr>
+
+<p>I noticed this tab still open and had a few spare moments, so I tried to bang out a quick sample. I made the "form" consist of two randomly-sized circles, just to emphasize the custom shape effect and the transparencyâdon't read anything into the design or get any crazy ideas! Here's what I came up with:</p>
+
+<pre><code>using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+public class MyCrazyForm : Form
+{
+   private Size szFormSize = new Size(600, 600);
+   private Size szCaptionButton = SystemInformation.CaptionButtonSize;
+   private Rectangle rcMinimizeButton = new Rectangle(new Point(330, 130), szCaptionButton);
+   private Rectangle rcCloseButton = new Rectangle(new Point(rcMinimizeButton.X + szCaptionButton.Width + 3, rcMinimizeButton.Y), SystemInformation.CaptionButtonSize);
+
+   public MyCrazyForm()
+   {
+      // Not necessary in this sample: the designer was not used.
+      //InitializeComponent();
+
+      // Force the form's size, and do not let it be changed.
+      this.Size = szFormSize;
+      this.MinimumSize = szFormSize;
+      this.MaximumSize = szFormSize;
+
+      // Do not show a standard title bar (since we can't see it anyway)!
+      this.FormBorderStyle = FormBorderStyle.None;
+
+      // Set up the irregular shape of the form.
+      using (GraphicsPath path = new GraphicsPath())
+      {
+         path.AddEllipse(0, 0, 200, 200);
+         path.AddEllipse(120, 120, 475, 475);
+         this.Region = new Region(path);
+      }
+   }
+
+   protected override void OnActivated(EventArgs e)
+   {
+      base.OnActivated(e);
+
+      // Force a repaint on activation.
+      this.Invalidate();
+   }
+
+   protected override void OnDeactivate(EventArgs e)
+   {
+      base.OnDeactivate(e);
+
+      // Force a repaint on deactivation.
+      this.Invalidate();
+   }
+
+   protected override void OnPaint(PaintEventArgs e)
+   {
+      base.OnPaint(e);
+
+      // Draw the custom title bar ornamentation.
+      if (this.Focused)
+      {
+         ControlPaint.DrawCaptionButton(e.Graphics, rcMinimizeButton, CaptionButton.Minimize, ButtonState.Normal);
+         ControlPaint.DrawCaptionButton(e.Graphics, rcCloseButton, CaptionButton.Close, ButtonState.Normal);
+      }
+      else
+      {
+         ControlPaint.DrawCaptionButton(e.Graphics, rcMinimizeButton, CaptionButton.Minimize, ButtonState.Inactive);
+         ControlPaint.DrawCaptionButton(e.Graphics, rcCloseButton, CaptionButton.Close, ButtonState.Inactive);
+      }
+   }
+
+   private Point GetPointFromLParam(IntPtr lParam)
+   {
+      // Handle 64-bit builds, which we detect based on the size of a pointer.
+      // Otherwise, this is functionally equivalent to the Win32 MAKEPOINTS macro.
+      uint dw = unchecked(IntPtr.Size == 8 ? (uint)lParam.ToInt64() : (uint)lParam.ToInt32());
+      return new Point(unchecked((short)dw), unchecked((short)(dw &gt;&gt; 16)));
+   }
+
+   protected override void WndProc(ref Message m)
+   {
+      const int WM_SYSCOMMAND = 0x112;
+      const int WM_NCHITTEST = 0x84;
+      const int WM_NCLBUTTONDOWN = 0xA1;
+      const int HTCLIENT = 1;
+      const int HTCAPTION = 2;
+      const int HTMINBUTTON = 8;
+      const int HTCLOSE = 20;
+
+      // Provide additional handling for some important messages.
+      switch (m.Msg)
+      {
+         case WM_NCHITTEST:
+            {
+               base.WndProc(ref m);
+
+               Point ptClient = PointToClient(GetPointFromLParam(m.LParam));
+               if (rcMinimizeButton.Contains(ptClient))
+               {
+                  m.Result = new IntPtr(HTMINBUTTON);
+               }
+               else if (rcCloseButton.Contains(ptClient))
+               {
+                  m.Result = new IntPtr(HTCLOSE);
+               }
+               else if (m.Result.ToInt32() == HTCLIENT)
+               {
+                  // Make the rest of the form's entire client area draggable
+                  // by having it report itself as part of the caption region.
+                  m.Result = new IntPtr(HTCAPTION);
+               }
+
+               return;
+            }
+         case WM_NCLBUTTONDOWN:
+            {
+               base.WndProc(ref m);
+
+               if (m.WParam.ToInt32() == HTMINBUTTON)
+               {
+                  this.WindowState = FormWindowState.Minimized;
+                  m.Result = IntPtr.Zero;
+               }
+               else if (m.WParam.ToInt32() == HTCLOSE)
+               {
+                  this.Close();
+                  m.Result = IntPtr.Zero;
+               }
+
+               return;
+            }
+         case WM_SYSCOMMAND:
+            {
+               // Setting the form's MaximizeBox property to false does *not* disable maximization
+               // behavior when the caption area is double-clicked.
+               // Since this window is fixed-size and does not support a "maximized" mode, and the
+               // entire client area is treated as part of the caption to enable dragging, we also
+               // need to ensure that double-click-to-maximize is disabled.
+               // NOTE: See documentation for WM_SYSCOMMAND for explanation of the magic value 0xFFF0!
+               const int SC_MAXIMIZE = 0xF030;
+               if ((m.WParam.ToInt32() &amp; 0xFFF0) == SC_MAXIMIZE)
+               {
+                  m.Result = IntPtr.Zero;
+               }
+               else
+               {
+                  base.WndProc(ref m);
+               }
+               return;
+            }
+      }
+      base.WndProc(ref m);
+   }
+}
+</code></pre>
+
+<p>Here it is running on Windows XP and 7, side-by-side:</p>
+
+<p><a href="http://i.stack.imgur.com/mz5nV.png" rel="nofollow"><img src="http://i.stack.imgur.com/mz5nVm.png" alt=""></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://i.stack.imgur.com/1Y0O5.png" rel="nofollow"><img src="http://i.stack.imgur.com/1Y0O5m.png" alt=""></a></p>
+
+<p>Whew! It <em>does</em> work, but it's a long way from complete. There are lots of little things that still need to be done. For example:</p>
+
+<ul>
+<li>The caption buttons do not "depress" when clicked. There is a built-in state for that that can be used with the <code>DrawCaptionButton</code> method, but you need to either force a redraw when one of the buttons is clicked, or do the repaint directly on the form right then and there.</li>
+<li>It doesn't support Visual Styles. This is a limitation of the <code>ControlPaint</code> class; it was written before Visual Styles were invented. Implementing support for this will be a lot more work, but there is <a href="http://msdn.microsoft.com/en-us/library/vstudio/ms171733.aspx" rel="nofollow">a WinForms wrapper</a>. You will have to make sure that you write fallback code to handle the case where Visual Styles are disabled, too.</li>
+<li>The caption buttons aren't actually centeredâI just eyeballed it. And even if your eyeballs are better than mine, this is still a bad approach, because the caption buttons can be different sizes, depending on system settings and which version of the OS you're running (Vista changed the button shapes).</li>
+<li>Other windows invoke the actions when the mouse goes <em>up</em> over the caption bar buttons. But when you try to use <code>WM_NCLBUTTONUP</code> (instead of <code>WM_NCLBUTTONDOWN</code>), you have to <em>double-click</em> the caption buttons to make them work. This is because the non-client area is capturing the mouse. I'm sure there's a solution, but I ran out of patience before I discovered what it was.</li>
+<li>You don't get the pretty animation effects when the window is minimized (or restored), nor do you have the glow-on-hover for the caption buttons. There are tons of visual niceties that you get for free with the default styles that are missing-in-action here. Some of them can be easily added by writing more code, but for each line you write, the maintenance burden skyrocketsânewer versions of Windows are likely to break things. And worse, some things are <em>far</em> from trivial to implement, so it probably isn't even worth it. And all this effort for what, again?</li>
+<li>Repainting the entire form on activation/deactivation just to update the caption buttons is probably a bad idea. If you are painting anything else more complicated on the form, this is likely to slow down the entire system.</li>
+<li>Once you start adding controls to the form, you might run into a problem. For example, even with a Label control, you won't be able to drag the form around by clicking and holding on top of that Label control. Label controls don't return <code>HTTRANSPARENT</code> in response to the <code>WM_NCHITTEST</code> message, so the message doesn't get passed on to the parent form. You can subclass <code>Label</code> to do so and use your subclass instead.</li>
+<li>The code is <em>completely</em> untested with Windows 8, since I don't have a copy. Custom non-client areas tend to blow up with new OS updates that change the way the non-client area is rendered, so you're on your own to adapt the code accordingly. Even if it works, it certainly won't have the right Windows 8 look-and-feel.</li>
+<li><em>Et cetera</em>, <em>et cetera</em>.</li>
+</ul>
+
+<p>You can also see that, like I cautioned above, the circular border is not anti-aliased, so it looks jagged. Unfortunately, that is unfixable.</p>

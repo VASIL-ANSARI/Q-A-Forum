@@ -1,0 +1,37 @@
+<p>Two errors:</p>
+
+<p>1) <code>from_bytes()</code> overload that takes the single <code>const char*</code> expects a null-terminated byte string, but your very second byte is '\0'.</p>
+
+<p>2) your system is likely little-endian, so you need to convert from UTF-16LE to UCS-4:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;locale&gt;
+#include &lt;memory&gt;
+#include &lt;codecvt&gt;
+#include &lt;string&gt;
+
+using namespace std;
+
+int main()
+{
+    u16string s;
+
+    s.push_back('h');
+    s.push_back('e');
+    s.push_back('l');
+    s.push_back('l');
+    s.push_back('o');
+
+    wstring_convert&lt;codecvt_utf16&lt;wchar_t, 0x10ffff, little_endian&gt;,
+                     wchar_t&gt; conv;
+    wstring ws = conv.from_bytes(
+                     reinterpret_cast&lt;const char*&gt; (&amp;s[0]),
+                     reinterpret_cast&lt;const char*&gt; (&amp;s[0] + s.size()));
+
+    wcout &lt;&lt; ws &lt;&lt; endl;
+
+    return 0;
+}
+</code></pre>
+
+<p>Tested with Visual Studio 2010 SP1 on Windows and CLang++/libc++-svn on Linux.</p>

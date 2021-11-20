@@ -1,0 +1,68 @@
+<p>Not the best approach, but it gets the job done: </p>
+
+<pre><code>import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Iterator;
+
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class TreeApp {
+
+    public String generateJSONfromTree(Tree&lt;String&gt; tree) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonFactory factory = new JsonFactory();
+        ByteArrayOutputStream out = new ByteArrayOutputStream(); // buffer to write to string later
+        JsonGenerator generator = factory.createJsonGenerator(out, JsonEncoding.UTF8);
+
+        ObjectNode rootNode = generateJSON(tree.getRootElement(), mapper.createObjectNode());
+        mapper.writeTree(generator, rootNode);
+
+        return out.toString();
+    }
+
+    public ObjectNode generateJSON(Node&lt;String&gt; node, ObjectNode obN) {
+        if (node == null) {
+            return obN;
+        }
+
+        obN.put("text", node.getData());
+
+        ArrayNode childN = obN.arrayNode();
+        obN.set("children", childN);        
+        if (node.getChildren() == null || node.getChildren().isEmpty()) {
+            return obN;
+        }
+
+        Iterator&lt;Node&lt;String&gt;&gt; it = node.getChildren().iterator();
+        while (it.hasNext()) {  
+            childN.add(generateJSON(it.next(), new ObjectMapper().createObjectNode()));
+        }
+        return obN;
+    }
+
+    public static void main(String[] args) throws IOException {
+        Tree&lt;String&gt; tree = new Tree&lt;String&gt;();
+        Node&lt;String&gt; rootNode = new Node&lt;String&gt;("root");
+        Node&lt;String&gt; nodeA = new Node&lt;String&gt;("A");
+        Node&lt;String&gt; nodeB = new Node&lt;String&gt;("B");
+        Node&lt;String&gt; nodeC = new Node&lt;String&gt;("C");
+        Node&lt;String&gt; nodeD = new Node&lt;String&gt;("D");
+        Node&lt;String&gt; nodeE = new Node&lt;String&gt;("E");
+
+        rootNode.addChild(nodeA);
+        rootNode.addChild(nodeB);
+        nodeA.addChild(nodeC);
+        nodeB.addChild(nodeD);
+        nodeB.addChild(nodeE);
+
+        tree.setRootElement(rootNode);
+
+        System.out.println(new TreeApp().generateJSONfromTree(tree));
+    }
+}
+</code></pre>

@@ -1,0 +1,56 @@
+<p>Have your <code>Service</code> implement <code>MediaPlayerControl</code>, example...</p>
+
+<pre><code>public class MyMusicService extends Service
+    implements MediaPlayerControl {
+
+    ...
+
+    // Override the various `MediaPLayerControl` methods
+}
+</code></pre>
+
+<p>Now, in order for your <code>Fragment</code> to use the <code>MediaPlayerControl</code> it must bind to the <code>Service</code>. Add the following to the <code>Service</code>...</p>
+
+<pre><code>private final IBinder mBinder = new LocalBinder();
+
+public class LocalBinder extends Binder {
+    public MyMusicService getService() {
+        return MyMusicService.this;
+    }
+}
+
+@Override
+public IBinder onBind(Intent arg0) {
+    return mBinder;
+}
+</code></pre>
+
+<p>Now you need to add the ability to bind to your <code>Service</code> in your <code>Fragment</code> code -<em>NOTE</em>, I've only done this with an <code>Activity</code> but the theory is the same for a <code>Fragment</code>. Add a <code>ServiceConnection</code> to your <code>Fragment</code> code...</p>
+
+<pre><code>MyMusicService mService = null;
+boolean mBound;
+
+private ServiceConnection mConnection = new ServiceConnection() {
+    public void onServiceConnected(ComponentName className, IBinder service) {
+        LocalBinder binder = (LocalBinder) service;
+        mService = binder.getService();
+        mBound = true;
+    }
+
+    public void onServiceDisconnected(ComponentName className) {
+        mService = null;
+        mBound = false;
+    }
+};
+</code></pre>
+
+<p>You can bind to your <code>Service</code> in the <code>onResume()</code> and unbind in <code>onPause()</code> of your <code>Fragment</code> and if you add the following to your <code>Fragment</code> you can set the <code>MediaController</code> to be the <code>Service</code>...</p>
+
+<pre><code>public void showMediaControllerHere() {
+    if (mBound){
+        controller.setMediaPlayer(mService);
+        controller.setEnabled(true);
+        controller.show();
+    }
+}
+</code></pre>

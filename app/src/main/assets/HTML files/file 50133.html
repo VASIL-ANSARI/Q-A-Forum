@@ -1,0 +1,39 @@
+<p>The implementation that you show uses arrays <code>_Keys</code> to store keys and <code>_Values</code> to store their corresponding values. Only the portion of these arrays from index zero, inclusive, to index <code>_Count</code>, exclusive, is occupied. The elements at <code>_Count</code> and above are not used.</p>
+
+<p><code>_Keys</code> and <code>_Values</code> arrays are populated sequentially on addition. When a removal occurs, the corresponding elements are placed on <em>free list</em>. When the next addition occurs, the last element returned to free list is used before considering the expansion to the element at <code>_Count</code>.</p>
+
+<blockquote>
+  <p><code>_Next</code> seems to be related to hash collision, does it store the next index of the key/value that has the same hash?</p>
+</blockquote>
+
+<p><code>_Next</code> has two purposes, depending on whether the corresponding item is used or is on a free list.</p>
+
+<ul>
+<li>When the item <code>i</code>is used, <code>_Next[i]</code> represents the index of the next element with <em>colliding</em> hash code (it is not necessarily the same hash code!)</li>
+<li>When the item <code>i</code> is on a free list, <code>_Next[i]</code> represents the next item on the free list (i.e. the item that was placed on free list before <code>i</code>-th, if any).</li>
+</ul>
+
+<blockquote>
+  <p>What's the difference between <code>Count</code> and <code>_Count</code>?</p>
+</blockquote>
+
+<p><code>_Count</code> is the high watermark of the <code>_Keys</code> and <code>_Values</code> arrays; <code>Count</code> is the actual count, which is computed as high watermark less the number of items placed on the free list (i.e. max added minus currently removed).</p>
+
+<blockquote>
+  <p>So given a Key we compute <code>Index = GetHashCode(Key) % Buckets.Length;</code> which gives us an index that we could use in the <code>_Keys</code>/<code>_Values</code>/<code>_HashCodes</code> arrays. Why do we need to compare <code>_HashCodes[i] == hash</code>?</p>
+</blockquote>
+
+<p>Because <code>GetHashCode(Key) % Buckets.Length</code> remainder may be the same for different values of hash code. You can optimize the code by comparing hash code before invoking <code>Equals</code>, although this step is not necessary.</p>
+
+<blockquote>
+  <p>What's <code>num</code> doing in <code>Remove</code>?</p>
+</blockquote>
+
+<p>An item that we are removing may be part of a list of items with colliding hash codes. The item may be at the head of the list, or it may be somewhere else on the list. The code uses <code>num</code> to treat these situations differently:</p>
+
+<ul>
+<li>When the item is at the head of its list, the next item needs to be "promoted" to the head by adjusting <code>_Buckets[]</code></li>
+<li>When the item is not at the head of the list, its <code>_Next[]</code> index needs to be adjusted without promoting to the head.</li>
+</ul>
+
+<p><code>next</code> starts at a negative number, and switches to a non-negative number after the initial iteration. The check <code>if (num &lt; 0)</code> means "are we on the first iteration?"</p>

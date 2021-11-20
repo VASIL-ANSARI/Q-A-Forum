@@ -1,0 +1,28 @@
+<p>After some digging in the code, I have found where the issue comes from.</p>
+
+<p>As I explained in <a href="https://github.com/tenderlove/mechanize/issues/177" rel="nofollow">#177</a>:</p>
+
+<blockquote>
+  <p>in
+  <a href="https://github.com/tenderlove/mechanize/blob/master/lib/mechanize/page/meta_refresh.rb" rel="nofollow"><code>/lib/mechanize/page/meta_refresh.rb:40</code></a></p>
+
+<pre><code>class Mechanize::Page::MetaRefresh
+
+def self.parse content, base_uri
+  return unless content =~ CONTENT_REGEXP
+
+  delay, refresh_uri = $1, $3
+
+  dest = base_uri
+  dest += refresh_uri if refresh_uri     # Oops!
+
+  return delay, dest
+end
+</code></pre>
+  
+  <p>The referenced line will raise <code>URI::InvalidURIError</code> if <code>refresh_uri</code>
+  contains illegal symbols (such as <code>&lt;</code>). I don't quite know where the
+  sanitize should be done though.</p>
+</blockquote>
+
+<p>The <a href="http://ruby-doc.org/stdlib-1.9.3/libdoc/uri/rdoc/URI/Generic.html#method-i-merge" rel="nofollow"><code>URI#merge</code></a> of my error log is hidden in the <a href="http://ruby-doc.org/stdlib-1.9.3/libdoc/uri/rdoc/URI/Generic.html#method-i-2B" rel="nofollow"><code>+=</code></a> operator on the <em>oops</em> line, if you wondered.</p>

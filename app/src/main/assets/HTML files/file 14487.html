@@ -1,0 +1,34 @@
+<p>There is a way to handle this, but you need to think outside of the box a bit. What you need is an intermediate type that is implicitly constructable from both <code>std::string</code> and your allocator string.</p>
+
+<p>There is a <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3334.html">proposal for such a thing before the C++ committee currently</a>. It is based on a <a href="http://cxx1y-array-string-ref.googlecode.com/git-history/115bdc29789cea33f0fa6e706213ca5f03819fa3/include/string_ref.h">Google-built Apache-licensed implementation that already exists</a>. It's called <code>basic_string_ref</code>; it's a template class that is basically a pointer to the first character in a string and a size, representing the length of the string. It's not a true container in the sense that it doesn't manage memory.</p>
+
+<p>Which is exactly what you need.</p>
+
+<p><code>basic_string_ref</code> for a particular character type and traits type is implicitly constructable from a <code>std::basic_string</code> <em>regardless</em> of allocator.</p>
+
+<p>All of the comparison operators can be defined in terms of <code>basic_string_ref</code>. Since it is implicitly constructable from <code>std::basic_string</code> (and virtually free to construct), it would work transparently for comparisons between differently allocated strings.</p>
+
+<p>Doing assignment is rather trickier, but doable. It requires a series of conversions:</p>
+
+<pre><code>a = pstring{basic_string_ref{y}};
+</code></pre>
+
+<p>Not the prettiest code, of course. We would prefer to simply change the copy constructor and assignment operator of <code>std::basic_string</code> to be allocator agnostic. But since that's not doable, this is really the next best thing. You could even wrap it in a template function:</p>
+
+<pre><code>template&lt;typename DestAllocator, typename SourceAllocator, typename charT, typename traits&gt;
+std::basic_string&lt;charT, traits, DestAllocator&gt; conv_str(const std::basic_string&lt;charT, traits, SourceAllocator&gt; &amp;input)
+{
+  return std::basic_string&lt;charT, traits, DestAllocator&gt;{basic_string_ref&lt;charT, traits&gt;{y}};
+}
+</code></pre>
+
+<p>Of course, if you can do that, you can just do this:</p>
+
+<pre><code>template&lt;typename DestAllocator, typename SourceAllocator, typename charT, typename traits&gt;
+std::basic_string&lt;charT, traits, DestAllocator&gt; conv_str(const std::basic_string&lt;charT, traits, SourceAllocator&gt; &amp;input)
+{
+  return std::basic_string&lt;charT, traits, DestAllocator&gt;{y.begin(), y.end()};
+}
+</code></pre>
+
+<p>It'd be great if this were just part of <code>std::basic_string</code>, so that you wouldn't need the workarounds. But it isn't.</p>

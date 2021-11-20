@@ -1,0 +1,78 @@
+<p>You can do this in javascript, modifying vertex color, like you do it in your sample but you will be quickly limited by the number of polygon.</p>
+
+<p>That said, consider your brush like a cone, which start from the Ray.origin and extend in Ray.direction. The radius of the cone is driven by the radius of your brush.</p>
+
+<ul>
+<li>Iterate over each vertices. </li>
+<li>For each, get the minimum distance between the vertex to the Ray line.</li>
+<li>Get the radius of the brush/cone based on the distance between this vertex and the Ray.origin</li>
+<li>If the minimum distance is inferior to the cone radius, your vertex is "in". You can also handle the distance to create a smooth brush.</li>
+</ul>
+
+<p>It should looks like this, it kind of pseudo code, you may need to adapt to ThreeJs Math lib:</p>
+
+<pre><code>// Important, Ray origin and direction must be defined in the same space a vertices positions
+// You may need to transform ray origin and direction in object local space.
+
+
+// get the length of Ray.direction
+// may be useless if 'direction' is normalized
+var rayDirLenSq = ray.direction.length();
+rayDirLenSq *= rayDirLenSq;
+
+var brushRadius = 10.0;
+
+
+for( var i=0;i&lt; vertices.length;i++){
+
+  // get the vertex
+  var v = vertices[i];
+
+  var vdir = v.sub( ray.origin );
+
+  var dot = vdir.dot( ray.direction ) / rayDirLenSq;
+
+  if( dot &lt; 0 ){
+    // handle vertices behind the camera if needed
+  }
+
+  // v2 : projection of the vertex onto ray line
+  var v2 = ray.direction.clone().multiplyScalar( dot );
+
+  // v3 : projection -&gt; vertex
+  var v3 = vdir.subtract( v2 )
+
+  // dist is the distance between the vertex and the ray line
+  var dist = v3.length()
+
+  // 0 when vertex is at the brush border
+  // 1 when vertex is in the brush center
+  var paintingFactor = Math.max(0.0, 1.0 - dist/brushRadius )
+
+
+}
+</code></pre>
+
+<p>Depending of what you want, you can store the painting factor of each vertices to get a mean factor per faces. Or you can modify vertex color of each vertices independantly to get gradients on your faces...</p>
+
+<p>I didn't test the code, it may contain some mistakes :)</p>
+
+<h2>A more advanced method</h2>
+
+<p>You could also use a texture to paint on. You will get rid of vertex (and javascript) limitations. You will be able to paint with textured brushes, and have detail inside a triangle (no more vertex color).</p>
+
+<p>The principle : 
+You need UVs datas and a texture + FBO for each of your meshes. </p>
+
+<p>In a prepass, for each mesh, render it to it's Fbo in it's uvs coords </p>
+
+<pre><code>gl_Position = vec4( UVs*2.0-1.0, 0.0, 1.0 );
+</code></pre>
+
+<p>Provide the worldSpace vertex position to fragment shader, so you can access the world space position of each pixel of the object texture.</p>
+
+<pre><code>vVertexPosition = modelMatrix * aPosition;
+</code></pre>
+
+<p>With <em>vVertexPosition</em> in your fragment shader, you can then use the same method as the javascript one to get the brushFactor of each <em>pixels</em> of your mesh.
+You can even project this world space pixel position in a custom projection matrix  based on the Ray to get the uvs coordinate of the pixel in a brush texture, and paint with textured brush.</p>

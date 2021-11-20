@@ -1,0 +1,61 @@
+<p>Problem is that DataGrid column is not a part of a visual tree, and because of that it does not inherit DataContext. To be able to use DataTriggers in your ButtonOneDataTemplate you need that button, you applying this template to, has correct DataContext. There is a trick, how to provide DataContext to elements that are not in VisualTree, described <a href="http://www.thomaslevesque.com/2011/03/21/wpf-how-to-bind-to-data-when-the-datacontext-is-not-inherited/" rel="nofollow">here</a></p>
+
+<p>Applying that solution to your code we'll have the following:</p>
+
+<p>Proxy</p>
+
+<pre><code>public class BindingProxy : Freezable
+{
+    #region Overrides of Freezable
+
+    protected override Freezable CreateInstanceCore()
+    {
+        return new BindingProxy();
+    }
+
+    #endregion
+
+    public object Data
+    {
+        get { return (object)GetValue(DataProperty); }
+        set { SetValue(DataProperty, value); }
+    }
+
+    // Using a DependencyProperty as the backing store for Data.  This enables animation, styling, binding, etc...
+    public static readonly DependencyProperty DataProperty =
+        DependencyProperty.Register("Data", typeof(object), typeof(BindingProxy), new UIPropertyMetadata(null));
+}
+</code></pre>
+
+<p>Window.Resources</p>
+
+<pre><code>    &lt;local:BindingProxy x:Key="proxy" Data="{Binding}" /&gt;
+
+    &lt;DataTemplate x:Key="ButtonOneDataTemplate"&gt;
+        &lt;Control x:Name="theControl" Template="{DynamicResource imgNo}" Foreground="Orange"/&gt;
+        &lt;DataTemplate.Triggers&gt;
+            &lt;DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=DataContext.IsImageChanged}" Value="True"&gt;
+                &lt;Setter TargetName="theControl" Property="Template" Value="{DynamicResource imgUp}" /&gt;
+            &lt;/DataTrigger&gt;
+            &lt;DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=DataContext.IsImageChanged}" Value="False"&gt;
+                &lt;Setter TargetName="theControl" Property="Template" Value="{DynamicResource imgDown}" /&gt;
+            &lt;/DataTrigger&gt;
+        &lt;/DataTemplate.Triggers&gt;
+    &lt;/DataTemplate&gt;
+</code></pre>
+
+<p>HeaderTemplate</p>
+
+<pre><code>&lt;DataGridTextColumn.HeaderTemplate&gt;
+    &lt;DataTemplate&gt;
+        &lt;Border Background="Violet"&gt;
+            &lt;StackPanel&gt;
+                &lt;Button ContentTemplate="{StaticResource ButtonOneDataTemplate}" 
+                        DataContext="{Binding Path=Data, Source={StaticResource proxy}}"
+                        Command="{Binding DataContext.ButtonClick, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}"/&gt;
+            &lt;/StackPanel&gt;
+        &lt;/Border&gt;
+    &lt;/DataTemplate&gt;
+&lt;/DataGridTextColumn.HeaderTemplate&gt;
+</code></pre>

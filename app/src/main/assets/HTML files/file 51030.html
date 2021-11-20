@@ -1,0 +1,49 @@
+<p>I have implemented something similar in an MVC project where I'm calling to our application from a different domain. To do this, you need to add the Access-Control-Allow-Origin header with value of the Origin (origin of the request) to your response. I imagine this method will work for web api too. You don't want to allow requests from any website! This method will allow you to respond to the initial request, which it seems like you want to do as you're returning an array of users.</p>
+
+<p>I found the easiest way was to create an attribute that you can decorate your methods with:</p>
+
+<pre><code>        public class AllowCrossSiteAttribute : ActionFilterAttribute
+        {
+            public override void OnActionExecuting(ActionExecutingContext filterContext)
+            {
+                switch (filterContext.RequestContext.HttpContext.Request.Headers["Origin"])
+                {
+                    case "https://myotherwebsite1.com":
+                        filterContext.RequestContext.HttpContext.Response.AddHeader("Access-Control-Allow-Origin", filterContext.RequestContext.HttpContext.Request.Headers["Origin"]);
+                        break;
+                    case "https://myotherwebsite2.com":
+                        filterContext.RequestContext.HttpContext.Response.AddHeader("Access-Control-Allow-Origin", filterContext.RequestContext.HttpContext.Request.Headers["Origin"]);
+                        break;
+                    default:
+                        filterContext.Result = new EmptyResult();
+                        break;
+                }
+
+                base.OnActionExecuting(filterContext);
+            }
+        }
+</code></pre>
+
+<p>The switch statement checks the origin and makes sure it's from a trusted source. You don't need to hard code these, but for talk sake I have. If you get a match we add the appropriate header to the response.</p>
+
+<p>You can then decorate your method with this attribute:</p>
+
+<pre><code>[AllowCrossSite]
+public class LoginController : ApiController
+{
+    public User[] PutUser()
+    {
+       //this is where I want to create a user through requests to further work with the application
+    }
+}
+</code></pre>
+
+<p>To actually send data from the other application you could use a jquery Ajax request or just a form post, but make sure the method is set to PUT or POST (depending on what you want to do, it's unclear from the naming) if your application relies on verbs.</p>
+
+<p>You could gather the requested data in a FormDataCollection I believe:</p>
+
+<pre><code>public public User[] PutUser(FormDataCollection form)
+{
+   //...
+}
+</code></pre>

@@ -1,0 +1,74 @@
+<p>This is not currently implemented in Json.NET as of version 8.0.2.</p>
+
+<p>JSONPath property name matching is done with two classes, <a href="https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Linq/JsonPath/FieldFilter.cs" rel="nofollow"><code>FieldFilter</code></a> for simple name matches, and <a href="https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Linq/JsonPath/ScanFilter.cs" rel="nofollow"><code>ScanFilter</code></a> for recursive searches.  <code>FieldFilter</code> has the following code, where <code>o</code> is a <code>JObject</code>:</p>
+
+<pre><code>                    JToken v = o[Name];
+
+                    if (v != null)
+                    {
+                        yield return v;
+                    }
+</code></pre>
+
+<p>Internally <a href="https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Linq/JObject.cs" rel="nofollow"><code>JObject</code></a> uses a <a href="https://github.com/JamesNK/Newtonsoft.Json/blob/master/Src/Newtonsoft.Json/Linq/JPropertyKeyedCollection.cs" rel="nofollow"><code>JPropertyKeyedCollection</code></a> to hold its properties, which in turn uses the following comparer for property name lookups:</p>
+
+<pre><code>private static readonly IEqualityComparer&lt;string&gt; Comparer = StringComparer.Ordinal;
+</code></pre>
+
+<p>It is thus case-sensitive.</p>
+
+<p>Similarly <code>ScanFilter</code> has </p>
+
+<pre><code>                JProperty e = value as JProperty;
+                if (e != null)
+                {
+                    if (e.Name == Name)
+                    {
+                        yield return e.Value;
+                    }
+                }
+</code></pre>
+
+<p>Which is also case sensitive.  </p>
+
+<p>There's no mention of case-insensitive matching in the <a href="http://goessner.net/articles/JsonPath/" rel="nofollow">JSONPath standard</a> so I think what you want simply isn't available out of the box.</p>
+
+<p>As a workaround, you could add your own extension methods for this:</p>
+
+<pre><code>public static class JsonExtensions
+{
+    public static IEnumerable&lt;JToken&gt; CaseSelectPropertyValues(this JToken token, string name)
+    {
+        var obj = token as JObject;
+        if (obj == null)
+            yield break;
+        foreach (var property in obj.Properties())
+        {
+            if (name == null)
+                yield return property.Value;
+            else if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                yield return property.Value;
+        }
+    }
+
+    public static IEnumerable&lt;JToken&gt; CaseSelectPropertyValues(this IEnumerable&lt;JToken&gt; tokens, string name)
+    {
+        if (tokens == null)
+            throw new ArgumentNullException();
+        return tokens.SelectMany(t =&gt; t.CaseSelectPropertyValues(name));
+    }
+}
+</code></pre>
+
+<p>And then chain them together with standard <code>SelectTokens</code> calls, for instance:</p>
+
+<pre><code>        var root = new { Array = new object[] { new { maxAppVersion = "1" }, new { MaxAppVersion = "2" } } };
+
+        var json = JToken.FromObject(root);
+
+        var tokens = json.SelectTokens("Array[*]").CaseSelectPropertyValues("maxappversion").ToList();
+        if (tokens.Count != 2)
+            throw new InvalidOperationException(); // No exception thrown
+</code></pre>
+
+<p>(Relatedly, see the Json.NET issue <a href="https://github.com/JamesNK/Newtonsoft.Json/issues/815" rel="nofollow">Provide a way to do case-sensitive property deserialization</a> which requests a case-sensitive contract resolver for consistency with the case-sensitivity of LINQ-to-JSON.)</p>

@@ -1,0 +1,17 @@
+<p>Are you mistaking threads and tasks?</p>
+
+<pre><code>ActivityManager am = (ActivityManager) this.getSystemService(ACTIVITY_SERVICE);
+List&lt;ActivityManager.RecentTaskInfo&gt; recentTasks = 
+     am.getRecentTasks(10000,ActivityManager.RECENT_WITH_EXCLUDED);
+</code></pre>
+
+<p>would give you a task list, in there you should find the sender for intents your application is receiving.</p>
+
+<p>Because Thread.currentThread will always reference the thread your app is running in, which was started by the activity manager, you wont get to the sender of the intent through your thread. Even worse, stacktrace is not related at all to another thread.
+What you see in your logger is the stacktrace from within the SMSManagers - Thread.</p>
+
+<p>To clearify: One process may span as many threads as it wants to (restricted by resource usage and some other limitations as the defined maximum number of processes or file descriptors). This process is the parent process of all other threads. 
+The Activity Manager itself relies on Zygote, which is responsible for tasks as starting activities or putting them into the background, the ActivityManager provides a Java - Interface to it (as Zygote itself is part of the OS). Threads know about the parent processes (pid()) but not necessarily anything about other threads executing in parallel in the environment. Stacktraces are process related. Because threads are light - weighted processes, they have there own stacktraces. In a stacktrace contained are only informations that adresses the processes adress space, which is restricted to the thread's process itself.</p>
+
+<p>And even more precise: Even when relating to the tasks currently in the stack (this is the task - stack, not to be confused with the stack you will get by getBackTrace), there will only be a random guess on who's sending the intent. It even maybe that the task which was sending the intent already has been killed and not existing any longer.
+This is part of the android design, a intent does not generally contain a reference to its sender. If you wonder why: Again, the sender of an Intent and the receiver maybe objects living in different adress spaces or processes. So a direct reference to that object could not be passed from one thread to another without sharing a portion of the adress spaces. But this is advanced thread handling and IPC. PendingIntent contains a method called getIntentSender. But it's on the implementers side to give a PendingIntent to a receiver which then can use it to start other processes (activities, services, ...). So unless you can't retrieve a pending intent from the  SMSManager you won't get the sender of the intent by api calls. Instead you can try the work around by examining the task  stack as described above.</p>

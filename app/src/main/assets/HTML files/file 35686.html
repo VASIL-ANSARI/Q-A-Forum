@@ -1,0 +1,61 @@
+<p>I actually implemented something very similar. The class is, at heart, a just a wrapped around a ComboBox which hides some functionality while adding a generic interface.</p>
+
+<pre><code>// Generic type which strongly hints at Enum type; no way to actually force
+public class EnumBox&lt;TEnum&gt; : Bin where TEnum : struct, IConvertible, IFormattable {
+    // Necessary wrappers for objects which extend Bin
+    protected override void OnSizeAllocated(Gdk.Rectangle allocation) {
+        WrappedComboBox.Allocation = allocation;
+    }
+
+    protected override void OnSizeRequested(ref Requisition requisition) {
+        requisition = WrappedComboBox.SizeRequest();
+    }
+
+    // Stored values
+    private string[] EnumValues;
+    private ComboBox WrappedComboBox;
+
+    // Constructor
+    public EnumBox() {
+        EnumValues = Enum.GetNames(typeof(TEnum));
+        WrappedComboBox = new ComboBox(EnumValues);
+        WrappedComboBox.Active = 0;
+        WrappedComboBox.Changed += OnChanged;
+
+        this.Child = WrappedComboBox;
+    }
+    // Events
+    public event EventHandler Changed;
+
+    public void OnChanged(object sender = null, EventArgs e = null) {
+        if (Changed != null) {
+            Changed(sender, e);
+        }
+    }
+    // Provide some ComboBox like behavior
+    public int Active { 
+        get { return WrappedComboBox.Active; }
+        set { WrappedComboBox.Active = value; }
+    }
+
+    public TEnum ActiveValue {
+        get {
+            TEnum retval;
+            if (Enum.TryParse&lt;TEnum&gt;(WrappedComboBox.ActiveText, out retval)) {
+                return retval;
+            } else {
+                throw new Exception("Invalid EnumBox state");
+            }
+        }
+
+        set {
+            for (int i = 0; i &lt; EnumValues.Length; ++i) {
+                if (EnumValues[i] == value.ToString()) {
+                    WrappedComboBox.Active = i;
+                    return;
+                }
+            }
+        }
+    }
+}
+</code></pre>

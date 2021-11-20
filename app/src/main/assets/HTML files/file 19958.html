@@ -1,0 +1,26 @@
+<p>I had the same goal as you apparently had (delete <strong>B</strong> as soon as the last referenced <strong>A</strong> is deleted). It took me longer than expected to get this right. Particularly because </p>
+
+<ul>
+<li>At the time <strong>A</strong> prepares for deletion, the to-many relationship in <strong>B</strong> might not be updated yet, so you can't just count the <strong>A</strong> referenced in <strong>B</strong>.</li>
+<li>isDeleted on <strong>A</strong> seems to be already set during <code>-prepareForDeletion</code></li>
+</ul>
+
+<p>Here's what worked for me if anybody's interested (I'll use <em>Department</em> &lt;-->> <em>Employee</em> because it's easier to read):</p>
+
+<p>In <em>Employee</em>:</p>
+
+<pre><code>- (void)prepareForDeletion {
+    // Delete our department if we we're the last employee associated with it.
+    Department *department = self.department;
+    if (department &amp;&amp; (department.isDeleted == NO)) {
+        NSPredicate *predicate = [NSPredicate predicateWithFormat:@"isDeleted == NO"];
+        NSSet *employees = [department.employees filteredSetUsingPredicate:predicate];
+
+        if ([employees count] == 0) {           
+            [self.managedObjectContext deleteObject:department];
+        } 
+    }
+}
+</code></pre>
+
+<p>Other people have suggested putting this logic into <code>-willSave</code> in <em>Department</em>. I prefer the solution above since I might actually want to save an empty department in some cases (e.g. during manual store migration or data import). </p>

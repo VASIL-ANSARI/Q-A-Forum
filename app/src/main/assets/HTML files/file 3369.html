@@ -1,0 +1,32 @@
+<p>The problem is that @dep1Id and @dep1Id are scalar and are retaining the last value only from the two set based inserts.</p>
+
+<p>Since it's a one off you should probably do it as a cursor</p>
+
+<pre><code>DECLARE CURSOR @curs FOR
+SELECT c1,c2,c3,c4,c5 FROM OldDatebase
+
+open @curs
+fetch next from @curs into
+@c1,@c2,@c3,@c4,@c5 --declare these!
+
+while @@fetch_status &lt;&gt; 0
+BEGIN
+
+INSERT INTO DependentA (column1, column2) VALUES @c1, @c2
+
+SELECT @dep1Id = Scope_Identity()
+
+INSERT INTO DependentB (column3, column4) VALUES @c3, @c4 
+
+SELECT @dep2Id = Scope_Identity()
+
+INSERT INTO BaseTable (column5, department1Id, department2Id) @c5, @dep1Id, @dep2Id    
+
+fetch next from @curs into
+@c1,@c2,@c3,@c4,@c5
+END
+close @curs
+deallocate @curs
+</code></pre>
+
+<p>My cursor syntax is probably riddled with errors, but you get the idea.</p>

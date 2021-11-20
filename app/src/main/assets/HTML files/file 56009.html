@@ -1,0 +1,50 @@
+<p>I've come up with the following definitions.  The <code>defaultValue</code> parameters are there mostly to be able to overload the <code>TryGet</code> method, as generic constraints are not part of a method's signature, that which makes the method unique when deciding which method to call (for instance, the return type is also not part of the signature).</p>
+
+<pre><code>public async Task&lt;T&gt; TryGet&lt;T&gt;(Func&lt;Task&lt;T&gt;&gt; func, T defaultValue = null) where T : class
+{
+    try
+    {
+        return await func();
+    }
+    catch (ArgumentException)
+    {
+        return defaultValue;
+    }
+    catch (FormatException)
+    {
+        return defaultValue;
+    }
+    catch (OverflowException)
+    {
+        return defaultValue;
+    }
+}
+
+public async Task&lt;Nullable&lt;T&gt;&gt; TryGet&lt;T&gt;(Func&lt;Task&lt;T&gt;&gt; func, Nullable&lt;T&gt; defaultValue = null) where T : struct
+{
+    try
+    {
+        return await func();
+    }
+    catch (ArgumentException)
+    {
+        return defaultValue;
+    }
+    catch (FormatException)
+    {
+        return defaultValue;
+    }
+    catch (OverflowException)
+    {
+        return defaultValue;
+    }
+}
+</code></pre>
+
+<p>You should review exception handling, this example handles the common parsing exceptions.  It may make more sense to react to other exceptions, such as <code>InvalidOperationException</code> and <code>NotSupportedException</code>, probably the most used exception types on the framework itself (not necessarily the most commonly thrown ones).</p>
+
+<p>Another approach is to re-throw critical exceptions, such as <code>ThreadAbortException</code> and have a simple catch-all clause that returns the default value.  However, this will hide every exception not deemed critical, no matter how severe it is.</p>
+
+<p>As such, and because throwing exceptions is an expensive operation, it's <code>Parse</code> that is usually defined in terms of <code>TryParse</code>.  So your <code>TryGet</code> should have a contract, e.g. deal with <code>OperationCanceledException</code>, which includes <code>TaskCanceledException</code> and nothing else.</p>
+
+<p>Finally, you should name it <code>TryGetAsync</code>, following the Async-suffix convention. <sup><a href="https://msdn.microsoft.com/en-us/library/hh873175(v=vs.110).aspx" rel="nofollow">[1]</a></sup> <sup><a href="https://msdn.microsoft.com/en-us/library/mt674882.aspx" rel="nofollow">[2]</a></sup></p>

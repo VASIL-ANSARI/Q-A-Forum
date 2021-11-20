@@ -1,0 +1,33 @@
+<p>My investigation lead me to the core of the problem: <a href="http://stackoverflow.com/questions/2213340/what-is-daemon-thread-in-java">daemon threads</a>.</p>
+
+<p>The snmp server implementation which I use (snmp4j) use daemon threads internally. So even when snmp server started, there are no more live user threads in JVM, so it exits.</p>
+
+<p><strong>TL/DR:</strong></p>
+
+<p>Just add this method to any bean (snmp server bean is good candidate for this):</p>
+
+<pre><code>@Scheduled(fixedDelay = 1000 * 60 * 60) // every hour
+public void doNothing() {
+    // Forces Spring Scheduling managing thread to start
+}
+</code></pre>
+
+<p>(Do not forget to add <code>@EnableScheduling</code> to your spring configuration).</p>
+
+<p><strong>Explanation:</strong></p>
+
+<p>To prevent stopping spring context, while SNMP server is still running, we need <strong>any</strong> non-daemon thread to be alive in JVM. Not necessarily <code>main</code> thread. So we can let <code>main</code> method to finish.</p>
+
+<ol>
+<li><p>We can run new non-daemon thread from our server bean's <code>start</code> method. This thread will <code>wait</code> on some lock in <code>while</code> loop checking for some <code>running</code> variable, while our <code>stop</code> method will set this <code>running</code> variable to <code>false</code> and <code>notifyAll</code> on this lock.</p>
+
+<p>This way, our non-daemon thread will be alive until shotdown hook is triggered (and prevents JVM to exit).
+After shutdown hook, spring context lifecycle <code>close</code> method will call all <code>SmartLifecycle</code> bean's <code>close</code> methods, that will lead to SNMP server bean's <code>stop</code> method call, that will lead to set <code>running</code> to false, that will lead to our non-daemon thread to stop, that allow JVM to stop gracefully.</p></li>
+<li><p>Or instead we can use Spring's scheduling thread in similar way. It also is non-daemon thread, so it will prevent JVM to exit. And Spring manages this thread itself, so it will automatically stop it when shutdown hook is triggered.</p>
+
+<p>To make Spring's scheduling thread to start we need any <code>@Scheduled</code> method in any bean.</p></li>
+</ol>
+
+<hr>
+
+<p>I think that first (manual) approach is still more "correct", while requires more async coding (which is error-prone as we all know). Who knows how Spring will change it's scheduling implementation in the future.</p>

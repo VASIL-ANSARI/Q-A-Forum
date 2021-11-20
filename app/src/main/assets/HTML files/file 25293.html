@@ -1,0 +1,93 @@
+<p>You've got multiple problems here.</p>
+
+<hr>
+
+<p>The first is that you're printing <code>bytes</code> objects directly:</p>
+
+<pre><code>print(name,"wrote:".format(self.client_address[0]))
+</code></pre>
+
+<p>That's why you get <code>b'Bob' wrote:</code> instead of <code>Bob wrote:</code>. When you print a <code>bytes</code> object in Python 3, this is what happens. If you want to decode it to a string, you have to do that explicitly.</p>
+
+<p>You have code that does that all over the place. It's usually cleaner to use the <code>decode</code> and <code>encode</code> methods than the <code>str</code> and <code>bytes</code> constructors, and if you're already using <code>format</code> there are even nicer ways to deal with this, but sticking with your existing style:</p>
+
+<pre><code>print(str(name, "utf-8"), "wrote:".format(self.client_address[0]))
+</code></pre>
+
+<hr>
+
+<p>Next, I'm not sure why you're calling <code>format</code> on a string with no format parameters, or why you're mixing multi-argument <code>print</code> functions and <code>format</code> calls together. It looks like you're trying to get <code>self.client_address[0]</code>, but you're not doing that. Then again, your desired output doesn't show it, soâ¦ just remove that <code>format</code> call if you don't want it, add a <code>{}</code> somewhere in the format string if you do. (You're also probably going to want to decode <code>client_address[0]</code>, too.)</p>
+
+<hr>
+
+<p>Next, you store the same value in <code>name</code> and <code>data</code>:</p>
+
+<pre><code>data = self.request[0].strip()
+name = self.request[0].strip()
+</code></pre>
+
+<p>So, when you later do this:</p>
+
+<pre><code>print(data)
+</code></pre>
+
+<p>â¦ that's just printing <code>name</code> againâand, again, without decoding it. So, even if you fix the decoding problem, you'll still get this:</p>
+
+<pre><code>Bob wrote:
+Bob
+</code></pre>
+
+<p>â¦ instead of just:</p>
+
+<pre><code>Bob wrote:
+</code></pre>
+
+<p>To fix that, just get rid of the <code>data</code> variable and the <code>print(data)</code> call.</p>
+
+<hr>
+
+<p>Next, you're sending two separate packets, one with the <code>name</code> and the other with the <code>data</code>, but trying to recover both out of each packet. So, even if you fix all of the above, you're going to get <code>Bob</code> in one packet as the name, and <code>hello my name is bob</code> in the next packet, resulting in:</p>
+
+<pre><code>Bob wrote:
+hello my name is bob wrote:
+</code></pre>
+
+<p>If you want this to be stateful, you need to actually store the state somewhere. In your case, the state is incredibly simpleâjust a flag saying whether this is the first message from a given clientâbut it still has to go somewhere. One solution is to associate a new state with each address using a dictionaryâalthough in this case, since the state is either "seen before" or nothing at all, we can just use a set.</p>
+
+<p>Putting it all together:</p>
+
+<pre><code>class MyUDPHandler(socketserver.BaseRequestHandler):
+    def __init__(self, *args, **kw):
+        self.seen = set()
+        super().__init__(*args, **kw)
+
+    def handle(self):
+        data = self.request[0].strip()
+        addr = self.client_address[0]
+        if not addr in self.seen:
+            print(str(data, "utf-8"), "wrote:")
+            self.seen.add(addr)
+        else:
+            print(str(data, "utf-8"))
+        socket.sendto(data.upper(), self.client_address)
+</code></pre>
+
+<hr>
+
+<p>Meanwhile, it seems like what you <em>actually</em> want is to store the name from the first request as your per-client state, so you can reuse it in every future request. That's almost as easy. For example:</p>
+
+<pre><code>class MyUDPHandler(socketserver.BaseRequestHandler):
+    def __init__(self, *args, **kw):
+        self.clients = {}
+        super().__init__(*args, **kw)
+
+    def handle(self):
+        data = str(self.request[0].strip(), 'utf-8')
+        addr = self.client_address[0]
+        if not addr in self.clients:                
+            print(data, "joined!")
+            self.clients[addr] = data
+        else:
+            print(self.clients[addr], 'wrote:', data)
+        socket.sendto(data.upper(), self.client_address)
+</code></pre>

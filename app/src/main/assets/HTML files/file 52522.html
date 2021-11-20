@@ -1,0 +1,63 @@
+<p>OK, so the first thing you need is long-form data. Let's say you start with this:</p>
+
+<pre><code>import numpy
+import pandas
+import seaborn
+numpy.random.seed(0)
+
+N = 100
+seasons = ['winter', 'spring', 'summer', 'autumn']
+df = pandas.DataFrame({
+    'season': numpy.random.choice(seasons, size=N),
+    'A': numpy.random.normal(4, 1.75, size=N),
+    'B': numpy.random.normal(4, 4.5, size=N),
+    'C': numpy.random.lognormal(0.5, 0.05, size=N),
+    'D': numpy.random.beta(3, 1, size=N)
+})
+
+print(df.sample(7))
+
+           A         B         C         D  season
+85  7.236212  5.044815  1.845659  0.550943  autumn
+13  4.749581  1.014348  1.707000  0.630618  autumn
+0   1.014027  4.750031  1.637803  0.285781  winter
+3   3.233370  8.250158  1.516189  0.973797  winter
+44  6.062864 -0.969725  1.564768  0.954225  autumn
+43  7.317806 -3.209259  1.699684  0.968950  spring
+39  5.576446 -2.187281  1.735002  0.436692  winter
+</code></pre>
+
+<p>You get it into long-form data with the <code>pandas.melt</code> function.</p>
+
+<pre><code>lf = pandas.melt(df, value_vars=['A', 'B', 'C', 'D'], id_vars='season')
+print(lf.sample(7))
+
+     season variable     value
+399  winter        D  0.238061
+227  spring        C  1.656770
+322  autumn        D  0.933299
+121  autumn        B  4.393981
+6    autumn        A  1.175679
+5    autumn        A  5.360608
+51   spring        A  5.709118
+</code></pre>
+
+<p>Then you can just pipe all that straight into <code>seaborn.factorplot</code></p>
+
+<pre><code>fg = (
+    pandas.melt(df, value_vars=['A', 'B', 'C', 'D'], id_vars='season')
+        .pipe(
+            (seaborn.factorplot, 'data'), # (&lt;fxn&gt;, &lt;dataframe var&gt;)
+            kind='box',                   # type of plot we want
+            x='season', x_order=seasons,  # x-values of the plots
+            y='value', palette='BrBG_r',  # y-values and colors
+            col='variable', col_wrap=2,   # 'A-D' in columns, wrap at 2nd col
+            sharey=False                  # tailor y-axes for each group
+            notch=True, width=0.75,       # kwargs passed to boxplot
+        )
+)
+</code></pre>
+
+<p>And that gives me:</p>
+
+<p><a href="http://i.stack.imgur.com/I46ep.png" rel="nofollow"><img src="http://i.stack.imgur.com/I46ep.png" alt="enter image description here"></a></p>

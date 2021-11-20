@@ -1,0 +1,29 @@
+<p>To have <code>num_nodes</code> clients, do:</p>
+
+<pre><code>for(j = 0; j&lt;num_nodes; j++)
+    if (fork() == 0) {
+        close(sockdescriptor);
+        client_prog();
+        exit(0);
+    }
+</code></pre>
+
+<p>Then to have a separate process handling each client connection, such that multiple clients can proceed in parallel, I suggest that you replace the entire <code>for</code> loop with something like this:</p>
+
+<pre><code>while(1) {
+    td = accept(sockdescriptor, ...);
+    client_num++;
+    if (fork() == 0) {
+        close(sockdescriptor);
+
+        /* handle client interaction here */
+        send(...) / receive(...)
+
+        exit(0);
+    } else {
+        close(td);
+    }
+}
+</code></pre>
+
+<p>Note that there is a race condition: If <code>num_nodes</code> is greater than SOMAXCONN, it is possible that connections are dropped. Spawning the server process first does not eliminate the race condition. This sort of thing is safer with pipes, that are pre-opened before fork.</p>

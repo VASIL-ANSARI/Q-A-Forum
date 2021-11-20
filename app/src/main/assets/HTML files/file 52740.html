@@ -1,0 +1,77 @@
+<p>It is possible to do it, but it requires the use of a context, along with the necessary package to do the setting/clearing of the context. You'd need to test with your data to see if this is performant enough.</p>
+
+<p><strong>Create New Context</strong></p>
+
+<pre><code>create or replace context test_context using pkg_context_utils;
+</code></pre>
+
+<p><strong>Create package to set new context</strong></p>
+
+<pre><code>create or replace package pkg_context_utils
+as
+  procedure set_date (p_date in date);
+  procedure clear_date;
+end pkg_context_utils;
+/
+
+create or replace  package body pkg_context_utils
+as
+  procedure set_date (p_date in date)
+  is
+  begin
+    dbms_session.set_context (namespace =&gt; 'test_context',
+                              attribute =&gt; 'test_date',
+                              value     =&gt; p_date);
+  end set_date;
+
+  procedure clear_date
+  is
+  begin
+    dbms_session.clear_context(namespace =&gt; 'test_context',
+                               client_id =&gt; null,
+                               attribute =&gt; 'test_date');
+  end clear_date;
+
+end pkg_context_utils;
+/
+</code></pre>
+
+<p><strong>Create a view using the context in the where clause</strong></p>
+
+<pre><code>create or replace view test_view
+as
+select * from dual where sys_context('test_context', 'test_date') &gt; sysdate;
+</code></pre>
+
+<p><strong>Run the view with no context set</strong></p>
+
+<pre><code>select * from test_view;
+
+no rows selected.
+</code></pre>
+
+<p><strong>Set the context to be after the current date</strong></p>
+
+<pre><code>begin
+  pkg_context_utils.set_date(trunc(sysdate + 1));
+end;
+/
+
+select * from test_view;
+
+DUMMY
+-----
+X   
+</code></pre>
+
+<p><strong>Set the context to before the current date</strong></p>
+
+<pre><code>begin
+  pkg_context_utils.set_date(trunc(sysdate));
+end;
+/
+
+select * from test_view;
+
+no rows selected.
+</code></pre>

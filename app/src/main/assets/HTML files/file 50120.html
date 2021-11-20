@@ -1,0 +1,46 @@
+<p>Hey Geffory only putting widget on the view we can't upload files we have to create Controller according to the widget.In my project I normally use krajee File Input yii2 extension. anyway I found an example Controller from <a href="https://github.com/2amigos/yii2-file-upload-widget/issues/5" rel="nofollow">https://github.com/2amigos/yii2-file-upload-widget/issues/5</a> </p>
+
+<p><b>Controller Function</b></p>
+
+<pre><code>public function actionUpload($id)
+{
+    $tour = Tour::findOne($id);
+    if (!$tour) {
+        throw new NotFoundHttpException(Yii::t('app', 'Page not found'));
+    }
+    $picture = new TourPicture(['scenario' =&gt; 'upload']);
+    $picture-&gt;tour_id = $id;
+    $picture-&gt;image = UploadedFile::getInstance($picture, 'image');
+    if ($picture-&gt;image !== null &amp;&amp; $picture-&gt;validate(['image'])) {
+
+        Yii::$app-&gt;response-&gt;getHeaders()-&gt;set('Vary', 'Accept');
+        Yii::$app-&gt;response-&gt;format = Response::FORMAT_JSON;
+
+        $response = [];
+
+        if ($picture-&gt;save(false)) {
+            $response['files'][] = [
+                'name' =&gt; $picture-&gt;image-&gt;name,
+                'type' =&gt; $picture-&gt;image-&gt;type,
+                'size' =&gt; $picture-&gt;image-&gt;size,
+                'url' =&gt; $picture-&gt;getImageUrl(),
+                'thumbnailUrl' =&gt; $picture-&gt;getImageUrl(TourPicture::SMALL_IMAGE),
+                'deleteUrl' =&gt; Url::to(['delete', 'id' =&gt; $picture-&gt;id]),
+                'deleteType' =&gt; 'POST'
+            ];
+        } else {
+            $response[] = ['error' =&gt; Yii::t('app', 'Unable to save picture')];
+        }
+        @unlink($picture-&gt;image-&gt;tempName);
+    } else {
+        if ($picture-&gt;hasErrors(['picture'])) {
+            $response[] = ['error' =&gt; HtmlHelper::errors($picture)];
+        } else {
+            throw new HttpException(500, Yii::t('app', 'Could not upload file.'));
+        }
+    }
+    return $response;
+}
+</code></pre>
+
+<p>you can use this controller function and add modify your controller according to your need..</p>

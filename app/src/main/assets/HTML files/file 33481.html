@@ -1,0 +1,22 @@
+<p>I have been troubled for hours or days around such problems. Typically gcc wants <code>this-&gt;</code> but clang does not. In some cases <code>Foo::</code> also helps but there have been cases where I have given up using the member names. The following is only using the <em>type</em> names and (though more verbose) I think will not have any problems with either:</p>
+
+<pre><code>template&lt;typename Base, typename Acc&gt;
+struct Foo
+{
+    Base base;
+    Acc acc;
+
+    template&lt;typename S&gt;
+    using result = typename std::result_of&lt;S&gt;::type;
+
+    auto operator()(unsigned i) const
+    -&gt; result&lt;const Acc(result&lt;const Base(unsigned)&gt;)&gt;
+        { return acc(base(i)); }
+};
+</code></pre>
+
+<p>More generally, whenever <code>decltype(member_name)</code> is causing problems, you can safely use <code>decltype(std::declval&lt;member_type&gt;())</code> where <code>member_type</code> is <code>const</code>-qualified if the member function using it is <code>const</code>.</p>
+
+<p>Even more generally, if you have a member function that is <code>&amp;&amp;</code>, <code>&amp;</code> or <code>const&amp;</code> qualified, use <code>member_type</code>, <code>member_type&amp;</code> or <code>const member_type&amp;</code> respectively in such expressions.</p>
+
+<p>I have never looked into what the standard says but in practice compilers treat expressions differently in trailing return types and inside function definitions when it comes to class members.</p>

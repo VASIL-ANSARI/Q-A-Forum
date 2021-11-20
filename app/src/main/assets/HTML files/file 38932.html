@@ -1,0 +1,54 @@
+<p>What's happening is that you're seeing <code>0</code> as the value of <code>appData</code> in <code>convCallback</code>, which is where the error is coming from - the reply data is empty, which means bad conversation, which causes the <code>PAM_AUTHTOK_RECOVERY_ERR</code> return value. This is based on reading the <code>support.c</code> file in the current code for the PAM-Linux source code.</p>
+
+<p>Ok, couple of issues.</p>
+
+<ol>
+<li><p>You can't reassign the conversation appdata_ptr value after initialization - the value of the pointer should be considered a constant after the invocation of <code>pam_start</code>. You should pass in a value there that will never change. If you checked the conversation function you would have noticed that the value of <code>appData</code> is <code>0</code>.</p></li>
+<li><p>You <em>must</em> assume that the value being put into the reply is owned by the calling routine - i.e. you'll have to strdup the password string (with all the evil that is connected to that).</p></li>
+</ol>
+
+<p>With both of these in mind, I slightly altered your code to the following, which should address your problems (again, this is simplified code):</p>
+
+<pre><code>class Pam
+{
+public:
+    Pam(const char *module, const char *username)
+    {
+        mConv.appdata_ptr = (void *)(this);
+        mConv.conv = &amp;convCallback;
+        const int res = pam_start(module, username, &amp;mConv, &amp;mPamHandle);
+        if (res != PAM_SUCCESS)
+            throw std::runtime_error("Failed to initialize PAM");
+     }
+
+     bool authenticate(char *passwd)
+     {
+         mPassword = passwd;
+         const int res = pam_authenticate(mPamHandle, 0);
+         log(res);
+         return res == PAM_SUCCESS;
+    }
+
+    ~Pam()
+    {
+        if (mPamHandle)
+            pam_end(mPamHandle, PAM_SUCCESS);
+        mPamHandle = 0;
+    }
+private:
+    static int convCallback (int msgId, const pam_message **msg, pam_response **resp, void *appData)
+    {
+        Pam *me = static_cast&lt;Pam *&gt;(appData);
+        pam_response *reply = static_cast&lt;pam_response *&gt;(calloc(1, sizeof(pam_response)));
+        reply-&gt;resp = strdup(me-&gt;mPassword);
+        reply-&gt;resp_retcode = 0;
+        *resp = reply;
+        return PAM_SUCCESS;
+    }
+
+private:
+    pam_handle_t *mPamHandle = 0;
+    pam_conv mConv;
+    const char *mPassword = 0;
+};
+</code></pre>

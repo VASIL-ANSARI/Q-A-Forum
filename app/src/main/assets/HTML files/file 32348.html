@@ -1,0 +1,39 @@
+<p>As far as I can tell, the result of these two expressions</p>
+
+<pre><code>(double)(M * 100) / N
+(double) M / N * 100
+</code></pre>
+
+<p>is the same EXCEPT for floating point precision errors (and also for possible overflows, but let us ignore them here since both lines are susceptible to them, albeit in a different way). These errors COULD cause the values to be one slightly above or equal to an integer, and one slightly below the same integer, which would cause</p>
+
+<pre><code>(int)((double)(M * 100) / N)
+(int)((double) M / N * 100)
+</code></pre>
+
+<p>to differ by one. In general, when dealing with floating point, you have more chances to get closer to the "real" value if you leave the division as the last operation.</p>
+
+<p>There is one further consideration, which can get quite tricky: you have no parentheses around <code>(double)M/N</code> in your second line. This MIGHT give additional freedom to an optimizer, which could make the result dependent on the optimization level. I don't know whether this can happen in Java.</p>
+
+<p>As for the order of operations, I tried out this particular case in C (because that's quicker for me):</p>
+
+<pre><code>int i, j, k;
+for (i = 1; i &lt;= 100; i++) {
+   j = (int)(((double)i / 100) * 100);
+   if (i != j) {
+      printf("%d -&gt; %d\n", i, j);
+   }
+   k = (int)(((double)i * 100) / 100);
+   if (i != k) {
+      printf("%d ?? %d\n", i, k);
+   }
+}
+</code></pre>
+
+<p>and the output on my machine is</p>
+
+<pre><code>29 -&gt; 28
+57 -&gt; 56
+58 -&gt; 57
+</code></pre>
+
+<p>Replacing 100 with 10000000 yields 587200 lines of the same kind (i.e., an error rate of 5.872%)</p>

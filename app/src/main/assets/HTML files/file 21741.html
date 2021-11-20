@@ -1,0 +1,133 @@
+<p>If you have a view that is supposed to be in front of the <code>MKMapView</code> and not move on the screen as the map moves underneath it, you should implement it as you've described, as a separate view in front of (i.e. on top of) the map view. But rather than having this front view handle gestures and try to change the map view programmatically, you should just set the <code>userInteractionEnabled</code> to <code>NO</code> for this front view (you can do this programmatically or via Interface Builder). This will let the map view behind it receive the touches. </p>
+
+<p>If you have some controls on that front view which need to accept user interaction, then go ahead and enable user interaction for those few controls, but make sure that the bulk of this front view is configured to not have <code>userInteractionEnabled</code>. </p>
+
+<hr>
+
+<p>If you wanted an overlay that should move with the map, you should just add the overlay to the <code>MKMapView</code>, itself, not a separate view. See <a href="http://developer.apple.com/library/ios/documentation/UserExperience/Conceptual/LocationAwarenessPG/AnnotatingMaps/AnnotatingMaps.html#//apple_ref/doc/uid/TP40009497-CH6-SW15" rel="nofollow">Displaying Overlays on a Map</a> in the <em>Location Awareness Programming Guide.</em> If you use <code>MKMapView</code> overlays instead of a separate view, you don't lose any of the built-in gestures.</p>
+
+<p>For example, if you set the <code>delegate</code> for your <code>MKMapView</code> to be your view controller, you can then write a <code>rendererForOverlay</code> in iOS 7 (or <code>viewForOverlay</code> method for earlier versions):</p>
+
+<pre><code>// for iOS7+; see `viewForOverlay` for earlier versions
+
+- (MKOverlayRenderer *)mapView:(MKMapView *)mapView rendererForOverlay:(id&lt;MKOverlay&gt;)overlay
+{
+    if ([overlay isKindOfClass:[MKPolygon class]])
+    {
+        MKPolygonRenderer *renderer = [[MKPolygonRenderer alloc] initWithPolygon:overlay];
+
+        renderer.fillColor   = [[UIColor cyanColor] colorWithAlphaComponent:0.2];
+        renderer.strokeColor = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        renderer.lineWidth   = 3;
+
+        return renderer;
+    }
+
+    if ([overlay isKindOfClass:[MKCircle class]])
+    {
+        MKCircleRenderer *renderer = [[MKCircleRenderer alloc] initWithCircle:overlay];
+
+        renderer.fillColor   = [[UIColor cyanColor] colorWithAlphaComponent:0.2];
+        renderer.strokeColor = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        renderer.lineWidth   = 3;
+
+        return renderer;
+    }
+
+    if ([overlay isKindOfClass:[MKPolyline class]])
+    {
+        MKPolylineRenderer *renderer = [[MKPolylineRenderer alloc] initWithPolyline:overlay];
+
+        renderer.strokeColor = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        renderer.lineWidth   = 3;
+
+        return renderer;
+    }
+
+    return nil;
+}
+
+// for iOS versions prior to 7; see `rendererForOverlay` for iOS7 and later
+
+- (MKOverlayView *)mapView:(MKMapView *)mapView viewForOverlay:(id &lt;MKOverlay&gt;)overlay
+{
+    if ([overlay isKindOfClass:[MKPolygon class]])
+    {
+        MKPolygonView *overlayView = [[MKPolygonView alloc] initWithPolygon:overlay];
+
+        overlayView.fillColor      = [[UIColor cyanColor] colorWithAlphaComponent:0.2];
+        overlayView.strokeColor    = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        overlayView.lineWidth      = 3;
+
+        return overlayView;
+    }
+
+    if ([overlay isKindOfClass:[MKCircle class]])
+    {
+        MKCircleView *overlayView = [[MKCircleView alloc] initWithCircle:overlay];
+
+        overlayView.fillColor     = [[UIColor cyanColor] colorWithAlphaComponent:0.2];
+        overlayView.strokeColor   = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        overlayView.lineWidth     = 3;
+
+        return overlayView;
+    }
+
+    if ([overlay isKindOfClass:[MKPolyline class]])
+    {
+        MKPolylineView *overlayView = [[MKPolylineView alloc] initWithPolyline:overlay];
+
+        overlayView.strokeColor     = [[UIColor blueColor] colorWithAlphaComponent:0.7];
+        overlayView.lineWidth       = 3;
+
+        return overlayView;
+    }
+
+    return nil;
+}
+</code></pre>
+
+<p>This handles polygons, circles, and lines. Clearly if you're only drawing polygons, for example, you could simplify the above code accordingly.</p>
+
+<p>Once you do that, you can now add an overlay directly to the map. For example, this adds an overlay that is a rectangle of a certain size around a particular coordinate:</p>
+
+<pre><code>- (void)addOverlayAround:(CLLocationCoordinate2D)originalCoordinate atDistance:(double)distanceKm
+{
+    MKCoordinateRegion region = MKCoordinateRegionMakeWithDistance(originalCoordinate, distanceKm * 1000.0 * 2.0, distanceKm * 1000 * 2.0);
+    MKCoordinateSpan span = region.span;
+
+    CLLocationCoordinate2D  points[4];
+    points[0] = CLLocationCoordinate2DMake(originalCoordinate.latitude  + span.latitudeDelta / 2.0,
+                                           originalCoordinate.longitude - span.longitudeDelta / 2.0);
+    points[1] = CLLocationCoordinate2DMake(originalCoordinate.latitude  + span.latitudeDelta / 2.0 ,
+                                           originalCoordinate.longitude + span.longitudeDelta / 2.0);
+    points[2] = CLLocationCoordinate2DMake(originalCoordinate.latitude  - span.latitudeDelta / 2.0,
+                                           originalCoordinate.longitude + span.longitudeDelta / 2.0);
+    points[3] = CLLocationCoordinate2DMake(originalCoordinate.latitude  - span.latitudeDelta / 2.0,
+                                           originalCoordinate.longitude - span.longitudeDelta / 2.0);
+
+    MKPolygon* poly = [MKPolygon polygonWithCoordinates:points count:4];
+    if ([self.mapView respondsToSelector:@selector(addOverlay:level:)])
+        [self.mapView addOverlay:poly level:MKOverlayLevelAboveLabels];
+    else
+        [self.mapView addOverlay:poly];
+
+//    // If you want to draw a circle around the coordinate, instead, you could do something like:
+//
+//    MKCircle *circle = [MKCircle circleWithCenterCoordinate:originalCoordinate radius:distanceKm * 1000.0 * sqrt(2.0)];
+//    if ([self.mapView respondsToSelector:@selector(addOverlay:level:)])
+//        [self.mapView addOverlay:circle level:MKOverlayLevelAboveLabels];
+//    else
+//        [self.mapView addOverlay:circle];
+
+//    // if you want to draw some lines, you could do something like:
+//  
+//    MKPolyline *polyline = [MKPolyline polylineWithCoordinates:points count:4];
+//    if ([self.mapView respondsToSelector:@selector(addOverlay:level:)])
+//        [self.mapView addOverlay:polyline level:MKOverlayLevelAboveLabels];
+//    else
+//        [self.mapView addOverlay:polyline];
+
+    self.mapView.delegate = self;
+}
+</code></pre>

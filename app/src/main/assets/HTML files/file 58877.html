@@ -1,0 +1,65 @@
+<p>Sorry for the silence. I was away from my laptop. These are my suggestions.</p>
+
+<ol>
+<li><p>Get rid of the data node; it seems rather redundant. You can simply add other nodes under the root node i.e. <em>appname</em>.</p></li>
+<li><p>Refractor your <code>viewDidLoad</code>; because its rather convoluted. Put the firebase retrieval stuff in a separate method.</p></li>
+<li><p>Adopt a reusing habit. It makes your code less complex and easy to follow. This applies even with something as little as variables. e.g. you have <code>ref</code> declared globally; which is the way to go. But again you have another <code>ref</code> declared in your <code>viewDidLoad</code> and they both serve the same purpose. I know its a minor thing but why have multiple variables serving the same purpose?</p></li>
+<li><p>You are not checking your result for any errors or <code>nil</code> values. You are directly unwrapping things. It is fine to directly unwrap things but this should only be done in places which you are 100% certain that you do have a value. For most internet queries, this is not the case and you want your app to handle those scenarios as well.</p></li>
+</ol>
+
+<p>This is how I would have done it if I were you.
+I made these two global variables:</p>
+
+<pre><code>var currentUser: FIRUser = FIRUser()
+let databaseRef = FIRDatabase.database().reference()
+</code></pre>
+
+<p>Then I made this method which gets the user data just once. If you want it to get live updates, then simply change it from a <code>observeSingleEvent</code> to an <code>observe</code> instead and the type to either <code>.childAdded</code> or <code>.childChanged</code> depending on your specific scenario. I'll leave that challenge to you and everything else is the pretty much the same.</p>
+
+<pre><code>func getUserDetailsOnce()
+{
+    self.tableView.contentInset = UIEdgeInsetsMake(20, 0, 0, 0)
+
+    // check first if the user is currently logged in. If yes, then save them in the variable user. Normally, you'd want to run this check inside your AppDelegate after didFinishLaunchWithOptions
+    guard let user = FIRAuth.auth()?.currentUser else
+    {
+        print("No logged user in existence")
+        return
+    }
+
+    currentUser = user // update the global variable
+
+    // append to the current user's node location
+    databaseRef.child("data/users").child(currentUser.uid).observeSingleEvent(of: .value) { (snapshot: FIRDataSnapshot) in
+
+        // you have retrieved the result and store it in firebaseValue. snapshot.value returns AnyObject?. Since its an optional it can be nil and we want to handle that scenario. And its highly advisable to cast it as a [String:AnyObject] instead of an NSDictionary
+        guard let firebaseValue = snapshot.value as [String:AnyObject] else
+        {
+            print("Error with FrB snapshot") // this is printed if no Firebase value is returned
+            return
+        }
+
+        // Now that we have our value, we can access the respective elements
+
+        let index = 0
+
+        while index &lt; self.about.count
+        {
+            let indexPath = NSIndexPath(row: index, section: 0)
+            let cell: UITableViewCell = self.tableView.cellForRow(at: indexPath)
+
+            // This is where I am a little bit puzzled as to how you have your cell structured. But if you want to access the individual elements inisde our database then you simply have to check for nils for each individual component as shown below
+
+            guard let email = firebaseValue["email"] as? String, let name = firebaseValue["name"] as? String else // add the other ones respectively
+            {
+                print("Error extracting individual Firebase components")
+                return
+            }
+
+            // Then you can display the values since they are now stored in the variables email,name etc
+
+            index += 1
+        }
+    }
+}
+</code></pre>

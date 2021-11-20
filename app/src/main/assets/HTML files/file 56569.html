@@ -1,0 +1,93 @@
+<p>Pyparsing let's you build up a parser by stitching together smaller parsers using '+' and '|' operators (among others). You can also attach names to the individual elements in the parser, to make it easier to get at the values afterward.</p>
+
+<pre><code>from pyparsing import (pyparsing_common, CaselessKeyword, Optional, ungroup, restOfLine, 
+    oneOf, SkipTo)
+
+int_qty = pyparsing_common.integer
+
+# compose an expression for the quantity, in its various forms
+"""
+{n}
+{n}PCS
+{n}PC
+{n}PCS.
+{n}PC.
+Lot of {n}
+"""
+LOT = CaselessKeyword("lot")
+OF = CaselessKeyword("of")
+pieces = oneOf("PC PCS PC. PCS.", caseless=True)
+qty_expr = Optional(LOT + OF).suppress() + int_qty("qty") + Optional(pieces).suppress()
+
+# compose expression for entire line
+line_expr = SkipTo(qty_expr)("text1") + qty_expr + restOfLine("text2")
+
+tests = """
+    Send me 1000 widgets pronto!
+    Deliver a Lot of 50 barrels of maple syrup by Monday, June 10.
+    My shipment was short by 25 pcs.
+    """
+
+line_expr.runTests(tests)
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>Send me 1000 widgets pronto!
+['Send me', 1000, ' widgets pronto!']
+- qty: 1000
+- text1: ['Send me']
+- text2:  widgets pronto!
+
+
+Deliver a Lot of 50 barrels of maple syrup by Monday, June 10.
+['Deliver a ', 50, ' barrels of maple syrup by Monday, June 10.']
+- qty: 50
+- text1: ['Deliver a ']
+- text2:  barrels of maple syrup by Monday, June 10.
+
+
+My shipment was short by 25 pcs.
+['My shipment was short by', 25, '']
+- qty: 25
+- text1: ['My shipment was short by']
+- text2: 
+</code></pre>
+
+<p>EDIT:
+Pyparsing supports two forms of alternatives for matching: MatchFirst, which stops on the first matched alternative (which is defined using the '|' operator), and Or, which evaluates all alternatives and selects the longest match (defined using '^' operator). So if you need a priority of the quantity expression, then you define it explicitly:</p>
+
+<pre><code>qty_pcs_expr = int_qty("qty") + White().suppress() + pieces.suppress()
+qty_expr = Optional(LOT + OF).suppress() + int_qty("qty") + FollowedBy(White())
+
+# compose expression for entire line
+line_expr = (SkipTo(qty_pcs_expr)("text1") + qty_pcs_expr + restOfLine("text2") |
+             SkipTo(qty_expr)("text1") + qty_expr + restOfLine("text2"))
+</code></pre>
+
+<p>Here are the new tests:</p>
+
+<pre><code>tests = """
+    Send me 1000 widgets pronto!
+    Deliver a Lot of 50 barrels of maple syrup by Monday, June 10.
+    My shipment was short by 25 pcs.
+    2. I expect 22 pcs delivered in the morning
+    On May 15 please deliver 1000 PCS.
+    """
+</code></pre>
+
+<p>Giving:</p>
+
+<pre><code>2. I expect 22 pcs delivered in the morning
+['2. I expect ', 22, ' delivered in the morning']
+- qty: 22
+- text1: ['2. I expect ']
+- text2:  delivered in the morning
+
+
+On May 15 please deliver 1000 PCS.
+['On May 15 please deliver ', 1000, '']
+- qty: 1000
+- text1: ['On May 15 please deliver ']
+- text2: 
+</code></pre>

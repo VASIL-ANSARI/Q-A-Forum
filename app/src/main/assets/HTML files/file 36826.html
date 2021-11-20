@@ -1,0 +1,53 @@
+<p>First, don't do this. This will bring many problems upon you and make life much harder for you and your users. Anyway, python is very dynamic so you can do that.</p>
+
+<p>Setup your package like that:</p>
+
+<pre><code>yourpackage/
+    __init__.py
+    decorators.py
+</code></pre>
+
+<p>In <code>decorators.py</code>:</p>
+
+<pre><code># List all decorators you want to publish. Use english names here.
+__all__ = ['apple', 'orange', ...]
+
+# Here come implementations named in english
+def apple(...):
+    ...
+
+...
+</code></pre>
+
+<p>In <code>__init__.py</code>:</p>
+
+<pre><code># Whatever over submodules export or just []
+__all__ = [...]
+
+from . import decorators
+
+# Get locale somehow
+LOCALE = ...
+
+# This translation function could be as complex as you wish
+# I use a lookup in hard-coded dict
+TRANSLATIONS = {
+    'fr': {'apple': u'pomme', ...},
+    ...
+}
+def _translate_name(name):
+    # If something is not translated we use default english name,
+    # could be easily changed to raise error
+    return TRANSLATIONS.get(LOCALE, {}).get(name, name)
+
+# Generate dynamic attributes to current module and add them to __all__
+import sys
+this_module = sys.modules[__name__]
+
+for name in decorators.__all__:
+    translated = _translate_name(name)
+    setattr(this_module, translated, getattr(decorators, name))
+    __all__.append(translated)
+</code></pre>
+
+<p>Managing <code>__all__</code> in <code>__init__.py</code> is optional. This is to allow <code>from yourmodule import *</code>.</p>

@@ -1,0 +1,129 @@
+<p>The problem is that you are recreating a new <code>JTable</code> instead of re-using the existing one (and additionally, you don't remove the old one to replace it by the new one, so the new one has no chance to ever be displayed).</p>
+
+<p>Rather update the <code>TableModel</code> of the <code>JTable</code>. Either use the default one provided (you can get it by invoking <code>JTable.getModel()</code>) which is a <code>DefaultTableModel</code> or implement your own by extending <code>AbstractTableModel</code> (and calling <code>fireXXX()</code> methods) which you can set using <code>JTable.setModel()</code>.</p>
+
+<p>Check out the Swing tutorial on <a href="http://docs.oracle.com/javase/tutorial/uiswing/components/table.html#data" rel="nofollow">How to use tables</a> and especially the part on <code>TableModel</code></p>
+
+<p>Additional tip: stay away from <code>static</code> variables, they always hurt.</p>
+
+<p>Slightly updated code (not specifically pretty, but shows you the idea):</p>
+
+<pre><code>import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Random;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+import javax.swing.table.AbstractTableModel;
+
+@SuppressWarnings("serial")
+public class DPServerGUI extends JFrame {
+
+    private JPanel serverPanel;
+    private JButton startButton;
+    private JButton loadServerButton;
+    private JLabel serverLabel;
+
+    private JTable connectedClientsList;
+    private JScrollPane scrollPane;
+    public String player1Connected = "No";
+    public String player2Connected = "No";
+    public String player3Connected = "No";
+    public String player4Connected = "No";
+
+    public DPServerGUI() {
+        serverPanel = new JPanel();
+
+        startButton = new JButton("Start Game");
+
+        loadServerButton = new JButton("Load Server");
+
+        scrollPane = new JScrollPane(getTable());
+
+        serverLabel = new JLabel("Server Not Running");
+
+        serverPanel.add(serverLabel);
+        serverPanel.add(startButton);
+        serverPanel.add(loadServerButton);
+        serverPanel.add(scrollPane);
+        this.add(serverPanel);
+    }
+
+    private PlayerTableModel tableModel;
+
+    public class PlayerTableModel extends AbstractTableModel {
+
+        private String[] header = { "Players", "Connected To Server" };
+        private String[][] table = { { "Player 1", player1Connected }, { "Player 2", player2Connected }, { "Player 3", player3Connected },
+                { "Player 4", player4Connected } };
+
+        @Override
+        public String getColumnName(int column) {
+            return header[column];
+        }
+
+        @Override
+        public int getRowCount() {
+            return table.length;
+        }
+
+        @Override
+        public int getColumnCount() {
+            return header.length;
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            return table[rowIndex][columnIndex];
+        }
+
+        public void setPlayerConnected(int rowIndex, boolean connected) {
+            table[rowIndex][1] = connected ? "Yes" : "No";
+            fireTableCellUpdated(rowIndex, 1);
+        }
+
+    }
+
+    private JTable getTable() {
+        tableModel = new PlayerTableModel();
+        connectedClientsList = new JTable(tableModel);
+        return connectedClientsList;
+    }
+
+    public static void main(String[] args) {
+        final DPServerGUI serverGUI = new DPServerGUI();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                serverGUI.setTitle("Dark Project Server GUI");
+                serverGUI.setSize(800, 600);
+                serverGUI.setLocationRelativeTo(null);
+                serverGUI.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                serverGUI.setVisible(true);
+            }
+        });
+
+        // Dummy thread that simulates user connecting and disconnecting randomly.
+        Timer t = new Timer(2000, new ActionListener() {
+
+            Random random = new Random();
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                for (int i = 0; i &lt; serverGUI.tableModel.getRowCount(); i++) {
+                    serverGUI.tableModel.setPlayerConnected(i, random.nextBoolean());
+                }
+
+            }
+        });
+        t.start();
+    }
+
+}
+</code></pre>

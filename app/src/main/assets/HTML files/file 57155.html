@@ -1,0 +1,47 @@
+<p>The template will be <em>partially specialised</em> to handle the different allocations. In short,</p>
+
+<pre><code>template &lt;typename T, int N&gt;
+struct Vector {
+    T data[N];
+};
+
+static const int Dynamic = -1;
+
+template &lt;typename T&gt;
+struct Vector&lt;T, Dynamic&gt; {
+    T* data;
+};
+</code></pre>
+
+<p>Clearly a lot of the interface is missing in this example, but this highlights the important part of the <em>mechanics</em> of template specialisation, as well as the detail of the differing underlying storage. The constructor (in the specialisation) would perform the dynamic allocation.</p>
+
+<p>In practice, one might defer the details of the storage to a <code>VectorStorage&lt;T, Rows, Cols&gt;</code> which is partially specialised. The <code>Vector</code> would contain a member of that type (properly instantiated using its own parameters) and much of the interface would be implemented only once...</p>
+
+<pre><code>template &lt;typename T, int N&gt;
+struct VectorStorage {
+    VectorStorage(const size_t) {}
+    T data[N];
+};
+
+static const int Dynamic = -1;
+
+template &lt;typename T&gt;
+struct VectorStorage&lt;T, Dynamic&gt; {
+    VectorStorage(const size_t n) : data(new T[n]) {}
+    ~VectorStorage() { delete[] data; }
+    // define copy ops, etc.
+    T* data;
+};
+
+template &lt;typename T, int N&gt;
+class Vector {
+  public:
+    Vector(const size_t n) : storage(n) {}
+
+    T operator[](const size_t i) const { return storage.data[i]; }
+    // etc.
+
+  private:
+    VectorStorage&lt;T,N&gt; storage;
+};
+</code></pre>

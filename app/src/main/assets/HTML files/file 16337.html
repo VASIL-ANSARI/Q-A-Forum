@@ -1,0 +1,70 @@
+<p>I have made some progress working around this, basically by ignoring <code>numberOfObjects</code> and returning the actual length I want the table fixed at. This takes a bit of trickery in <code>controller:didChangeObject:...</code> but seems to be working so far.</p>
+
+<pre><code>- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return kTableSize;
+    //return [[[self.fetchedResultsController sections] objectAtIndex:section] numberOfObjects];
+}
+
+- (void)controller:(NSFetchedResultsController *)controller didChangeObject:(id)anObject atIndexPath:(NSIndexPath *)indexPath forChangeType:(NSFetchedResultsChangeType)type newIndexPath:(NSIndexPath *)newIndexPath
+{
+    UITableView *tableView = self.myTableView;
+
+    switch(type) {
+
+        case NSFetchedResultsChangeInsert:
+
+            // Only modify table if insert will effect visible rows
+            if (newIndexPath.row &lt; kTableSize) {
+                // Delete last row to maintain fixed length
+                [tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:[NSIndexPath indexPathForRow:(kTableSize - 1) inSection:newIndexPath.section]] withRowAnimation:UITableViewRowAnimationAutomatic];
+
+                [tableView insertRowsAtIndexPaths:[NSArray arrayWithObject:newIndexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+            }
+            break;
+
+        case NSFetchedResultsChangeDelete:
+
+            // Only modify table if delete will effect visible rows
+            if (indexPath.row &lt; kTableSize) {
+                [tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+
+                // Insert extra row to maintain fixed length
+                [tableView insertRowsAtIndexPaths:[NSArray arrayWithObject:[NSIndexPath indexPathForRow:(kTableSize - 1) inSection:newIndexPath.section]] withRowAnimation:UITableViewRowAnimationAutomatic];
+            }
+            break;
+
+        case NSFetchedResultsChangeUpdate:
+
+            // Only modify table if update will effect visible rows
+            if (indexPath.row &lt; kTableSize) {
+                [tableView reloadRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+            }
+            break;
+
+        case NSFetchedResultsChangeMove:
+
+            // Only modify table if move will effect visible rows
+            if ((indexPath.row &lt; kTableSize) || (newIndexPath.row &lt; kTableSize)) {
+
+
+                // Delete old row or last row of table
+                if (indexPath.row &lt; kTableSize) {
+                    [tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+                } else {
+                    [tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:[NSIndexPath indexPathForRow:(kTableSize - 1) inSection:newIndexPath.section]] withRowAnimation:UITableViewRowAnimationAutomatic];
+                }
+
+                // Insert new row or a row at bottom of table
+                if (newIndexPath.row &lt; kTableSize) {
+                    [tableView insertRowsAtIndexPaths:[NSArray arrayWithObject:newIndexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+                } else {
+                    [tableView insertRowsAtIndexPaths:[NSArray arrayWithObject:[NSIndexPath indexPathForRow:(kTableSize - 1) inSection:newIndexPath.section]] withRowAnimation:UITableViewRowAnimationAutomatic];
+                }
+            }
+            break;
+    }
+}
+</code></pre>
+
+<p>Also need to take care in <code>tableView:cellForRowAtIndexPath:</code> to make sure we don't try and access an object which doesn't exist if there are less objects than the table length.</p>

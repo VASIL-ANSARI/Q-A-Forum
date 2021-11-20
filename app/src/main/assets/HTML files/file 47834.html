@@ -1,0 +1,41 @@
+<p>Finally, I think this works better:</p>
+
+<pre><code>AgentTailerListener listener = new AgentTailerListener();
+Tailer tailer;
+String tailSource;
+Thread thread;
+
+WatchService watcher = FileSystems.getDefault().newWatchService();
+
+WatchKey watchKey;
+watchKey = Paths.get("/tmp").register(watcher, ENTRY_CREATE);
+
+List&lt;Thread&gt; threadList = new ArrayList&lt;Thread&gt;();
+while (true) {
+    watchKey = watcher.take();
+    for (WatchEvent&lt;?&gt; event : watchKey.pollEvents()) {
+    if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+
+        tailSource = event.context().toString();
+        System.out.println(tailSource);
+        File file = new File("/tmp/" + tailSource);
+        String end = "log";
+        if (file.getName().endsWith(end)) {
+            tailer= TailerFactory.createTailer(file, listener);
+            if(threadList.isEmpty()){}
+            else{
+                Thread.sleep(1000);
+                threadList.get(0).stop();
+                threadList.clear();}
+            System.out.println(threadList.size());
+            threadList.add(thread = new Thread(tailer));
+            threadList.get(0).start();
+            }
+    }
+}
+watchKey.reset();
+
+} 
+</code></pre>
+
+<p>But it creates very many threads, I think I have to use a fix thread pool.</p>

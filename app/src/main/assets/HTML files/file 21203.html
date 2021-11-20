@@ -1,0 +1,22 @@
+<p>You can do this with a correlated subquery:</p>
+
+<pre><code>select l.userid, l.objectid, l.LikeDate,
+       (select count(*) from likes l2 where l2.objectid = l.objectid and l2.LikeDate &gt;= l.likeDate and l2.userid &lt;&gt; l.userid
+       ) as NumLikesAfterward
+from likes l
+</code></pre>
+
+<p>What this is doing is counting the number of likes on an object, by other users, after a given like.  It returns one row for every row in <code>likes</code>.  The calculation is done using a correlated subquery in the <code>select</code> clause.</p>
+
+<p>It will run much faster assuming you have an index on <code>likes(objectid, likedate, userid)</code>.</p>
+
+<p>To get the total points for a user:</p>
+
+<pre><code>select sum(NumLikesAfterward) as TotalPoints
+from (select l.userid, l.objectid, l.LikeDate,
+             (select count(*) from likes l2 where l2.objectid = l.objectid and l2.LikeDate &gt;= l.likeDate and l2.userid &lt;&gt; l.userid
+             ) as NumLikesAfterward
+      from likes l
+      where userid = $userid
+     ) uol
+</code></pre>

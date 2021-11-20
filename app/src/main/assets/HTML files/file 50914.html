@@ -1,0 +1,30 @@
+<h2>Diagnosis</h2>
+
+<p>The problem with your second query is that you are doing <code>GROUP BY t.id</code>, but the other columns being selected (<code>t.title</code>, <code>r.id</code>, and <code>r.body</code>) are not aggregate functions.  This is, in fact, an error under standard SQL, but MySQL won't complain unless you enable the server-wide <code>ONLY_FULL_GROUP_BY</code> setting.  Instead, MySQL just gives you non-deterministic results.</p>
+
+<h2>Suggested solution</h2>
+
+<pre><code>select t.id, t.title, r.id, r.body
+    from (
+            select forum_topic_id, max(id) as id
+                from forum_responses
+                group by forum_topic_id
+        ) as latest
+        inner join forum_topics t on latest.forum_topic_id = t.id
+        inner join forum_responses r on latest.id = r.id
+    order by r.id desc;
+</code></pre>
+
+<h2>Beyond MySQL</h2>
+
+<p>With a more capable database, one would write this using window functions, also called analytic functions.  You could then avoid one of those joins.  On PostgreSQL, MS SQL Server, or Oracle, the query would look more like this:</p>
+
+<pre><code>select t.id, t.title, r.id, r.body
+    from (
+        select forum_topic_id, id, body
+            from forum_responses
+            where 1 = rank(id over partition by forum_topic_id order by id desc)
+        ) as r
+        inner join forum_topics t on t.id = r.forum_topic_id
+    order by r.id desc;
+</code></pre>

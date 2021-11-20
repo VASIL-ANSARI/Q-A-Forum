@@ -1,0 +1,46 @@
+<p>the difference in behaviour that you're seeing is probably because of different <code>NLS_SORT</code> parameter setting. Consider:</p>
+
+<pre><code>SQL&gt; select * from nls_session_parameters where parameter='NLS_SORT';
+
+PARAMETER                      VALUE
+------------------------------ ----------------------------------------
+NLS_SORT                       BINARY
+
+SQL&gt; SELECT * FROM my_data order by title;
+
+TITLE
+-----
+321
+Abc
+Def
+
+SQL&gt; alter session set nls_sort=french;
+
+Session altered
+
+SQL&gt; SELECT * FROM my_data order by title;
+
+TITLE
+-----
+Abc
+Def
+321
+</code></pre>
+
+<p>You can build a query that should give you the expected result regardless of your <code>NLS_SORT</code> session parameter setting, for example:</p>
+
+<pre><code>SQL&gt; SELECT *
+  2    FROM my_data
+  3   ORDER BY CASE
+  4               WHEN regexp_like(title, '[0-9]+\.?[0-9]*') THEN
+  5                1
+  6               ELSE
+  7                2
+  8            END, title;
+
+TITLE
+-----
+321
+Abc
+Def
+</code></pre>

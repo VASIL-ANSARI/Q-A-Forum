@@ -1,0 +1,52 @@
+<p>You are not really using the template facilities. Or rather miss using it. What happens is you call the <code>ZOrder(Value)</code> the <code>void UpdateValue(T Value)</code> get instantiated where every occurence of <code>T</code> gets replaced with <code>CString</code> as you specified. But that is all.</p>
+
+<p>The function look like this</p>
+
+<pre><code>void UpdateValue(CString Value)
+{   
+    if ( typeid(int) == typeid(Value) ) 
+    {  
+       ZOrder(Value);
+    }
+    else if ( typeid(bool) == typeid(Value) )
+    {  
+       BOOL bShow = Value ? TRUE : FALSE;
+       Show(bShow);
+    }
+    else if ( typeid(CString) == typeid(Value) )
+    {  
+       Theme(Value);
+    }
+}
+</code></pre>
+
+<p>After the template gets instantied the normal compiling stuff happens ... and you get an error 'cause it is written <code>ZOrder(Value);</code> where <code>value</code> is of <code>CString</code> type. This will produce an error, even though utilizing RTTI this call path should never be reached in such case.</p>
+
+<p>What you should do is to use specializations to handle different types. Try replacing original definition of <code>UpdateValue</code> with these:</p>
+
+<pre><code>template&lt;&gt; // specialization when T is get to be int
+void UpdateValue&lt;int&gt;(int Value) { ZOrder(Value);};
+
+template&lt;&gt; // specialization when T is get to be CString
+void UpdateValue&lt;bool&gt;(bool Value) { BOOL bShow = Value ? TRUE : FALSE; Show(bShow);};
+
+template&lt;&gt; // specialization when T is get to be CString
+void UpdateValue&lt;CString&gt;(CString Value) { Theme(Value);};
+
+template&lt;class T&gt;  //general case
+void UpdateValue(T Value) { cout &lt;&lt; "IMPLEMENT ME\n";};
+</code></pre>
+
+<p>Then when you call <code>UpdateValue&lt; T &gt;</code> you invoke version with appropriate body. also you don't have to use RTTI.</p>
+
+<p>UPDATE: After the commenter suggestion. If you do not need/want to the handle general case (i.e. unknown type), you can resort to plain overloads and go with:</p>
+
+<pre><code>//Value is int
+void UpdateValue(int Value) { ZOrder(Value);};
+//Value is bool
+void UpdateValue(bool Value) { BOOL bShow = Value ? TRUE : FALSE; Show(bShow);};
+//Value is CString
+void UpdateValue(CString Value){ Theme(Value);};
+</code></pre>
+
+<p>No need even for templates then!</p>

@@ -1,0 +1,41 @@
+<p>Two things are missing here. First, when using the embedded eventstore client, you have to start the node:</p>
+
+<pre><code>node.Start();
+</code></pre>
+
+<p>Second, you have to wait for the node to become master before you can use the connection. The <code>ClusterVNode</code> has an event named <code>NodeStatusChanged</code> that you can listen to and find out when there is a master node. The following should work:</p>
+
+<pre><code>ClusterVNode node = EmbeddedVNodeBuilder
+    .AsSingleNode()
+    .RunInMemory()
+    .OnDefaultEndpoints()
+    .Build();
+
+bool isNodeMaster = false;
+node.NodeStatusChanged += (sender, args) =&gt; {
+    isNodeMaster = args.NewVNodeState == VNodeState.Master;
+};
+node.Start();
+
+var stopwatch = new Stopwatch();
+stopwatch.Start();
+while (!isNodeMaster) {
+    if (stopwatch.Elapsed.Seconds &gt; 20) {
+        throw new InvalidOperationException(
+        "Waited too long (20 seconds) for EventStore node to become master.");
+    }
+    Thread.Sleep(1);
+}
+stopwatch.Stop();
+
+var connection = EmbeddedEventStoreConnection.Create(node);
+await connection.ConnectAsync();
+var sampleEventData = new EventData(Guid.NewGuid(), "myTestEvent", false, new byte[] { 6, 10, 15 }, null);
+WriteResult writeResult = await connection.AppendToStreamAsync("sampleStream, ExpectedVersion.NoStream, sampleEventData);
+</code></pre>
+
+<p>The stopwatch stuff isn't necessary, but is helpful to break out of the <code>while</code> loop when something goes wrong and a node never becomes master.</p>
+
+<p>If you put a breakpoint in the event handler delegate, you will notice that the <code>node</code> progresses through 3 <code>VNodeState</code>s. First it will be <code>VNodeState.Unknown</code>, then <code>VNodeState.PreMaster</code>, then finally <code>VNodeState.Master</code>. </p>
+
+<p>You also shouldn't need to wait for the node to become master before creating the connection and invoking <code>ConnectAsync()</code> on it. However, you will need to wait for the node to become master before you can invoke any other methods like <code>AppendToStreamAsync</code> on it without running into the exception in your original question. </p>

@@ -1,0 +1,47 @@
+<p>In Java you usually have to manually check every field like this:</p>
+
+<pre><code>class MyObject {
+    String name;
+    int age, monthborn;
+
+    public boolean isEqual(MyObject other) {
+        return Objects.equals(name, other.name) &amp;&amp; 
+               age == other.age &amp;&amp; monthborn == other.monthborn;
+    }
+}
+</code></pre>
+
+<p><code>Objects.equals</code> is used here which is null-safe equivalent of <code>name.equals(other.name)</code>. When you add new fields you will have to add new checks in your method as well. The alternative would be to utilize reflection, but it looks ugly and has significant performance drawback. Here's a draft example how to do this (do not take into account possible inheritance):</p>
+
+<pre><code>import java.lang.reflect.Field;
+import java.util.Objects;
+
+public class ObjectUtil {
+    public static &lt;T&gt; boolean allFieldsEqual(T o1, T o2) throws IllegalAccessException {
+        if(o1 == o2) return true;
+        if(o1.getClass() != o2.getClass()) return false;
+        for(Field field : o1.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            if(!Objects.equals(field.get(o1), field.get(o2))) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+class MyObject {
+    String name;
+    int age, monthborn;
+
+    public boolean isEqual(MyObject other) {
+        try {
+            return ObjectUtil.allFieldsEqual(this, other);
+        } catch (IllegalAccessException e) {
+            return false;
+        }
+    }
+}
+</code></pre>
+
+<p>This way upon adding the new field the <code>isEqual</code> method will take it into account as well. However I would not recommend such solution.</p>

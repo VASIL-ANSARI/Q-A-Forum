@@ -1,0 +1,57 @@
+<p>I blogged about this at <a href="http://sedodream.com/2013/03/06/HowToPublishOneWebProjectFromASolution.aspx">http://sedodream.com/2013/03/06/HowToPublishOneWebProjectFromASolution.aspx</a> a few months back. I've copied the details here as well, see below.</p>
+
+<hr>
+
+<p>Today on twitter <a href="https://twitter.com/nunofcosta">@nunofcosta</a> asked me roughly the question âHow do I publish one web project from a solution that contains many?â</p>
+
+<p>The issue that he is running into is that he is building from the command line and passing the following properties to msbuild.exe.</p>
+
+<pre><code>/p:DeployOnBuild=true
+/p:PublishProfile='siteone - Web Deploy'
+/p:Password=%password%
+</code></pre>
+
+<p>You can read more about how to automate publishing at <a href="http://sedodream.com/2013/01/06/CommandLineWebProjectPublishing.aspx">http://sedodream.com/2013/01/06/CommandLineWebProjectPublishing.aspx</a>.</p>
+
+<p>When you pass these properties to msbuild.exe they are known as global properties. These properties are difficult to override and are passed to every project that is built. Because of this if you have a solution with multiple web projects, when each web project is built it is passed in the same set of properties. Because of this when each project is built the publish process for that project will start and it will expect to find a file named <strong>siteone â Web Deploy.pubxml</strong> in the folder *Properties\PublishProfiles*. If the file doesnât exist the operation may fail.</p>
+
+<p><strong>Note: If you are interested in using this technique for an orchestrated publish see my comments at <a href="http://stackoverflow.com/a/14231729/105999">http://stackoverflow.com/a/14231729/105999</a> before doing so.</strong></p>
+
+<p>So how can we resolve this?</p>
+
+<p>Letâs take a look at a sample (see links below). I have a solution, <strong>PublishOnlyOne</strong>, with the following projects.</p>
+
+<ol>
+<li>ProjA</li>
+<li>ProjB</li>
+</ol>
+
+<p>ProjA has a publish profile named â<strong>siteone â Web Deploy</strong>â, ProjB does not. When trying to publish this you may try the following command line.</p>
+
+<pre><code>msbuild.exe PublishOnlyOne.sln /p:DeployOnBuild=true /p:PublishProfile=âsiteone â Web Deployâ /p:Password=%password%
+</code></pre>
+
+<p><em>See publish-sln.cmd in the samples.</em></p>
+
+<p>If you do this, when its time for ProjB to build it will fail because thereâs no <strong>siteone â Web Deploy</strong> profile for that project. Because of this, we cannot pass DeployOnBuild. Instead here is what we need to do.</p>
+
+<ol>
+<li>Edit ProjA.csproj to define another property which will conditionally set DeployOnBuild</li>
+<li>From the command line pass in that property</li>
+</ol>
+
+<p>I edited ProjA and added the following property group before the Import statements in the .csproj file.</p>
+
+<pre><code>&lt;PropertyGroup&gt;
+&lt;DeployOnBuild Condition=" '$(DeployProjA)'!='' "&gt;$(DeployProjA)&lt;/DeployOnBuild&gt;
+&lt;/PropertyGroup&gt;
+</code></pre>
+
+<p>Here you can see that DeployOnBuild is set to whatever value DeployProjA is as long as itâs not empty. Now the revised command is:</p>
+
+<pre><code>msbuild.exe PublishOnlyOne.sln /p:DeployProjA=true /p:PublishProfile=âsiteone â Web Deployâ /p:Password=%password%
+</code></pre>
+
+<p>Here instead of passing DeployOnBuild, I pass in DeployProjA which will then set DeployOnBuild. Since DeployOnBuild wasnât passed to ProjB it will not attempt to publish.</p>
+
+<p>You can find the complete sample at <a href="https://github.com/sayedihashimi/sayed-samples/tree/master/PublishOnlyOne">https://github.com/sayedihashimi/sayed-samples/tree/master/PublishOnlyOne</a>.</p>

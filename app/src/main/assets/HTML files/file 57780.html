@@ -1,0 +1,69 @@
+<p>The problem is that the <code>Parallel.ForEach</code> insists on running the all tasks on the UI thread. One way I got this changed was by calling the <code>long_running_process</code> from a <code>BackgroundWorker.DoWork</code>, like so:</p>
+
+<pre><code>Public Class Form1
+
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        BackgroundWorker1.RunWorkerAsync()
+
+    End Sub
+
+    Private Sub BackgroundWorker1_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles BackgroundWorker1.DoWork
+        testmodule.long_running_process(Label1)
+    End Sub
+End Class
+</code></pre>
+
+<p>Notice that I had to provide the <code>Label1</code> as a parameter because  otherwise the InvokeRequired always returned false.</p>
+
+<p>The changed <code>long_running_process</code> looks like this:</p>
+
+<pre><code>Sub long_running_process(lbl As Label)
+    Dim x(100000000) As Integer
+    Dim cnt As Integer
+    Dim syncobject As New Object
+
+    If lbl.InvokeRequired Then
+        lbl.BeginInvoke(New MethodInvoker(Sub()
+                                              lbl.Text = "started"
+                                          End Sub), Nothing)
+    End If
+
+
+    Parallel.ForEach(x, Sub(z)
+
+                            '*** This just put in to make the processors do some work.
+                            Dim p As New Random
+                            Dim m As Double = p.NextDouble
+                            Dim zzz As Double = Math.Cosh(m) + Math.Cos(m)
+
+                            '*** This is the basic updating method.
+                            SyncLock syncobject
+                                cnt += 1
+
+                                '*** Update every millionth iteration
+                                If cnt Mod 1000000 &lt; 1 Then
+
+                                    '**** This is how it is marshalled to the UI thead.
+                                    If lbl.InvokeRequired Then
+                                        lbl.BeginInvoke(New invokedelegate(AddressOf invokemethod), {cnt.ToString()})
+                                    Else
+                                        lbl.Text = cnt
+                                    End If
+
+                                End If
+                            End SyncLock
+                        End Sub)
+
+    If lbl.InvokeRequired Then
+        lbl.BeginInvoke(New MethodInvoker(Sub()
+                                              lbl.Text = "Finished"
+                                          End Sub), Nothing)
+    End If
+
+End Sub
+Sub invokemethod(txt As String)
+    Form1.Label1.Text = txt
+End Sub
+</code></pre>
+
+<p>The counter updates smoothly with these changes.</p>

@@ -1,0 +1,22 @@
+<p>I would just use a <code>Dictionary&lt;long, List&lt;Person&gt;&gt;</code> (or maybe just <code>Dictionary&lt;long, IEnumerable&lt;Person&gt;&gt;</code>)  and <em>only</em> change the structure if speed is a <em>measurable</em> issue.  Then a lookup would just be:</p>
+
+<pre><code>outerDict[listID].First(p =&gt; p.ID == personID);
+</code></pre>
+
+<p>A few drawbacks of using <code>Dictionary&lt;long, Dictionary&lt;long, Person&gt;&gt;</code>:</p>
+
+<ul>
+<li>If the ID of a person changes, you'd need to intentionally move it to a different bucket in the <code>Dictionary</code> (there's no framework structure that does this for you)</li>
+<li>If you just want a list of <code>Person</code>s, or need to look up people by an attribute other than <code>ID</code>, then the structure just makes it a bit harder to traverse the inner collection.</li>
+</ul>
+
+<p>If neither of those is a concern, then <code>Dictionary&lt;long, Dictionary&lt;long, Person&gt;&gt;</code> would definitely be faster, but you won't know how much faster until you try both and measure them.</p>
+
+<p>Based on your edit (and assuming the List ID and Person ID <em>never change</em> for a Person), another option may be to load all of the data into a flat list and create lookups by ListID and a dictionary by PersonID:</p>
+
+<pre><code>List&lt;Person&gt; people = {load list};
+var peopleByListID = people.GroupBy(p =&gt; p.ListID).ToLookup();
+var peopleByID = people.ToDictionary(p =&gt; pID, p =&gt; p);
+</code></pre>
+
+<p>That way you can use whatever structure best fits your needs.  There's some additional overhead for creating the lookup and dictionary, so unless you're needing to constantly go back to the original source these would provide significant performance benefit in the searches.</p>

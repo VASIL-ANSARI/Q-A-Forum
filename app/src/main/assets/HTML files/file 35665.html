@@ -1,0 +1,105 @@
+<p>I suspect that you'll do better by computing the prime factorisation of <code>insideVal</code> and taking the product of those primes that appear in a multiple of the root.</p>
+
+<p>For example</p>
+
+<p>108 = 2<sup>2</sup> &times; 3<sup>3</sup></p>
+
+<p>and hence</p>
+
+<p><sup>3</sup>&radic;108 = 3 &times; <sup>3</sup>&radic;2<sup>2</sup></p>
+
+<p>and</p>
+
+<p>324 = 2<sup>2</sup> &times; 3<sup>4</sup></p>
+
+<p>and hence</p>
+
+<p><sup>3</sup>&radic;324 = 3 &times; <sup>3</sup>&radic;(2<sup>2</sup> &times; 3)</p>
+
+<p>You can use <a href="http://en.wikipedia.org/wiki/Trial_division" rel="nofollow">trial division</a> to construct the factorisation.</p>
+
+<p><strong>Edit</strong> A C++ implementation</p>
+
+<p>First we need an integer overload for <code>pow</code></p>
+
+<pre><code>unsigned long
+pow(unsigned long x, unsigned long n)
+{
+    unsigned long p = 1;
+
+    while(n!=0)
+    {
+        if(n%2!=0) p *= x;
+        n /= 2;
+        x *= x;
+    }
+    return p;
+}
+</code></pre>
+
+<p>Note that this is simply the <a href="http://en.wikipedia.org/wiki/Ancient_Egyptian_multiplication" rel="nofollow">peasant algorithm</a> applied to powers.<br>
+Next we need to compute the prime numbers in sequence</p>
+
+<pre><code>unsigned long
+next_prime(const std::vector&lt;unsigned long&gt; &amp;primes)
+{
+    if(primes.empty()) return 2;
+
+    unsigned long p = primes.back();
+    unsigned long i;
+
+    do
+    {
+        ++p;
+        i = 0;
+        while(i!=primes.size() &amp;&amp; primes[i]*primes[i]&lt;=p &amp;&amp; p%primes[i]!=0) ++i;
+    }
+    while(i!=primes.size() &amp;&amp; primes[i]*primes[i]&lt;=p);
+
+    return p;
+}
+</code></pre>
+
+<p>Note that <code>primes</code> is expected to contain all of the prime numbers less than the one we're trying to find and that we can quit checking once we reach a prime greater than the square root of the candidate <code>p</code> since that could not possibly be a factor.<br>
+Using these functions, we can calculate the factor that we can take outside the root with</p>
+
+<pre><code>unsigned long
+factor(unsigned long x, unsigned long n)
+{
+    unsigned long f = 1;
+
+    std::vector&lt;unsigned long&gt; primes;
+    unsigned long p = next_prime(primes);
+
+    while(pow(p, n)&lt;=x)
+    {
+        unsigned long i = 0;
+        while(x%p==0)
+        {
+            ++i;
+            x /= p;
+        }
+        f *= pow(p, (i/n));
+
+        primes.push_back(p);
+        p = next_prime(primes);
+    }
+    return f;
+}
+</code></pre>
+
+<p>Applying this to your example</p>
+
+<pre><code>std::cout &lt;&lt; factor(108, 3) &lt;&lt; std::endl; //output: 3
+</code></pre>
+
+<p>gives the expected result. For another example, try</p>
+
+<pre><code>std::cout &lt;&lt; factor(3333960000UL, 4) &lt;&lt; std::endl; //output: 30
+</code></pre>
+
+<p>which you can confirm is correct by noting that</p>
+
+<p>3333960000 = 30<sup>4</sup> &times; 4116</p>
+
+<p>and checking that 4116 doesn't have any factor that is a power of 4.</p>

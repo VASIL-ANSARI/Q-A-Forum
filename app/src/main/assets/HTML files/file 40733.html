@@ -1,0 +1,25 @@
+<p><a href="https://docs.oracle.com/database/121/ARPLS/d_metada.htm#ARPLS026" rel="nofollow">DBMS_METADATA</a> is the official way to regenerate object DDL.  It's usually better than manually creating DDL statements.  There are hundreds of options for creating indexes, <code>DBMS_METADATA.GET_DDL</code> is the only way to ensure you accurately recreate the object.</p>
+
+<pre><code>declare
+    v_index_ddl clob;
+begin
+    for indexes_in_wrong_schema in
+    (
+        select table_name, index_name
+        from all_indexes
+        where table_owner = 'SIM' and owner like 'TIM'
+    ) loop
+        v_index_ddl := dbms_metadata.get_ddl('INDEX', 
+            indexes_in_wrong_schema.index_name, 'TIM');
+        --Or replace these with "execute immediate" to run instead of print.
+        dbms_output.put_line('drop index TIM.'||
+            indexes_in_wrong_schema.index_name);
+        dbms_output.put_line(replace(v_index_ddl, '"TIM"', '"SIM"'));
+    end loop;
+end;
+/
+</code></pre>
+
+<p><strong>Privileges</strong></p>
+
+<p>DBMS_METADATA requires you either have the <code>SELECT_CATALOG_ROLE</code> or are executing as the schema owner.  Ask a DBA or other privileged user if they can grant you that role.  Or convert the above PL/SQL block into a function, install the function on the owner's schema, and then <code>grant execute on new_function to your_user;</code>.</p>

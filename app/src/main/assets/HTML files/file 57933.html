@@ -1,0 +1,63 @@
+<p>Looks like the internal computation is overflowing. 
+I don't think this is a <em>library</em> bug, the library is used incorrectly with the underlying (unchecked) <code>int</code> type.
+(However, there is a different bug in the library that I mention at the end.)</p>
+
+<p>Try using a smaller "integer representation" of the problem:</p>
+
+<p>For example:</p>
+
+<pre><code>LayoutRectangle t(167402,297592,167404,297607);
+LayoutRectangle n(168082,299806,168084,299821);
+</code></pre>
+
+<p>Unfortunately there is no general solution of the problem in integer arithmetic, except 0) using higher precision can buy you something, 1) scaling the problem 2) using multiprecision, 3) using rational arithmetic and integer part</p>
+
+<p>(For floating point the solution is simply normalizing the components, this is how <code>std::abs</code> for <code>std::complex&lt;double&gt;</code> works to avoid floating point overflow)</p>
+
+<p>It is good to use large integers to represent a geometric problem BUT
+for this reason, as a workaround, use coordinates that <em>span distance of at most</em> <code>(int)std::sqrt((double)std::numeric_limits&lt;int&gt;::max()/2) = 2^15 = 32768</code>.
+Which is a surprisingly small number.</p>
+
+<p>Complete code:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;cmath&gt;
+#include &lt;boost/polygon/polygon.hpp&gt;
+#include &lt;boost/geometry.hpp&gt;
+
+int main(){
+
+namespace gtl = boost::polygon;
+using namespace boost::polygon::operators;
+
+typedef gtl::rectangle_data&lt;int&gt; LayoutRectangle;
+
+    LayoutRectangle t(167401,297592,167403,297606);
+    LayoutRectangle n(168081,299806,168083,299820);
+
+    std::cout &lt;&lt; gtl::euclidean_distance(t, n) &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; gtl::euclidean_distance(t, n, gtl::HORIZONTAL) &lt;&lt; " "
+              &lt;&lt; gtl::euclidean_distance(t, n, gtl::VERTICAL) &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; gtl::square_euclidean_distance(t, n) &lt;&lt; std::endl;
+    std::cout &lt;&lt; std::sqrt(gtl::square_euclidean_distance(t, n)) &lt;&lt; std::endl;
+    std::cout &lt;&lt; (int) std::sqrt(gtl::square_euclidean_distance(t, n)) &lt;&lt; std::endl;
+
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>2302.1
+678 2200
+5299684
+2302.1
+2302
+</code></pre>
+
+<p>Which is the expected result.</p>
+
+<hr>
+
+<p>Looking at the code, it seems that there is a bug in the library, not because it gives overflow but because an internal computation is casted to <code>int</code> and not the the underlying <em>generic</em> integer data type. This means that probably even if you use multiprecision integers the results will overflow.</p>

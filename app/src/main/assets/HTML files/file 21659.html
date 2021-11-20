@@ -1,0 +1,43 @@
+<p>I don't see anything obvious (though obviously we don't see the building of the <code>xml</code> array nor do we know precisely what the XML itself looks like). You should <code>NSLog</code> (or set a breakpoint and manually inspect) the <code>xml</code> as well as <code>hola1</code> and <code>dataa</code> results in <code>showImage</code>, to identify at precisely what's going on at each step.</p>
+
+<p>There are two possible problems with background operations and downloading XML. Neither of these seem applicable here, but I'll mention it just in case:</p>
+
+<ol>
+<li><p>But there's nothing that would prevent the downloading and parsing of your XML like you have demonstrated here. If you were using <code>NSURLConnection</code> to download the XML (perhaps you simplified it here for the purposes of demonstration), there are issues in using <code>NSURLConnection</code> in a background queue. But if you use <code>dataWithContentsOfURL</code> (or better, <code>NSXMLParser</code> method <code>initWithContentsOfURL</code>) that wouldn't be an issue.</p></li>
+<li><p>It looks like you're downloading a single XML, but if you were downloading multiple XML sources simultaneously, you should appreciate that many servers impose a limit as to how many concurrent connections they'll allow from a single client. You can use <code>NSOperationQueue</code> property <code>maxConcurrentOperationCount</code> to mitigate that problem. Four is a typical value.</p></li>
+</ol>
+
+<hr>
+
+<p>Unrelated, but there are a couple of minor memory management things you might want to look at:</p>
+
+<ul>
+<li><p>if you already have <code>xml</code> you don't need to create a new <code>imagen</code>;</p></li>
+<li><p>you should probably <code>release</code> the <code>queue</code> object after adding the <code>operation</code>, or if you need to keep it around to reuse it, you should make it a class property or instance variable;</p></li>
+<li><p>you could get rid of <code>operation</code> completely if you did:</p>
+
+<pre><code>[queue addOperationWithBlock:^{
+    [self loadDataWithOperation];
+}];
+</code></pre></li>
+<li><p>you should <code>release</code> the <code>parser</code> object when you're done with it;</p></li>
+<li><p>if you keep <code>imagen</code> in your code you should also <code>release</code> it when done; and</p></li>
+<li><p>you should not <code>release</code> the <code>img</code> object since <code>imageWithData</code> returns an <code>autorelease</code> object</p></li>
+</ul>
+
+<p>The routine memory management stuff probably would be pointed out to you if you did a static analysis (choose "Analyze" from the "Product" menu).</p>
+
+<p>One final observation:</p>
+
+<ul>
+<li><p>I notice that you have:</p>
+
+<pre><code>NSData *xmlData = [NSData dataWithContentsOfURL:url1];
+NSXMLParser *parser = [[NSXMLParser alloc]initWithData:xmlData];
+</code></pre>
+
+<p>Clearly that <code>xmlData</code> is not necessary because you could have also just have done:</p>
+
+<pre><code>NSXMLParser *parser = [[NSXMLParser alloc] initWithContentsOfURL:url1];
+</code></pre></li>
+</ul>

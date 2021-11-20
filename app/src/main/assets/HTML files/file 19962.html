@@ -1,0 +1,43 @@
+<p>Does your page have any scrolling or allows for any kind of system UI animation, like pinch to zoom etc? If it does, your problem likely has nothing to do with PhoneGap or even the FastButton implementation, but you are the victim of a nasty bug that was introduced in the iOS6. You'll be able to reproduce this problem easily even if you disable FastButton and just use ontouchend listener, and even if you use a standalone web page with no PhoneGap.</p>
+
+<p>The bug works like this: If any intervals or timeouts are created while these system UI animations are in progress, those intervals and timeouts won't work, and worse, even re-creating them after the animation is done won't make them work. JQ animations in particular are often a problem here. If you invoke any JQ animation while the page is scrolling (which is easy to do with ontoucstart / ontouchend events that FastButton is using, your animations will fail and so will any callbacks that you have at the end of animations.</p>
+
+<p>So the solutions:</p>
+
+<ul>
+<li><p>Use CSS animations if possible. This is of course only if the animations are what's causing your problem in the first place. If it's some other kind of setInterval / setTimeout that's breaking, CSS animations won't help you.</p></li>
+<li><p>Use custom made wrapper for timers that uses webkit's requestAnimationFrames that was introduced in iOS6. Take a look and download from here: <a href="https://gist.github.com/4180482" rel="nofollow">https://gist.github.com/4180482</a></p></li>
+</ul>
+
+<p>I ended up going with 2nd solution, but I had to fix up the code in one place because something was breaking on initialization for me. In the line where it says:</p>
+
+<pre><code>if(uid.indexOf &amp;&amp; uid.indexOf(TIMERID) &gt; -1){
+</code></pre>
+
+<p>I had to change it to:</p>
+
+<pre><code>if(uid &amp;&amp; uid.indexOf &amp;&amp; uid.indexOf(TIMERID) &gt; -1){
+</code></pre>
+
+<p>Also, the original code makes strict iOS6 check and applies its wrapper functions only then. This is fine for websites where you can update things on the fly, but for an app, I think you want to be a bit more paranoid, and assume that this could remain unfixed in iOS7 and on (after all, it sometimes really does seem like Apple is trying to sabotage web apps wherever they can) so you'll want an ios6+ check instead. Find the line that says:</p>
+
+<pre><code>if (!navigator.userAgent.match(/OS 6(_\d)+/i)) return;
+</code></pre>
+
+<p>and replace it with:</p>
+
+<pre><code>if(/(iPhone|iPod|iPad)/i.test(navigator.userAgent)) {
+    if(/OS [2-5]_\d(_\d)? like Mac OS X/i.test(navigator.userAgent)) {
+        // iOS 2-5, map to native Timers
+        return
+    } else if(/CPU like Mac OS X/i.test(navigator.userAgent)) {
+        // iOS 1, map to native Timers
+        return
+    }
+}
+else
+{
+    // Not iOS, map to native Timers
+    return
+}
+</code></pre>

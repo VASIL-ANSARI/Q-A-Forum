@@ -1,0 +1,108 @@
+<p>The problem is when the <code>await</code> hits your function returns with the incomplete task and exits the <code>lock</code> allowing more things to run the task. You normally would solve it by awaiting inside of the lock, but the following code will not compile</p>
+
+<pre><code>public async Task TryToBeginSomeProcess()
+{
+    lock (someLock)
+    {
+        if (onlyOneTask == null)
+        {
+            onlyOneTask = DoSomethingButOnlyOneAtATime();
+        }
+        //does not compile
+        await onlyOneTask;
+    }
+}
+</code></pre>
+
+<p>The way we fix it is by switching from <code>lock</code> to <code>SemaphoreSlim</code> with a <code>InitialCount</code> of 1 and using its <code>WaitAsync()</code> method. </p>
+
+<pre><code>private SemaphoreSlim someLock = new SemaphoreSlim(1);
+
+public async Task TryToBeginSomeProcess()
+{
+    try
+    {
+        await someLock.WaitAsync();
+
+        await DoSomethingButOnlyOneAtATime().ConfigureAwait(false);
+    }
+    finally
+    {
+        someLock.Release();
+    }
+}
+
+public async Task DoSomethingButOnlyOneAtATime()
+{
+    // do some work
+
+    await SomeWork();
+
+    // do some more work
+}
+</code></pre>
+
+<hr>
+
+<p><strong>UPDATE:</strong>
+The previous code did not replicate the old behavior, the original if you called the function 20 times it would return the single instance from the 20 calls and only run the code once. My code will run the code 20 times but only one at a time.</p>
+
+<p>This solution really is just a async version of <a href="http://stackoverflow.com/a/37870792/80274">StriplingWarrior's answer</a>, I also create a extension method to make adding in the <code>Task.Yeild()</code> easier.</p>
+
+<pre><code>SemaphoreSlim someLock = new SemaphoreSlim(1);
+private Task onlyOneTask;
+
+public async Task TryToBeginSomeProcess()
+{
+    Task localCopy;
+    try
+    {
+        await someLock.WaitAsync();
+
+        if (onlyOneTask == null)
+        {
+            onlyOneTask = DoSomethingButOnlyOneAtATime().YeildImmedeatly();
+        }
+        localCopy = onlyOneTask;
+    }
+    finally
+    {
+        someLock.Release();
+    }
+
+    await localCopy.ConfigureAwait(false);
+}
+
+public async Task DoSomethingButOnlyOneAtATime()
+{
+    //Do some synchronous work.
+
+    await SomeWork().ConfigureAwait(false);
+
+    try
+    {
+        await someLock.WaitAsync().ConfigureAwait(false);
+        onlyOneTask = null;
+    }
+    finally
+    {
+        someLock.Release();
+    }
+}
+
+
+//elsewhere
+public static class ExtensionMethods
+{
+    public static async Task YeildImmedeatly(this Task @this)
+    {
+        await Task.Yield();
+        await @this.ConfigureAwait(false);
+    }
+    public static async Task&lt;T&gt; YeildImmedeatly&lt;T&gt;(this Task&lt;T&gt; @this)
+    {
+        await Task.Yield();
+        return await @this.ConfigureAwait(false);
+    }
+}
+</code></pre>

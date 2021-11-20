@@ -1,0 +1,74 @@
+<p>LocalStorage can certainly be used... </p>
+
+<p>As you mentioned in the question that you are making a intranet webapp, Its obvious that you will have only one single server hosting it on your network. The browsers will allow your storage into the localstorage and you can access your values from all your dashboards. (MULTIPLE DASHBOARDS ARE ASSUMED BY ME TO BE EITHER MULTIPLE USERS WITH 1 DASHBOARD EACH OR MULTIPLE USERS WITH MULTIPLE DASHBOARDS.). So the things don't need to be cross domain... </p>
+
+<p>And still if you want to pass some object cross domain, Pass its values  through URL. You can easily access it on the other side..</p>
+
+<p>For cross-domain localstorage sharing,</p>
+
+<p>As you may know, LocalStorage is domain based. You canât read or write from localstorage thatâs on different domain, even if thatâs subdomain. But there is iframe trick that you can use to store data from domain to itâs subdomain.</p>
+
+<p>Besically you create an iframe thatâs hosted on your subdomain that set document.domain to the parent domain. Then you send PostMessage to that iframe and inside iframe you set that value of localStorage.</p>
+
+<p>Here is the code</p>
+
+<p>main file</p>
+
+<pre><code>&lt;script&gt;
+window.onload = function() {
+    var win = document.getElementsByTagName('iframe')[0].contentWindow;
+    var obj = {
+       name: "Jack"
+    };
+    win.postMessage(JSON.stringify({key: 'storage', data: obj}), "*");
+};
+&lt;/script&gt;
+&lt;iframe style="display:none" src="http://sub.domain.com/iframe.html"&gt;&lt;/iframe&gt;
+</code></pre>
+
+<p>If you want to save and load value from LocalStorage, you can PostMessage with method key that will indicate what action it need to take. You can also send message back from iframe to itâs parent with data read from localStorage.</p>
+
+<p><strong>iframe</strong></p>
+
+<pre><code>document.domain = "domain.com";
+window.onmessage = function(e) {
+    if (e.origin !== "http://domain.com") {
+        return;
+    }
+    var payload = JSON.parse(e.data);
+    switch(payload.method) {
+        case 'set':
+            localStorage.setItem(payload.key, JSON.stringify(payload.data));
+            break;
+        case 'get':
+            var parent = window.parent;
+            var data = localStorage.getItem(payload.key);
+            parent.postMessage(data, "*");
+            break;
+        case 'remove':
+            localStorage.removeItem(payload.key);
+            break;
+    }
+};
+</code></pre>
+
+<p>and your <strong>main page on domain</strong></p>
+
+<pre><code>window.onload = function() {
+    var win = document.getElementsByTagName('iframe')[0].contentWindow;
+    var obj = {
+       name: "Jack"
+    };
+    // save obj in subdomain localStorage
+    win.postMessage(JSON.stringify({key: 'storage', method: "set", data: obj}), "*");
+    // load previously saved data
+    win.postMessage(JSON.stringify({key: 'storage', method: "get"}), "*");
+    window.onmessage = function(e) {
+        if (e.origin != "http://sub.domain.com") {
+            return;
+        }
+        // this will log "Jack"
+        console.log(JSON.parse(e.data).name);
+    };
+};
+</code></pre>

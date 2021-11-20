@@ -1,0 +1,138 @@
+<p>update:</p>
+
+<p>probably the most STL-like way:</p>
+
+<p>Features:</p>
+
+<ol>
+<li><p>Iterator-based so choice of source and destination containers is left to the caller</p></li>
+<li><p>Source iterators may be move-iterators if move-partitioning is required, or leave as normal iterators to make a copy</p></li>
+<li><p>Linear time complexity</p></li>
+<li><p>Stable ordering of results (ref <code>std::stable_partition</code>)</p></li>
+</ol>
+
+<p>-</p>
+
+<pre><code>#include &lt;array&gt;
+#include &lt;vector&gt;
+#include &lt;utility&gt;
+#include &lt;cassert&gt;
+
+using Point=std::pair&lt;int,int&gt;;
+
+// example split function - could be a function object
+extern std::size_t which_bucket(const Point&amp;);
+
+
+template&lt;class Iter, class OutIter, class Which&gt;
+  auto split_n(Iter first, Iter last, 
+               OutIter outfirst, std::size_t N, 
+              Which&amp;&amp; which)
+{
+  while (first != last) {
+    auto index = which(*first);
+    assert (index &lt; N);
+    std::next(outfirst, index) -&gt; push_back(*first);
+    ++ first;
+  }
+}
+
+template&lt;class Iter, class OutIter, class Which&gt;
+  auto split_to(Iter first, Iter last, 
+               OutIter outfirst, OutIter outlast, 
+              Which&amp;&amp; which)
+{
+  return split_n(first, last, outfirst, 
+                  std::distance(outfirst, outlast),
+                  std::forward&lt;Which&gt;(which));
+}
+
+
+int main(){
+  std::vector&lt;Point&gt; source;
+  std::array&lt;std::vector&lt;Point&gt;, 4&gt; dest { }; 
+
+  split_n(source.begin(), source.end(), 
+          dest.begin(), dest.size(), 
+          which_bucket);
+
+  // or
+
+  split_to(source.begin(), source.end(),
+           dest.begin(), dest.end(),
+           which_bucket);
+
+  // or with move request:
+
+  split_to(std::make_move_iterator(source.begin()), 
+           std::make_move_iterator(source.end()),
+           dest.begin(), dest.end(),
+           which_bucket);
+}
+</code></pre>
+
+<p>another way</p>
+
+<pre><code>#include &lt;array&gt;
+#include &lt;vector&gt;
+#include &lt;utility&gt;
+
+using Point=std::pair&lt;int,int&gt;;
+
+// example split function - could be a function object
+extern std::size_t which_bucket(const Point&amp;);
+
+
+template&lt;class Iter, class Which&gt;
+  auto split4(Iter first, Iter last, Which&amp;&amp; which)
+{
+  std::array&lt;std::vector&lt;Point&gt;, 4&gt; result {};
+  while (first != last) {
+    result[which(*first)].push_back(*first);
+    ++first;
+  }
+  return result;
+}
+
+int main(){
+  std::vector&lt;Point&gt; data;
+
+  auto results = split4(data.begin(), data.end(), which_bucket);
+}
+</code></pre>
+
+<p>Here's another way which honours any custom allocator in the vector:</p>
+
+<pre><code>#include &lt;array&gt;
+#include &lt;vector&gt;
+#include &lt;utility&gt;
+
+using Point=std::pair&lt;int,int&gt;;
+
+// example split function - could be a function object
+extern std::size_t which_bucket(const Point&amp;);
+
+
+template&lt;class T, class A, class Which&gt;
+  auto split4(const std::vector&lt;T,A&gt;&amp; v, 
+              Which&amp;&amp; which)
+{
+  using vec_type = std::vector&lt;T,A&gt;;
+  std::array&lt;std::vector&lt;T,A&gt;, 4&gt; result { 
+    vec_type(v.get_allocator()),
+    vec_type(v.get_allocator()),
+    vec_type(v.get_allocator()),
+    vec_type(v.get_allocator())
+  };
+  for (auto&amp; p : v) {
+    result[which(p)].push_back(p);
+  }
+  return result;
+}
+
+int main(){
+  std::vector&lt;Point&gt; data;
+
+  auto results = split4(data, which_bucket);
+}
+</code></pre>

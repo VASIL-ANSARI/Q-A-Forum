@@ -1,0 +1,30 @@
+<p>Yes, you need to create an <code>admin.py</code> for your custom comments app if you want your model to appear in the django admin. You should be able to subclass the <code>CommentsAdmin</code>, and customize as required.</p>
+
+<pre><code>from django.contrib import admin
+from django.utils.translation import ugettext_lazy as _, ungettext
+from django.contrib.comments.admin import CommentsAdmin
+from django.contrib.comments import get_model
+
+from comments_app.models import CommentWithAddedFields
+
+class MyCommentsAdmin(CommentsAdmin):
+    # Same fieldsets as parent admin, but include 'company'
+    fieldsets = (
+        (None,
+           {'fields': ('content_type', 'object_pk', 'site')}
+        ),
+        (_('Content'),
+           {'fields': ('user', 'user_name', 'user_email', 'user_url', 'company', 'comment')}
+        ),
+        (_('Metadata'),
+           {'fields': ('submit_date', 'ip_address', 'is_public', 'is_removed')}
+        ),
+     )
+
+# Only register the admin if the comments model is CommentWithAddedFields
+# The equivalent section in django.contrib.comments.admin is what prevents 
+# the admin from being registered when you set COMMENTS_APP = 'comments_app' 
+# in your settings file
+if get_model() is CommentWithAddedFields:
+    admin.site.register(CommentWithAddedFields, MyCommentsAdmin)
+</code></pre>

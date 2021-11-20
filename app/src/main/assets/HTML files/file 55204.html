@@ -1,0 +1,12 @@
+<p>I think your problem is that you're overloading the USART. I assume that <code>GLCD_WriteData()</code> is VERY quick, and that <code>USART_Transmit()</code> buffers the character for transmission and then quickly returns. I don't know your hardware, so I can't tell - but a four-character buffer for a USART sounds reasonable.</p>
+
+<p>Your five-character examples don't work because the actual character that you're trying to transmit is lost - so it puts an 0xFF in instead. You need to check the state of the USART buffer and wait for it to show that space is available (note <strong>NOT</strong> empty - that'd be inefficient!).</p>
+
+<p>In the 8250 and 16450 UART chips there are two status bits:</p>
+
+<ul>
+<li><code>TSRE</code> says that the <strong>T</strong>ransmit <strong>S</strong>hift <strong>R</strong>egister is <strong>E</strong>mpty;</li>
+<li><code>THRE</code> says that the <strong>T</strong>ransmit <strong>H</strong>olding <strong>R</strong>egister is <strong>E</strong>mpty.</li>
+</ul>
+
+<p><code>THRE</code> can be set even when <code>TSRE</code> isn't - it's busy. I'd test <code>TSRE</code> and not send the next character until there's room - or set up a buffer and an interrupt handler.</p>

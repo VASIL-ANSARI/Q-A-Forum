@@ -1,0 +1,73 @@
+<p>The code below will fulfill the requirement in the OP, to have a <em>clean</em> XML. It will remove all tributes from all elements, but it will add a <code>type</code> attribute to the <code>anyType</code> elements, so the original type could still be distinguish for each element.</p>
+
+<pre><code>static void Main(string[] args)
+{
+    object[] components = new object[] { new Component_1(), new Component_1() };
+
+    var doc = new XmlDocument();
+    doc.Load("source.xml");
+    var project = doc.GetElementsByTagName("project")[0];
+
+    var nav = project.CreateNavigator();
+
+    var emptyNamepsaces = new XmlSerializerNamespaces(new[] { 
+        XmlQualifiedName.Empty
+    });
+
+    foreach (var component in components)
+    {
+        using (var writer = nav.AppendChild())
+        {
+            var serializer = new XmlSerializer(component.GetType());
+            writer.WriteWhitespace("");
+            serializer.Serialize(writer, component
+                , emptyNamepsaces
+                );
+            writer.Close();
+        }
+    }
+
+    foreach (XmlNode node in doc.GetElementsByTagName("anyType"))
+    {
+        string attributeType = "";
+        foreach (XmlAttribute xmlAttribute in node.Attributes)
+        {
+            if (xmlAttribute.LocalName == "type")
+            { 
+            attributeType=xmlAttribute.Value.Split(':')[1];
+            }
+        }
+        node.Attributes.RemoveAll();
+        node.CreateNavigator().CreateAttribute("","type","",attributeType);
+    }
+    doc.Save("output.xml");
+
+}
+</code></pre>
+
+<p>If you want to deserialize the XML, you'll have to create a dictionary:</p>
+
+<pre><code>static Dictionary&lt;string, Type&gt; _typeCache;
+</code></pre>
+
+<p>add the expected XML types mapped to corresponding <code>Type</code> values to it:</p>
+
+<pre><code>_typeCache = new Dictionary&lt;string, Type&gt;();
+_typeCache.Add("string", typeof(System.String));
+_typeCache.Add("int", typeof(System.Int32));
+_typeCache.Add("dateTime", typeof(System.DateTime));
+</code></pre>
+
+<p>and replace each <code>XmlNode</code> in the array by converting it to it's expected type accordingly:</p>
+
+<pre><code>Component_1 c = Deserialize&lt;Component_1&gt;(project.ChildNodes[0].OuterXml);
+
+for (int i = 0; i &lt; c.objectArray.Length; i++)
+{
+    var type = _typeCache[(((System.Xml.XmlNode[])(c.objectArray[i]))[0]).Value];
+    var item = Convert.ChangeType((((System.Xml.XmlNode[])(c.objectArray[i]))[1]).Value, type);
+    c.objectArray[i] = item;
+}
+
+Console.WriteLine(c.objectArray[0].GetType()); // -&gt; System.String
+</code></pre>

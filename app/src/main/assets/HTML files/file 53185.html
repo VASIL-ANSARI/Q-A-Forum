@@ -1,0 +1,84 @@
+<h1>No, it is not possible.</h1>
+
+<p>The function which is called is chosen at <em>compile-time</em>. Lets say you have code like this:</p>
+
+<pre><code>Base &amp;o = getSomeObject();
+handle(o);
+</code></pre>
+
+<p>The compiler doesn't know the <em>real</em> type of o. It only knows that it is some subtype of <code>Base</code> or <code>Base</code> itself. This mean it will search for a function which acceppts objects of type <code>Base</code>.</p>
+
+<p>You could implement a check for the type yourself or use a map to store possible functions:</p>
+
+<pre><code>Base &amp;o = getSomeObject();
+functionMap[typeid(o)](o);
+</code></pre>
+
+<p>But <a href="http://en.cppreference.com/w/cpp/language/typeid" rel="nofollow"><code>typeid</code></a> does only work this whay if <code>Base</code> is a <em>polymorphic type</em>. This mean it must have at least one <em>virtual function</em>. This brings us to the next section:</p>
+
+<h1>But you could use virtual functions.</h1>
+
+<p><a href="http://en.cppreference.com/w/cpp/language/virtual" rel="nofollow"><em>Virtual functions</em></a> are <em>non-static</em> member functions of classes which can be overridden. The right function is resolved at runtime. The following code would output <code>Subt</code> instead of <code>Base</code>:</p>
+
+<pre><code>class Base {
+public: virtual std::string f() {return "Base"}
+};
+class Subt : public Base {
+public: virtual std::string f() {return "Subt"}
+};
+
+int main() {
+    Subt s;
+    Base &amp;b = s;
+    std::cout &lt;&lt; b.f() &lt;&lt; std::endl;
+}
+</code></pre>
+
+<p>You can omit <code>virtual</code> in the definition of <code>Subt</code>. The function <code>f()</code> is already defined as <em>virtual</em> in it's base class.</p>
+
+<p>Classes with at least one virtual function (also called <em>polymorphic types</em>) are storing a reference to a <em>virtual function table</em> (also called <em>vtable</em>). This table is used to get the right function at runtime.</p>
+
+<p>The problem in your question could be solved like this:</p>
+
+<pre><code>class Parent {
+public:
+    virtual void handle() = 0;
+};
+
+class A : public Parent {
+public:
+    void handle() override { /* do something for instances of A */ }
+};
+class B : public Parent {
+public:
+    void handle() override { /* do something for instances of B */ }
+};
+class C : public Parent {
+public:
+    void handle() override { /* do something for instances of C */ }
+};
+
+int main()
+{
+    std::vector&lt;std::unique_ptr&lt;Parent&gt;&gt; children = {
+            std::make_unique&lt;A&gt;(),
+            std::make_unique&lt;B&gt;(),
+            std::make_unique&lt;C&gt;()};
+
+    for (const auto &amp;child : children)
+        child-&gt;handle();
+}
+</code></pre>
+
+<p><strong>Note about compatibility:</strong> The keywords <a href="http://en.cppreference.com/w/cpp/language/auto" rel="nofollow"><code>auto</code></a> and <a href="http://en.cppreference.com/w/cpp/language/override" rel="nofollow"><code>override</code></a> are only available in C++11 and above. The <a href="http://en.cppreference.com/w/cpp/language/range-for" rel="nofollow">range-based for loop</a> and <a href="http://de.cppreference.com/w/cpp/memory/unique_ptr" rel="nofollow"><code>std::unique_ptr</code></a> is also available since C++11. The function <a href="http://en.cppreference.com/w/cpp/memory/unique_ptr/make_unique" rel="nofollow"><code>std::make_unique</code></a> is available since C++14. But virtual function can be used with older versions, too.</p>
+
+<h1>Another hint:</h1>
+
+<p><strong>Polymorphism does only work with references and pointers.</strong> The following would call <code>Base::f()</code> and not <code>Subt::f()</code>:</p>
+
+<pre><code>Subt s;
+Base b = s;
+std::cout &lt;&lt; b.f() &lt;&lt; std::endl;
+</code></pre>
+
+<p>In this example <code>b</code> will just contain a object of type <code>Base</code> instead of <code>Subt</code>. The object is just created at <code>Base b = s;</code>. It may copy some information from <code>s</code> but it isn't <code>s</code> anymore. It is a new object of type <code>Base</code>.</p>

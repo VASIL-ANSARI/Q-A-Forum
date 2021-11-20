@@ -1,0 +1,41 @@
+<p>You can use the python <a href="http://docs.python.org/library/json.html" rel="nofollow">json module</a> with the SQLObject <a href="http://sqlobject.org/SQLObject.html#class-sqlmeta" rel="nofollow">sqlmeta</a> class. Like this:</p>
+
+<pre><code>def to_json(obj):
+    return json.dumps(dict((c, getattr(obj, c)) for c in obj.sqlmeta.columns))
+</code></pre>
+
+<p>When I run this with your class <code>Foo</code> I get:</p>
+
+<pre><code>&gt;&gt;&gt; print to_json(f)
+{"bar": "test", "lulz": "only for the", "baz": true}
+</code></pre>
+
+<p><strong>Edit:</strong> if you want to include <a href="http://sqlobject.org/SQLObject.html#adding-magic-attributes-properties" rel="nofollow">magic attributes</a> in your json string and you don't mind using something of a hack, you could abuse the fact that the attributes of your object are python properties. For example, if I add a magic attribute <code>foo</code> to your original sample class:</p>
+
+<pre><code>class Foo(SQLObject):
+    bar = UnicodeCol(length=128)
+    baz = BoolCol(default=True)
+    lulz = UnicodeCol(length=256)
+
+    def _get_foo(self):
+        return "foo"
+</code></pre>
+
+<p>Then I can define the <code>to_json()</code> function like this:</p>
+
+<pre><code>def to_json(obj):
+    cls = type(obj)
+    d = dict((c, getattr(obj, c)) for c in vars(cls) if isinstance(getattr(cls, c), property))
+    return json.dumps(d)
+</code></pre>
+
+<p>Now, if I do this:</p>
+
+<pre><code>f = Foo(bar = "test", lulz = "only for the")
+print to_json(f)
+</code></pre>
+
+<p>I get the following result:</p>
+
+<pre><code>{"baz": true, "lulz": "only for the", "bar": "test", "foo": "foo"}
+</code></pre>

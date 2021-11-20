@@ -1,0 +1,38 @@
+<p>One should note that we shold not add <code>ICECandidate</code> to <code>PeerConnection</code> before it's remoteDescription is set, assuming that that is not your current problem, it might be:</p>
+
+<pre><code>peerConnection.onaddstream = function (stream) {
+  if (!isCaller) {
+    $log.info('Caller Stream is', stream);
+    peerConnection.addStream(stream.stream);        // ---&gt; specially this line.
+    remoteVideo.src = $window.URL.createObjectURL(stream.stream);
+  }
+};
+</code></pre>
+
+<p>I am not sure why callee is sending back remote stream as it's local stream, other than that with this code, caller upon receiving callee's stream, would do nothing. <code>peerConnection.addStream</code> is used for sharing the your local stream with the remote user. and normally callee need not wait for caller's stream to respond with it's stream. so change the above code into...</p>
+
+<pre><code>peerConnection.onaddstream = function (event) {
+    $log.info('add stream event:', event);
+    remoteVideo.src = $window.URL.createObjectURL(event.stream);
+};
+
+...        // also add the retrieved stream to peerConnection for both caller and callee.
+
+navigator.getUserMedia({
+    'audio': true,
+    'video': true
+  }, function (stream) {
+
+        peerConnection.addStream(stream);       // before if (isCaller) check
+        localVideo.src = $window.URL.createObjectURL(stream);
+        if (isCaller) {
+...
+</code></pre>
+
+<p>other than that I hope that the code you have written is just a prototype for testing if WebRTC works, it has got some design issues, few of them may be:</p>
+
+<ul>
+<li>Ice candidate handling can be clubbed, no difference between caller or callee iceCandidate.</li>
+<li>do not like the way of explicitly specifying the caller and callee.</li>
+<li>current system would not support multiple peers per room.</li>
+</ul>

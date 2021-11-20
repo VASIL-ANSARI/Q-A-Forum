@@ -1,0 +1,32 @@
+<p><code>pthread_mutex_lock</code> does not prevent <em>previous</em> instructions to be ordered after it.</p>
+
+<p>Similar, <code>pthread_mutex_unlock</code> does not prevent <em>followed</em> instructions to be ordered before it.</p>
+
+<p>But:</p>
+
+<ol>
+<li><p>In threadA <code>global_a = 100</code> <em>happens-before</em> <code>pthread_mutex_unlock(&amp;b_mutex)</code>.</p></li>
+<li><p>In threadB <code>pthread_mutex_lock(&amp;b_mutex)</code> <em>happens-before</em> <code>int tmp = global_a;</code>.</p></li>
+</ol>
+
+<p>And if you observe</p>
+
+<ol start="3">
+<li><code>pthread_mutex_unlock(&amp;b_mutex)</code> in threadA <em>happens-before</em> <code>pthread_mutex_lock(&amp;b_mutex)</code> in threadB.</li>
+</ol>
+
+<p>(in other words, threadB aquires lock <em>after</em> threadA releases it), then</p>
+
+<p><code>global_a = 100;</code> in threadA <em>happens-before</em> <code>int tmp = global_a;</code> in threadB. So, the last one sees effect of the first one.</p>
+
+<p><strong>What POSIX Standard says:</strong></p>
+
+<p>As for synchronisation details in the POSIX standard, the only reference I found (and others refer to) is short chapter about <a href="http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_11" rel="nofollow">Memory Synchronization</a>. It says that <code>pthread_mutex_lock</code> (and some other functions)</p>
+
+<blockquote>
+  <p>synchronize memory with respect to other threads</p>
+</blockquote>
+
+<p>Someones interpret this as <strong>full memory barrier</strong> garantee, others (and me) prefer to think about some <em>classic</em> garantees, when locking and waiting actions provides <em>memory acquire</em> semantic, unlocking and notifying ones - <em>memory release</em> semantic. See, e.g., this <a href="http://www.decadent.org.uk/pipermail/cpp-threads/2005-May/000436.html" rel="nofollow">mail</a>.</p>
+
+<p>There is no <em>happens-before</em> term in the POSIX. But it can be defined as usual, taking into account memory order garantees(in one's inerpretation).</p>

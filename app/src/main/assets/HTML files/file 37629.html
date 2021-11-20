@@ -1,0 +1,78 @@
+<p>The unsafe field is your instance of Unsafe. If you don't know how to get it, simply use:</p>
+
+<pre><code>Unsafe unsafe = getUnsafe();
+Unsafe getUnsafe() {
+    try {
+        Field f = Unsafe.class.getDeclaredField("theUnsafe");
+        f.setAccessible(true);
+        return (Unsafe) f.get(null);
+    } catch (Exception x) {
+        x.printStackTrace();
+    }
+
+    return null;
+}
+</code></pre>
+
+<p>Keep in mind this should work for HotSpot JVM since the field name differs across different implementations.</p>
+
+<p>You can move objects off the heap by:</p>
+
+<p>1) Allocate the proper bytes to the memory address. You can read the int at the offset 4L, convert to unsigned long, and add 12L, and get the address at that location. </p>
+
+<p>An example implementation:</p>
+
+<pre><code>public static long sizeOf(Object object) {
+    return unsafe.getAddress( normalize( unsafe.getInt(object, 4L) ) + 12L );
+}
+
+public static long normalize(int value) {
+   if(value &gt;= 0) return value;
+   return (~0L &gt;&gt;&gt; 32) &amp; value;
+}
+</code></pre>
+
+<p>You can allocate the offheap space using:</p>
+
+<pre><code>Object object = // Your object
+long size = sizeOf(object);
+long address = unsafe.allocateMemory(size);
+</code></pre>
+
+<p>(Keep the address field handy)</p>
+
+<p>2) Copy the object into the memory section specified by the address .</p>
+
+<p>Example:</p>
+
+<pre><code>getUnsafe().copyMemory(
+            object,
+            0,
+            null,
+            address,
+            size);
+</code></pre>
+
+<p>Done! Now your object is offheap.</p>
+
+<p>To get your object back, simply execute following:</p>
+
+<pre><code>// Class wide field
+Object anchor;
+
+// Deserializarion
+long offset = unsafe.objectFieldOffset(this.getClass().getDeclaredField("anchor"));
+
+unsafe.putLong(this, offset, address);
+</code></pre>
+
+<p>Then, anchor should be your Object from offheap!</p>
+
+<p>NOTE: Remember to release the resources of the allocated memory when you finish by doing:</p>
+
+<pre><code>unsafe.freeMemory(address);
+</code></pre>
+
+<p>(See, told you the address was important [as if it wasn't obvious already])</p>
+
+<p>Source(s):  <a href="http://highlyscalable.wordpress.com/2012/02/02/direct-memory-access-in-java/" rel="nofollow">http://highlyscalable.wordpress.com/2012/02/02/direct-memory-access-in-java/</a>, a great guy named RawCode which I don't believe is here, but told me about how Unsafe works a while ago.</p>

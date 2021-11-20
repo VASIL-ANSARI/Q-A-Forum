@@ -1,0 +1,16 @@
+<p>okay so this topic requires some careful attention. <a href="https://developer.android.com/training/articles/perf-jni.html" rel="nofollow">Android docs</a> talk about JavaVM and JNIEnv and how to interface with them. What you will need to do is store a global reference to the JavaVM that's accessible from all threads in the C code. The JVM allows a thread to get access to the JNIEnv which can get you access to a class's methods and what not. The next key problem is that you need to stash a jobject 'pointer' to the android object you call back to from the C code (which you probably already know). Make sure you call JNIEnv->DetachThread <em>on the thread that acquired the JNIEnv reference</em>.</p>
+
+<p>so again:</p>
+
+<ul>
+<li>get JavaVM reference and store it in c code</li>
+<li>have java call c code to store the jobject reference for your callback</li>
+<li>start a thread to do looping, acquire a reference to a JNIEnv on that thread to call to java</li>
+<li>call DetachThread before terminating thread execution</li>
+</ul>
+
+<p>another point of trouble is accessing c++ objects from java code, there's a neat trick where you can have c++ code <em>create</em> the java objects, and assign into a <code>private long _cppPointer</code> member on the created Java class, then add this object to some collection on a java object you have already pointer to (like an activity or something)</p>
+
+<p>good luck.</p>
+
+<p>edit: i finally recalled <a href="https://thebreakfastpost.com/2012/01/21/wrapping-a-c-library-with-jni-introduction/" rel="nofollow">another great source</a> of information about JNI work</p>

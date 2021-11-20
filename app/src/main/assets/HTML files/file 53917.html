@@ -1,0 +1,71 @@
+<p>If you can only use XSLT 1.0, try this XSLT for starters, which uses the Muenchian Grouping method</p>
+
+<pre><code>&lt;xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"&gt;
+  &lt;xsl:output method="xml" indent="yes" /&gt;
+
+  &lt;xsl:key name="form" match="form" use="@attribute1" /&gt;
+
+  &lt;xsl:template match="root"&gt;
+    &lt;xsl:copy&gt;
+        &lt;!-- Get first "form" element that occurs in each group --&gt;
+        &lt;xsl:for-each select="form[generate-id() = generate-id(key('form',@attribute1)[1])]"&gt;
+          &lt;group&gt;
+            &lt;header&gt;&lt;xsl:value-of select="@attribute1" /&gt;&lt;/header&gt;
+            &lt;!-- Get the "form" elements that make up the group --&gt;
+            &lt;xsl:apply-templates select="key('form', @attribute1)" /&gt;
+          &lt;/group&gt;
+        &lt;/xsl:for-each&gt;
+    &lt;/xsl:copy&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="form"&gt;
+    &lt;row&gt;&lt;xsl:value-of select="@attribute2" /&gt;&lt;/row&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>And here's some XSLT that can create an HTML table. This one is slightly more advanced as it works out the maximum number of columns for a row, and uses that in creating colspan attributes for the shorter rows</p>
+
+<pre><code>&lt;xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"&gt;
+  &lt;xsl:output method="html" doctype-public="XSLT-compat" omit-xml-declaration="yes" encoding="UTF-8" indent="yes" /&gt;
+
+  &lt;xsl:key name="form" match="form" use="@attribute1" /&gt;
+
+    &lt;xsl:variable name="maxCells"&gt;
+        &lt;xsl:for-each select="/root/form[generate-id() = generate-id(key('form',@attribute1)[1])]"&gt;
+            &lt;xsl:sort select="count(key('form', @attribute1))" order="descending" /&gt;
+            &lt;xsl:if test="position() = 1"&gt;
+                &lt;xsl:value-of select="count(key('form', @attribute1))" /&gt;
+            &lt;/xsl:if&gt;
+        &lt;/xsl:for-each&gt;
+    &lt;/xsl:variable&gt;
+
+  &lt;xsl:template match="root"&gt;
+    &lt;table border="1"&gt;
+        &lt;!-- Get first "form" element that occurs in each group --&gt;
+        &lt;xsl:for-each select="form[generate-id() = generate-id(key('form',@attribute1)[1])]"&gt;
+            &lt;tr&gt;
+                &lt;th colspan="{$maxCells}"&gt;
+                    &lt;xsl:value-of select="@attribute1" /&gt;
+                &lt;/th&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+            &lt;!-- Get the "form" elements that make up the group --&gt;
+                &lt;xsl:apply-templates select="key('form', @attribute1)" /&gt;
+            &lt;/tr&gt;
+        &lt;/xsl:for-each&gt;
+    &lt;/table&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="form"&gt;
+    &lt;td&gt;
+        &lt;xsl:if test="position() = last()"&gt;
+            &lt;xsl:attribute name="colspan"&gt;
+                &lt;xsl:value-of select="$maxCells - count(key('form', @attribute1)) + 1" /&gt;
+            &lt;/xsl:attribute&gt;
+        &lt;/xsl:if&gt;
+        &lt;xsl:value-of select="@attribute2" /&gt;   
+    &lt;/td&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>

@@ -1,0 +1,38 @@
+<p>This is a misunderstanding about how <code>@DatabaseSetup</code> works. The problem tests are all dealing with referencing data by a generated id. The <a href="http://springtestdbunit.github.io/spring-test-dbunit/apidocs/com/github/springtestdbunit/annotation/DatabaseSetup.html" rel="nofollow">API</a> states: </p>
+
+<blockquote>
+  <p>Test annotation which indicates how to put a database into a know
+  state before tests are run. This annotation can be placed on a class
+  or on methods. When placed on a class the setup is applied before each
+  test methods is executed.</p>
+</blockquote>
+
+<p>which to my mind is a little ambiguous, but <a href="http://springtestdbunit.github.io/spring-test-dbunit/" rel="nofollow">additional documentation</a> states:</p>
+
+<blockquote>
+  <p>By default setup will perform a CLEAN_INSERT operation, this means
+  that all data from tables referenced in the DataSet XML will be
+  removed before inserting new rows.</p>
+</blockquote>
+
+<p>i.e. tests should not assume that the database (including any sequence numbers) is put into a clean state, just that the data is clean. </p>
+
+<p>Adding the following code </p>
+
+<pre><code>  private static int currentOffset = 0;
+  private static final int TEST_OFFSET = 3;
+
+  /**
+   * After each test is run DatabaseSetup annotation deletes records 
+   * and inserts fresh ones - this means we need to keep track of the 
+   * current offset
+   */
+   @After
+   public void offset() {
+     currentOffset += TEST_OFFSET;
+   }
+</code></pre>
+
+<p>(with occasional modifications to currentOffset when testing inserts) can keep track of the current ids. </p>
+
+<p>This does not seems ideal, but I do not know a way of resetting the database to a truly clean state.</p>

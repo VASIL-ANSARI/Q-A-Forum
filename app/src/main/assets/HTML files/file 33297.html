@@ -1,0 +1,19 @@
+<p>There are several problems with this query.</p>
+
+<p>The first one is <code>ToLower</code> conversion. In SQL this is translated to something like <code>lower(firstname) = :input1</code> and this prevents sqlite from using of the index on firstname column if such index exists. And in this case sqlite is required to scan all 300k records instead of finding a very small fraction of records directly using index.</p>
+
+<p>To mitigate this you can add additional columns to <code>contacts</code> table <code>lowercase_firstname</code> and <code>lowercase_lastname</code> and set their value from <code>firstname</code> and <code>lastname</code> in trigger on insert or update of contact table. You should add indices for this columns and filter by them to avoid calling <code>lower</code> in where clause. </p>
+
+<p>The second problem is using of <code>Contains</code>. I'm not sure how exactly LINQ translates this to SQL but it doesn't have much options. It either </p>
+
+<ol>
+<li>translates to something like: <code>firstname like '%&lt;input1&gt;%'</code></li>
+<li>or does in memory filtering</li>
+</ol>
+
+<p>The second option requires reading all records from database and that wouldn't be quick.
+The first option doesn't use existing index on firstname column and requires full table scan. </p>
+
+<p>Unfortunately at the moment there is no way in sqlite to do like search using index. So this  can't be quick. </p>
+
+<p>One option is to disallow searching inside first and last name and allow only search by first letters of the name. So that if input1=Rita user is able to find <code>Rita</code> but not <code>Margarita</code>. With this limitation it is possible search using index by issuing range query like this <code>lowercase_firstname between 'Rita' and 'Rita{'</code> (here <code>{</code> is the letter following <code>z</code>). <a href="http://stackoverflow.com/questions/4087311/equivalent-of-sql-between-statement-using-linq-or-a-lambda-expression">This</a> should help you with expressing between in LINQ.</p>

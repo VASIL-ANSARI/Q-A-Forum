@@ -1,0 +1,39 @@
+<p>You can use semaphores for this and asynchronously call the long running process as much as you want:</p>
+
+<pre><code>private Semaphore _semaphore;
+private delegate void Processor(string fileName);
+[Test]
+public void SetterTest() {
+  var queue = new Queue&lt;string&gt;();
+  queue.Enqueue("1.mp3");
+  queue.Enqueue("2.mp3");
+  queue.Enqueue("3.mp3");
+  // ..
+  queue.Enqueue("10000.mp3");
+  var noOfThreads = 5;
+  using (_semaphore = new Semaphore(noOfThreads, noOfThreads)) {
+    while (queue.Count &gt; 0) {
+      string fileName;
+      fileName = queue.Dequeue();
+      _semaphore.WaitOne();
+      new Processor(ProcessFile).BeginInvoke(fileName, null, null);
+    }
+    for (int i=0; i&lt;noOfThreads; i++) _semaphore.WaitOne();
+  }
+}
+private void ProcessFile(string file) {
+  Process p;
+  using (p = new Process()) {
+    p.StartInfo.FileName = @"binary.exe";
+    p.StartInfo.Arguments = file;
+    p.StartInfo.UseShellExecute = false;
+    p.StartInfo.CreateNoWindow = true;
+    p.StartInfo.RedirectStandardOutput = true;
+    p.Start();
+    p.WaitForExit();
+  }
+  _semaphore.Release();
+}
+</code></pre>
+
+<p>hope this helps</p>

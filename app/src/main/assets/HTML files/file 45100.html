@@ -1,0 +1,141 @@
+<p>I think the problem is that you try to exit your activity from a background thread. One solution would be this.</p>
+
+<p>Declare your JSONObject at the beginning of the CreateUser class:</p>
+
+<pre><code>JSONObject json;
+</code></pre>
+
+<p>In doInBackground() replace:</p>
+
+<pre><code>JSONObject json = jsonParser.makeHttpRequest(url_new_user,
+            "POST", params);
+</code></pre>
+
+<p>with:</p>
+
+<pre><code>json = jsonParser.makeHttpRequest(url_new_user,
+            "POST", params);
+</code></pre>
+
+<p>Move this code in onPostExecute:</p>
+
+<pre><code>try {
+        int success = json.getInt(TAG_SUCCESS);
+
+        if (success == 1) {
+            // successfully created a user
+            Intent i = new Intent(getApplicationContext(), LoginActivity.class);
+            startActivity(i);
+            // closing this screen
+            finish();
+        } else {
+            // failed to create user
+            Log.d("failed to create user", json.toString());
+
+        }
+    } catch (JSONException e) {
+        e.printStackTrace();
+    }
+</code></pre>
+
+<p>Finally, you should have this in the CreateUser class:</p>
+
+<pre><code>class CreateUser extends AsyncTask&lt;String, String, String&gt; {
+    JSONObject json;
+
+@Override
+protected void onPreExecute() {
+    super.onPreExecute();
+    pDialog = new ProgressDialog(ConsentActivity.this);
+    pDialog.setMessage("Registering New User..");
+    pDialog.setIndeterminate(false);
+    pDialog.setCancelable(true);
+    pDialog.show();
+}
+
+@Override
+protected String doInBackground(String... args) {
+
+    SharedPreferences pref = getSharedPreferences("UserMgmt", Context.MODE_PRIVATE);
+
+    String Firstname = pref.getString("FName", "");
+    String Lastname = pref.getString("LName", "");
+    String Userid = pref.getString("UserId", "");
+    String Password = pref.getString("Password", "");
+    String Repassword = pref.getString("RePassword", "");
+
+    String Idproof_typ=pref.getString("IdType","");
+    String Idproof_number=pref.getString("IdNumber","");
+    String Dob=pref.getString("DOB","");
+    String Gender=pref.getString("Gender","");
+    String Email=pref.getString("Email","");
+    String Mobile_number=pref.getString("Mobile","");
+    String Country_code=pref.getString("CountryCode","");
+    String Landline=pref.getString("LandLine","");
+
+    String Country=pref.getString("Country","");
+    String State=pref.getString("State","");
+    String Address=pref.getString("Address","");
+    String Pincod=pref.getString("Pincode","");
+
+    boolean Tc_chk_state = pref.getBoolean("ChkBoxTC", true);
+
+    boolean Consent_chk_state = pref.getBoolean("ChkBoxConsent", true);
+
+    List&lt;NameValuePair&gt; params = new ArrayList&lt;NameValuePair&gt;();
+
+   // params.add(new BasicNameValuePair("userId", Userid));
+    params.add(new BasicNameValuePair("firstName", Firstname));
+    params.add(new BasicNameValuePair("lastName", Lastname));
+    params.add(new BasicNameValuePair("password", Password));
+    params.add(new BasicNameValuePair("newPassword", Repassword));
+
+    params.add(new BasicNameValuePair("identityType", Idproof_typ));
+    params.add(new BasicNameValuePair("identityNumber", Idproof_number));
+    params.add(new BasicNameValuePair("dob", Dob));
+    params.add(new BasicNameValuePair("gender", Gender));
+    params.add(new BasicNameValuePair("emailId", Email));
+    params.add(new BasicNameValuePair("mobileNumber", Mobile_number));
+    params.add(new BasicNameValuePair("stdCode", Country_code));
+    params.add(new BasicNameValuePair("landlineNumber", Landline));
+    params.add(new BasicNameValuePair("countryCode", Country));
+    params.add(new BasicNameValuePair("stateCode", State));
+    params.add(new BasicNameValuePair("addr", Address));
+    params.add(new BasicNameValuePair("zipcode", Pincod));
+
+    json = jsonParser.makeHttpRequest(url_new_user,
+            "POST", params);
+
+          //  Log.d("Create Response", json.toString());
+
+
+    return null;
+}
+
+  protected void onProgressUpdate(Integer... progress) {
+
+  }
+
+protected void onPostExecute(String file_url) {
+    // dismiss the dialog once done
+    pDialog.dismiss();
+    try {
+        int success = json.getInt(TAG_SUCCESS);
+
+        if (success == 1) {
+            // successfully created a user
+            Intent i = new Intent(getApplicationContext(), LoginActivity.class);
+            startActivity(i);
+            // closing this screen
+            finish();
+        } else {
+            // failed to create user
+            Log.d("failed to create user", json.toString());
+
+        }
+    } catch (JSONException e) {
+        e.printStackTrace();
+    }
+
+}
+</code></pre>

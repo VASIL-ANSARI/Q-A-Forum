@@ -1,0 +1,365 @@
+<h1>Concepts:</h1>
+
+<p><strong>NALUs:</strong>  NALUs are simply a chunk of data of varying length that has a NALU start code header <code>0x00 00 00 01 YY</code> where the first 5 bits of <code>YY</code> tells you what type of NALU this is and therefore what type of data follows the header.  (Since you only need the first 5 bits, I use <code>YY &amp; 0x1F</code> to just get the relevant bits.)  I list what all these types are in the method <code>NSString * const naluTypesStrings[]</code>, but you don't need to know what they all are.  </p>
+
+<p><strong>Parameters:</strong>  Your decoder needs parameters so it knows how the H.264 video data is stored.  The 2 you need to set are <strong>Sequence Parameter Set (SPS)</strong> and <strong>Picture Parameter Set (PPS)</strong> and they each have their own NALU type number.  You don't need to know what the parameters mean, the decoder knows what to do with them.</p>
+
+<p><strong>H.264 Stream Format:</strong>  In most H.264 streams, you will receive with an initial set of PPS and SPS parameters followed by an i frame (aka IDR frame or flush frame) NALU.  Then you will receive several P frame NALUs (maybe a few dozen or so), then another set of parameters (which may be the same as the initial parameters) and an i frame, more P frames, etc.  i frames are much bigger than P frames.  Conceptually you can think of the i frame as an entire image of the video, and the P frames are just the changes that have been made to that i frame, until you receive the next i frame.</p>
+
+<h1>Procedure:</h1>
+
+<ol>
+<li><p><strong>Generate individual NALUs from your H.264 stream.</strong>  I cannot show code for this step since it depends a lot on what video source you're using.  I made this graphic to show what I was working with ("data" in the graphic is "frame" in my following code), but your case may and probably will differ. <a href="http://i.stack.imgur.com/9XEy4.png"><img src="http://i.stack.imgur.com/9XEy4.png" alt="What I was working with"></a> My method <code>receivedRawVideoFrame:</code> is called every time I receive a frame (<code>uint8_t *frame</code>) which was one of 2 types.  In the diagram, those 2 frame types are the 2 big purple boxes.</p></li>
+<li><p><strong>Create a CMVideoFormatDescriptionRef from your SPS and PPS NALUs with CMVideoFormatDescriptionCreateFromH264ParameterSets( )</strong>.  You cannot display any frames without doing this first.  The SPS and PPS may look like a jumble of numbers, but VTD knows what to do with them.  All you need to know is that <code>CMVideoFormatDescriptionRef</code> is a description of video data., like width/height, format type (<code>kCMPixelFormat_32BGRA</code>, <code>kCMVideoCodecType_H264</code> etc.), aspect ratio, color space etc.  Your decoder will hold onto the parameters until a new set arrives (sometimes parameters are resent regularly even when they haven't changed).</p></li>
+<li><p><strong>Re-package your IDR and non-IDR frame NALUs according to the "AVCC" format.</strong>  This means removing the NALU start codes and replacing them with a 4-byte header that states the length of the NALU. You don't need to do this for the SPS and PPS NALUs.  (Note that the 4-byte NALU length header is in big-endian, so if you have a <code>UInt32</code> value it must be byte-swapped before copying to the <code>CMBlockBuffer</code> using <code>CFSwapInt32</code>.  I do this in my code with the <code>htonl</code> function call.)</p></li>
+<li><p><strong>Package the IDR and non-IDR NALU frames into CMBlockBuffer.</strong> Do not do this with the SPS PPS parameter NALUs.  All you need to know about <code>CMBlockBuffers</code> is that they are a method to wrap arbitrary blocks of data in core media. (Any compressed video data in a video pipeline is wrapped in this.)</p></li>
+<li><p><strong>Package the CMBlockBuffer into CMSampleBuffer.</strong>  All you need to know about <code>CMSampleBuffers</code> is that they wrap up our <code>CMBlockBuffers</code> with other information (here it would be the <code>CMVideoFormatDescription</code> and <code>CMTime</code>, if <code>CMTime</code> is used).</p></li>
+<li><p><strong>Create a VTDecompressionSessionRef and feed the sample buffers into VTDecompressionSessionDecodeFrame( ).</strong> Alternatively, you can use <code>AVSampleBufferDisplayLayer</code> and its <code>enqueueSampleBuffer:</code> method and you won't need to use VTDecompSession.  It's simpler to set up, but will not throw errors if something goes wrong like VTD will.</p></li>
+<li><p><strong>In the VTDecompSession callback, use the resultant CVImageBufferRef to display the video frame.</strong>  If you need to convert your <code>CVImageBuffer</code> to a <code>UIImage</code>, see my StackOverflow answer <a href="http://stackoverflow.com/a/29170802/3841734">here</a>.</p></li>
+</ol>
+
+<h2>Other notes:</h2>
+
+<ul>
+<li><p>H.264 streams can vary a lot.  From what I learned, <strong>NALU start code headers are sometimes 3 bytes</strong> (<code>0x00 00 01</code>) <strong>and sometimes 4</strong> (<code>0x00 00 00 01</code>).  My code works for 4 bytes; you will need to change a few things around if you're working with 3.</p></li>
+<li><p>If you want to <strong>know more about NALUs</strong>, I found <a href="http://stackoverflow.com/a/24890903/3841734">this answer</a> to be very helpful.  In my case, I found that I didn't need to ignore the "emulation prevention" bytes as described, so I personally skipped that step but you may need to know about that.</p></li>
+<li><p>If your <strong>VTDecompressionSession outputs an error number (like -12909)</strong> look up the error code in your XCode project.  Find the VideoToolbox framework in your project navigator, open it and find the header VTErrors.h.  If you can't find it, I've also included all the error codes below in another answer.</p></li>
+</ul>
+
+<h2>Code Example:</h2>
+
+<p>So let's start by declaring some global variables and including the VT framework (VT = Video Toolbox). </p>
+
+<pre><code>#import &lt;VideoToolbox/VideoToolbox.h&gt;
+
+@property (nonatomic, assign) CMVideoFormatDescriptionRef formatDesc;
+@property (nonatomic, assign) VTDecompressionSessionRef decompressionSession;
+@property (nonatomic, retain) AVSampleBufferDisplayLayer *videoLayer;
+@property (nonatomic, assign) int spsSize;
+@property (nonatomic, assign) int ppsSize;
+</code></pre>
+
+<p>The following array is only used so that you can print out what type of NALU frame you are receiving.  If you know what all these types mean, good for you, you know more about H.264 than me :)  My code only handles types 1, 5, 7 and 8.</p>
+
+<pre><code>NSString * const naluTypesStrings[] =
+{
+    @"0: Unspecified (non-VCL)",
+    @"1: Coded slice of a non-IDR picture (VCL)",    // P frame
+    @"2: Coded slice data partition A (VCL)",
+    @"3: Coded slice data partition B (VCL)",
+    @"4: Coded slice data partition C (VCL)",
+    @"5: Coded slice of an IDR picture (VCL)",      // I frame
+    @"6: Supplemental enhancement information (SEI) (non-VCL)",
+    @"7: Sequence parameter set (non-VCL)",         // SPS parameter
+    @"8: Picture parameter set (non-VCL)",          // PPS parameter
+    @"9: Access unit delimiter (non-VCL)",
+    @"10: End of sequence (non-VCL)",
+    @"11: End of stream (non-VCL)",
+    @"12: Filler data (non-VCL)",
+    @"13: Sequence parameter set extension (non-VCL)",
+    @"14: Prefix NAL unit (non-VCL)",
+    @"15: Subset sequence parameter set (non-VCL)",
+    @"16: Reserved (non-VCL)",
+    @"17: Reserved (non-VCL)",
+    @"18: Reserved (non-VCL)",
+    @"19: Coded slice of an auxiliary coded picture without partitioning (non-VCL)",
+    @"20: Coded slice extension (non-VCL)",
+    @"21: Coded slice extension for depth view components (non-VCL)",
+    @"22: Reserved (non-VCL)",
+    @"23: Reserved (non-VCL)",
+    @"24: STAP-A Single-time aggregation packet (non-VCL)",
+    @"25: STAP-B Single-time aggregation packet (non-VCL)",
+    @"26: MTAP16 Multi-time aggregation packet (non-VCL)",
+    @"27: MTAP24 Multi-time aggregation packet (non-VCL)",
+    @"28: FU-A Fragmentation unit (non-VCL)",
+    @"29: FU-B Fragmentation unit (non-VCL)",
+    @"30: Unspecified (non-VCL)",
+    @"31: Unspecified (non-VCL)",
+};
+</code></pre>
+
+<p>Now this is where all the magic happens.</p>
+
+<pre><code>-(void) receivedRawVideoFrame:(uint8_t *)frame withSize:(uint32_t)frameSize isIFrame:(int)isIFrame
+{
+    OSStatus status;
+
+    uint8_t *data = NULL;
+    uint8_t *pps = NULL;
+    uint8_t *sps = NULL;
+
+    // I know what my H.264 data source's NALUs look like so I know start code index is always 0.
+    // if you don't know where it starts, you can use a for loop similar to how i find the 2nd and 3rd start codes
+    int startCodeIndex = 0;
+    int secondStartCodeIndex = 0;
+    int thirdStartCodeIndex = 0;
+
+    long blockLength = 0;
+
+    CMSampleBufferRef sampleBuffer = NULL;
+    CMBlockBufferRef blockBuffer = NULL;
+
+    int nalu_type = (frame[startCodeIndex + 4] &amp; 0x1F);
+    NSLog(@"~~~~~~~ Received NALU Type \"%@\" ~~~~~~~~", naluTypesStrings[nalu_type]);
+
+    // if we havent already set up our format description with our SPS PPS parameters, we
+    // can't process any frames except type 7 that has our parameters
+    if (nalu_type != 7 &amp;&amp; _formatDesc == NULL)
+    {
+        NSLog(@"Video error: Frame is not an I Frame and format description is null");
+        return;
+    }
+
+    // NALU type 7 is the SPS parameter NALU
+    if (nalu_type == 7)
+    {
+        // find where the second PPS start code begins, (the 0x00 00 00 01 code)
+        // from which we also get the length of the first SPS code
+        for (int i = startCodeIndex + 4; i &lt; startCodeIndex + 40; i++)
+        {
+            if (frame[i] == 0x00 &amp;&amp; frame[i+1] == 0x00 &amp;&amp; frame[i+2] == 0x00 &amp;&amp; frame[i+3] == 0x01)
+            {
+                secondStartCodeIndex = i;
+                _spsSize = secondStartCodeIndex;   // includes the header in the size
+                break;
+            }
+        }
+
+        // find what the second NALU type is
+        nalu_type = (frame[secondStartCodeIndex + 4] &amp; 0x1F);
+        NSLog(@"~~~~~~~ Received NALU Type \"%@\" ~~~~~~~~", naluTypesStrings[nalu_type]);
+    }
+
+    // type 8 is the PPS parameter NALU
+    if(nalu_type == 8)
+    {
+        // find where the NALU after this one starts so we know how long the PPS parameter is
+        for (int i = _spsSize + 4; i &lt; _spsSize + 30; i++)
+        {
+            if (frame[i] == 0x00 &amp;&amp; frame[i+1] == 0x00 &amp;&amp; frame[i+2] == 0x00 &amp;&amp; frame[i+3] == 0x01)
+            {
+                thirdStartCodeIndex = i;
+                _ppsSize = thirdStartCodeIndex - _spsSize;
+                break;
+            }
+        }
+
+        // allocate enough data to fit the SPS and PPS parameters into our data objects.
+        // VTD doesn't want you to include the start code header (4 bytes long) so we add the - 4 here
+        sps = malloc(_spsSize - 4);
+        pps = malloc(_ppsSize - 4);
+
+        // copy in the actual sps and pps values, again ignoring the 4 byte header
+        memcpy (sps, &amp;frame[4], _spsSize-4);
+        memcpy (pps, &amp;frame[_spsSize+4], _ppsSize-4);
+
+        // now we set our H264 parameters
+        uint8_t*  parameterSetPointers[2] = {sps, pps};
+        size_t parameterSetSizes[2] = {_spsSize-4, _ppsSize-4};
+
+        status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault, 2, 
+                                                (const uint8_t *const*)parameterSetPointers, 
+                                                parameterSetSizes, 4, 
+                                                &amp;_formatDesc);
+
+        NSLog(@"\t\t Creation of CMVideoFormatDescription: %@", (status == noErr) ? @"successful!" : @"failed...");
+        if(status != noErr) NSLog(@"\t\t Format Description ERROR type: %d", (int)status);
+
+        // See if decomp session can convert from previous format description 
+        // to the new one, if not we need to remake the decomp session.
+        // This snippet was not necessary for my applications but it could be for yours
+        /*BOOL needNewDecompSession = (VTDecompressionSessionCanAcceptFormatDescription(_decompressionSession, _formatDesc) == NO);
+         if(needNewDecompSession)
+         {
+             [self createDecompSession];
+         }*/
+
+        // now lets handle the IDR frame that (should) come after the parameter sets
+        // I say "should" because that's how I expect my H264 stream to work, YMMV
+        nalu_type = (frame[thirdStartCodeIndex + 4] &amp; 0x1F);
+        NSLog(@"~~~~~~~ Received NALU Type \"%@\" ~~~~~~~~", naluTypesStrings[nalu_type]);
+    }
+
+    // create our VTDecompressionSession.  This isnt neccessary if you choose to use AVSampleBufferDisplayLayer
+    if((status == noErr) &amp;&amp; (_decompressionSession == NULL))
+    {
+        [self createDecompSession];
+    }
+
+    // type 5 is an IDR frame NALU.  The SPS and PPS NALUs should always be followed by an IDR (or IFrame) NALU, as far as I know
+    if(nalu_type == 5)
+    {
+        // find the offset, or where the SPS and PPS NALUs end and the IDR frame NALU begins
+        int offset = _spsSize + _ppsSize;
+        blockLength = frameSize - offset;
+        data = malloc(blockLength);
+        data = memcpy(data, &amp;frame[offset], blockLength);
+
+        // replace the start code header on this NALU with its size.
+        // AVCC format requires that you do this.  
+        // htonl converts the unsigned int from host to network byte order
+        uint32_t dataLength32 = htonl (blockLength - 4);
+        memcpy (data, &amp;dataLength32, sizeof (uint32_t));
+
+        // create a block buffer from the IDR NALU
+        status = CMBlockBufferCreateWithMemoryBlock(NULL, data,  // memoryBlock to hold buffered data
+                                                    blockLength,  // block length of the mem block in bytes.
+                                                    kCFAllocatorNull, NULL,
+                                                    0, // offsetToData
+                                                    blockLength,   // dataLength of relevant bytes, starting at offsetToData
+                                                    0, &amp;blockBuffer);
+
+        NSLog(@"\t\t BlockBufferCreation: \t %@", (status == kCMBlockBufferNoErr) ? @"successful!" : @"failed...");
+    }
+
+    // NALU type 1 is non-IDR (or PFrame) picture
+    if (nalu_type == 1)
+    {
+        // non-IDR frames do not have an offset due to SPS and PSS, so the approach
+        // is similar to the IDR frames just without the offset
+        blockLength = frameSize;
+        data = malloc(blockLength);
+        data = memcpy(data, &amp;frame[0], blockLength);
+
+        // again, replace the start header with the size of the NALU
+        uint32_t dataLength32 = htonl (blockLength - 4);
+        memcpy (data, &amp;dataLength32, sizeof (uint32_t));
+
+        status = CMBlockBufferCreateWithMemoryBlock(NULL, data,  // memoryBlock to hold data. If NULL, block will be alloc when needed
+                                                    blockLength,  // overall length of the mem block in bytes
+                                                    kCFAllocatorNull, NULL,
+                                                    0,     // offsetToData
+                                                    blockLength,  // dataLength of relevant data bytes, starting at offsetToData
+                                                    0, &amp;blockBuffer);
+
+        NSLog(@"\t\t BlockBufferCreation: \t %@", (status == kCMBlockBufferNoErr) ? @"successful!" : @"failed...");
+    }
+
+    // now create our sample buffer from the block buffer,
+    if(status == noErr)
+    {
+        // here I'm not bothering with any timing specifics since in my case we displayed all frames immediately
+        const size_t sampleSize = blockLength;
+        status = CMSampleBufferCreate(kCFAllocatorDefault,
+                                      blockBuffer, true, NULL, NULL,
+                                      _formatDesc, 1, 0, NULL, 1,
+                                      &amp;sampleSize, &amp;sampleBuffer);
+
+        NSLog(@"\t\t SampleBufferCreate: \t %@", (status == noErr) ? @"successful!" : @"failed...");
+    }
+
+    if(status == noErr)
+    {
+        // set some values of the sample buffer's attachments
+        CFArrayRef attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, YES);
+        CFMutableDictionaryRef dict = (CFMutableDictionaryRef)CFArrayGetValueAtIndex(attachments, 0);
+        CFDictionarySetValue(dict, kCMSampleAttachmentKey_DisplayImmediately, kCFBooleanTrue);
+
+        // either send the samplebuffer to a VTDecompressionSession or to an AVSampleBufferDisplayLayer
+        [self render:sampleBuffer];
+    }
+
+    // free memory to avoid a memory leak, do the same for sps, pps and blockbuffer
+    if (NULL != data)
+    {
+        free (data);
+        data = NULL;
+    }
+}
+</code></pre>
+
+<p>The following method creates your VTD session.  Recreate it whenever you receive <em>new</em> parameters.  (You don't have to recreate it <em>every</em> time you receive parameters, pretty sure.)  </p>
+
+<p>If you want to set attributes for the destination <code>CVPixelBuffer</code>, read up on <a href="http://iosapi.xamarin.com/?link=T%3AMonoTouch.CoreVideo.CVPixelBufferAttributes%2FP">CoreVideo PixelBufferAttributes values</a> and put them in <code>NSDictionary *destinationImageBufferAttributes</code>. </p>
+
+<pre><code>-(void) createDecompSession
+{
+    // make sure to destroy the old VTD session
+    _decompressionSession = NULL;
+    VTDecompressionOutputCallbackRecord callBackRecord;
+    callBackRecord.decompressionOutputCallback = decompressionSessionDecodeFrameCallback;
+
+    // this is necessary if you need to make calls to Objective C "self" from within in the callback method.
+    callBackRecord.decompressionOutputRefCon = (__bridge void *)self;
+
+    // you can set some desired attributes for the destination pixel buffer.  I didn't use this but you may
+    // if you need to set some attributes, be sure to uncomment the dictionary in VTDecompressionSessionCreate
+    NSDictionary *destinationImageBufferAttributes = [NSDictionary dictionaryWithObjectsAndKeys:
+                                                      [NSNumber numberWithBool:YES],
+                                                      (id)kCVPixelBufferOpenGLESCompatibilityKey,
+                                                      nil];
+
+    OSStatus status =  VTDecompressionSessionCreate(NULL, _formatDesc, NULL,
+                                                    NULL, // (__bridge CFDictionaryRef)(destinationImageBufferAttributes)
+                                                    &amp;callBackRecord, &amp;_decompressionSession);
+    NSLog(@"Video Decompression Session Create: \t %@", (status == noErr) ? @"successful!" : @"failed...");
+    if(status != noErr) NSLog(@"\t\t VTD ERROR type: %d", (int)status);
+}
+</code></pre>
+
+<p>Now this method gets called every time VTD is done decompressing any frame you sent to it.  This method gets called even if there's an error or if the frame is dropped. </p>
+
+<pre><code>void decompressionSessionDecodeFrameCallback(void *decompressionOutputRefCon,
+                                             void *sourceFrameRefCon,
+                                             OSStatus status,
+                                             VTDecodeInfoFlags infoFlags,
+                                             CVImageBufferRef imageBuffer,
+                                             CMTime presentationTimeStamp,
+                                             CMTime presentationDuration)
+{
+    THISCLASSNAME *streamManager = (__bridge THISCLASSNAME *)decompressionOutputRefCon;
+
+    if (status != noErr)
+    {
+        NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+        NSLog(@"Decompressed error: %@", error);
+    }
+    else
+    {
+        NSLog(@"Decompressed sucessfully");
+
+        // do something with your resulting CVImageBufferRef that is your decompressed frame
+        [streamManager displayDecodedFrame:imageBuffer];
+    }
+}
+</code></pre>
+
+<p>This is where we actually send the sampleBuffer off to the VTD to be decoded.</p>
+
+<pre><code>- (void) render:(CMSampleBufferRef)sampleBuffer
+{
+    VTDecodeFrameFlags flags = kVTDecodeFrame_EnableAsynchronousDecompression;
+    VTDecodeInfoFlags flagOut;
+    NSDate* currentTime = [NSDate date];
+    VTDecompressionSessionDecodeFrame(_decompressionSession, sampleBuffer, flags,
+                                      (void*)CFBridgingRetain(currentTime), &amp;flagOut);
+
+    CFRelease(sampleBuffer);
+
+    // if you're using AVSampleBufferDisplayLayer, you only need to use this line of code
+    // [videoLayer enqueueSampleBuffer:sampleBuffer];
+}
+</code></pre>
+
+<p>If you're using <code>AVSampleBufferDisplayLayer</code>, be sure to init the layer like this, in viewDidLoad or inside some other init method.</p>
+
+<pre><code>-(void) viewDidLoad
+{
+    // create our AVSampleBufferDisplayLayer and add it to the view
+    videoLayer = [[AVSampleBufferDisplayLayer alloc] init];
+    videoLayer.frame = self.view.frame;
+    videoLayer.bounds = self.view.bounds;
+    videoLayer.videoGravity = AVLayerVideoGravityResizeAspect;
+
+    // set Timebase, you may need this if you need to display frames at specific times
+    // I didn't need it so I haven't verified that the timebase is working
+    CMTimebaseRef controlTimebase;
+    CMTimebaseCreateWithMasterClock(CFAllocatorGetDefault(), CMClockGetHostTimeClock(), &amp;controlTimebase);
+
+    //videoLayer.controlTimebase = controlTimebase;
+    CMTimebaseSetTime(self.videoLayer.controlTimebase, kCMTimeZero);
+    CMTimebaseSetRate(self.videoLayer.controlTimebase, 1.0);
+
+    [[self.view layer] addSublayer:videoLayer];
+}
+</code></pre>

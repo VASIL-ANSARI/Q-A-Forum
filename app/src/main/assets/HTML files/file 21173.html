@@ -1,0 +1,111 @@
+<p>First of all, use <code>ObservableCollection</code> instead of <code>List</code> since it implements <code>INotifyPropertyChanged</code> interface.</p>
+
+<p>As far as I understand your requirements, <code>PrimaryItem</code> class should has a property <code>SecondaryItems</code>. So remove it from <code>ViewModel</code> and paste to <code>PrimaryItem</code> class (as well as <code>SelectedSecondaryItem</code> property):</p>
+
+<pre><code>private ObservableCollection&lt;SecondaryItem&gt; _secondaryItems;
+public ObservableCollection&lt;SecondaryItem&gt; SecondaryItems
+{
+    get { return _secondaryItems; }
+    set { _secondaryItems = value; RaisePropertyChanged(); }
+}
+</code></pre>
+
+<p><em><strong>EDIT:</em></strong></p>
+
+<p>I've fully reproduced your situation and get it working.</p>
+
+<p><em>Classes:</em></p>
+
+<pre><code>public class PrimaryItem
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public List&lt;SecondaryItem&gt; SecondaryItems { get; set; }
+
+    private SecondaryItem _selectedSecondaryItem;
+    public SecondaryItem SelectedSecondaryItem
+    {
+        get { return _selectedSecondaryItem; }
+        set
+        {
+            _selectedSecondaryItem = value;
+
+            if (_selectedSecondaryItem != null)
+            { // My breakpoint here
+                //TO DO
+            }
+        }
+    }
+}
+
+public class SecondaryItem
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+</code></pre>
+
+<p><em>ViewModel:</em></p>
+
+<pre><code>public class MyViewModel : ViewModelBase
+{
+    private List&lt;PrimaryItem&gt; _primaryItems;
+    public List&lt;PrimaryItem&gt; PrimaryItems
+    {
+        get { return _primaryItems; }
+        set { _primaryItems = value; RaisePropertyChanged("PrimaryItems"); }
+    }
+
+    public ErrorMessageViewModel()
+    {
+        this.PrimaryItems = new List&lt;PrimaryItem&gt;
+            {
+                new PrimaryItem
+                    {
+                        SecondaryItems =
+                            new List&lt;SecondaryItem&gt;
+                                {
+                                    new SecondaryItem { Id = 1, Name = "First" },
+                                    new SecondaryItem { Id = 2, Name = "Second" },
+                                    new SecondaryItem { Id = 3, Name = "Third" }
+                                },
+                        Name = "FirstPrimary",
+                        Id = 1
+                    }
+            };
+    }
+}
+</code></pre>
+
+<p><em>View:</em></p>
+
+<pre><code>&lt;Window x:Class="TestApp.Views.MyView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="clr-namespace:TestApp.ViewModels;assembly=TestApp.ViewModels"
+    xmlns:my="http://schemas.microsoft.com/wpf/2008/toolkit"
+    Title="Title" Height="240" Width="270" ResizeMode="NoResize"
+    WindowStartupLocation="CenterOwner" WindowStyle="ToolWindow"&gt;
+&lt;Window.DataContext&gt;
+    &lt;vm:MyViewModel/&gt;
+&lt;/Window.DataContext&gt;
+&lt;Grid&gt;
+    &lt;ListBox ItemsSource="{Binding PrimaryItems}"&gt;
+        &lt;ListBox.ItemTemplate&gt;
+            &lt;DataTemplate&gt;
+                &lt;StackPanel&gt;
+                    &lt;TextBlock Text="{Binding Name}"/&gt;
+                    &lt;ListBox ItemsSource="{Binding SecondaryItems}" SelectedItem="{Binding SelectedSecondaryItem}" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"&gt;
+                        &lt;ListBox.ItemTemplate&gt;
+                            &lt;DataTemplate&gt;
+                                &lt;TextBlock Text="{Binding Name}"/&gt;
+                            &lt;/DataTemplate&gt;
+                        &lt;/ListBox.ItemTemplate&gt;
+                    &lt;/ListBox&gt;
+                &lt;/StackPanel&gt;
+            &lt;/DataTemplate&gt;
+        &lt;/ListBox.ItemTemplate&gt;
+    &lt;/ListBox&gt;
+&lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>

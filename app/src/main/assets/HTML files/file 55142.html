@@ -1,0 +1,7 @@
+<p>You can't "redirect" standard input from, or standard output to a function in your program.</p>
+
+<p>You can however create a pair of pipes and replace standard input and output with these pipes, and have another function (possibly in another thread or even a child process) use the other end of the pipes to communicate with the function.</p>
+
+<p>You can of course use e.g. <a href="http://en.cppreference.com/w/c/io/setvbuf" rel="nofollow"><code>setvbuf</code></a> to change the buffers of <code>stdin</code> and <code>stdout</code> to a pair of buffers you provide, then you can read directly from, or write directly to the buffers like any other memory buffer (i.e. array). Not that I recommend it though, it's frail and prone to errors.</p>
+
+<p>However in this case it seems like what you want is that all writing to <code>stdout</code> should go to the file. In that case (like the use of pipes) there is no standard C way of handling it, but you need to use operating system specific functionality. Then if you're on a POSIX platform (like Linux or OSX) you can tell the operating system to duplicate the underlying file descriptor for your file, and say that <code>STDOUT_FILNO</code> (which is the file descriptor used for <code>stdout</code>) is a duplicate for the file descriptor of the file you opened. Then all writes to <code>stdout</code> will be written to your file. For this you need to use <a href="http://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html" rel="nofollow">the <code>dup2</code> system call</a>.</p>

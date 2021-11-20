@@ -1,0 +1,22 @@
+<blockquote>
+  <p>To keep a coalesced access, I should shift the index for the array access by the number of threads I have. eg: Thread with ID 0 will access A[0] and A[0+32]. Am I right with this assumption?</p>
+</blockquote>
+
+<p>Yes, that's a correct approach.</p>
+
+<p>Strictly speaking it's not <em>should</em> but rather <em>could</em>: any memory access will be coalesced as long as all threads within a warp request addresses that fall within the same (aligned) 128 byte line. This means you could permute the thread indices and your accesses would still be coalesced (but why do complicated when you can do simple).</p>
+
+<p>Another solution would be to have each thread load an <code>int2</code>:</p>
+
+<pre><code>__global__ void co_acc ( int A[64], int B[64] ) {
+    int inx = threadIdx.x + (gridDim.x * blockDim.x);
+
+    reinterpret_cast&lt;int2*&gt;(B)[inx] = reinterpret_cast&lt;int2*&gt;(A)[inx];
+}
+</code></pre>
+
+<p>This is (in my opinion) simpler and clearer code, and <em>might</em> give marginally better performance as this may reduce the number of instructions emitted by the compiler and the latency between memory requests (disclaimer: I have not tried it).</p>
+
+<blockquote>
+  <p>Note: as Robert Crovella has mentioned in his comment, if you really are using thread blocks of 32 threads, then you are likely seriously underusing the capacity of your GPU.</p>
+</blockquote>

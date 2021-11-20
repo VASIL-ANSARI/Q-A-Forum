@@ -1,0 +1,41 @@
+<p>You can create a derivative that either extends or composes <strong>Doctrine_Cache_Memcache</strong>.  In the derivative you just modify the <em>id</em> by prepending the domain portion of the key before passing execution to <strong>Doctrine_Cache_Memcache</strong>.</p>
+
+<p>Here's an example to consider using inheritance, overriding the <strong>_doSave</strong> method; the other public members can be overridden in similar fashion.</p>
+
+<pre><code>&lt;?php
+class DomainCache extends Doctrine_Cache_Memcache
+{
+    private function _getDomain()
+    {
+        // this could pull from config, a database, it
+        // could even be hardcoded on a per-project basis - YMMV!
+    }
+
+    /**
+     * Given the normal id the application would use, prefix
+     * it with the appropriate domain.
+     */
+    private function _getDomainId($id)
+    {
+        return $this-&gt;_getDomain() . '_' . $id;
+    }
+
+    /**
+     * Save a cache record directly. This method is implemented by the cache
+     * drivers and used in Doctrine_Cache_Driver::save().
+     * Overridden such that a domain-specific key is used.
+     *
+     * @param string $id        cache id
+     * @param string $data      data to cache
+     * @param int $lifeTime     if != false, set a specific lifetime for this
+     *                          cache record (null =&gt; infinite lifeTime)
+     * @return boolean true if no problem
+     */
+    protected function _doSave($id, $data, $lifeTime = false)
+    {
+        return parent::_doSave($this-&gt;_getDomainId($id), $data, $lifeTime);
+    }
+}
+</code></pre>
+
+<p>If you're interested in composing <strong>Doctrine_Cache_Memcache</strong> for example suppose you'd like to extend whatever provides the real work for <strong>_getDomain</strong>, you would implement <strong>Doctrine_Class_Interface</strong> instead.</p>

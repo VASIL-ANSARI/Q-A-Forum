@@ -1,0 +1,245 @@
+<p>For each live cell, create a bit mask of adjacent live cells. Say you use the bits with values 1, 2, 4, and 8 for north, east, south and west. You get a set of 16 tiles:</p>
+
+<p><a href="http://i.stack.imgur.com/QGfDV.png" rel="nofollow"><img src="http://i.stack.imgur.com/QGfDV.png" alt="Sixteen tiles"></a></p>
+
+<p>If you just want to display the cells with a rounded outline, you can quickly copy the appropriate tile to your canvas or bitmap window. That should be reasonably fast, because the tiles are already rendered.</p>
+
+<p>If you really need the outline as a curve, create the dark red lines as curves for each tile. Note that the tiles <code>0101</code> and <code>1010</code> consist of two curves, the tile <code>1111</code> doesn't have a curve and the tile <code>0000</code> is a closed curve.</p>
+
+<p>Move the curve segments with an offset for the current cell to a list. All curves (except <code>0000</code>) have loose ends; these ends always lie on cell border intersections.</p>
+
+<p>Now you can create paths. Create a look-up table, maybe a hash, of all end points. Each end point should have two connected curve segments. Now pick a curve segment from the list. Its starting point is the starting point of the curve. Now look up the segment's end point and go to the next segment. Remove visited segments and add them to a path. Continue until you reach the
+starting point of the curve. Add the curve to a list. Repeat while there are still curve segments in the list.</p>
+
+<p>You should probably put cells without neighbours (<code>0000</code>) into the final curve list right away. You must also treat the two line segments of the <code>0101</code> and <code>1010</code> cells as separate segments.</p>
+
+<p><strong>Edit</strong>: I've cobbled together a proof-of-concept example in C that takes a randomly generated cell grid and creates a PostScript filem of the smooth rendering.</p>
+
+<p>The nomenclature is a bit inconsitent, I'm afraid, but there are basically four segment types: closed circles, spikes (or noses), quarter-circles and straight walls. These are rendered in clockwise fashion, so that the enclosed shape is always to the right of the curve.</p>
+
+<p>The PS rendering &ndash; the <code>path</code> field of <code>stype</code> &ndash; is made up of quarter-circles (<code>NE</code>, <code>SE</code>, <code>SW</code>, <code>NW</code>), of straight lines of the cell size (<code>N1</code>, <code>E1</code>, <code>S1</code>, <code>W1</code>) and of straight lines of half the cell size (<code>N2</code>, <code>E2</code>, <code>S2</code>, <code>W2</code>). Instead of using PS commands, you can render them as sequences of straight lines and cubic BÃ©zier curves, of course.</p>
+
+<p>Each segment also stores where the start and end corner of a cell is with the <code>NE</code>, <code>SE</code>, <code>SW</code> and <code>NW</code> enumeration.</p>
+
+<p>In addition to the cells, there is a list of segments and a grid of corners, which stores which segments are attached to a corner. A corner can only have no or two segments attached.</p>
+
+<p>The example has a size that is fixed a compile time to make life for the C programmer easier. Here goes:</p>
+
+<pre><code>#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define N 24
+
+#define die(...) exit((fprintf(stderr, __VA_ARGS__), 1))
+
+enum {NW, NE, SE, SW, NCORNER};
+
+static const int dx[NCORNER] = {0, 1, 1, 0};
+static const int dy[NCORNER] = {0, 0, 1, 1};
+
+struct stype {
+    const char *name;
+    int start;
+    int end;
+    const char *path;
+};
+
+#define STYPE(X)                            \
+    X(None,      -1, -1, "")                \
+    X(WallN,     NW, NE, "E1")              \
+    X(WallE,     NE, SE, "S1")              \
+    X(WallS,     SE, SW, "W1")              \
+    X(WallW,     SW, NW, "N1")              \
+    X(QuarterNE, SE, NW, "W2 SW N2")        \
+    X(QuarterSE, SW, NE, "N2 NW E2")        \
+    X(QuarterSW, NW, SE, "E2 NE S2")        \
+    X(QuarterNW, NE, SW, "S2 SE W2")        \
+    X(SpikeN,    NE, NW, "S2 SE SW N2")     \
+    X(SpikeE,    SE, NE, "W2 SW NW E2")     \
+    X(SpikeS,    SW, SE, "N2 NW NE S2")     \
+    X(SpikeW,    NW, SW, "E2 NE SE W2")     \
+    X(Circle,    NW, NW, "MM")
+
+#define STYPE_STRUCT(Name, S1, S2, P) {#Name, S1, S2, P},
+#define STYPE_ENUM(Name, S1, S2, P) Name,
+
+enum {STYPE(STYPE_ENUM) MAX_STYPE};
+static const struct stype stype[MAX_STYPE] = { STYPE(STYPE_STRUCT)};
+
+int ctype[16][3] = {
+  /*  0 */  {Circle,            None},
+  /*  1 */  {SpikeN,            None},
+  /*  2 */  {SpikeE,            None},
+  /*  3 */  {QuarterNE,         None},
+  /*  4 */  {SpikeS,            None},
+  /*  5 */  {WallW, WallE,      None},
+  /*  6 */  {QuarterSE,         None},
+  /*  7 */  {WallW,             None},
+  /*  8 */  {SpikeW,            None},
+  /*  9 */  {QuarterNW,         None},
+  /* 10 */  {WallN, WallS,      None},
+  /* 11 */  {WallS,             None},
+  /* 12 */  {QuarterSW,         None},
+  /* 13 */  {WallE,             None},
+  /* 14 */  {WallN,             None},
+  /* 15 */  {                   None},
+};
+
+struct seg {
+    int type;
+    int x;
+    int y;
+};
+
+struct pt {
+    int seg1;
+    int seg2;
+};
+
+int alive(int cell[N][N], int x, int y)
+{
+    if (x &lt; 0 || x &gt;= N) return 0;
+    if (y &lt; 0 || y &gt;= N) return 0;
+    return cell[y][x];
+}
+
+void addpt(struct pt *pt, int seg)
+{
+    if (pt-&gt;seg1 &lt; 0) {
+        pt-&gt;seg1 = seg;
+    } else if (pt-&gt;seg2 &lt; 0) {
+        pt-&gt;seg2 = seg;
+    } else {
+        die("Too many segments for point.\n");
+    }
+}
+
+int main(void)
+{
+    int cell[N][N];
+    int count = 0;
+    int i, x, y;
+
+    for (y = 0; y &lt; N; y++) {
+        for (x = 0; x &lt; N; x++) {
+            int r = 1 + abs(N/2 - x) + abs(N/2 - y);
+
+            cell[y][x] = (rand() / 4 &lt; RAND_MAX / r);
+            if (cell[y][x]) count++;
+        }
+    }
+
+    /* Create line segments */
+
+    struct seg seg[2 * count];
+    int nseg = 0;
+
+    for (y = 0; y &lt; N; y++) {
+        for (x = 0; x &lt; N; x++) {
+            int ix = 0;
+
+            if (cell[y][x] == 0) continue;         
+
+            if (alive(cell, x, y - 1)) ix |= 1;
+            if (alive(cell, x + 1, y)) ix |= 2;
+            if (alive(cell, x, y + 1)) ix |= 4;
+            if (alive(cell, x - 1, y)) ix |= 8;
+
+            int *p = ctype[ix];
+
+            while (*p != None) {
+                if (nseg &gt;= 2 * count) die("Segment overflow\n");
+
+                seg[nseg].x = x;
+                seg[nseg].y = y;
+                seg[nseg].type = *p++;
+                nseg++;
+            }
+        }
+    }
+
+    /* determine start and end points of segments */
+
+    struct pt pt[N + 1][N + 1];
+    memset(pt, -1, sizeof(pt));
+
+    for (i = 0; i &lt; nseg; i++) {
+        int tp = seg[i].type;
+        int s = stype[tp].start;
+        int e = stype[tp].end;
+
+        x = seg[i].x;
+        y = seg[i].y;
+
+        addpt(&amp;pt[y + dy[s]][x + dx[s]], i);
+        addpt(&amp;pt[y + dy[e]][x + dx[e]], i);
+    }
+
+    /* set up PostScript header */
+
+    puts("%!PS-Adobe 3.0");
+
+    puts("/A 10 def");
+    puts("/A2 A 2 mul def");
+    puts("/C { rcurveto } def");
+    puts("/L { rlineto } def");
+    puts("/START { newpath exch A2 mul exch A2 mul moveto } bind def");
+    puts("/END { closepath stroke } bind def");
+    puts("/MM { A 0 rmoveto NE SE SW NW } bind def");
+    puts("/NW { 0 A neg 0 A neg A A neg C } bind def");
+    puts("/NE { A 0 A 0 A A C } bind def");
+    puts("/SE { 0 A 0 A A neg A C } bind def");
+    puts("/SW { A neg 0 A neg 0 A neg A neg C } bind def");
+    puts("/N1 { 0 A2 neg L } bind def");
+    puts("/E1 { A2 0 L } bind def");
+    puts("/S1 { 0 A2 L } bind def");
+    puts("/W1 { A2 neg 0 L } bind def");
+    puts("/N2 { 0 A neg L } bind def");
+    puts("/E2 { A 0 L } bind def");
+    puts("/S2 { 0 A L } bind def");
+    puts("/W2 { A neg 0 L } bind def");
+
+    puts("57 180 translate");
+
+    /* walk segments */
+
+    for (i = 0; i &lt; nseg; i++) {
+        struct seg *s = seg + i;
+
+        if (s-&gt;type == None) continue;
+
+        int x0 = s-&gt;x + dx[stype[s-&gt;type].start];
+        int y0 = s-&gt;y + dy[stype[s-&gt;type].start];
+        int j = i;
+
+        x = s-&gt;x + dx[stype[s-&gt;type].end];
+        y = s-&gt;y + dy[stype[s-&gt;type].end];
+
+        printf("%d %d START", x0, y0);
+
+        for (;;) {
+            printf(" %s", stype[s-&gt;type].path);
+
+            s-&gt;type = None;
+            if (x == x0 &amp;&amp; y == y0) break;
+
+            if (pt[y][x].seg1 == j) {
+                j = pt[y][x].seg2;
+            } else {
+                j = pt[y][x].seg1;
+            }
+
+            s = seg + j;
+            x = s-&gt;x + dx[stype[s-&gt;type].end];
+            y = s-&gt;y + dy[stype[s-&gt;type].end];
+        }      
+
+        puts(" END");        
+    }
+
+    puts("showpage");       
+
+    return 0;
+}
+</code></pre>

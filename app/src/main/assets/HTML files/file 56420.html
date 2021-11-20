@@ -1,0 +1,28 @@
+<p>You don't have to serialize <em>just</em> the user id in <code>serializeUser</code>, it can also be an object that contains (for instance) the admin status (from your database contents, it looks like <code>cust_code</code> only exists for regular users, so we can use that to check if a user is an admin or not):</p>
+
+<pre><code>passport.serializeUser(function(user, done) {
+  done(null, {
+    id      : user.id,
+    isAdmin : user.cust_code === undefined // this does require that `cust_code`
+                                           // is defined for all regular users.
+  });
+});
+</code></pre>
+
+<p>This obviously assumes that the <code>user</code> document contains <em>something</em> that reflects if the user is an admin or not.</p>
+
+<p>Using that object in <code>deserializeUser</code> you can determine which table to query:</p>
+
+<pre><code>passport.deserializeUser(function(user, done) {
+  var table = user.isAdmin ? 'users' : 'register';
+  connection.query('select * from ?? where id = ?', [ table, user.id ], function(err, rows) {
+    if (err) {
+      return done(err);
+    } else if (! Array.isArray(rows) || ! rows.length) {
+      return done();
+    } else {
+      return done(null, rows[0]);
+    }
+  });
+}); 
+</code></pre>

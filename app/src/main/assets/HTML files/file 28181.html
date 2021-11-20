@@ -1,0 +1,57 @@
+<p>Passing a pointer to <code>base_all&lt;U...&gt;</code> merely requires the existence of a declaration of <code>base_all&lt;U...&gt;</code>. Without attempting the to access the definition, the compiler won't detect that the type is actually ill-defined. One approach to mitigate that problem would be to use an argument which requires a definition of <code>base_all&lt;U...&gt;</code>, e.g.:</p>
+
+<pre><code>template&lt; class ...T&gt; struct base_all
+   : id&lt;T&gt; ...
+{
+    typedef int type;
+};
+// ...
+template&lt; class ... U&gt;
+static constexpr bool test(typename base_all&lt;U...&gt;::type) noexcept
+{
+    return true;
+}
+</code></pre>
+
+<p>Although the above answers the question, it fail to compile: the multiple inheritance created isn't in a suitable context to be considered for SFINAE. I don't think you can leverage the rule on not allowing the same base inherited from twice. The relevant test can be implemented differently, though:</p>
+
+<pre><code>#include &lt;type_traits&gt;
+
+template &lt;typename...&gt;
+struct is_one_of;
+
+template &lt;typename F&gt;
+struct is_one_of&lt;F&gt;
+{
+    static constexpr bool value = false;
+};
+
+template &lt;typename F, typename S, typename... T&gt;
+struct is_one_of&lt;F, S, T...&gt;
+{
+    static constexpr bool value = std::is_same&lt;F, S&gt;::value
+        || is_one_of&lt;F, T...&gt;::value;
+};
+
+template &lt;typename...&gt;
+struct is_unique;
+
+template &lt;&gt;
+struct is_unique&lt;&gt; {
+    static constexpr bool value = true;
+};
+
+template&lt;typename F, typename... T&gt;
+struct is_unique&lt;F, T...&gt;
+{
+    static constexpr bool value = is_unique&lt;T...&gt;::value
+        &amp;&amp; !is_one_of&lt;F, T...&gt;::value;
+};
+
+int main()
+{
+    constexpr bool b = is_unique&lt;int, float, double&gt;::value;
+    constexpr bool c = is_unique&lt; int, char, int&gt;::value;
+    static_assert( b == true &amp;&amp; c == false , "!");
+}
+</code></pre>

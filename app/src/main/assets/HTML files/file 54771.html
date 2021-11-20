@@ -1,0 +1,28 @@
+<p>Finally, I was able to make it work. First, I fixed the linker issues, as suggested by Dan. It finally compiled but I still got:</p>
+
+<pre><code>ImportError: libboost_python.so.1.55.0: cannot open shared object file: No such file or directory
+</code></pre>
+
+<p>The problem was that the python module was not able to load correctly so I needed to add another linker option. Here, I report the final Makefile:</p>
+
+<pre><code># location of the Python header file
+PYTHON_VERSION = 2.7
+PYTHON_INCLUDE = /usr/include/python$(PYTHON_VERSION)
+
+# location of the Boost Python include files and library
+
+BOOST_INC = ${HOME}/boost/include
+BOOST_LIB = ${HOME}/boost/lib
+
+# compile mesh classes
+TARGET = hello_ext
+
+$(TARGET).so: $(TARGET).o
+    g++ -shared -Wl,-rpath,$(BOOST_LIB) -Wl,--export-dynamic $(TARGET).o -L$(BOOST_LIB) -lboost_python -L/usr/lib/python$(PYTHON_VERSION)/config -lpython$(PYTHON_VERSION) -o $(TARGET).so
+
+$(TARGET).o: $(TARGET).C
+    g++ -I$(PYTHON_INCLUDE) -I$(BOOST_INC) -fPIC -c $(TARGET).C
+</code></pre>
+
+<p>Notice the <strong>-Wl,-rpath,</strong> option, which apparently makes the new created shared library available to the python script.<br>
+@Dan: Thanks for the valuable hints.</p>

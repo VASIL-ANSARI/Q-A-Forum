@@ -1,0 +1,46 @@
+<p>Something like this:</p>
+
+<pre><code>WITH n(portefeuille, client, lvl, opcvm, ca, iter) AS (
+  SELECT  portefeuille,
+          client,
+          0,
+          opcvm,
+          ca,
+          ',' || portefeuille
+  FROM    dbo.chiffres
+  WHERE   opcvm is null 
+UNION ALL
+  SELECT  m.portefeuille,
+          n.client,
+          n.lvl+1,
+          m.opcvm,
+          m.ca+n.ca,
+          iter || m.portefeuille || ','
+FROM      dbo.chiffres m
+          inner join n
+          on n.portefeuille = m.opcvm
+)
+select distinct
+       n.lvl,
+       n.client,
+       n.portefeuille,
+       n.ca ,
+       n.opcvm,
+       iter,
+       ( SELECT COUNT(*)
+                FROM n T1
+                WHERE T1.iter LIKE '%,' || n.portefeuille || ',%'
+       ) - 1 AS Subordinates
+from   n,
+       dbo.chiffres c
+where ((SELECT COUNT(*) FROM n T1 WHERE T1.iter LIKE '%,' || n.portefeuille || ',%') - 1) = 0
+order by lvl
+</code></pre>
+
+<p>I haven't got any tables to test it on but I've</p>
+
+<ul>
+<li>renamed <code>level</code> to <code>lvl</code> (as <code>level</code> is a keyword used in hierarchical queries).</li>
+<li>The string concatenation operator is <code>||</code> in Oracle rather than <code>+</code>.</li>
+<li>Removed all the casts - I don't think you need them.</li>
+</ul>

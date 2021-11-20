@@ -1,0 +1,25 @@
+<p>This is starting to sound like you're having two applications (contexts) in the container with the same log configuration - they're going to step on each other - almost guaranteed.</p>
+
+<p>That may explain why your log rolling behavior is so erratic.</p>
+
+<p>There is no simple/easy fix for this. You can investigate external rolling mechanisms like logrotate (if you're hosting on a unix system) as an option.</p>
+
+<p>You might be able to utilize a combination of logback+slf4j to accomplish a way around this though.  Slf4j provides a plug for plug re-route library to subvert log4j based logging.  I have used this to replace log4j with logback+slf4j in an application and managed to make sure that dependent libraries (which were written against log4j) still operate properly.</p>
+
+<p>Additionally, you may be able to utilize logback's <a href="http://logback.qos.ch/manual/loggingSeparation.html#contextSelectors" rel="nofollow">context selector</a> to determine what/when log files are rotated.</p>
+
+<p>Without providing separate application deployments, your log4j configuration is going to conflict between the two apps and result in the behavior you are seeing.</p>
+
+<p><strong>EDIT</strong> Based on questions/commentary by OP, the following should provide a way to accomplish the context based selection.</p>
+
+<p>With regard to your situation, that it is one application deployed under two contexts, try doing the following from the server.xml.  It will provide an Environment entry into the JNDI tree for the deployed context.</p>
+
+<pre><code>&lt;Context docBase="application.war" path="/firstApplication" reloadable="true"&gt;
+    &lt;Environment name="logback/context-name" value="firstApplication" type="java.lang.String" /&gt;
+&lt;/Context&gt;
+&lt;Context docBase="application.war" path="/secondApplication" reloadable="true"&gt;
+    &lt;Environment name="logback/context-name" value="secondApplication" type="java.lang.String" /&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<p>At this point, you should be able follow the documentation based on the context selector.</p>

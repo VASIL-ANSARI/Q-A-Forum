@@ -1,0 +1,49 @@
+<p>There are a couple of issues with your code:</p>
+
+<ol>
+<li><p>You pass a wrong address to <code>munmap</code> in:</p>
+
+<pre><code>list_data* list_shmem;
+list_shmem = (list_data *) mmap(...);
+
+for (uiCounter = DEFAULT_VALUE_ZERO; uiCounter &lt; 10; ++uiCounter)
+{
+    memcpy ( list_shmem, &amp;item[uiCounter], sizeof(person) );
+    ++list_shmem; // &lt;---- invalidates list_shmem original value
+}
+
+munmap(list_shmem, sizeof(list_data) * 10);
+</code></pre></li>
+<li><p>You specify wrong size to <code>memcpy</code> in:</p>
+
+<pre><code>memcpy ( list_shmem, &amp;item[uiCounter], sizeof(person) );
+</code></pre>
+
+<p>A fix is:</p>
+
+<pre><code>memcpy ( list_shmem, &amp;item[uiCounter], sizeof(item[uiCounter]) );
+</code></pre></li>
+</ol>
+
+<hr>
+
+<p>One fix for both issues would be to use standard algorithm <a href="http://en.cppreference.com/w/cpp/algorithm/copy" rel="nofollow"><code>std::copy</code></a> instead of the hand-coded loop:</p>
+
+<pre><code>    std::copy(item + DEFAULT_VALUE_ZERO, item + 10, list_shmem);
+</code></pre>
+
+<hr>
+
+<p>Bonus point:</p>
+
+<pre><code>list_data item[10]; // struct size is 767 bytes
+for (uiCounter=DEFAULT_VALUE_ZERO; uiCounter &lt; 10; ++uiCounter)
+{
+    memset(&amp;item[uiCounter], 0, sizeof(list_data));
+}  
+</code></pre>
+
+<p>Is the same as:</p>
+
+<pre><code>list_data item[10] = {}; 
+</code></pre>

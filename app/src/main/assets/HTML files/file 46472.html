@@ -1,0 +1,57 @@
+<p>You can use 800x600 only if your camera supports it. My camera for example doesn't.</p>
+
+<p>Find available resolutions:</p>
+
+<pre><code>uint[] x_res; // available horizontal resolutions
+uint[] y_res; // available vertical resolutions
+uint resolutionwidth; //used horizontal resolution
+uint resolutionheight; //used vertical resolution
+
+private void get_res_button_click(object sender, RoutedEventArgs e)
+{
+    resolution_listbox.Items.Clear();
+    IEnumerable&lt;VideoEncodingProperties&gt; available_resolutions = captureManager.VideoDeviceController.GetAvailableMediaStreamProperties(MediaStreamType.Photo).Select(x =&gt; x as VideoEncodingProperties);
+    int total_res = available_resolutions.Count();
+    x_res = new uint[total_res];
+    y_res = new uint[total_res]
+    int i = 0;
+    foreach (VideoEncodingProperties resolution in available_resolutions)
+    {
+        x_res[i] = resolution.Width;
+        y_res[i] = resolution.Height;
+        resolution_listbox.Items.Add(x_res[i].ToString() + "  x  " + y_res[i].ToString());
+        i++;
+    }
+}
+</code></pre>
+
+<p>Select the one you want:</p>
+
+<pre><code>private async void resolution_listbox_selectionchanged(object sender, SelectionChangedEventArgs e)
+{
+    if (resolution_listbox.SelectedItem != null)
+    {
+        int j = resolution_listbox.SelectedIndex;
+        resolutionwidth = x_res[j];
+        resolutionheight = y_res[j];
+    }
+// And apply it:
+    IReadOnlyList&lt;IMediaEncodingProperties&gt; resolutions = captureManager.VideoDeviceController.GetAvailableMediaStreamProperties(MediaStreamType.Photo);
+    for (int k = 0; k &lt; resolutions.Count; k++)
+    {
+        if (resolutions[k] is VideoEncodingProperties)
+        {
+            VideoEncodingProperties vidprops = (VideoEncodingProperties)resolutions[k];
+            // check which VideoEncodingProperties contains the correct resolution
+            if (vidprops.Width == resolutionwidth &amp;&amp; vidprops.Height == resolutionheight)
+            {
+                await captureManager.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.Photo, resolutions[k]);
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>Note:in the 1st method I used <em>IEnumerable&lt; VideoEncodingProperties ></em> . This because I only want the numbers.</p>
+
+<p>In the 2nd method I used <em>IReadOnlyList&lt; IMediaEncodingProperties ></em>. This is because only the <em>VideoEncodingProperties</em> which contains the wanted resolution, needs to be applied. Not every <em>IMediaEncodingProperties</em> contains resolution information.</p>

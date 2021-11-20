@@ -1,0 +1,53 @@
+<p>The short answer is: yes, that's a bug. I've put a minimal repro and a short analysis below.</p>
+
+<p>My apologies. I wrote a lot of that code and so it was likely my bad.</p>
+
+<p>I have sent a repro off to the Roslyn development, test and program management teams. I doubt this reproduces in Roslyn, but they'll verify that it does not and decide whether this makes the bar for a C# 5 service pack. </p>
+
+<p>Feel free to enter an issue on connect.microsoft.com as well if you want it tracked there as well. </p>
+
+<hr>
+
+<p>Minimal repro:</p>
+
+<pre><code>using System;
+using System.Linq.Expressions;
+struct S&lt;T&gt;
+{
+    public static bool operator ==(S&lt;T&gt; a, S&lt;T&gt; b) { return false; }
+    public static bool operator !=(S&lt;T&gt; a, S&lt;T&gt; b) { return false; }
+}
+class Program
+{
+    static void Main()
+    {
+        Expression&lt;Func&lt;S&lt;int&gt;?, S&lt;int&gt;, bool&gt;&gt; x = (a, b) =&gt; a == b;
+    }
+}
+</code></pre>
+
+<hr>
+
+<p>The code that is generated in the minimal repro is equivalent to</p>
+
+<pre><code>ParameterExpression pa = Expression.Parameter(typeof(S&lt;int&gt;?), "a");
+ParameterExpression pb = Expression.Parameter(typeof(S&lt;int&gt;), "b");
+Expression.Lambda&lt;Func&lt;S&lt;int&gt;?, S&lt;int&gt;, bool&gt;&gt;(
+    Expression.Equal(pa, pb, false, infoof(S&lt;int&gt;.op_Equality)
+    new ParameterExpression[2] { pa, pb } );
+</code></pre>
+
+<p>Where <code>infoof</code> is a fake operator that gets a <code>MethodInfo</code> for the given method.</p>
+
+<p>The correct code would be:</p>
+
+<pre><code>ParameterExpression pa = Expression.Parameter(typeof(S&lt;int&gt;?), "a");
+ParameterExpression pb = Expression.Parameter(typeof(S&lt;int&gt;), "b");
+Expression.Lambda&lt;Func&lt;S&lt;int&gt;?, S&lt;int&gt;, bool&gt;&gt;(
+    Expression.Equal(pa, Expression.Convert(pb, typeof(S&lt;int&gt;?), false, infoof(S&lt;int&gt;.op_Equality)
+    new ParameterExpression[2] { pa, pb } );
+</code></pre>
+
+<p>The <code>Equal</code> method cannot deal with one nullable, one non-nullable operands. It requires that either both are nullable or neither is. </p>
+
+<p>(Note that the <code>false</code> is correct. This Boolean controls whether the result of a lifted equality is a lifted Boolean; in C# it is not, in VB it is.)</p>

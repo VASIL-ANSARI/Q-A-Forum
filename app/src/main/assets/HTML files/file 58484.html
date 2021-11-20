@@ -1,0 +1,77 @@
+<p>You are right, each disposable component are disposed the reverse order they have been created. </p>
+
+<p>Each <code>ILifetimeScope</code> have a <code>IDisposer</code> (<a href="https://github.com/autofac/Autofac/blob/41aa4dd2117c913fd244c2a09186db5867a12bf3/src/Autofac/Core/IDisposer.cs" rel="nofollow">disposer.cs</a>) instance which tracks instances of all <code>IDisposable</code> objects for its scope. </p>
+
+<pre><code>/// &lt;summary&gt;
+/// Provided on an object that will dispose of other objects when it is
+/// itself disposed.
+/// &lt;/summary&gt;
+public interface IDisposer : IDisposable
+{
+    /// &lt;summary&gt;
+    /// Adds an object to the disposer. When the disposer is
+    /// disposed, so will the object be.
+    /// &lt;/summary&gt;
+    /// &lt;param name="instance"&gt;The instance.&lt;/param&gt;
+    void AddInstanceForDisposal(IDisposable instance);
+}
+</code></pre>
+
+<p>Default implementation of <code>IDisposer</code> (<a href="https://github.com/autofac/Autofac/blob/41aa4dd2117c913fd244c2a09186db5867a12bf3/src/Autofac/Core/Disposer.cs" rel="nofollow">disposer.cs</a>) uses a <code>Stack&lt;IDisposable&gt;</code>, the <code>Dispose</code> method is called by the <code>Dispose</code> method of the <code>ILifetimeScope</code> and 'pop' the stack. </p>
+
+<pre><code>/// &lt;summary&gt;
+/// Releases unmanaged and - optionally - managed resources
+/// &lt;/summary&gt;
+/// &lt;param name="disposing"&gt;
+///   &lt;c&gt;true&lt;/c&gt; to release both managed and unmanaged resources; 
+///   &lt;c&gt;false&lt;/c&gt; to release only unmanaged resources.
+/// &lt;/param&gt;
+protected override void Dispose(bool disposing)
+{
+    if (disposing)
+    {
+        lock (_synchRoot)
+        {
+            while (_items.Count &gt; 0)
+            {
+                var item = _items.Pop();
+                item.Dispose();
+            }
+            _items = null;
+        }
+    }
+    base.Dispose(disposing);
+}
+</code></pre>
+
+<p>The <code>AddInstanceForDisposal</code> is called just after the instanciation of the component. See the <code>Activate</code> method of the <code>InstanceLookup</code> (<a href="https://github.com/autofac/Autofac/blob/db0d058b5b58a99c80928e9ad46142271ad0f64e/src/Autofac/Core/Resolving/InstanceLookup.cs" rel="nofollow">InstanceLookup.cs</a>]</p>
+
+<pre><code>private object Activate(IEnumerable&lt;Parameter&gt; parameters)
+{
+    ComponentRegistration.RaisePreparing(this, ref parameters);
+
+    try
+    {
+        _newInstance = ComponentRegistration.Activator.ActivateInstance(this, parameters);
+    }
+    catch (Exception ex)
+    {
+        throw new DependencyResolutionException(ex);
+    }
+
+    if (ComponentRegistration.Ownership == InstanceOwnership.OwnedByLifetimeScope)
+    {
+        // The fact this adds instances for disposal agnostic of the activator is
+        // important. The ProvidedInstanceActivator will NOT dispose of the provided
+        // instance once the instance has been activated - assuming that it will be
+        // done during the lifetime scope's Disposer executing.
+        var instanceAsDisposable = _newInstance as IDisposable;
+        if (instanceAsDisposable != null)
+            _activationScope.Disposer.AddInstanceForDisposal(instanceAsDisposable);
+    }
+
+    ComponentRegistration.RaiseActivating(this, parameters, ref _newInstance);
+
+    return _newInstance;
+}
+</code></pre>

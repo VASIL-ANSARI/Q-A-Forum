@@ -1,0 +1,97 @@
+<p>Your question is extremely broad and as @doogle mentioned in the comment, Abstract classes and interfaces aren't necessarily tied to a specific type of project, but are based on your design.  </p>
+
+<p>Without knowing the design of your eCommerce or store management applications, it is impossible to give you any specific help, but in reading one of your earlier questions, it looks like you might be trying to understand how abstract classes and interfaces might be able to help you, so here is a basic example of something that might point you in the right direction.</p>
+
+<p>In a hypothetical store you have thousands of different products and you want to track them in your application.  There are obviously things common to all products, like manufacturer, price, department, quantity, but also pieces of information that might only be applicable to specific products (clothing would have a size, but a DVD wouldn't).</p>
+
+<p>A solution might be to create a <code>Product</code> interface that would be common to all Products but allow each class to implement the interface and add their own Properties.  Now you can guarantee that any product class would have, at minimum, these common members.</p>
+
+<p>Here's a hypothetical Product interface:</p>
+
+<pre><code>public interface IProduct
+{
+    decimal SellingPrice { get; set; }
+    decimal StoreCost { get; set; }
+    int QuantityOnHand { get; set; }
+
+    string Manufacturer { get; set; }
+    string DepartmentName { get; set; }
+
+    decimal CalculateProfit();
+}
+</code></pre>
+
+<p>Then you could create an abstract class that implements <code>IProduct</code>.  Here's a clothing product that implements <code>IProduct</code> but also adds a <code>Size</code> field</p>
+
+<pre><code>public abstract class ClothingProduct : IProduct
+{
+    public string Size { get; set; }
+
+    public decimal SellingPrice { get; set; }
+    public decimal StoreCost { get; set; }
+    public int QuantityOnHand { get; set; }
+    public string Manufacturer { get; set; }
+    public string DepartmentName { get; set; }
+
+    // by marking CalculateProfits abstract, you can let every class that inherits
+    //  from ClothingProduct decide how to calculate the profit based on the selling
+    //  costs of that product
+    public abstract decimal CalculateProfit(); 
+}
+</code></pre>
+
+<p>Now that you have a <code>ClothingProduct</code> class, you could then go and create classes for some of the items in the store.  Here's a Shoes and Shirt class:</p>
+
+<pre><code>public class Shirt : ClothingProduct
+{
+    public override CalculateProfit()
+    {
+        return this.SellingPrice - this.StoreCost - this.CalculateSellingCosts();
+    }
+
+    private decimal CaclulateSellingCosts()
+    {
+        // some code that would let you calculate the selling costs and
+        //  overhead costs associated with this specific product
+    }
+}
+
+public class Shoes : ClothingProduct
+{
+    private const decimal commissionRate = 0.05;
+
+    public override CalculateProfit()
+    {
+        return this.SellingPrice - this.StoreCost - this.CalculateSellingCosts() - this.CalculateCommission();
+    }
+
+    private decimal CaclulateSellingCosts()
+    {
+        // some code that would let you calculate the selling costs and
+        //  overhead costs associated with this specific product
+    }
+
+    private decimal CalculateCommission()
+    {
+        return this.SellingPrice * commissionRate;
+    }
+}
+</code></pre>
+
+<p>In the end, both <code>Shoes</code> and <code>Shirt</code> are <code>IProducts</code> because they inherit from <code>ClothingProduct</code> which in turn implements <code>IProduct</code>.</p>
+
+<p>Could you create other classes or abstract classes for other products throughout the store, but as long as the implement <code>IProduct</code>, you can guarantee that they would have all of the Properties that are part of <code>IProduct</code>.</p>
+
+<p>Where this helps is you could even create a collection of your interface types and add all products to it since the all implement <code>IProduct</code></p>
+
+<pre><code>// a hypothetical method that grabs everything  (maybe from a database)
+List&lt;IProduct&gt; products = GetAllProducts(); 
+
+// this query would give you the total number of items in your inventory
+var totalItems = products.Select(quant =&gt; quant.QuantityOnHand).Sum();
+
+// and this would calculate the total value of the products based on the store's cost
+var totalCost =  products.Select(quant =&gt; quant.StoreCost).Sum();
+</code></pre>
+
+<p>The 2 queries are just contrived examples as it would just as easy to do this in the database (if that is where everythign is store), but I just did it to give you an example of how tying all related items back to a single interface can help</p>

@@ -1,0 +1,15 @@
+<p>Your current parser will just give you a flat list of parsed tokens, since that is the default in pyparsing. The purpose is so that, regardless of how you build up your parser, whether in smaller pieces and then put them all together, or just in one giant statement, the tokens you get from parsing are structured (or not structured) the same. To get something akin to an AST, you need to define where you want structure using pyparsing's Group class (and I recommend using results names as well).  So for example if you change statement to:</p>
+
+<pre><code>statement = Group(ident("lhs") + '=' + Group(expr)("rhs"))
+</code></pre>
+
+<p>Then your output will be much more predictable - every parsed statement will have 3 top-level elements - the target identifier (addressable as result.lhs), the '=' operator, and the source expression (addressable as result.rhs).  The source expression may have further structure to it, but overall there will always be these 3 at the top-most level in every statement.</p>
+
+<p>To ensure the parenthetical groups in your RHS expression are retained when evaluating your expr, again, use a Group:</p>
+
+<pre><code>atom = (integer | Group(lpar + expr + rpar))
+</code></pre>
+
+<p>You can navigate the hierarchical structure of the parsed results as if you were walking a list of nested lists.</p>
+
+<p>But I would also encourage you to look at the <a href="http://pyparsing.wikispaces.com/file/view/simpleBool.py/451074414/simpleBool.py" rel="nofollow">SimpleBool example on the pyparsing wiki</a>. In this example, the various parsed expressions get rendered into instances of classes which then can be processed using a visitor or just an iterator, and each class can then implement its own special logic for emitting your bytecode.  Imagine that you had written a typical parser to generate an AST, then walked the AST to create CodeGenerator objects which subclass into AssignmentCodeGenerator or IfCodeGenerator or PrintCodeGenerator classes, and then walked this structure to create your bytecode. Instead, you can define assignment, if-then-else, or print statement expressions in pyparsing, have pyparsing create the classes directly, and then walk the classes to create the bytecode. In the end, your code is neatly organized into different statement types, and each type encapsulates the type of bytecode that it should output.</p>

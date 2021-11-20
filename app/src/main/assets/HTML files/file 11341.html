@@ -1,0 +1,162 @@
+<p>I use an int to pull the record from the dbase.</p>
+
+<p>From my ContactView class</p>
+
+<pre><code>static long record = 1;
+
+public void getData() {
+
+    DBase db = new DBase(this);
+    db.open();
+    lastRecord = db.lRec();
+    firstRecord = db.fRec();
+    rRec = db.getRec(record);
+    db.close();
+
+}
+</code></pre>
+
+<p>then my query is from my Dbase class</p>
+
+<pre><code>public String[] getRec(long record) {
+
+    record = ContactView.record;
+
+    String[] columns = new String[] { KEY_ROWID, KEY_ONE, KEY_TWO,
+            KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX };
+    Cursor c = ourDatabase.query(DATABASE_TABLE, columns, KEY_ROWID + "="
+            + record, null, null, null, null);
+    if (c != null &amp;&amp; c.moveToFirst()) {
+        String rRec = c.getString(0);
+        String rOne = c.getString(1);
+        String rTwo = c.getString(2);
+        String rThree = c.getString(3);
+        String rFour = c.getString(4);
+        String rFive = c.getString(5);
+        String rSix = c.getString(6);
+
+        String[] rData = { rRec, rOne, rTwo, rThree, rFour,
+                rFive, rSix };
+
+        return rData;
+
+    }
+    return null;
+}
+</code></pre>
+
+<p>and the next few are from my ContactView class</p>
+
+<p>my buttons</p>
+
+<pre><code>@Override
+public void onClick(View arg0) {
+
+    switch (arg0.getId()) {
+    case R.id.bSQLvPrev:
+
+        recordMinus();
+        display();
+
+        break;
+    case R.id.bSQLvNext:
+
+        recordPlus();
+        display();
+
+        break;
+
+    }
+}
+</code></pre>
+
+<p>and the methods they call</p>
+
+<pre><code>public void display() {
+
+    etSQLvRec.setText(rRec[0]);
+    etSQLvOne.setText(rRec[1]);
+    etSQLvTwo.setText(rRec[2]);
+    etSQLvThree.setText(rRec[3]);
+    etSQLvFour.setText(rRec[4]);
+    etSQLvFive.setText(rRec[5]);
+    etSQLvSix.setText(rRec[6]);
+}
+
+public void recordPlus() {
+        record++;
+
+    }
+
+public void recordMinus() {
+        record--;
+    }
+</code></pre>
+
+<p>That will get the record from the database based on the "record" variable, and the buttons increment it, or decrement it, it also skips any "empty" records.</p>
+
+<p>EDIT OK, I had changed some stuff around since I lasted used my db, so use the next recordPlus() and recordMinus() code instead</p>
+
+<pre><code>public void recordPlus() {
+    if (record &lt; lastRecord) {
+        record++;
+    } else {
+        record = firstRecord;
+    }
+    getData();
+
+    do {
+        if (record &lt; lastRecord) {
+            record++;
+        } else {
+            record = firstRecord;
+        }
+        getData();
+    } while (rRec == null);
+}
+
+public void recordMinus() {
+    if (record == 1) {
+        record = lastRecord;
+    } else {
+        record--;
+    }
+    getData();
+
+    do {
+        if (record == 1) {
+            record = lastRecord;
+        } else {
+            record--;
+        }
+        getData();
+    } while (rRec == null);
+}
+</code></pre>
+
+<p>And you'll need my fRec() and lRec() which find the first and last records in the DB</p>
+
+<pre><code>public long fRec() {
+
+    Cursor c = ourDatabase.query(DATABASE_TABLE, new String[] { "min(" + 
+    KEY_ROWID
+            + ")" }, null, null, null, null, null);
+    c.moveToFirst();
+    long rowID = c.getInt(0);
+
+    return rowID;
+}
+
+}
+
+public long lRec() {
+
+    long lastRec = 0;
+    String query = "SELECT ROWID from Table order by ROWID DESC limit 1";
+    Cursor c = ourDatabase.rawQuery(query, null);
+    if (c != null &amp;&amp; c.moveToFirst()) {
+        lastRec = c.getLong(0);
+    }
+    return lastRec;
+}
+</code></pre>

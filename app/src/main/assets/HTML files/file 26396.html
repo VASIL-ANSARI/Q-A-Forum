@@ -1,0 +1,78 @@
+<p>I'm fairly confident this is something along the lines of what was intended for this assignment. Note the use of a by-address pointer parameter (i.e. a pointer-to-pointer) for remembering where the stack top is. Double pointers are a little daunting the first time you really use them, and honestly this is a really poor example of how one should be used.</p>
+
+<p>Note that with a ptr-to-ptr the only real use for the array base is to test the limits of how many elements you already have. As I said, a little pointless.</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;math.h&gt;
+
+#define STACK_SIZE  10
+
+#define STACK_FULL   -2
+#define STACK_EMPTY -1
+#define NORMAL          0
+
+int push(double stack[], double value, double **top, int sizemax)
+{
+    if (*top - stack &lt; sizemax)
+    {
+        **top = value;
+        ++*top;
+        return NORMAL;
+    }
+    return STACK_FULL;
+}
+
+int pop(double stack[], double **top, double *result)
+{
+    if (*top - stack &gt; 0)
+    {
+        --*top;
+        *result = **top;
+        return NORMAL;
+    }
+    return STACK_EMPTY;
+}
+
+
+int main()
+{
+    double s[STACK_SIZE];
+    double *s_top = s;
+    double randNum = 0;
+    double i = 0;
+
+    srand((unsigned)time(NULL));
+
+    for (i = 0; i &lt; STACK_SIZE; i++)
+    {
+        randNum = 33 + (double)(rand() % ((126-33)+ 1 ));
+        printf("Random value: %f\n", randNum);
+        push(s, randNum, &amp;s_top, STACK_SIZE);
+    }
+
+    printf("-----------\n");
+
+    while (pop(s, &amp;s_top, &amp;randNum) != STACK_EMPTY)
+        printf("Random value: %f\n", randNum);
+
+    return 0;
+}
+</code></pre>
+
+<p>Doing it like this is heavily prone to errors, since you can pass any value you like for the stack top, even something that was never initialized with the base-address of <code>s[]</code>. It would be <em>much</em> better to use an <code>int</code> offset (by address, of course) than a double pointer. Thus one of the reasons I said it was a poor fit for this assignment.</p>
+
+<hr>
+
+<p>Regarding your posted code. I could tear it up, but its obvious you're not comfortable with pointer arithmetic or ptr-to-ptr situations (especially in assignments where they're a poor fit, I imagine). Some things bear noting, however.</p>
+
+<ol>
+<li><p>Anytime you see yourself doing this: <code>&amp;(*(var))</code> you know something isn't right. It is both incorrect and won't compile. Interesting to note that the <em>opposite</em> order is not undefined, but is rather pointless: <code>*(&amp;(var))</code> is equivalent to <code>var</code>.</p></li>
+<li><p>All these functions should either return state or values. Note the change I made to pop. Also, normally one has functions like <code>empty()</code> and <code>top()</code> for stacks, queues, lists, etc. A proper return value is what allows me to write the final <code>while-loop</code> the way it is defined in the above code.</p></li>
+<li><p>Pay attention to your <code>printf()</code> specifiers. You never changed yours when you text-replaced all "char" with "double" (which wasn't going to work anyway) and were therefore sending a <code>double</code> to <code>printf()</code> where it expected an integer type. It won't crash, but it certainly also won't be correct output. (and it <em>would</em> likely crash had you made the opposite mistake, sending a <code>char</code> to a <code>%f</code> specifier).</p></li>
+<li><p>Don't global-replace data types and expect your code to just compile. Rarely is it that simple (as you found out). </p></li>
+<li><p>Judging by the code posted here, take a look at your <code>char</code> implementation for similar problems.</p></li>
+</ol>
+
+<p>Hope it helps.</p>

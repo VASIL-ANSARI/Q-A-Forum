@@ -1,0 +1,29 @@
+<p>When you receive a response, you fill with it a non-initialized CoreData object.</p>
+
+<pre><code>        if (statusCode==200)
+        {
+            for (NSDictionary *rackStockTakeStatus in returnedDict) {
+                RackStockTakeStatus *rackStockTakeStatusObj; // !!! MISSING INITIALIZATION HERE
+                rackStockTakeStatusObj.stockTakeLocId = rackStockTakeStatus[@"stockTakeLocId"];
+</code></pre>
+
+<p>At the time you fill it it can point on whatever piece of memory.</p>
+
+<p>Common practice for such case is fetching already existing CoreData object for its ID. If no objects exist for such ID, you should create a new object.
+After you can fill it with the data and fetched results controller will observe changes.</p>
+
+<pre><code>        if (statusCode==200)
+        {
+            for (NSDictionary *rackStockTakeStatus in returnedDict) {
+                NSFetchRequest *request = [[NSFetchRequest alloc] initWithEntityName:@"RackStockTakeStatus"];
+                request.fetchLimit = 1;
+                request.predicate = [NSPredicate predicateWithFormat:@"stockTakeLocId = %@", rackStockTakeStatus[@"stockTakeLocId"]];
+                NSError *error = nil;
+                RackStockTakeStatus *rackStockTakeStatusObj = [[context executeFetchRequest:request error:&amp;error] firstObject];
+                if (nil == rackStockTakeStatusObj)
+                {
+                     rackStockTakeStatusObj = [NSEntityDescription insertNewObjectForEntityForName:@"RackStockTakeStatus" inManagedObjectContext:context]
+                     rackStockTakeStatusObj.stockTakeLocId = rackStockTakeStatus[@"stockTakeLocId"];
+                }
+                ...
+</code></pre>

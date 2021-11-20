@@ -1,0 +1,35 @@
+<p>To avoid copying overÂ all the properties from <code>prop</code>, you can set <code>prop</code> as the prototype of <code>inst</code>. Since <code>inst</code> is a function (not an ordinary object), you have no control of its constructor (it has to be <code>Function</code>), so the only way to change its prototype is via the internal <code>__proto__</code> property.</p>
+
+<p>The immediate drawback is, you lose access to all methods of a function, e.g. you cannot call x.call(). But you can solve it by chaining Function.prototype to prop. See the code below.</p>
+
+<pre><code>var Functor = function(f, prop) {
+  var inst = function() {
+      return inst.__op__.apply(this, arguments)
+  }
+  // Setup prototype chain: inst -&gt; prop -&gt; Function.prototype
+  prop.__proto__ = inst.__proto__
+  inst.__proto__ = prop
+
+  inst.__op__ = f
+  return inst
+}
+
+!function() {
+    var x = Functor(null, {qwe:123})
+    console.log(x.qwe) // 123
+
+    // Method 1: bind the context to __op__
+    x.__op__ = console.log.bind(console)
+    x(321) // 321
+
+    // Method 2: call x with the context
+    x.__op__ = console.log
+    x.call(console, 321) // 321
+}()
+</code></pre>
+
+<p>As for the use of <code>this</code>, you are already correctly passing on the context to <code>__op__</code> at <code>inst</code> via <code>Function.prototype.apply</code>.</p>
+
+<p>The way to pass on a context is via calling <code>x</code> with a context (Method 2), or the more clumsy <code>console.x = x; console.x(321)</code>. If you don't want to do this, you can always bind the context into <code>__op__</code> (Method 1).</p>
+
+<p>Keep in mind that when a function is executed, it needs both the context (<code>this</code>) and the arguments. The context is either permanently bound to the function (Method 1) or supplied in situ (Method 2).</p>

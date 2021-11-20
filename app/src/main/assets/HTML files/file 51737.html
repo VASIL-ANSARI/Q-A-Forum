@@ -1,0 +1,18 @@
+<p>After coming across this issue again I've debugged it using the shell on the server as it's not been possible to reproduce &amp; found that the issue is caused by cached ContentType objects.</p>
+
+<p>Let me illustrate;</p>
+
+<pre><code>&gt;&gt;&gt; content_types = dict((ct.model, ct) for ct in ContentType.objects.filter(app_label='consoles'))
+&gt;&gt;&gt; content_types
+{}
+&gt;&gt;&gt; content_types = dict((ct.model, ct) for ct in ContentType.objects.filter(app_label='news'))
+&gt;&gt;&gt; content_types
+{u'latestnews': &lt;ContentType: latest news&gt;}
+&gt;&gt;&gt; from django.core.cache import cache
+&gt;&gt;&gt; cache.clear()
+&gt;&gt;&gt; content_types = dict((ct.model, ct) for ct in ContentType.objects.filter(app_label='consoles'))
+&gt;&gt;&gt; content_types
+{u'runner': &lt;ContentType: runner&gt;, u'importedclient': &lt;ContentType: imported client&gt;, u'placetype': &lt;ContentType: place type&gt;, u'invoice': &lt;ContentType: invoice&gt;, u'placetypetotal': &lt;ContentType: place type total&gt;, u'clientconsoles': &lt;ContentType: client consoles&gt;, u'emailtemplate': &lt;ContentType: email template&gt;, u'event': &lt;ContentType: event&gt;, u'occupation': &lt;ContentType: occupation&gt;, u'console': &lt;ContentType: console&gt;, u'meettheexperts': &lt;ContentType: meet the experts&gt;, u'auditlog': &lt;ContentType: audit log entry&gt;, u'proxyuser': &lt;ContentType: user&gt;, u'consoleuser': &lt;ContentType: Console User&gt;, u'paidby': &lt;ContentType: paid by&gt;, u'meettheexpertstransaction': &lt;ContentType: Meet the experts Transaction&gt;, u'clientuserconsole': &lt;ContentType: client user console&gt;, u'paymentmethod': &lt;ContentType: payment method&gt;, u'transaction': &lt;ContentType: transaction&gt;, u'country': &lt;ContentType: Country&gt;, u'client': &lt;ContentType: client&gt;, u'place': &lt;ContentType: place&gt;, u'consoletotal': &lt;ContentType: console total&gt;}
+</code></pre>
+
+<p>So a fix to the cached manager which was caching all content types has resolved the issue.</p>

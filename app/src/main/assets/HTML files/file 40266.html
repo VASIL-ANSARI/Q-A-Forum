@@ -1,0 +1,212 @@
+<p>The <code>pickle</code> module normally can't pickle instance methods:</p>
+
+<pre><code>&gt;&gt;&gt; import pickle
+&gt;&gt;&gt; class A(object):
+...  def z(self): print "hi"
+... 
+&gt;&gt;&gt; a = A()
+&gt;&gt;&gt; pickle.dumps(a.z)
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+  File "/usr/local/lib/python2.7/pickle.py", line 1374, in dumps
+    Pickler(file, protocol).dump(obj)
+  File "/usr/local/lib/python2.7/pickle.py", line 224, in dump
+    self.save(obj)
+  File "/usr/local/lib/python2.7/pickle.py", line 306, in save
+    rv = reduce(self.proto)
+  File "/usr/local/lib/python2.7/copy_reg.py", line 70, in _reduce_ex
+    raise TypeError, "can't pickle %s objects" % base.__name__
+TypeError: can't pickle instancemethod objects
+</code></pre>
+
+<p>However, the <code>multiprocessing</code> module <a href="https://hg.python.org/cpython/file/84928af5d703/Lib/multiprocessing/forking.py#l56">has a custom <code>Pickler</code> that adds some code to enable this feature</a>:</p>
+
+<pre><code>#
+# Try making some callable types picklable
+#
+
+from pickle import Pickler
+class ForkingPickler(Pickler):
+    dispatch = Pickler.dispatch.copy()
+
+    @classmethod
+    def register(cls, type, reduce):
+        def dispatcher(self, obj):
+            rv = reduce(obj)
+            self.save_reduce(obj=obj, *rv)
+        cls.dispatch[type] = dispatcher
+
+def _reduce_method(m):
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+ForkingPickler.register(type(ForkingPickler.save), _reduce_method)
+</code></pre>
+
+<p>You can  replicate this using the <a href="https://docs.python.org/2/library/copy_reg.html"><code>copy_reg</code></a> module to see it work for yourself:</p>
+
+<pre><code>&gt;&gt;&gt; import copy_reg
+&gt;&gt;&gt; def _reduce_method(m):
+...     if m.im_self is None:
+...         return getattr, (m.im_class, m.im_func.func_name)
+...     else:
+...         return getattr, (m.im_self, m.im_func.func_name)
+... 
+&gt;&gt;&gt; copy_reg.pickle(type(a.z), _reduce_method)
+&gt;&gt;&gt; pickle.dumps(a.z)
+"c__builtin__\ngetattr\np0\n(ccopy_reg\n_reconstructor\np1\n(c__main__\nA\np2\nc__builtin__\nobject\np3\nNtp4\nRp5\nS'z'\np6\ntp7\nRp8\n."
+</code></pre>
+
+<p>When you use <code>Process.start</code> to spawn a new process on Windows, <a href="https://hg.python.org/cpython/file/84928af5d703/Lib/multiprocessing/forking.py#l181">it pickles all the parameters you passed to the child process using this custom <code>ForkingPickler</code></a>:</p>
+
+<pre><code>#
+# Windows
+#
+
+else:
+    # snip...
+    from pickle import load, HIGHEST_PROTOCOL
+
+    def dump(obj, file, protocol=None):
+        ForkingPickler(file, protocol).dump(obj)
+
+    #
+    # We define a Popen class similar to the one from subprocess, but
+    # whose constructor takes a process object as its argument.
+    #
+
+    class Popen(object):
+        '''
+        Start a subprocess to run the code of a process object
+        '''
+        _tls = thread._local()
+
+        def __init__(self, process_obj):
+            # create pipe for communication with child
+            rfd, wfd = os.pipe()
+
+            # get handle for read end of the pipe and make it inheritable
+            ...
+            # start process
+            ...
+
+            # set attributes of self
+            ...
+
+            # send information to child
+            prep_data = get_preparation_data(process_obj._name)
+            to_child = os.fdopen(wfd, 'wb')
+            Popen._tls.process_handle = int(hp)
+            try:
+                dump(prep_data, to_child, HIGHEST_PROTOCOL)
+                dump(process_obj, to_child, HIGHEST_PROTOCOL)
+            finally:
+                del Popen._tls.process_handle
+                to_child.close()
+</code></pre>
+
+<p>Note the "send information to the child" section. It's using the <code>dump</code> function, which uses <code>ForkingPickler</code> to pickle the data, which means your instance method can be pickled.</p>
+
+<p>Now, when you use methods on <code>multiprocessing.Pool</code> to send a method to a child process, it's using a <code>multiprocessing.Pipe</code> to pickle the data. In Python 2.7, <code>multiprocessing.Pipe</code> is implemented in C, <a href="https://hg.python.org/cpython/file/84928af5d703/Modules/_multiprocessing/connection.h#l260">and calls <code>pickle_dumps</code> directly</a>, so it doesn't take advantage of the <code>ForkingPickler</code>. That means pickling the instance method doesn't work.</p>
+
+<p>However, if you use <code>copy_reg</code> to register the <code>instancemethod</code> type, rather than a custom <code>Pickler</code>, <em>all</em> attempts at pickling will be affected. So you can use that to enable pickling instance methods, even via <code>Pool</code>:</p>
+
+<pre><code>import multiprocessing
+import copy_reg
+import types
+
+def _reduce_method(m):
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+copy_reg.pickle(types.MethodType, _reduce_method)
+
+def test1():
+    print("Hello, world 1")
+
+def increment(x):
+    return x + 1
+
+class testClass():
+    def process(self):
+        process1 = multiprocessing.Process(target=test1)
+        process1.start()
+        process1.join()
+        process2 = multiprocessing.Process(target=self.test2)
+        process2.start()
+        process2.join()
+
+    def pool(self):
+        pool = multiprocessing.Pool(1)
+        for answer in pool.imap(increment, range(10)):
+            print(answer)
+        print
+        for answer in pool.imap(self.square, range(10)):
+            print(answer)
+
+    def test2(self):
+        print("Hello, world 2")
+
+    def square(self, x):
+        return x * x
+
+def main():
+    c = testClass()
+    c.process()
+    c.pool()
+
+if __name__ == "__main__":
+    main()
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>Hello, world 1
+Hello, world 2
+GOT (0, 0, (True, 1))
+GOT (0, 1, (True, 2))
+GOT (0, 2, (True, 3))
+GOT (0, 3, (True, 4))
+GOT (0, 4, (True, 5))
+ 1GOT (0, 5, (True, 6))
+
+GOT (0, 6, (True, 7))
+2
+GOT (0, 7, (True, 8))
+3
+ GOT (0, 8, (True, 9))
+GOT (0, 9, (True, 10))
+4
+5
+6
+7
+8
+9
+10
+
+GOT (1, 0, (True, 0))
+0
+GOT (1, 1, (True, 1))
+1
+GOT (1, 2, (True, 4))
+4
+GOT (1, 3, (True, 9))
+9
+ GOT (1, 4, (True, 16))
+16
+GOT (1, 5, (True, 25))
+25
+ GOT (1, 6, (True, 36))
+36
+ GOT (1, 7, (True, 49))
+49
+ GOT (1, 8, (True, 64))
+64
+GOT (1, 9, (True, 81))
+81
+GOT None
+</code></pre>
+
+<p>Also note that in Python 3.x, <code>pickle</code> can pickle instance method types natively, so none of this stuff matters any more. :)</p>

@@ -1,0 +1,31 @@
+<p>So this is something that nabbed me early on in understanding promises. You need to get ALL of your code away from the practice of passing in a callback, and then simply using the promise to call that. Instead, to keep the continuous nature of promises, you want to just <em>return</em> promises to the calling function, unless your function is the one that should decide what to do afterward. So, your code should look something like this.</p>
+
+<pre><code>public cleanup(onCleanupComplete: any):Promise&lt;any&gt; {
+        if (this._app == null) return; //this._app comes out of an external API
+
+       // Below line of code won't compile, it is just for illustration. 
+       // I'm trying to show that I need a promise in return from method
+       var promiseArray = [];
+       for (var i = 0; i &lt; this.conversationLength; i++) {
+         promiseArray.push(removeConference(i));
+       }
+       return Promise.all(promiseArray);
+
+    }
+
+    private removeConference(i : number):Promise&lt;any&gt; {
+        if (this._app.conversationsManager.conversations == null 
+           || i === this.conversationLength)
+            return Promise.resolve(true);
+
+        var conversation = this._app.conversationsManager.conversations(0);
+                console.log("app.cleanup.leave", `Leaving conversation ${conversation}`);
+        return conversation.leave().then(() =&gt; {
+                console.log("app.cleanup.leave", `Conversation ${conversation} left successfully`);
+            this.app.conversationsManager.conversations.remove(conversation);
+            this.removeConference(i);
+        });
+    }
+</code></pre>
+
+<p>I'm not 100% sure this compiles correctly, but hopefully it helps conceptually. <code>Promise.all</code> is really the key function here - it takes an array of promises, and creates a matching "control promise" that only resolves when all of them have.</p>

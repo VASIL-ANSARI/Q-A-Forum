@@ -1,0 +1,37 @@
+<p>It is most likely the problem is the parameters, and in my experience, dates are always a mess..  </p>
+
+<p>The most common problem is the month-day inversion, it happens on various scenarios, for example implicit conversion between date and datetime.<br>
+take a look at this:</p>
+
+<pre><code>declare @d1 date = '2016-02-03'
+declare @d2 datetime = '2016-02-03'
+select FORMAT(@d1, 'yyyy-MMMM-dd') ParDate, FORMAT(@d2, 'yyyy-MMMM-dd') ParDateTime
+</code></pre>
+
+<p>the result is funny:</p>
+
+<pre><code>ParDate             ParDateTime
+2016-febbraio-03    2016-marzo-02
+</code></pre>
+
+<p>So you can try to debug your SPB, modify the <code>WHERE</code> clause of <code>PATH ('Owner')</code> in SPB.<br>
+Temporarly rem both the conditions on <code>@startDate/@endDate</code> and <code>@VesselPln</code></p>
+
+<pre><code>-- AND (LandingDate1 BETWEEN @startDate AND @endDate)
+-- AND LandingHeaders.VesselPLN = RTRIM(@VesselPln)
+</code></pre>
+
+<p>Then try to call it from your app, it should return all results.<br>
+Then re-add the condition on <code>@VesselPln</code>, test it, I think it will still output something.  </p>
+
+<p>If not, you have already found your problem, maybe something related to multybyte strings <code>nchar(10)</code> or less likely something related to ansi paddings and trailing spaces.  </p>
+
+<p>If yes, add <code>@startDate</code> and <code>@endDate</code> to <code>SELECT</code> section of <code>PATH ('Owner')</code> to check how they are viewed by the SPB:</p>
+
+<pre><code>FORMAT(@startDate, 'yyyy-MMMM-dd') as '@StartDate', 
+FORMAT(@endDate, 'yyyy-MMMM-dd') as '@EndDate',
+</code></pre>
+
+<p>This way you should see in your xml output what's the problem.</p>
+
+<p>I hope this helps.</p>

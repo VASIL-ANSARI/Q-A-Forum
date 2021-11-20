@@ -1,0 +1,66 @@
+<p>UUID is a 128bit data type. Excluding the 6 reserved bits, there are 122 data bits in it. Makes it impossible to fully convert any UUID to a 64bit integer. You'll at least need to store it as 2 64bit numbers or 4 32bit numbers.</p>
+
+<p>You can unpack the UUID into binary, then unpack it as 4 32bit unsigned character:</p>
+
+
+
+<pre><code>function uuidToHex($uuid) {
+    return str_replace('-', '', $uuid);
+}
+
+function hexToUuid($hex) {
+    $regex = '/^([\da-f]{8})([\da-f]{4})([\da-f]{4})([\da-f]{4})([\da-f]{12})$/';
+    return preg_match($regex, $hex, $matches) ?
+        "{$matches[1]}-{$matches[2]}-{$matches[3]}-{$matches[4]}-{$matches[5]}" :
+        FALSE;
+}
+
+function hexToIntegers($hex) {
+    $bin = pack('h*', $hex);
+    return unpack('L*', $bin);
+}
+
+function integersToHex($integers) {
+    $args = $integers; $args[0] = 'L*'; ksort($args);
+    $bin = call_user_func_array('pack', $args);
+    $results = unpack('h*', $bin);
+    return $results[1];
+}
+
+$uuid = '1968ec4a-2a73-11df-9aca-00012e27a270';
+var_dump($uuid);
+
+$integers = hexToIntegers(uuidToHex('1968ec4a-2a73-11df-9aca-00012e27a270'));
+var_dump($integers);
+
+$uuid = hexToUuid(integersToHex($integers));
+var_dump($uuid);
+</code></pre>
+
+<p>It will returns</p>
+
+
+
+<pre><code>string(36) "1968ec4a-2a73-11df-9aca-00012e27a270"
+array(4) {
+  [1]=&gt;
+  int(2764998289)
+  [2]=&gt;
+  int(4245764002)
+  [3]=&gt;
+  int(268479657)
+  [4]=&gt;
+  int(120222434)
+}
+string(36) "1968ec4a-2a73-11df-9aca-00012e27a270"
+</code></pre>
+
+<p><code>$integers</code> is an array 4 32bit numbers that represents the hex.</p>
+
+<h3>Reference</h3>
+
+<ol>
+<li>Stack Overflow: <a href="http://stackoverflow.com/questions/2484267/16-bytes-binary-form-of-canonical-uuid-representation-in-php">16 bytes binary form of canonical uuid representation in php</a></li>
+<li>Stack Overflow: <a href="http://stackoverflow.com/questions/12683833/how-to-convert-byte-array-to-integer-in-php">How to convert byte array to integer in php?</a></li>
+<li>PHP Manual: <a href="http://php.net/manual/en/function.pack.php" rel="nofollow">pack()</a></li>
+</ol>

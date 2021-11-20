@@ -1,0 +1,53 @@
+<p>When students are dynamic it means you need a result class for result rows like this:</p>
+
+<pre><code>class ResultRow
+{
+    public ResultRow()
+    {
+        Students = new Dictionary&lt;string, string&gt;();
+    }
+
+    public string Class { get; set; }
+
+    public IDictionary&lt;string, string&gt; Students { get; set; }
+}
+</code></pre>
+
+<p>Because you need dynamic columns for students.<br>
+Now I can generate a result similar to your expected result with this code:</p>
+
+<pre><code>var res = tblClass
+        .GroupBy(g=&gt; g.ClassId)
+        .Select(c =&gt;
+        {
+            var rr = new ResultRow {Class = c.Key};
+            foreach (var r in tblClass.GroupBy(gg=&gt; gg.Student))
+            {
+                rr.Students[r.Key] = "N";
+            }
+            foreach (var r in c.Where(w=&gt; w.ClassId == c.Key))
+            {
+                rr.Students[r.Student] = "Y";
+            }
+            return rr;
+        })
+        .toList();  //optional
+</code></pre>
+
+<hr>
+
+<p>You can also add these two method to <code>ResultRow</code> class:</p>
+
+<pre><code>public string GetHeader()
+{
+    return Students.Aggregate("Class", (current, s) =&gt; current + "|" + s.Key);
+}
+
+public string GetSolidRow()
+{
+    return Students.Aggregate(Class, (current, s) =&gt; current + "|" + s.Value);
+}
+</code></pre>
+
+<p><strong>[<a href="http://ideone.com/NYLcQ7" rel="nofollow"> <code>Demo Here</code> </a>]</strong><br>
+HTH</p>

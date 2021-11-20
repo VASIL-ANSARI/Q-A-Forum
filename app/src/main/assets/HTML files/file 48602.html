@@ -1,0 +1,60 @@
+<p><strong>The format engine of <code>java.time.format</code> always works with internal exceptions to control the flow.</strong> This is even true if you try to use a <code>ParsePosition</code>. 
+An exception occurs, and the <code>ParsePosition</code>-object does not even report an error:</p>
+
+<pre><code>   pp = new ParsePosition(0);
+   try {
+       TemporalAccessor t = 
+           DateTimeFormatter.ofPattern("uuuu-MM-dd")
+             .withResolverStyle(ResolverStyle.STRICT)
+             .parse("2015-02-29", pp);
+   } catch (RuntimeException e) {
+       e.printStackTrace();
+       System.out.println("Error! " + pp);
+       // Error! java.text.ParsePosition[index=10,errorIndex=-1]
+   }
+</code></pre>
+
+<p>The <a href="http://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html#parse-java.lang.CharSequence-java.text.ParsePosition-" rel="nofollow">javadoc</a> explains:</p>
+
+<blockquote>
+  <p>The operation of this method is slightly different to similar methods
+  using ParsePosition on java.text.Format. That class will return errors
+  using the error index on the ParsePosition. By contrast, this method
+  will throw a DateTimeParseException if an error occurs, with the
+  exception containing the error index. This change in behavior is
+  necessary due to the increased complexity of parsing and resolving
+  dates/times in this API.</p>
+</blockquote>
+
+<p>The following example tries to avoid an exception by using the method <code>parseUnresolved</code>:</p>
+
+<pre><code>   ParsePosition pp = new ParsePosition(0);
+   try {
+        TemporalAccessor t = 
+            DateTimeFormatter.ofPattern("uuuu-MM-dd")
+             .withResolverStyle(ResolverStyle.STRICT)
+             .parseUnresolved("2015-02-29", pp);
+        System.out.println("Info! " + t + "/" + pp); // note, no error in pp here!
+        // Info! {DayOfMonth=29, MonthOfYear=2, Year=2015},null,null/java.text.ParsePosition[index=10,errorIndex=-1]
+        boolean leapyear = Year.from(t).isLeap();
+        MonthDay md = MonthDay.from(t);
+        if (!leapyear &amp;&amp; md.getDayOfMonth() == 29 &amp;&amp; md.getMonth().getValue() == 2) {
+            System.out.println("Error!"); // hand-made validation covering a special case
+        }
+   } catch (RuntimeException e) {
+        e.printStackTrace(); // does not happen for given input
+   }
+</code></pre>
+
+<p>This works without exception but you have to write the validation code yourself which asks for trouble.</p>
+
+<p>I have always considered this approach of throwing exceptions for controlling the program flow as bad coding practice and therefore designed my own library Time4J in such a way that it strives for avoiding internal exceptions as good as possible (not in every case but in most cases without exception).</p>
+
+<pre><code>   ParseLog plog = new ParseLog();
+   PlainDate date = ChronoFormatter.ofDatePattern("uuuu-MM-dd", PatternType.CLDR, Locale.ROOT).parse("2015-02-29", plog);
+   System.out.println(date); // null
+   System.out.println(plog.isError() + "/" + plog.getErrorMessage());
+   // true/Validation failed =&gt; DAY_OF_MONTH out of range: 29 [parsed={YEAR=2015, MONTH_AS_NUMBER=2, DAY_OF_MONTH=29}]
+</code></pre>
+
+<p>This code clearly demonstrates the possibility of another design. I consider the choosen design of <code>java.time</code> as potential bottleneck if it comes to batch processing of mass bulk data with a lot of wrong data.</p>

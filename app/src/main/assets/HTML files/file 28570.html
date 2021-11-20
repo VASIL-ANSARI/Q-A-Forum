@@ -1,0 +1,46 @@
+<p>Right now, you have set up your application using what is a rough equivalent to the "<a href="http://flask.pocoo.org/docs/patterns/appfactories/">Application Factory</a>" pattern (so called by the Flask documentation). This is a Flask idea, not a Python one. It has some advantages, but it also means that you need to do things such as initialize your SQLAlchemy object using the <code>init_app</code> method rather than the SQLAlchemy constructor. There is nothing "wrong" with doing it this way, but it means that you need to run methods like <code>create_all()</code> within an <a href="http://flask.pocoo.org/docs/appcontext/">application context</a>, which currently you would not be if you tried to run it in the <code>main()</code> method.</p>
+
+<p>There are a few ways you can resolve this, but it's up to you to determine which one you want (there is no right answer):</p>
+
+<h2>Don't use the Application Factory pattern</h2>
+
+<p>In this way, you don't create the app in a function. Instead, you put it somewhere (like in <code>project/__init__.py</code>). Your <code>project/__init__.py</code> file can import the <code>models</code> package, while the <code>models</code> package can import <code>app</code> from <code>project</code>. This is a circular reference, but that's okay as long as the <code>app</code> object is created in the <code>project</code> package first before <code>model</code> tries to import <code>app</code> from <code>package</code>. See the Flask docs on <a href="http://flask.pocoo.org/docs/patterns/packages/">Larger Application Patterns</a> for an example where you can split your package into multiple packages, yet still have these other packages be able to use the <code>app</code> object by using circular references. The docs even say:</p>
+
+<blockquote>
+  <p>Every Python programmer hates them, and yet we just added some:
+  circular imports. [...] Be advised that this is a
+  bad idea in general but here it is actually fine.</p>
+</blockquote>
+
+<p>If you do this, then you can change your <code>Models/__init__.py</code> file to build the <code>SQLAlchemy</code> object with a reference to the app in the constructor. In that way, you can use <code>create_all()</code> and <code>drop_all()</code> methods of the <code>SQLAlchemy</code> object, <a href="http://pythonhosted.org/Flask-SQLAlchemy/api.html#configuration">as described in the documentation for Flask-SQLAlchemy</a>.</p>
+
+<h2>Keep how you have it now, but build in a request_context()</h2>
+
+<p>If you continue with what you have now (creating your app in a function), then you will need to build the <code>SQLAlchemy</code> object in the <code>Models</code> package without using the <code>app</code> object as part of the constructor (as you've done). In your main method, change the...</p>
+
+<pre><code>db = SQLAlchemy(app)
+</code></pre>
+
+<p>...to a...</p>
+
+<pre><code>db.init_app(app)
+</code></pre>
+
+<p>Then, you would need to move the <code>create_all()</code> method into a function inside of the application context. A common way to do this for something this early in the project would be to utilize the <a href="http://flask.pocoo.org/docs/api/#flask.Flask.before_first_request"><code>before_first_request()</code></a> decorator....</p>
+
+<pre><code>app = Flask(...)
+
+@app.before_first_request
+def initialize_database():
+    db.create_all()
+</code></pre>
+
+<p>The "initialize_database" method is run before the first request is handled by Flask. You could also do this at any point by using the <code>app_context()</code> method:</p>
+
+<pre><code>app = Flask(...)
+with app.app_context():
+    # This should work because we are in an app context.
+    db.create_all()
+</code></pre>
+
+<p>Realize that if you are going to continue using the Application Factory pattern, you should really understand how the application context works; it can be confusing at first but necessary to realize what errors like "application not registered on db instance and no application bound to current context" mean.</p>

@@ -1,0 +1,79 @@
+<p><code>Shadows</code> hides an implementation of a member and provides a new one in its accessibility context. That means that in your case <code>RectangularDrawingObject's</code> <code>ToXMLInternal()</code> is still valid when accessing <code>Rectangle</code> from the outside. The caller just does not know that there is a shadowing method. Why would he? The method is private after all.</p>
+
+<p>If you call <code>ToXMLInternal()</code> from inside <code>Rectangle</code>, it is different. Then the caller knows that there is a shadowing method and uses this instead of <code>RectangularDrawingObject's</code> method.</p>
+
+<p>The question is, why would you even want this behavior? There might be rare cases when shadowing is a good idea, but in general it is rather a misconception of your design.</p>
+
+<p>There is just no way to make a public member of a base class inaccessible to a subclass. That would contradict the whole object oriented paradigm. You can only change the behavior in subclasses.</p>
+
+<h2>Edit</h2>
+
+<p>Let's consider this simple class hierarchy:</p>
+
+<pre><code>Class A
+    Public Sub Method()
+        Console.WriteLine("From A")
+    End Sub
+End Class
+
+Class B
+    Inherits A
+
+    Private Shadows Sub Method()
+        Console.WriteLine("From B")
+    End Sub
+End Class
+</code></pre>
+
+<p>Now, if we do the following:</p>
+
+<pre><code>Sub Main()
+    Dim obj As New B()
+    obj.Method()
+End Sub
+</code></pre>
+
+<p>Then the output is "From A". You look at class <code>B</code> from the outside and therefore do not see that there is a shadowing method. The method is private. Thus, the inherited public method from class <code>A</code> is used and "From A" is printed to the console.</p>
+
+<p>If we add another method to class <code>B</code>:</p>
+
+<pre><code>Public Sub CallMethod()
+    Method()
+End Sub
+</code></pre>
+
+<p>and in <code>Main()</code></p>
+
+<pre><code>obj.CallMethod()
+</code></pre>
+
+<p>Then <code>CallMethod()</code> is within class <code>B</code> and can see the private shadowing method, which it immediately uses. The resulting output is "From B".</p>
+
+<p>You could even access the inherited (not shadowed) method from <code>CallMethod</code> with</p>
+
+<pre><code>MyBase.Method()
+</code></pre>
+
+<p>which would output "From A".</p>
+
+<p>Keep in mind that every public method of a base class is also available to subclasses. You can at most shadow this method with another public method, but there is no way to completely hide the method. The C# equivalent of <code>Shadows</code> is <code>new</code>, which also describes the behavior quite well. The original implementation is kept and a new implementation is added to the class.</p>
+
+<p>As the last example shows, there are possible situations in which to use a <code>Private Shadows</code>. Although, it is arguable how reasonable this could be.</p>
+
+<h2>Edit 2</h2>
+
+<p>Just another thought about the difference to <code>Overrides</code>.</p>
+
+<p>If the shadowing method in the above example would be public, then </p>
+
+<pre><code>Dim obj As New B()
+obj.Method()
+</code></pre>
+
+<p>would output "From B". Of course. But, if we call <code>obj</code> as an <code>A</code>:</p>
+
+<pre><code>Dim obj As A = New B()
+obj.Method()
+</code></pre>
+
+<p>then the output is "From A". That's because the shadowed method is still there and by accessing <code>obj</code> through <code>A</code>, you access the original method. <code>Overrides</code> would completely replace the method and even the above example would output "From B", because the original method does not exist any more in <code>obj</code>.</p>

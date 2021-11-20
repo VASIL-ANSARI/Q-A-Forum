@@ -1,0 +1,32 @@
+<p>You 'know' the ip address of the connecting client. So you can use this information to obtain more information, e.g. with <code>arp -n</code></p>
+
+<pre><code># your_app/views.py
+import re
+from subprocess import Popen, PIPE
+from django.shortcuts import render
+
+def mac(request):
+
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+
+    proc = Popen(["arp", "-n", ip], stdout=PIPE)
+    out = proc.communicate()[0]
+    mac = re.search(r"(([a-f\d]{1,2}\:){5}[a-f\d]{1,2})", out).groups()[0]
+
+    return render(request, 'mac.html', {'mac': mac})
+</code></pre>
+
+<h3>Credits:</h3>
+
+<ul>
+<li><a href="http://stackoverflow.com/a/4581997/469111">http://stackoverflow.com/a/4581997/469111</a></li>
+<li><a href="http://stackoverflow.com/a/1750931/469111">http://stackoverflow.com/a/1750931/469111</a></li>
+</ul>
+
+<h3>Note:</h3>
+
+<p><code>arp -n</code> only gives a result for 'known' entries (<code>arp -a</code>). In the situation here it is working because the client request happening <em>before</em> the arp lookup.  </p>

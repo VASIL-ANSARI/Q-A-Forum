@@ -1,0 +1,48 @@
+<p>In the <code>spmatrix</code> class (which you can check in scipy/sparse/base.py) the <code>__mul__()</code> there is a set of "ifs" that can answer your question:</p>
+
+<pre><code>class spmatrix(object):
+    ...
+    def __mul__(self, other):
+        ...
+        M,N = self.shape
+        if other.__class__ is np.ndarray:
+            # Fast path for the most common case
+            if other.shape == (N,):
+                return self._mul_vector(other)
+            elif other.shape == (N, 1):
+                return self._mul_vector(other.ravel()).reshape(M, 1)
+            elif other.ndim == 2  and other.shape[0] == N:
+                return self._mul_multivector(other)
+</code></pre>
+
+<p>For a 1D array it will always go to <code>_mul_vector()</code> from <code>compressed.py</code>, inside class <code>_cs_matrix</code>, with the code given below:</p>
+
+<pre><code>def _mul_vector(self, other):
+    M,N = self.shape
+
+    # output array
+    result = np.zeros(M, dtype=upcast_char(self.dtype.char,
+                                           other.dtype.char))
+
+    # csr_matvec or csc_matvec
+    fn = getattr(sparsetools,self.format + '_matvec')
+    fn(M, N, self.indptr, self.indices, self.data, other, result)
+
+    return result
+</code></pre>
+
+<p>Note that it assumes the output with the number of lines of the sparse matrix. Basically, it treats your input 1D array as fitting to the number of columns of the sparse array (there is not tranpose or non-tranpose). But for a ndarray with <code>ndim==2</code> it cannot do such assumption, so that if you tried:</p>
+
+<pre><code>vec = np.array([[1,2,3,4],
+                [1,2,3,4]])
+</code></pre>
+
+<p><code>A * vec.T</code> would be the only option that works.</p>
+
+<p>For a 1D matrix the sparse module also does not assume that it fits the number of columns. To check that you can try:</p>
+
+<pre><code>A * mat(vec)
+#ValueError: dimension mismatch
+</code></pre>
+
+<p>And <code>A * mat(vec).T</code> would be your only choice.</p>

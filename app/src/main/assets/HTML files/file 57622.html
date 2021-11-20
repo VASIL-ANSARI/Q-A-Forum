@@ -1,0 +1,23 @@
+<p>You could rely on <code>tcpdump</code>'s output format and extract the packet length with something like <code>grep -Po '(?&lt;=length )\d+(?=\))'</code>. </p>
+
+<p>Here <code>grep</code>'s <code>-P</code> switch turns on the Perl regexes, <code>-o</code> makes grep output only the matching part. Then, <code>(?&lt;=length )</code> part of regex does a lookbehind, so <code>length[space]</code> has to be before the match. <code>\d+</code> matches one or more digits greedily, and <code>(?=\))</code> part does a lookahead, so a closing brace has to be after the match. Please note that lookaheads and lookbehinds are not matched themselves. Think of them as of anchors.</p>
+
+<p>Note that you can make the regex more strict by adding an endline anchor, <code>$</code>: <code>(?&lt;=length )\d+(?=\)$)</code></p>
+
+<p>I wouldn't really recommend doing this if you want your approach to be portable and universal.</p>
+
+<p>So the whole thing would look like</p>
+
+<pre><code>while read lngth ; do sh cap.sh "$lngth" ; done&lt; &lt;(unbuffer tcpdump -i eth1 -nttv 2&gt;/dev/null | unbuffer -p grep -Po '(?&lt;=length )\d+(?=\))')
+</code></pre>
+
+<p>Please note it uses <code>unbuffer</code> from <a href="http://expect.sourceforge.net" rel="nofollow" title="expect">expect</a> so you don't have to wait until the pipe buffer is full to flush it.</p>
+
+<p>Another approach to extract lengths would be to use something like <code>scapy</code>, a packet inspection/manipulation module for python (<a href="https://github.com/secdev/scapy" rel="nofollow">https://github.com/secdev/scapy</a>, <a href="https://github.com/phaethon/scapy" rel="nofollow">https://github.com/phaethon/scapy</a>).
+A python script that prints lengths of IP packets in an infinite loop using <code>scapy</code> will look like this:</p>
+
+<pre><code>from scapy.all import *
+sniff(filter='ip', prn=lambda x: x.sprintf("%IP.len%"))
+</code></pre>
+
+<p>So you can replace the <code>tcpdump | grep</code> part with this script, or maybe even rewrite your <code>cap.sh</code> in Python and do the whole thing in Python.</p>

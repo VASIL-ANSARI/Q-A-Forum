@@ -1,0 +1,45 @@
+<p>This applies to both <code>memset()</code> and <code>memcpy()</code>:</p>
+
+<ol>
+<li><strong>Less Code:</strong> As you have already mentioned, it's shorter - fewer lines of code.</li>
+<li><strong>More Readable:</strong> Shorter usually makes it more readable as well. (<code>memset()</code> is more readable than that loop)</li>
+<li><strong>It can be faster:</strong> It can sometimes allow more aggressive compiler optimizations. (so it may be faster)</li>
+<li><strong>Misalignment:</strong> In some cases, when you're dealing with misaligned data on a processor that doesn't support misaligned accesses, <code>memset()</code> and <code>memcpy()</code> may be the only clean solution.</li>
+</ol>
+
+<p>To expand on the 3rd point, <code>memset()</code> can be heavily optimized by the compiler using SIMD and such. If you write a loop instead, the compiler will first need to "figure out" what it does before it can attempt to optimize it.</p>
+
+<p>The basic idea here is that <code>memset()</code> and similar library functions, in some sense, "tells" the compiler your intent.</p>
+
+<hr>
+
+<p>As mentioned by @Oli in the comments, there are some downsides. I'll expand on them here:</p>
+
+<ol>
+<li>You need to make sure that <code>memset()</code> actually does what you want. The standard doesn't say that zeros for the various datatypes are necessarily zero in memory.</li>
+<li>For non-zero data, <code>memset()</code> is restricted to only 1 byte content. So you can't use <code>memset()</code> if you want to set an array of <code>int</code>s to something other than zero (or <code>0x01010101</code> or something...).</li>
+<li>Although rare, there are some corner cases, where it's actually possible to beat the compiler in performance with your own loop.*</li>
+</ol>
+
+<p>*I'll give one example of this from my experience:</p>
+
+<p>Although <code>memset()</code> and <code>memcpy()</code> are usually compiler intrinsics with special handling by the compiler, they are still <em>generic</em> functions. They say nothing about the datatype including the alignment of the data.</p>
+
+<p>So in a few (abeit rare) cases, the compiler isn't able to determine the alignment of the memory region, and thus must produce extra code to handle misalignment. Whereas, if you the programmer, is 100% sure of alignment, using a loop might actually be faster.</p>
+
+<p>A common example is when using SSE/AVX intrinsics. (such as copying a 16/32-byte aligned array of <code>float</code>s) If the compiler can't determine the 16/32-byte alignment, it will need to use misaligned load/stores and/or handling code. If you simply write a loop using SSE/AVX aligned load/store intrinsics, you can <em>probably</em> do better.</p>
+
+<pre><code>float *ptrA = ...  //  some unknown source, guaranteed to be 32-byte aligned
+float *ptrB = ...  //  some unknown source, guaranteed to be 32-byte aligned
+int length = ...   //  some unknown source, guaranteed to be multiple of 8
+
+//  memcopy() - Compiler can't read comments. It doesn't know the data is 32-byte
+//  aligned. So it may generate unnecessary misalignment handling code.
+memcpy(ptrA, ptrB, length * sizeof(float));
+
+//  This loop could potentially be faster because it "uses" the fact that
+//  the pointers are aligned. The compiler can also further optimize this.
+for (int c = 0; c &lt; length; c += 8){
+    _mm256_store_ps(ptrA + c, _mm256_load_ps(ptrB + c));
+}
+</code></pre>

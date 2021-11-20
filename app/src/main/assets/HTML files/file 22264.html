@@ -1,0 +1,147 @@
+<p>Test this query </p>
+
+<pre><code>CREATE TEMPORARY table Kratika
+(
+    _id int,
+    _value varchar(50)
+);
+
+INSERT INTO Kratika
+SELECT 1, '1111222255' UNION 
+SELECT 2, '1111222 255' UNION -- duplicate
+SELECT 3, '11112222 55' UNION -- duplicate
+SELECT 4, '1111222233'; -- not duplicate
+
+SELECT * FROM Kratika;
+
+DELETE FROM Kratika WHERE _value &lt;&gt; REPLACE(_value, ' ', '') ;
+
+SELECT * FROM Kratika;
+</code></pre>
+
+<p><strong>Output</strong></p>
+
+<pre><code>1   1111222255
+2   1111222 255
+3   11112222 55
+4   1111222233
+
+-- Select after deletion of duplicate records
+    1   1111222255
+    4   1111222233
+</code></pre>
+
+<p><strong>Edited</strong></p>
+
+<p>If you are ok with while loop then you could test this (I am not a MySQL developer, I don't know why MySQL not allowing me to write while loop, so created proc for the same)</p>
+
+<pre><code>DROP PROCEDURE IF EXISTS test_kratik;
+delimiter ##
+
+CREATE PROCEDURE test_kratik
+(
+
+)
+BEGIN
+DROP table IF EXISTS Kratika;
+CREATE TEMPORARY table Kratika
+(
+    _id int,
+    _value varchar(50)
+);
+
+INSERT INTO Kratika
+SELECT 1, '1111222255' UNION 
+SELECT 2, '1111222 255' UNION -- duplicate
+SELECT 3, '11112222 55' UNION -- duplicate
+SELECT 4, '1111222233'; -- not duplicate
+
+SELECT * FROM Kratika;
+
+SET @ID := 0;
+SET @DUP_ID := 0;
+SET @value := '';
+
+WHILE @ID &lt;= (SELECT MAX(_id) FROM kratika) DO
+    BEGIN
+        IF EXISTS(SELECT _id from kratika WHERE _id = @ID) THEN
+            BEGIN
+                SET @value = (SELECT REPLACE(_value, ' ', '') from kratika WHERE _id = @ID);
+                DELETE FROM kratika
+                WHERE REPLACE(_value, ' ', '') = @value
+                AND _id &lt;&gt; @ID;
+            END;
+        END IF;
+        SET @ID = @ID + 1;
+    END;
+END WHILE;
+
+UPDATE kratika
+SET _value = REPLACE(_value, ' ', '') 
+WHERE _value &lt;&gt; REPLACE(_value, ' ', '') ;
+
+SELECT * FROM kratika;
+
+END ##
+
+delimiter ;
+
+CALL test_kratik();
+</code></pre>
+
+<p><strong>Updated</strong> <em>It would be fine if you don't want to use while loop....</em></p>
+
+<pre><code>    DROP TABLE IF EXISTS Kratika; 
+
+CREATE TEMPORARY table Kratika
+(
+    _id int,
+    _value varchar(50)
+);
+
+INSERT INTO Kratika
+SELECT 1, '1111222255' UNION 
+SELECT 2, '1111222 255' UNION -- duplicate
+SELECT 3, '11112222 55' UNION -- duplicate
+SELECT 4, '111122 2233'; -- not duplicate
+
+DROP TABLE IF EXISTS copy_temp; 
+
+CREATE TEMPORARY table copy_temp  
+(
+    _id1 int,
+    _value1 varchar(50)
+);
+
+INSERT INTO copy_temp
+SELECT _id, _value FROM kratika;
+
+SELECT * FROM Kratika;
+
+DELETE FROM Kratika 
+WHERE _id &lt;&gt; (SELECT _id1 FROM copy_temp 
+WHERE REPLACE(_value, ' ', '') = REPLACE(_value1, ' ', '') 
+Limit 1
+);
+
+UPDATE kratika
+SET _value = REPLACE(_value, ' ', '') 
+WHERE _value &lt;&gt; REPLACE(_value, ' ', '') ;
+
+
+SELECT * FROM Kratika;
+</code></pre>
+
+<p><strong>Output</strong></p>
+
+<pre><code>1   1111222255
+2   1111222 255
+3   11112222 55
+4   1111222233
+</code></pre>
+
+<p><strong>After Update</strong></p>
+
+<pre><code>1   1111222255
+4   1111222233
+</code></pre>

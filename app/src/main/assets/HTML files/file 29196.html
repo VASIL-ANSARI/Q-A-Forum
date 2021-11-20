@@ -1,0 +1,68 @@
+<p>When you get a <code>FieldInfo</code> for the constant, you get the <code>MdFieldInfo</code> type.
+If we decompile the code, we will see that it does not do a security check for that type.</p>
+
+<p>Here's decompiled code for the <code>MdFieldInfo</code> type:</p>
+
+<pre><code>[DebuggerHidden]
+[DebuggerStepThrough]
+[TargetedPatchingOptOut("Performance critical to inline this type of method across NGen image boundaries")]
+public override object GetValue(object obj)
+{
+  return this.GetValue(false);
+}
+[SecuritySafeCritical]
+private object GetValue(bool raw)
+{
+  object obj = MdConstant.GetValue(this.GetRuntimeModule().MetadataImport, this.m_tkField, this.FieldType.GetTypeHandleInternal(), raw);
+  if (obj == DBNull.Value)
+    throw new NotSupportedException(Environment.GetResourceString("Arg_EnumLitValueNotFound"));
+  else
+    return obj;
+}
+</code></pre>
+
+<p>When you get a <code>FieldInfo</code> for the non-constant value you get the <code>RtFieldInfo</code> type and it does do a security check.</p>
+
+<p>Here's decompiled code for the <code>RtFieldInfo</code> type:</p>
+
+<pre><code>public override object GetValue(object obj)
+{
+  StackCrawlMark stackMark = StackCrawlMark.LookForMyCaller;
+  return this.InternalGetValue(obj, ref stackMark);
+}
+
+[SecuritySafeCritical]
+[DebuggerStepThrough]
+[DebuggerHidden]
+internal object InternalGetValue(object obj, ref StackCrawlMark stackMark)
+{
+  INVOCATION_FLAGS invocationFlags = this.InvocationFlags;
+  RuntimeType runtimeType1 = this.DeclaringType as RuntimeType;
+  if ((invocationFlags &amp; INVOCATION_FLAGS.INVOCATION_FLAGS_NO_INVOKE) != INVOCATION_FLAGS.INVOCATION_FLAGS_UNKNOWN)
+  {
+    if (runtimeType1 != (RuntimeType) null &amp;&amp; this.DeclaringType.ContainsGenericParameters)
+      throw new InvalidOperationException(Environment.GetResourceString("Arg_UnboundGenField"));
+    if (runtimeType1 == (RuntimeType) null &amp;&amp; this.Module.Assembly.ReflectionOnly || runtimeType1 is ReflectionOnlyType)
+      throw new InvalidOperationException(Environment.GetResourceString("Arg_ReflectionOnlyField"));
+    else
+      throw new FieldAccessException();
+  }
+  else
+  {
+    this.CheckConsistency(obj);
+    if ((invocationFlags &amp; INVOCATION_FLAGS.INVOCATION_FLAGS_NON_W8P_FX_API) != INVOCATION_FLAGS.INVOCATION_FLAGS_UNKNOWN)
+    {
+      RuntimeAssembly executingAssembly = RuntimeAssembly.GetExecutingAssembly(ref stackMark);
+      if ((Assembly) executingAssembly != (Assembly) null &amp;&amp; !executingAssembly.IsSafeForReflection())
+        throw new InvalidOperationException(Environment.GetResourceString("InvalidOperation_APIInvalidForCurrentContext", new object[1]
+        {
+          (object) this.FullName
+        }));
+    }
+    RuntimeType runtimeType2 = (RuntimeType) this.FieldType;
+    if ((invocationFlags &amp; INVOCATION_FLAGS.INVOCATION_FLAGS_NEED_SECURITY) != INVOCATION_FLAGS.INVOCATION_FLAGS_UNKNOWN)
+      RtFieldInfo.PerformVisibilityCheckOnField(this.m_fieldHandle, obj, this.m_declaringType, this.m_fieldAttributes, (uint) (this.m_invocationFlags &amp; ~INVOCATION_FLAGS.INVOCATION_FLAGS_IS_CTOR));
+    return this.UnsafeGetValue(obj);
+  }
+}
+</code></pre>

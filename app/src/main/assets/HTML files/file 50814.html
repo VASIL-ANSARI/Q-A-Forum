@@ -1,0 +1,36 @@
+<p>First, I would recommend checking if the user is a guest before you check the status. Otherwise, you'd be trying to grab the status of guests, which is not possible.</p>
+
+<p>Second, you have access to the user with the <code>user</code> method so you can just grab the status off the user like this:</p>
+
+<pre><code>public function handle($request, Closure $next)
+{
+    if ($this-&gt;auth-&gt;guest()) {
+        if ($request-&gt;ajax()) {
+            return response('Unauthorized.', 401);
+        } else {
+            return redirect()-&gt;guest('auth/login');
+        }
+    }
+
+    if ($this-&gt;auth-&gt;user()-&gt;status === 0) {
+        Session::flash('message', 'Your account hasn\'t been activated, please try again later.');
+        return redirect('/');
+    }
+
+    return $next($request);
+}
+</code></pre>
+
+<p>Extra tidbit: Laravel has a <a href="http://laravel.com/docs/5.1/eloquent-mutators#attribute-casting" rel="nofollow"><code>$casts</code></a> property you can add to your models. So, if you add this to your User model:</p>
+
+<pre><code>protected $casts = [
+    'status' =&gt; 'boolean'
+];
+</code></pre>
+
+<p>It will automatically convert "cast" <code>status</code> into a boolean value so you can just do this:</p>
+
+<pre><code>if (!$this-&gt;auth-&gt;user()-&gt;status) {
+    // User's status is false
+}
+</code></pre>

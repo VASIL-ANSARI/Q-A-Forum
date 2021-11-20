@@ -1,0 +1,68 @@
+<p>It isn't a problem because you can verify the authenticity of the cookie. Facebook includes a value called sig with each cookie. I won't go into full details, but basically, you append your API secret to the cookie, remove the sig value, hash the cookie value and verify that the hash matches the sig. Because you and Facebook are the only ones that know the value of the API secret you can be sure that the cookie wasn't tampered with.</p>
+
+<p>The other side of the things, the user viewing the contents of the cookie, doesnt matter either. The cookie only contains an access token associated with that user. If the user tries to tamper with the cookie the only thing that will happen is they will make the cookie invalid. And their access token only gets them access to their own account anyway.</p>
+
+<p>The most important thing is verifying the cookie is authentic. Many people dont do this and do cause huge security issues. For example, the cookie contains the facebook user id. Say I get that user Id then ask my user for their credit card. If I store that credit card with that user ID, but dont validate the cookie, anyone could come in and change the user id value in there cookie and get access to private data. However, if I verify the cookie with the API secret, I would know if the cookie was tampered with.</p>
+
+<p>Here is how we validate the cookie in my Facebook C# SDK (http://facebooksdk.codeplex.com):</p>
+
+<pre><code>        /// &lt;summary&gt;
+        /// Validates a session_version=3 style session object.
+        /// &lt;/summary&gt;
+        /// &lt;param name="session"&gt;The session to validate.&lt;/param&gt;
+        protected override void ValidateSessionObject(FacebookSession session)
+        {
+            if (session == null)
+            {
+                return;
+            }
+
+            var signature = this.GenerateSignature(session);
+            if (session.Signature == signature.ToString())
+            {
+                return;
+            }
+
+            session = null;
+        }
+
+        /// &lt;summary&gt;
+        /// Generates a MD5 signature for the facebook session.
+        /// &lt;/summary&gt;
+        /// &lt;param name="session"&gt;The session to generate a signature.&lt;/param&gt;
+        /// &lt;returns&gt;An MD5 signature.&lt;/returns&gt;
+        /// &lt;exception cref="System.ArgumentNullException"&gt;If the session is null.&lt;/exception&gt;
+        /// &lt;exception cref="System.InvalidOperationException"&gt;If there is a problem generating the hash.&lt;/exception&gt;
+        protected override string GenerateSignature(FacebookSession session)
+        {
+            var args = session.Dictionary;
+            StringBuilder payload = new StringBuilder();
+            var parts = (from a in args
+                         orderby a.Key
+                         where a.Key != "sig"
+                         select string.Format(CultureInfo.InvariantCulture, "{0}={1}", a.Key, a.Value)).ToList();
+            parts.ForEach((s) =&gt; { payload.Append(s); });
+            payload.Append(this.ApiSecret);
+            byte[] hash = null;
+            using (var md5 = System.Security.Cryptography.MD5CryptoServiceProvider.Create())
+            {
+                if (md5 != null)
+                {
+                    hash = md5.ComputeHash(Encoding.UTF8.GetBytes(payload.ToString()));
+                }
+            }
+
+            if (hash == null)
+            {
+                throw new InvalidOperationException("Hash is not valid.");
+            }
+
+            StringBuilder signature = new StringBuilder();
+            for (int i = 0; i &lt; hash.Length; i++)
+            {
+                signature.Append(hash[i].ToString("x2", CultureInfo.InvariantCulture));
+            }
+
+            return signature.ToString();
+        }
+</code></pre>

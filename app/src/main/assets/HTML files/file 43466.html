@@ -1,0 +1,11 @@
+<p>I faced this same problem as well, and the only solution I could find was to write my own <code>malloc</code> and <code>free</code>.  I didn't need anything special, so I just modeled my code after that shown in K&amp;R's <em>The C Programming Language</em> (they have a naive example documented).</p>
+
+<p>I then created two heaps: one for internal memory, and one for external memory.  My stack is in an entirely different block of memory (CCRAM on an STM32F4), so I didn't need to worry about <code>sbrk</code>.  However, I did have to know the start address of my internal SRAM heap based on the size of the data and bss segments.  That was determined from <code>extern</code> symbols injected by the linker script.  </p>
+
+<p>I have enough information about my heap to know its current size, amount of free space, and whether there is enough contiguous memory to perform an allocation.  If there's not enough in internal SRAM, it tries external SRAM. If there's not enough memory there, it's no different than the default <code>malloc</code> running out of memory.</p>
+
+<p>I am using the GNU toolchain, so I was able to employ the <a href="http://stackoverflow.com/questions/13961774/gnu-gcc-ld-wrapping-a-call-to-symbol-with-caller-and-callee-defined-in-the-sam">--wrap</a> option to override the C standard library's default <code>malloc</code>, <code>free</code>, <code>realloc</code>, and <code>calloc</code> (Actually <code>malloc_r</code>, <code>free_r</code>, <code>realloc_r</code> and <code>calloc_r</code> since I'm using newlib).  Since <code>new</code> and <code>delete</code> eventually call <code>malloc</code> and friends, I was able to make it work (at least for my needs).  </p>
+
+<p>I'm not terribly confident with this approach, but it's the best I could do within the limitations of my abilities.  Consider with scrutiny.</p>
+
+<p>I would be interested in knowing a simpler solution.</p>

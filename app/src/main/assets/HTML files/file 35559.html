@@ -1,0 +1,55 @@
+<p>While it is possible to use strings in order to apply conditions to a query, it can be unsafe, because of the risk of SQL injection. The better way for applying conditions to a query is using the <code>filter()</code> method. You can take the latest version of Pony ORM from <a href="https://github.com/ponyorm/pony" rel="nofollow">https://github.com/ponyorm/pony</a> repository and try a couple of examples provided below.</p>
+
+<p>First we define entities and create a couple of objects:</p>
+
+<pre><code>from decimal import Decimal
+from pony.orm import *
+
+db = Database('sqlite', ':memory:')
+
+class Product(db.Entity):
+    name = Required(unicode)
+    description = Required(unicode)
+    price = Required(Decimal)
+    quantity = Required(int, default=0)
+
+db.generate_mapping(create_tables=True)
+
+with db_session:
+    Product(name='iPad', description='Air, 16GB', price=Decimal('478.99'), quantity=10)
+    Product(name='iPad', description='Mini, 16GB', price=Decimal('284.95'), quantity=15)
+    Product(name='iPad', description='16GB', price=Decimal('299.00'), quantity=10)
+</code></pre>
+
+<p>Now we'll apply filters passing them as keyword arguments:</p>
+
+<pre><code>def find_by_kwargs(**kwargs):
+    q = select(p for p in Product)
+    q = q.filter(**kwargs)
+    return list(q)
+
+with db_session:
+    products = find_by_kwargs(name='iPad', quantity=10)
+    for p in products:
+        print p.name, p.description, p.price, p.quantity
+</code></pre>
+
+<p>Another option is to use lambdas in order to specify the conditions:</p>
+
+<pre><code>def find_by_params(name=None, min_price=None, max_price=None):
+    q = select(p for p in Product)
+    if name is not None:
+        q = q.filter(lambda p: p.name.startswith(name))
+    if min_price is not None:
+        q = q.filter(lambda p: p.price &gt;= min_price)
+    if max_price is not None:
+        q = q.filter(lambda p: p.price &lt;= max_price)
+    return list(q)
+
+with db_session:
+    products = find_by_params(name='iPad', max_price=400)
+    for p in products:
+        print p.name, p.description, p.price, p.quantity
+</code></pre>
+
+<p>As you can see filters can be applied dynamically. You can find more information about using filters following by this link: <a href="http://doc.ponyorm.com/queries.html#Query.filter" rel="nofollow">http://doc.ponyorm.com/queries.html#Query.filter</a></p>

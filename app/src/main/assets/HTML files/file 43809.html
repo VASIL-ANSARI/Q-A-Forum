@@ -1,0 +1,64 @@
+<p>The Python 2 data model says the following on <a href="https://docs.python.org/2/reference/datamodel.html#slots" rel="nofollow"><code>__slots__</code></a>:</p>
+
+<blockquote>
+  <ul>
+  <li>When inheriting from a class without <code>__slots__</code>, the <code>__dict__</code> attribute of that class will always be accessible, so a <code>__slots__</code> definition in the subclass is meaningless.</li>
+  </ul>
+</blockquote>
+
+<p>And that is what is happening here. In Python 2 the abstract base classes in the <code>collections</code> module did not have the <code>__slots__</code> at all:</p>
+
+<pre><code>&gt;&gt;&gt; from collections import Sequence
+&gt;&gt;&gt; Sequence.__slots__
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+AttributeError: type object 'Sequence' has no attribute '__slots__'
+</code></pre>
+
+<p>This was reported as the <a href="http://bugs.python.org/issue11333" rel="nofollow">issue 11333</a> in CPython issue tracker, and was fixed in Python 3.3.</p>
+
+<p>In Python 3.3+ the <code>Sequence</code> abstract base class now has <code>__slots__</code> set to an empty tuple:</p>
+
+<pre><code>&gt;&gt;&gt; from collections import Sequence
+&gt;&gt;&gt; Sequence.__slots__
+()
+</code></pre>
+
+<hr>
+
+<p>Thus in Python 2, you cannot inherit from a <code>collections</code> base class and have memory efficient storage with <code>__slots__</code> at the same time. </p>
+
+<hr>
+
+<p>Note however that even though the documentation on <a href="https://docs.python.org/2/library/collections.html" rel="nofollow"><code>collections</code> abstract base classes</a> claims that</p>
+
+<blockquote>
+  <p>These ABCs allow us to ask classes or instances if they provide particular functionality, for example: </p>
+
+<pre><code>size = None
+if isinstance(myvar, collections.Sized):
+    size = len(myvar)
+</code></pre>
+</blockquote>
+
+<p><a href="http://bugs.python.org/issue23864" rel="nofollow">This is not the case with <code>Sequence</code></a>; simply implementing all the methods required by the <code>Sequence</code> does not make instances of your class to pass the <code>isinstance</code> check. </p>
+
+<p>The reason for that is that the <a href="https://hg.python.org/cpython/file/dedf481ec2be/Lib/_abcoll.py#l587" rel="nofollow"><code>Sequence</code></a> class does not have a <a href="https://docs.python.org/2/library/abc.html#abc.ABCMeta.__subclasshook__" rel="nofollow"><code>__subclasshook__</code></a>; and in its absence, the parent class <code>__subclasshook__</code> is consulted instead; in this case <a href="https://hg.python.org/cpython/file/dedf481ec2be/Lib/_abcoll.py#l98" rel="nofollow"><code>Sized.__subclasshook__</code></a>; and that returns <code>NotImplemented</code> if the tested-against class wasn't <em>exactly</em> <code>Sized</code>. </p>
+
+<p>On the other hand, one couldn't distinguish between a mapping type and a sequence type by the magic methods, as both of them can have the exactly same magic methods - of <code>collections.OrderedDict</code> has <em>all</em> the magic methods of a <code>Sequence</code>, including the <code>__reversed__</code> method, yet it isn't a sequence.</p>
+
+<p>However, you still do not need to inherit from <code>Sequence</code> to make <code>isinstance(Point, Sequence)</code> return <code>True</code>. In the following example, the <code>Point</code> is the same, except derived from <code>object</code> instead of <code>Sequence</code>, on Python 2:</p>
+
+<pre><code>&gt;&gt;&gt; pt = Point(12, 42)
+&gt;&gt;&gt; pt.z = 5
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+AttributeError: 'Point' object has no attribute 'z'
+&gt;&gt;&gt; isinstance(pt, Sequence)
+False
+&gt;&gt;&gt; Sequence.register(pt)
+&gt;&gt;&gt; isinstance(pt, Sequence)
+True
+</code></pre>
+
+<p>You can register any class as a subclass of the abstract base class for the purpose of <code>isinstance</code> checks; and of the extra mix-in methods, you really need to implement only <code>count</code> and <code>index</code>; the functionality for others will be filled in by Python runtime.</p>

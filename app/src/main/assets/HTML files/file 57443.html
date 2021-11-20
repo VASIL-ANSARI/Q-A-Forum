@@ -1,0 +1,68 @@
+<p>These WinAPI functions all require cleanup: <code>::CetDC</code>, <code>::CreateCompatibleDC</code>, <code>::CreateCompatibleBitmap</code>. See documentation for each of them. Without cleanup, your program could quickly use its 10,000 GDI resource limit and crash.</p>
+
+<p>You don't have to worry about cleanup if you use the MFC version of these WinAPI functions (you should still see the docs to make sure). This is MFC example for double-buffering:</p>
+
+<pre><code>void foo::OnLButtonDown(UINT nFlags, CPoint point)
+{
+    CWnd::OnLButtonDown(nFlags, point);
+
+    CClientDC dc(this); 
+
+    CRect rect; 
+    GetClientRect(&amp;rect); 
+
+    //create memory dc 
+    CDC memdc;
+    memdc.CreateCompatibleDC(&amp;dc);
+    CBitmap bitmap; 
+    bitmap.CreateCompatibleBitmap(&amp;dc, rect.Width(), rect.Height()); 
+    memdc.SelectObject(bitmap); 
+
+    //some random drawings:
+    memdc.SelectObject(GetStockObject(BLACK_PEN)); 
+    memdc.SelectObject(GetStockObject(GRAY_BRUSH)); 
+    memdc.Rectangle(10, 10, 100, 100); 
+
+    //draw memory DC to destination DC
+    dc.BitBlt(0, 0, rect.Width(), rect.Height(), &amp;memdc, 0, 0, SRCCOPY);
+}; 
+</code></pre>
+
+<p>Your goal is probably to draw on screen buffer, as suggested in comments. In which case you declare <code>memdc</code> and <code>bitmap</code> as member data:</p>
+
+<pre><code>//declare member data
+CDC m_memdc;
+CBitmap m_bitmap;
+CRect m_rect;
+CPoint m_point;
+
+void foo::initialize_once()
+{
+    ASSERT(IsWindow(m_hWnd));
+    GetClientRect(&amp;m_rect);
+    //create memdc
+    m_memdc.CreateCompatibleDC(0);
+    CBitmap bitmap;
+    bitmap.CreateCompatibleBitmap(&amp;m_memdc, m_rect.Width(), m_rect.Height());
+    m_memdc.SelectObject(bitmap);
+    //initialize memdc background color
+    m_memdc.FillSolidRect(m_rect, RGB(255,255,255));
+}
+
+void foo::OnLButtonDown(UINT nFlags, CPoint point)
+{
+    __super::OnLButtonDown(nFlags, point);
+    m_point = point;
+    m_memdc.MoveTo(point);
+};
+
+void OnMouseMove(UINT nFlags, CPoint point)
+{
+    __super::OnMouseMove(nFlags, point);
+    if (!(nFlags &amp; MK_LBUTTON)) return;
+    m_point = point;
+    m_memdc.LineTo(point);
+    CClientDC dc(this);
+    dc.BitBlt(0, 0, m_rect.Width(), m_rect.Height(), &amp;m_memdc, 0, 0, SRCCOPY);
+}   
+</code></pre>

@@ -1,0 +1,73 @@
+<p>This is because Spring Boot has auto-configured an exception handler <code>org.springframework.boot.autoconfigure.web.BasicErrorController</code> which is probably not present in your unit tests. A way to get it will be to use the Spring Boot testing support related annotations:</p>
+
+<pre><code>@SpringApplicationConfiguration
+@WebIntegrationTest
+</code></pre>
+
+<p>More details are <a href="http://docs.spring.io/spring-boot/docs/current-SNAPSHOT/reference/htmlsingle/#boot-features-testing-spring-boot-applications" rel="nofollow">here</a></p>
+
+<p><strong>Update</strong>: 
+You are absolutely right, the behavior is very different in UI vs in test, the error pages which respond to status codes are not correctly hooked up in a non-servlet test environment. Improving this behavior can be a good bug to open for Spring MVC and/or Spring Boot.</p>
+
+<p>For now, I have a workaround which simulates the behavior of <code>BasicErrorController</code> the following way:</p>
+
+<pre><code>@RunWith(SpringJUnit4ClassRunner.class)
+@SpringApplicationConfiguration(classes = {RestApplication.class, TestConfiguration.class})
+@WebIntegrationTest
+public class PostControllerTest {
+
+    private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private FilterChainProxy springSecurityFilterChain;
+
+    @Before
+    public void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .addFilter(springSecurityFilterChain)
+                .build();
+    }  
+
+    @Test
+    public void bookmarkMissingActionTypeParam() throws Exception{
+        // @formatter:off
+        mockMvc.perform(
+                    post("/post/action/bookmark")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .param("postId", "55ab8831036437e96e8250b6")
+                        )
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exception", containsString("MissingServletRequestParameterException")));
+        // @formatter:on
+    }
+}
+     @Configuration
+    public static class TestConfiguration {
+
+
+        @Bean
+        public ErrorController errorController(ErrorAttributes errorAttributes) {
+            return new ErrorController(errorAttributes);
+        }
+    }
+@ControllerAdvice
+class ErrorController extends BasicErrorController {
+
+    public ErrorController(ErrorAttributes errorAttributes) {
+        super(errorAttributes);
+    }
+
+    @Override
+    @ExceptionHandler(Exception.class)
+    @ResponseBody
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; error(HttpServletRequest request) {
+        return super.error(request);
+    }
+}
+</code></pre>
+
+<p>What I am doing here is adding a <code>ControllerAdvice</code> which handles the Exception flow and delegates back to the <code>BasicErrorController</code>. This would atleast make the behavior consistent for you. </p>

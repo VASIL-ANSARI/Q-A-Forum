@@ -1,0 +1,56 @@
+<p>Can you move connection details to your config files? Here is an article about <a href="http://msdn.microsoft.com/en-us/library/system.data.entityclient.entityconnection.connectionstring.aspx" rel="nofollow">connection strings</a>. And following the same examples as in the article, here is the initialization and use of the context:</p>
+
+<pre><code>using (EntityConnection connection =  EntityConnection("name=AdventureWorksEntities"))
+{
+    AdventureWorksEntities context = new AdventureWorksEntities(connection);
+    context.AddObject("Customer", customer);
+    context.SaveChanges();
+}
+</code></pre>
+
+<p>EDIT: there is no need to repeat the connection building code in the calling clients. You should hide these details away from the callers. Here is example of the factory that returns new object context:</p>
+
+<pre><code>//app.config
+&lt;connectionStrings&gt;
+    &lt;add name="TestEntities" connectionString="...." /&gt;
+&lt;/connectionStrings&gt;
+
+//data entities
+public partial class TestEntities : ObjectContext
+{
+    public TestEntities() : base("name=TestEntities", "TestEntities")
+    {
+        ...
+    }
+    ....
+}
+
+//factory in Data Access layer
+public sealed class TestEntitiesFactory
+{
+    public static Func&lt;TestEntities&gt; GetNewTestEntitiesInstance { get; set; }
+
+    static TestEntitiesFactory()
+    {
+        GetNewTestEntitiesInstance = TestEntitiesCreator.CreateTestEntities;
+    }
+}
+
+public sealed class TestEntitiesDefaultCreator
+{
+    public static TestEntities CreateTestEntities()
+    {
+        TestEntities test = new TestEntities();
+
+        //whatever initializations you need
+
+        return test;
+    }
+}
+
+//business layer
+using (TestEntities ctx = TestEntitiesFactory.GetNewTestEntitiesInstance())
+{
+
+}
+</code></pre>

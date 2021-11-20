@@ -1,0 +1,125 @@
+<p>So after some fiddling around I figured out a solution to my question by programmatically rendering each gridview and header:</p>
+
+<p>Using a basic layout like this (since the number of gridviews needed is unknown):</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent" &gt;
+        &lt;LinearLayout
+            android:id="@+id/appListFragment"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical" /&gt;
+&lt;/ScrollView&gt;
+</code></pre>
+
+<p>And a buildAdapter method in the fragment like so:</p>
+
+<pre><code>boolean headerSectionsRendered = false;
+...
+private void buildAdapter() {
+    String gridViewIdString;
+
+    /* fill the adapter */
+    for (String category : mApps.keySet()) {
+      /* get all of the apps for current category */
+      mAppAdapter = new AppsAdapter(getActivity(), mApps.get(category));
+
+      /* begin programmatically creating the view */
+      LinearLayout appListLayout = (LinearLayout) getActivity()
+          .findViewById(R.id.appListFragment);
+
+      /* create the section header */
+      TextView appSectionHeader = new TextView(getActivity());
+      appSectionHeader.setLayoutParams(new LinearLayout.LayoutParams(
+          LinearLayout.LayoutParams.MATCH_PARENT,
+          LinearLayout.LayoutParams.WRAP_CONTENT));
+      appSectionHeader.setText(category);
+      LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) appSectionHeader
+          .getLayoutParams();
+      params.setMargins(15, 8, 15, 5); // left, top, right, bottom
+      appSectionHeader.setLayoutParams(params);
+      appSectionHeader.setTextSize(16);
+
+      /* create GridView for the current section*/
+      GridView appSectionGridView = new GridView(getActivity());
+      appSectionGridView.setLayoutParams(new LinearLayout.LayoutParams(
+          LinearLayout.LayoutParams.MATCH_PARENT,
+          LinearLayout.LayoutParams.WRAP_CONTENT));
+      appSectionGridView.setVerticalSpacing(10);
+      appSectionGridView.setHorizontalSpacing(10);
+      appSectionGridView.setNumColumns(3);
+      appSectionGridView.setGravity(Gravity.CENTER);
+      appSectionGridView.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+      appSectionGridView.setOnItemClickListener(new OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView&lt;?&gt; parent, View v, int position,
+            long id) {
+          /* position of clicked app and adapter it was located in */
+          showApp(position, parent.getAdapter());
+        }
+      });
+
+      if (!headerSectionsRendered) {
+        headerCount++;
+        appSectionGridView.setAdapter(mAppAdapter);
+        appListLayout.addView(appSectionHeader);
+        appListLayout.addView(appSectionGridView);
+      }
+      if (headerCount == mApps.keySet().size()) {
+        headerSectionsRendered = true;
+      }
+    }
+  }
+</code></pre>
+
+<p>With an Apps adapter that looks like this:</p>
+
+<pre><code>private class AppsAdapter extends BaseAdapter {
+
+    private final Activity mContext;
+    private final App[] apps;
+
+    public AppsAdapter(Activity context, App[] appList) {
+      mContext = context;
+      apps = appList;
+    }
+
+    public int getCount() {
+      return apps.length;
+    }
+
+    public App getItem(int position) {
+      return apps[position];
+    }
+
+    public long getItemId(int position) {
+      return position;
+    }
+
+    public View getView(int position, View convertView, ViewGroup parent) {
+      View gridItem;
+
+      gridItem = new View(mContext);
+      /* app_cell is the layout for the individual items */
+      gridItem = inflater.inflate(R.layout.app_cell, null);
+      ImageView appIcon = (ImageView) gridItem.findViewById(R.id.app_cell_icon);
+      TextView appTitle = (TextView) gridItem.findViewById(R.id.app_cell_title);
+
+      if (appIcon != null &amp;&amp; appTitle != null) {
+        mContext.loadImage(apps[position].getIcon(), appIcon);
+        appTitle.setText(apps[position].getTitle());
+      }
+
+      return gridItem;
+    }
+
+    @Override
+    public int getViewTypeCount() {
+      return 1;
+    }
+  }
+</code></pre>
+
+<p>I did not include all the specific details of how I implemented this solution, but if you would be curious to learn more or have any comments or suggestions please let me know!</p>

@@ -1,0 +1,350 @@
+<p>This is the way I handle entities with hidden inputs:</p>
+
+<p><strong>DataTransformer</strong></p>
+
+<pre><code>&lt;?php
+
+namespace Comakai\CQZBundle\Form\DataTransformer;
+
+use Symfony\Component\Form\DataTransformerInterface;
+use Symfony\Component\Form\Exception\TransformationFailedException;
+use Doctrine\Common\Persistence\ObjectManager;
+
+class EntityToIdTransformer implements DataTransformerInterface
+{
+    /**
+     * @var ObjectManager
+     */
+    private $om;
+    private $entityClass;
+
+    /**
+     * @param ObjectManager $om
+     */
+    public function __construct(ObjectManager $om, $entityClass)
+    {
+        $this-&gt;om = $om;
+        $this-&gt;entityClass = $entityClass;
+    }
+
+    /**
+     * Transforms an object to a string (id).
+     *
+     * @param  Object|null $entity
+     * @return string
+     */
+    public function transform($entity)
+    {
+        if (null === $entity) {
+            return "";
+        }
+
+        return $entity-&gt;getId();
+    }
+
+    /**
+     * Transforms a string (id) to an object.
+     *
+     * @param  string $id
+     * @return Object|null
+     * @throws TransformationFailedException if object is not found.
+     */
+    public function reverseTransform($id)
+    {
+        if (!$id) {
+            return null;
+        }
+
+        $entity = $this-&gt;om-&gt;getRepository($this-&gt;entityClass)-&gt;findOneById($id);
+
+        if (null === $entity) {
+
+            throw new TransformationFailedException(sprintf(
+                    'An entity of class ' . $this-&gt;entityClass . ' with id "%s" does not exist!', $id
+            ));
+        }
+
+        return $entity;
+    }
+
+}
+</code></pre>
+
+<p><strong>FormType</strong></p>
+
+<pre><code>&lt;?php
+
+namespace Comakai\CQZBundle\Form\Type;
+
+use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormBuilderInterface;
+use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\Common\Persistence\ObjectManager;
+use Comakai\CQZBundle\Form\DataTransformer\EntityToIdTransformer;
+
+class EntityHiddenType extends AbstractType
+{
+    /**
+     * @var ManagerRegistry
+     */
+    private $registry;
+
+    /**
+     * @var ObjectManager
+     */
+    private $om;
+    private $cache;
+
+    /**
+     * @param ObjectManager $om
+     */
+    public function __construct(ManagerRegistry $registry)
+    {
+        $this-&gt;registry = $registry;
+        $this-&gt;om = $registry-&gt;getManager();
+        $this-&gt;cache = [];
+    }
+
+    public function buildForm(FormBuilderInterface $builder, array $options)
+    {
+        $class = (empty($options['data_class'])) ? $this-&gt;getClassFromMetadata($builder-&gt;getName(), $builder-&gt;getParent()-&gt;getDataClass()) : $options['data_class'];
+
+        $transformer = new EntityToIdTransformer($this-&gt;om, $class);
+        $builder-&gt;addViewTransformer($transformer);
+
+        $builder-&gt;setAttribute('data_class', $class);
+    }
+
+    public function getParent()
+    {
+        return 'hidden';
+    }
+
+    public function getName()
+    {
+        return 'entity_hidden';
+    }
+
+    protected function getClassFromMetadata($name, $parentClass)
+    {
+        /* @var $md \Doctrine\ORM\Mapping\ClassMetadata */
+        $md = $this-&gt;getMetadata($parentClass)[0];
+        $a = $md-&gt;getAssociationMapping($name);
+        $class = $a['targetEntity'];
+
+        return $class;
+    }
+
+    protected function getMetadata($class)
+    {
+        if (array_key_exists($class, $this-&gt;cache)) {
+            return $this-&gt;cache[$class];
+        }
+
+        $this-&gt;cache[$class] = null;
+        foreach ($this-&gt;registry-&gt;getManagers() as $name =&gt; $em) {
+            try {
+                return $this-&gt;cache[$class] = array($em-&gt;getClassMetadata($class), $name);
+            } catch (MappingException $e) {
+                // not an entity or mapped super class
+            } catch (LegacyMappingException $e) {
+                // not an entity or mapped super class, using Doctrine ORM 2.2
+            }
+        }
+    }
+
+}
+</code></pre>
+
+<p><strong>Config (services.yml)</strong></p>
+
+<pre><code>services:
+    cqz.form.type.entity_hidden:
+        class: Comakai\CQZBundle\Form\Type\EntityHiddenType
+        arguments: ["@doctrine"]
+        tags:
+                -  { name: form.type, alias: entity_hidden }
+</code></pre>
+
+<p><strong>JobType</strong></p>
+
+<pre><code>$builder-&gt;add('company', 'entity_hidden');
+</code></pre>
+
+<p><strong>Then in your controller</strong></p>
+
+<pre><code>$job = new \Niche\JobBundle\Entity\Job();
+$type = new \Niche\JobBundle\Form\JobType();
+
+$job-&gt;setCompany($businessUser);
+
+$form = $this-&gt;createForm($type, $job);
+</code></pre>
+
+<p>This way you'll have a reusable entity_hidden type.</p>
+
+<p><strong>UPDATE FOR 2.3</strong></p>
+
+<p>Since there is no $builder->getParent() anymore (<a href="https://github.com/symfony/symfony/blob/master/UPGRADE-2.2.md">https://github.com/symfony/symfony/blob/master/UPGRADE-2.2.md</a>) and because I don't want to set the class of the field's data, I came up with this (btw, now I'm using the form.type_guesser.doctrine service to get the class):</p>
+
+<p><strong>Config</strong></p>
+
+<pre><code>cqz.form.type.suggest:
+        class: Comakai\CQZBundle\Form\Type\SuggestType
+        arguments: ["@doctrine.orm.entity_manager", "@form.type_guesser.doctrine"]
+</code></pre>
+
+<p><strong>DataTransformer</strong></p>
+
+<pre><code>&lt;?php
+
+namespace Comakai\CQZBundle\Form\DataTransformer;
+
+use Symfony\Component\Form\DataTransformerInterface;
+use Symfony\Component\Form\Exception\TransformationFailedException;
+use Doctrine\Common\Persistence\ObjectManager;
+
+class ObjectToIdTransformer implements DataTransformerInterface
+{
+     /**
+     * @var ObjectManager
+     */
+    private $om;
+    private $objectClass;
+
+    /**
+     * @param ObjectManager $om
+     */
+    public function __construct(ObjectManager $om, $objectClass = null)
+    {
+        $this-&gt;om = $om;
+        $this-&gt;objectClass = $objectClass;
+    }
+
+    /**
+     * Transforms an object to an id.
+     *
+     * @param  Object|null $object
+     * @return mixed
+     */
+    public function transform($object)
+    {
+        if (null === $object) {
+
+            return '';
+        }
+
+        return $object-&gt;getId();
+    }
+
+    /**
+     * Transforms an id to an object.
+     *
+     * @param  mixed $id
+     *
+     * @return Object|null
+     *
+     * @throws TransformationFailedException if object is not found.
+     */
+    public function reverseTransform($id)
+    {
+        if (!$id) {
+
+            return null;
+        }
+
+        $object = $this-&gt;om
+            -&gt;getRepository($this-&gt;objectClass)
+            -&gt;find($id)
+        ;
+
+        if (null === $object) {
+
+            throw new TransformationFailedException(sprintf(
+                'An instance of "%s" with id "%s" does not exist!',
+                $this-&gt;objectClass,
+                $id
+            ));
+        }
+
+        return $object;
+    }
+
+    public function getObjectClass()
+    {
+        return $this-&gt;objectClass;
+    }
+
+    public function setObjectClass($class)
+    {
+        $this-&gt;objectClass = $class;
+    }
+}
+</code></pre>
+
+<p><strong>Type</strong></p>
+
+<pre><code>&lt;?php
+
+namespace Comakai\CQZBundle\Form\Type;
+
+use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormBuilderInterface;
+use Doctrine\Common\Persistence\ObjectManager;
+use Symfony\Bridge\Doctrine\Form\DoctrineOrmTypeGuesser;
+use Symfony\Component\OptionsResolver\OptionsResolverInterface;
+use Comakai\CQZBundle\Form\DataTransformer\ObjectToIdTransformer;
+
+use Symfony\Component\Form\FormView;
+use Symfony\Component\Form\FormInterface;
+
+use Symfony\Component\Form\FormEvents;
+use Symfony\Component\Form\FormEvent;
+
+class SuggestType extends AbstractType
+{
+    /**
+     * @var ObjectManager
+     */
+    private $om;
+    private $guesser;
+
+    /**
+     * @param ObjectManager $om
+     */
+    public function __construct(ObjectManager $om, DoctrineOrmTypeGuesser $guesser)
+    {
+        $this-&gt;om = $om;
+        $this-&gt;guesser = $guesser;
+    }
+
+    public function buildForm(FormBuilderInterface $builder, array $options)
+    {
+        $transformer = new ObjectToIdTransformer($this-&gt;om);
+        $builder-&gt;addModelTransformer($transformer);
+
+        if($options['class'] === null) {
+
+            $builder-&gt;addEventListener(FormEvents::PRE_SET_DATA, function(FormEvent $event) use ($transformer, $builder) {
+
+                /* @var $form \Symfony\Component\Form\Form */
+                $form = $event-&gt;getForm();
+                $class = $form-&gt;getParent()-&gt;getConfig()-&gt;getDataClass();
+                $property = $form-&gt;getName();
+                $guessedType = $this-&gt;guesser-&gt;guessType($class, $property);
+                $options = $guessedType-&gt;getOptions();
+
+                $transformer-&gt;setObjectClass($options['class']);
+
+            });
+
+        } else {
+
+            $transformer-&gt;setObjectClass($options['class']);
+
+        }
+    }
+    ...
+</code></pre>
+
+<p>I feel that using a PRE_SET_DATA to set the data class on the transformer is nasty, what do you think?</p>

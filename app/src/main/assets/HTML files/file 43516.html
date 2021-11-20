@@ -1,0 +1,47 @@
+<p>Splitting is more easy (IMO) than applying the regular expressions. You can extract these values with the following function by passing in a log line:</p>
+
+<pre><code>def year_month(s):
+     try:
+         discard, month, rest = s.split('/', 2)  # split twice on '/' 
+     except ValueError:
+         return None  # for last line without /
+     year = rest.split(':', 1)[0]
+     year = int(year)  # optional
+     return year, month
+</code></pre>
+
+<p>You can use the returned tuple from this function as a key to some dictionary:</p>
+
+<pre><code>d = {}
+for line in open('yourfile'):
+    ym = year_month(line)
+    if ym is None:
+         continue
+    x = d.setdefault(ym, [0])
+    x[0] += 1
+for ym in sorted(d):
+    print('Year: {0}, Month: {1}, Hits: {2}'.format(ym[0], ym[1], d[ym][0]))
+</code></pre>
+
+<p>If you want to use regular expressions you can replace the <code>year_month()</code> part with:</p>
+
+<pre><code>import re
+
+# see https://docs.python.org/2/howto/regex.html
+year_month_pattern = re.compile(r"""
+.*/
+(?P&lt;month&gt;.*)
+/
+(?P&lt;year&gt;\d*)
+:.*
+""", re.VERBOSE)
+
+def year_month(s):
+    res = year_month_pattern.match(s)
+    if res is None:
+        return None
+    try:
+        return int(res.group('year')), res.group('month')
+    except ValueError:
+        pass
+</code></pre>

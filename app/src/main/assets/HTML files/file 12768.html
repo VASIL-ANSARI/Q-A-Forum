@@ -1,0 +1,47 @@
+<p>Well, here's your first problem:</p>
+
+<pre><code>Graphics2D g2 = (Graphics2D) comp.getGraphics().create();
+g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, t));
+comp.paint(g2);
+g2.dispose();
+</code></pre>
+
+<p>You should only be painting components inside a call to <code>paint(Graphics g)</code>. Painting during a call to your <code>setTransparency</code> method is A Bad Idea, because it will be erased the next time Swing decides to call <code>paint</code>. You need to make your component handle it's own transparency inside the <code>paintComponent</code> method.</p>
+
+<p>Also this: <code>if (!th.getClass().isInstance(new NoSuchMethodError()))</code></p>
+
+<p>What on earth are you doing? What's wrong with a simple <code>catch (NoSuchMethodError e)</code>? Or, if you <em>really</em> want to use instanceof then <code>th instanceof NoSuchMethodError</code>?</p>
+
+<p>By the way, @WalterLaan and @JimN know what they're talking about. <code>setOpaque</code> (or, more accurately, <code>isOpaque</code>) is a rendering hint to the Swing engine that can help it optimize it's operation. Check the javadocs and you'll see what I mean. It's nothing to do with turning the background on or off. Well, that's not <em>entirely</em> true - <code>JComponent</code>, by default, does some cleverness with the <code>opaque</code> property to automatically paint the background if appropriate, but if you're handling your own painting then that cleverness will probably be overridden.</p>
+
+<p>EDIT: Regarding the NoSuchMethodError. Take a look at this:</p>
+
+<pre><code>void setTransparency(Window w, double t) {
+    try {
+        setOpacity17(w, t);
+        return;
+    }
+    catch (NoSuchMethodError e) {
+        System.err.println("JRE *is* less than 1.7!"); // We know the JRE must be &lt; 1.7 because the right methods are known to exist in 1.7.
+    }
+    catch (Throwable t) {
+        t.printStackTrace();
+    }
+    try {
+        setOpacity16(w, t);
+    }
+    catch (Throwable t) {
+        System.err.println("Boom!");
+    }
+}
+
+void setOpacity17(Window w, double t) {
+    ...
+}
+
+void setOpacity16(Window w, double t) {
+    ...
+}
+</code></pre>
+
+<p>That's a lot cleaner. Note the <code>return</code> that will short-circuit the function if the 1.7 version succeeds.</p>

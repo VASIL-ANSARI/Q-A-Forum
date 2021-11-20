@@ -1,0 +1,38 @@
+<p>That is happening because json.NET is looking for a property name in your class which matches the field name in the json. Since <code>name</code> does not resemble anything in the json it finds nothing.</p>
+
+<p>There are a couple of options for how to work around this. You can use an annotation to say what the json field you want to put there is, or you can change the name of the property. However, from you post it sounds like you're saying there could be an object called <code>X</code> or an object called <code>Y</code> in the json, neither of those options will make that deserialize correctly in all cases. I'll edit with some ideas for how you may want to handle that.</p>
+
+<p>Based on OP's comment, here's what you're looking for;</p>
+
+<pre><code>        public class RootObject
+        {
+            public Stats stats { get; set; }
+            public string response { get; set; }
+            public int runtimeMs { get; set; }
+        }
+
+        public class Stats
+        {
+            public Varient X { get; set; }
+            public Varient Y { get; set; }
+            public Varient Z { get; set; }
+        }
+
+        public class Variant
+        {
+            public string name { get; set; }
+            public string Found { get; set; }
+        }
+</code></pre>
+
+<p>In other places in your code you just have to have two code paths or do a conversion to avoid doing nullity checks everywhere.</p>
+
+<pre><code>if (myInstance.X != null)
+   // it was X that was in the json
+else if (myInstace.Y != null)
+   // it was Y
+else
+   // not sure what happened, perhaps neither X nor Y were present.
+</code></pre>
+
+<p>Now the other option is to make this just an intermediary then you define another type that just has one property named name and you give it a constructor that takes a <code>RootObject</code> and assigns whichever value isn't null to it's <code>name</code> property or whatever you want to call it. I would probably do something like this myself because if use a dictionary as shown in the EZI's answer or an object with fields named X, Y, and Z you have to perform nullity or keyexists checks all over the place in order to safely use the object.</p>

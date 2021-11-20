@@ -1,0 +1,45 @@
+<p>To derive a type and fix a value, use a <a href="http://www.w3.org/TR/xmlschema-0/#DerivByRestrict" rel="nofollow">restriction</a>:</p>
+
+<pre><code>&lt;xs:complexType name="signal" &gt;
+    &lt;xs:complexContent&gt;
+      &lt;xs:restriction base="aos:event"&gt;
+        &lt;xs:attribute name="type" type="aos:event_type" fixed="signal" use="required" /&gt;
+        &lt;xs:attribute name="source" type="aos:signal_source" use="required" /&gt;
+      &lt;/xs:restriction&gt;
+    &lt;/xs:complexContent&gt;
+ &lt;/xs:complexType&gt;
+</code></pre>
+
+<p>From reading the spec, I would have expected that you <a href="http://www.w3.org/TR/xmlschema-1/#c-rad" rel="nofollow">couldn't add attributes in a restriction</a> unless the base type had an <a href="http://www.w3.org/TR/xmlschema-1/#ct-attribute_wildcard" rel="nofollow">attribute wildcard</a>, but the W3C XSD validator accepts the above. If you run into problems, you can break up the definition into a restriction and an extension:</p>
+
+<pre><code>&lt;xs:complexType name="fixedSignalEvent"&gt;
+  &lt;xs:complexContent&gt;
+    &lt;xs:restriction base="aos:event"&gt;
+      &lt;xs:attribute name="type" type="aos:event_type" fixed="signal" use="required" /&gt;
+    &lt;/xs:restriction&gt;
+  &lt;/xs:complexContent&gt;
+&lt;/xs:complexType&gt;
+
+&lt;xs:complexType name="signal" &gt;
+  &lt;xs:complexContent&gt;
+    &lt;xs:extension base="aos:fixedSignalEvent"&gt;
+      &lt;xs:attribute name="source" type="aos:signal_source" use="required" /&gt;
+    &lt;/xs:extension&gt;
+  &lt;/xs:complexContent&gt;
+&lt;/xs:complexType&gt;
+</code></pre>
+
+<p>Another fix would be to add an <a href="http://www.w3.org/TR/xmlschema-1/#element-anyAttribute" rel="nofollow">attribute wildcard</a> to the base type.</p>
+
+<pre><code>&lt;xs:complexType name="event" abstract="true" &gt;
+    &lt;xs:attribute name="move" type="aos:move_ref" use="required" /&gt;
+    &lt;xs:attribute name="type" type="aos:event_type" use="required" /&gt;
+    &lt;xs:anyAttribute /&gt;
+&lt;/xs:complexType&gt;
+</code></pre>
+
+<p>This isn't an equivalent solution, as it allows an event to have anything for an attribute (which may be undesirable, generally speaking, but perhaps not for code generation), and it doesn't add an additional type (which is desirable).</p>
+
+<p>Note that any particles (elements, groups or wildcards) in the base must be <a href="http://www.w3.org/TR/xmlschema-0/#DerivByRestrict" rel="nofollow">repeated in the restriction</a>, else they won't be allowed in the element. If a restricted attribute is required on the base, it must also be required in the restriction. There are numerous other properties a restriction must fulfill to be a valid <a href="http://www.w3.org/TR/xmlschema-1/#derivation-ok-restriction" rel="nofollow">derivation</a> or <a href="http://www.w3.org/TR/xmlschema-1/#cos-particle-restrict" rel="nofollow">particle</a>. The spec isn't that readable, but you can usually stumble through it. </p>
+
+<p>See also: "<a href="http://bytes.com/topic/net/answers/604681-how-use-restrictions-extensions-xsd-simultanously" rel="nofollow">how to use restrictions and extensions in XSD simultanously</a>".</p>

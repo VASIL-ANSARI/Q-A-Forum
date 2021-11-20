@@ -1,0 +1,38 @@
+<p>mod_wsgi 4.1.0 introduces an option for this (<a href="http://modwsgi.readthedocs.org/en/latest/release-notes/version-4.1.0.html" rel="nofollow">http://modwsgi.readthedocs.org/en/latest/release-notes/version-4.1.0.html</a>); you would add to your Apache config:</p>
+
+<pre><code>WSGIPythonHashSeed random
+</code></pre>
+
+<p>If you can't run that version, you have to set the variable in the startup environment of the Apache process, which will be OS-specific. For Fedora or RHEL 7, you can create /etc/systemd/system/httpd.service:</p>
+
+<pre><code>.include /lib/systemd/system/httpd.service
+[Service]
+Environment=PYTHONHASHSEED=random
+</code></pre>
+
+<p>then <code>systemctl daemon-reload; systemctl restart httpd.service</code>. For pre-systemd Red Hats, you can edit /etc/sysconfig/httpd. For Debian, it's /etc/apache2/envvars.</p>
+
+<p>Here's a WSGI file to test if it's working (based on the example in the mod_wsgi docs):</p>
+
+<pre><code>import sys
+
+def application(environ, start_response):
+    status = '200 OK'
+
+    try:
+        hr = sys.flags.hash_randomization
+        if hr == 0:
+            output = 'Hash randomization disabled'
+        elif hr == 1:
+            output = 'Hash randomization enabled'
+        else:
+            output = 'Unknown hash randomization: ' + str(hr)
+    except AttributeError:
+        output = 'Hash randomization not supported'
+
+    response_headers = [('Content-type', 'text/plain'),
+                        ('Content-Length', str(len(output)))]
+    start_response(status, response_headers)
+
+    return [output]
+</code></pre>

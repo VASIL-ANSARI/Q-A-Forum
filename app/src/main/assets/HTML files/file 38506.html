@@ -1,0 +1,334 @@
+<blockquote>
+  <p>1) How can i make the widget persist after dropping ?</p>
+</blockquote>
+
+<p>Please use this to understand how to use <code>QItemDelegate</code> (running in Windows 7, Python 2.7, pyqt4):</p>
+
+<pre><code>import sys
+import os
+from PyQt4 import QtCore, QtGui
+from functools import partial
+
+class QCustomDelegate (QtGui.QItemDelegate):
+    def createEditor (self, parentQWidget, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 0:
+            editorQWidget = QtGui.QPushButton(parentQWidget)
+            self.connect(editorQWidget, QtCore.SIGNAL('released()'), partial(self.requestNewPath, indexQModelIndex))
+            return editorQWidget            
+        elif column in [1, 2]:
+            editorQWidget = QtGui.QSpinBox(parentQWidget)
+            editorQWidget.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+            editorQWidget.setMinimum(0)
+            editorQWidget.setMaximum(2 ** 16)
+            return editorQWidget
+        else:
+            return QtGui.QItemDelegate.createEditor(self, parentQWidget, optionQStyleOptionViewItem, indexQModelIndex)
+
+    def setEditorData (self, editorQWidget, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 0:
+            textQString = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toString()
+            editorQWidget.setText(textQString)
+        elif column in [1, 2]:
+            value, _ = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toInt()
+            editorQWidget.setValue(value)
+        else:
+            QtGui.QItemDelegate.setEditorData(self, editorQWidget, indexQModelIndex)
+
+    def setModelData (self, editorQWidget, modelQAbstractItemModel, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 0:
+            textQString = editorQWidget.text()
+            modelQAbstractItemModel.setData(indexQModelIndex, textQString, QtCore.Qt.EditRole)
+        elif column in [1, 2]:
+            value = editorQWidget.value()
+            modelQAbstractItemModel.setData(indexQModelIndex, value, QtCore.Qt.EditRole)
+        else:
+            QtGui.QItemDelegate.setModelData(self, editorQWidget, modelQAbstractItemModel, indexQModelIndex)
+
+    def updateEditorGeometry(self, editorQWidget, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column in [0, 1, 2]:
+            editorQWidget.setGeometry(optionQStyleOptionViewItem.rect)
+        else:
+            QtGui.QItemDelegate.updateEditorGeometry(self, editorQWidget, optionQStyleOptionViewItem, indexQModelIndex)
+
+    def requestNewPath (self, indexQModelIndex):
+        self.emit(QtCore.SIGNAL('requestNewPath'), indexQModelIndex)
+
+    def paint (self, painterQPainter, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 0:
+            textQString = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toString()
+            foundIndexQModelIndex = indexQModelIndex
+            while foundIndexQModelIndex.parent() != QtCore.QModelIndex():
+                foundIndexQModelIndex = foundIndexQModelIndex.parent()
+            buttonQStyleOptionButton = QtGui.QStyleOptionButton()
+            buttonQStyleOptionButton.rect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            buttonQStyleOptionButton.text = str(foundIndexQModelIndex.row() + 1) + ' : ' + os.path.basename(str(textQString))
+            buttonQStyleOptionButton.state = QtGui.QStyle.State_Active
+            QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_PushButton, buttonQStyleOptionButton, painterQPainter)
+        elif column in [1, 2]:
+            value, _ = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toInt()
+            textQStyleOptionViewItem = optionQStyleOptionViewItem
+            textQStyleOptionViewItem.displayAlignment = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+            currentQRect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            currentQRect.setWidth(currentQRect.width() - 22)
+            self.drawDisplay(painterQPainter, textQStyleOptionViewItem, currentQRect, QtCore.QString(str(value)));
+            spinBoxQStyleOptionSpinBox = QtGui.QStyleOptionSpinBox()
+            spinBoxQStyleOptionSpinBox.rect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            QtGui.QApplication.style().drawComplexControl(QtGui.QStyle.CC_SpinBox, spinBoxQStyleOptionSpinBox, painterQPainter)
+        else:
+            QtGui.QItemDelegate.paint(self, painterQPainter, optionQStyleOptionViewItem, indexQModelIndex)
+
+class QCustomTreeWidget (QtGui.QTreeWidget):
+    def __init__(self, parent = None):
+        super(QCustomTreeWidget, self).__init__(parent)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+        self.setColumnCount(3)
+        self.setHeaderLabels(('script', 'chunksize', 'mem'))
+        for i in range(self.columnCount()):
+            self.headerItem().setTextAlignment(i, QtCore.Qt.AlignHCenter)
+        self.header().setStretchLastSection(False)
+        self.header().setResizeMode(0, QtGui.QHeaderView.Stretch)
+        self.setIndentation(60)
+        self.setColumnWidth(0, 200)
+        myQCustomDelegate = QCustomDelegate()
+        self.setItemDelegate(myQCustomDelegate)
+        self.connect(myQCustomDelegate, QtCore.SIGNAL('requestNewPath'), self.getNewPath)
+
+    def addMenu (self, script = 'echo path_to_script', chunksize = 1, mem = 200, parentQTreeWidgetItem = None):
+        if parentQTreeWidgetItem == None:
+            parentQTreeWidgetItem = self.invisibleRootItem()
+        currentQTreeWidgetItem = QtGui.QTreeWidgetItem(parentQTreeWidgetItem)
+        currentQTreeWidgetItem.setData(0, QtCore.Qt.EditRole, script)
+        currentQTreeWidgetItem.setData(1, QtCore.Qt.EditRole, chunksize)
+        currentQTreeWidgetItem.setData(2, QtCore.Qt.EditRole, mem)
+        currentQTreeWidgetItem.setFlags(currentQTreeWidgetItem.flags() | QtCore.Qt.ItemIsEditable)
+        for i in range(self.columnCount()):
+            currentQSize = currentQTreeWidgetItem.sizeHint(i)
+            currentQTreeWidgetItem.setSizeHint(i, QtCore.QSize(currentQSize.width(), currentQSize.height() + 30))
+        currentQTreeWidgetItem.setExpanded(True)
+        return currentQTreeWidgetItem
+
+    def getNewPath (self, indexQModelIndex):
+        currentQTreeWidgetItem = self.itemFromIndex(indexQModelIndex)
+        pathQString = QtGui.QFileDialog.getOpenFileName (
+            self, 'Select Script file', '', '.py Files (*.py);;Executable Files (*)')
+        if not pathQString.isEmpty():
+            currentQTreeWidgetItem.setData(indexQModelIndex.column(), QtCore.Qt.EditRole, pathQString)
+
+class QCustomQDialog (QtGui.QDialog):
+    def __init__ (self, parent = None):
+        super(QCustomQDialog, self).__init__(parent)
+        self.myQCustomTreeWidget = QCustomTreeWidget(self)
+        self.addQPushButton = QtGui.QPushButton('Add', self)
+        self.connect(self.addQPushButton, QtCore.SIGNAL('released()'), self.myQCustomTreeWidget.addMenu)
+        self.cssQPlainTextEdit = QtGui.QPlainTextEdit(self)
+        self.connect(self.cssQPlainTextEdit, QtCore.SIGNAL('textChanged()'), self.updateCss)
+        self.rootDecorationCBQCheckBox = QtGui.QCheckBox('Root is decorated')
+        self.connect(self.rootDecorationCBQCheckBox, QtCore.SIGNAL('stateChanged(int)'), self.updateRootDecorated)
+        self.updateRootDecorated(self.rootDecorationCBQCheckBox.checkState())
+        self.indentationQSlider = QtGui.QSlider(self)
+        self.indentationQSlider.setOrientation(QtCore.Qt.Horizontal)
+        self.indentationQSlider.setRange(0, 100)
+        self.indentationQSlider.setValue(20)
+        self.connect(self.indentationQSlider, QtCore.SIGNAL('valueChanged(int)'), self.alterIndentation)
+        self.alterIndentation(self.indentationQSlider.value())
+        self.layoutQVBoxLayout = QtGui.QVBoxLayout()
+        self.layoutQVBoxLayout.addWidget(self.myQCustomTreeWidget)
+        self.layoutQVBoxLayout.addWidget(self.addQPushButton)
+        self.layoutQVBoxLayout.addWidget(self.cssQPlainTextEdit)
+        self.downMenuQHBoxLayout = QtGui.QHBoxLayout()
+        self.downMenuQHBoxLayout.addWidget(self.rootDecorationCBQCheckBox)
+        self.downMenuQHBoxLayout.addWidget(self.indentationQSlider)
+        self.layoutQVBoxLayout.addLayout(self.downMenuQHBoxLayout)
+        self.layoutQVBoxLayout.setStretchFactor(self.myQCustomTreeWidget, 1)
+        self.setLayout(self.layoutQVBoxLayout)
+        self.resize(480, 640)
+        _ = self.myQCustomTreeWidget.addMenu()
+        _ = self.myQCustomTreeWidget.addMenu()
+        currentQTreeWidgetItem = self.myQCustomTreeWidget.addMenu()
+        self.myQCustomTreeWidget.addMenu(parentQTreeWidgetItem = currentQTreeWidgetItem)
+        self.myQCustomTreeWidget.addMenu(parentQTreeWidgetItem = currentQTreeWidgetItem)
+        currentQTreeWidgetItem = self.myQCustomTreeWidget.addMenu()
+        currentQTreeWidgetItem = self.myQCustomTreeWidget.addMenu(parentQTreeWidgetItem = currentQTreeWidgetItem)
+        currentQTreeWidgetItem = self.myQCustomTreeWidget.addMenu(parentQTreeWidgetItem = currentQTreeWidgetItem)
+        _ = self.myQCustomTreeWidget.addMenu()
+
+    def updateCss (self):
+        self.myQCustomTreeWidget.setStyleSheet(self.cssQPlainTextEdit.toPlainText())
+
+    def alterIndentation (self, value):
+        self.myQCustomTreeWidget.setIndentation(value)
+        self.myQCustomTreeWidget.updateGeometries()
+
+    def updateRootDecorated (self, state):
+        if state == QtCore.Qt.Checked:
+            self.myQCustomTreeWidget.setRootIsDecorated(True)
+        else:
+            self.myQCustomTreeWidget.setRootIsDecorated(False)
+        self.myQCustomTreeWidget.updateGeometries()
+
+app = QtGui.QApplication([])
+myQCustomQDialog = QCustomQDialog()
+myQCustomQDialog.show()
+sys.exit(app.exec_())
+</code></pre>
+
+<p>You are not the only one who has experienced this problem.  I strongly recommend using <code>QItemDelegate</code>.</p>
+
+<p>The document says:</p>
+
+<blockquote>
+  <p>If you want to display custom dynamic content or implement a custom editor widget, use QTreeView and subclass <code>QItemDelegate</code> instead.</p>
+</blockquote>
+
+<p>And (user ? or) you want 'editors' always visible.  It can do it in <code>QItemDelegate</code>.  But in class <code>QItemDelegate</code>, implements <code>QItemDelegate.paint (self, QPainter painter, QStyleOptionViewItem option, QModelIndex index)</code> (reference in later). And other property 'createEditor', 'setEditorData', etc.</p>
+
+<p>Example for implementing this class:</p>
+
+<pre><code>import sys
+from PyQt4 import QtCore, QtGui
+from functools import partial
+
+class QCustomDelegate (QtGui.QItemDelegate):
+    def createEditor (self, parentQWidget, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 1:
+            editorQWidget = QtGui.QSpinBox(parentQWidget)
+            editorQWidget.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+            editorQWidget.setMinimum(0)
+            editorQWidget.setMaximum(100)
+            return editorQWidget
+        elif column == 2:
+            editorQWidget = QtGui.QLineEdit(parentQWidget)
+            editorQWidget.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+            return editorQWidget
+        elif column == 3:
+            editorQWidget = QtGui.QPushButton(parentQWidget)
+            return editorQWidget            
+        else:
+            return QtGui.QItemDelegate.createEditor(self, parentQWidget, optionQStyleOptionViewItem, indexQModelIndex)
+
+    def setEditorData (self, editorQWidget, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 1:
+            value, _ = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toInt()
+            editorQWidget.setValue(value)
+        elif column == 2:
+            textQString = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toString()
+            editorQWidget.setText(textQString)
+        elif column == 3:
+            textQString = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toString()
+            self.connect(editorQWidget, QtCore.SIGNAL('released()'), partial(self.requestNewPath, indexQModelIndex))
+            editorQWidget.setText(textQString)
+        else:
+            QtGui.QItemDelegate.setEditorData(self, editorQWidget, indexQModelIndex)
+
+    def setModelData (self, editorQWidget, modelQAbstractItemModel, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 1:
+            value = editorQWidget.value()
+            modelQAbstractItemModel.setData(indexQModelIndex, value, QtCore.Qt.EditRole)
+        elif column == 2:
+            textQString = editorQWidget.text()
+            modelQAbstractItemModel.setData(indexQModelIndex, textQString, QtCore.Qt.EditRole)
+        elif column == 3:
+            textQString = editorQWidget.text()
+            modelQAbstractItemModel.setData(indexQModelIndex, textQString, QtCore.Qt.EditRole)
+        else:
+            QtGui.QItemDelegate.setModelData(self, editorQWidget, modelQAbstractItemModel, indexQModelIndex)
+
+    def updateEditorGeometry(self, editorQWidget, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 1:
+            editorQWidget.setGeometry(optionQStyleOptionViewItem.rect)
+        elif column == 2:
+            editorQWidget.setGeometry(optionQStyleOptionViewItem.rect)
+        elif column == 3:
+            editorQWidget.setGeometry(optionQStyleOptionViewItem.rect)
+        else:
+            QtGui.QItemDelegate.updateEditorGeometry(self, editorQWidget, optionQStyleOptionViewItem, indexQModelIndex)
+
+    def requestNewPath (self, indexQModelIndex):
+        self.emit(QtCore.SIGNAL('requestNewPath'), indexQModelIndex)
+
+    def paint (self, painterQPainter, optionQStyleOptionViewItem, indexQModelIndex):
+        column = indexQModelIndex.column()
+        if column == 1:
+            value, _ = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toInt()
+            textQStyleOptionViewItem = optionQStyleOptionViewItem
+            textQStyleOptionViewItem.displayAlignment = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+            currentQRect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            currentQRect.setWidth(currentQRect.width() - 22)
+            self.drawDisplay(painterQPainter, textQStyleOptionViewItem, currentQRect, QtCore.QString(str(value)));
+            spinBoxQStyleOptionSpinBox = QtGui.QStyleOptionSpinBox()
+            spinBoxQStyleOptionSpinBox.rect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            QtGui.QApplication.style().drawComplexControl(QtGui.QStyle.CC_SpinBox, spinBoxQStyleOptionSpinBox, painterQPainter)
+        elif column == 2:
+            textQStyleOptionViewItem = optionQStyleOptionViewItem
+            textQStyleOptionViewItem.displayAlignment = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+            QtGui.QItemDelegate.paint(self, painterQPainter, textQStyleOptionViewItem, indexQModelIndex)
+        elif column == 3:
+            textQString = indexQModelIndex.model().data(indexQModelIndex, QtCore.Qt.EditRole).toString()
+            buttonQStyleOptionButton = QtGui.QStyleOptionButton()
+            buttonQStyleOptionButton.rect = QtCore.QRect(optionQStyleOptionViewItem.rect)
+            buttonQStyleOptionButton.text = textQString
+            buttonQStyleOptionButton.state = QtGui.QStyle.State_Active
+            QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_PushButton, buttonQStyleOptionButton, painterQPainter)
+        else:
+            QtGui.QItemDelegate.paint(self, painterQPainter, optionQStyleOptionViewItem, indexQModelIndex)
+
+class QCustomTreeWidget (QtGui.QTreeWidget):
+    def __init__(self, parent = None):
+        super(QCustomTreeWidget, self).__init__(parent)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+        self.setColumnCount(4)
+        myQCustomDelegate = QCustomDelegate()
+        self.setItemDelegate(myQCustomDelegate)
+        self.connect(myQCustomDelegate, QtCore.SIGNAL('requestNewPath'), self.getNewPath)
+
+    def addMenu (self, title, value, text, path, parentQTreeWidgetItem = None):
+        if parentQTreeWidgetItem == None:
+            parentQTreeWidgetItem = self.invisibleRootItem()
+        currentQTreeWidgetItem = QtGui.QTreeWidgetItem(parentQTreeWidgetItem)
+        currentQTreeWidgetItem.setData(0, QtCore.Qt.EditRole, title)
+        currentQTreeWidgetItem.setData(1, QtCore.Qt.EditRole, value)
+        currentQTreeWidgetItem.setData(2, QtCore.Qt.EditRole, text)
+        currentQTreeWidgetItem.setData(3, QtCore.Qt.EditRole, path)
+        currentQTreeWidgetItem.setFlags(currentQTreeWidgetItem.flags() | QtCore.Qt.ItemIsEditable)
+        for i in range(self.columnCount()):
+            currentQSize = currentQTreeWidgetItem.sizeHint(i)
+            currentQTreeWidgetItem.setSizeHint(i, QtCore.QSize(currentQSize.width(), currentQSize.height() + 40))
+
+    def getNewPath (self, indexQModelIndex):
+        currentQTreeWidgetItem = self.itemFromIndex(indexQModelIndex)
+        pathQStringList = QtGui.QFileDialog.getOpenFileNames()
+        if pathQStringList.count() &gt; 0:
+            textQString = pathQStringList.first()
+            currentQTreeWidgetItem.setData(indexQModelIndex.column(), QtCore.Qt.EditRole, textQString)
+
+class QCustomQWidget (QtGui.QWidget):
+    def __init__ (self, parent = None):
+        super(QCustomQWidget, self).__init__(parent)
+        self.myQCustomTreeWidget = QCustomTreeWidget(self)
+        self.allQHBoxLayout = QtGui.QHBoxLayout()
+        self.allQHBoxLayout.addWidget(self.myQCustomTreeWidget)
+        self.setLayout(self.allQHBoxLayout)
+        self.myQCustomTreeWidget.addMenu('1', 10, 'A', 'home/Meyoko/Desktop')
+        self.myQCustomTreeWidget.addMenu('4', 14, 'B', 'home/Kitsune/Desktop')
+        self.myQCustomTreeWidget.addMenu('7', 17, 'C', 'home/Elbert/Desktop')
+
+app = QtGui.QApplication([])
+myQCustomQWidget = QCustomQWidget()
+myQCustomQWidget.show()
+sys.exit(app.exec_())
+</code></pre>
+
+<p><a href="http://doc.qt.digia.com/4.6/itemviews-spinboxdelegate.html" rel="nofollow">Spin Box Delegate Example (C++)</a></p>
+
+<p><a href="http://pyqt.sourceforge.net/Docs/PyQt4/qitemdelegate.html" rel="nofollow"><code>QItemDelegate</code></a></p>

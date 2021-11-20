@@ -1,0 +1,309 @@
+<pre><code>var defineClass = function () {
+    var inheritance = function inheritance() { };
+    return function defineClass(data) {
+        var classname = data.name,
+            superclass = data.extend || Object,
+            constructor = data.construct || function () { },
+            methods = data.methods || {},
+            statics = data.statics || {},
+            borrows,
+            provides;
+        if (!data.borrows) {
+            borrows = [];
+        }
+        else {
+            if (data.borrows instanceof Array) {
+                borrows = data.borrows;
+            }
+            else {
+                borrows = [data.borrows];
+            };
+        };
+        if (!data.provides) {
+            provides = [];
+        }
+        else {
+            if (data.provides instanceof Array) {
+                provides = data.provides;
+            }
+            else {
+                provides = [data.provides];
+            };
+        };
+        inheritance.prototype = superclass.prototype;
+        var proto = new inheritance();
+        for (var i = 0; i &lt; borrows.length; i++) {
+            var c = borrows[i];
+            for (var p in c.prototype) {
+                if (typeof c.prototype[p] != "function") continue;
+                proto[p] = c.prototype[p];
+            }
+        }
+        for (var p in methods) {
+            proto[p] = methods[p];
+        };
+        proto.constructor = constructor;
+        constructor.superclass = superclass.prototype;
+        if (classname) {
+            proto.classname = classname;
+        };
+        for (var i = 0; i &lt; provides.length; i++) {
+            var c = provides[i];
+            for (var p in c.prototype) {
+                if (typeof c.prototype[p] != "function") {
+                    continue;
+                };
+                if (p == "constructor" || p == "superclass") {
+                    continue;
+                };
+                if (p in proto &amp;&amp; typeof proto[p] == "function" &amp;&amp; proto[p].length == c.prototype[p].length) {
+                    continue;
+                };
+                throw new Error("Class " + classname + " are not provided method " + c.classname + "." + p);
+            };
+        };
+        constructor.prototype = proto;
+        for (var p in statics) {
+            constructor[p] = statics[p];
+        };
+        return constructor;
+    }
+}();
+var EndPoint = (function () {
+    return defineClass({
+        name: "EndPoint",
+        construct: function (urlObj) {
+            var myUrl,
+                myScheme,
+                myDefaultScheme = "http",
+                myLogin,
+                myPassword,
+                myHost,
+                myDefaultHost = "localhost",
+                myIP,
+                myDefaultIP = "127.0.0.1",
+                myPort,
+                myDefaultPort = "80",
+                myPath,
+                myDefaultPath = "/",
+                myOptions,
+                myAnchor;
+            var self = this;
+            var parse_url = /^(?:([A-Za-z]+):)?(\/{0,3})(?:([A-Za-z]+):([A-Za-z]+)@)?([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$/;
+            var result = parse_url.exec(urlObj);
+            var names = ['url', 'scheme', 'slash', 'login', 'password', 'host', 'port', 'path', 'query', 'hash'];
+            var i;
+            for (i = 0; i &lt; names.length; i += 1) {
+                switch (names[i]) {
+                    case 'url':
+                        myUrl = result[i];
+                        break;
+                    case 'scheme':
+                        myScheme = result[i];
+                        break;
+                    case 'slash':
+                        break;
+                    case 'login':
+                        myLogin = result[i];
+                        break;
+                    case 'password':
+                        myPassword = result[i];
+                        break;
+                    case 'host':
+                        myHost = result[i];
+                        break;
+                    case 'port':
+                        myPort = result[i];
+                        break;
+                    case 'path':
+                        myPath = result[i];
+                        break;
+                    case 'query':
+                        myOptions = result[i];
+                        break;
+                    case 'hash':
+                        myAnchor = result[i];
+                        break;
+                }
+            }
+            this.scheme = myScheme;
+            this.login = myLogin;
+            this.password = myPassword;
+            this.host = myHost;
+            this.ip = myIP;
+            this.port = myPort;
+            this.path = myPath;
+            this.options = myOptions;
+            this.anchor = myAnchor;
+            this.url = myUrl;
+        },
+        methods: {
+            ValidateIP: function (ip) {
+                return /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip);
+            },
+            ValidateUrl: function (url) {
+                return /^(http|ftp|https):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;amp;:\/~+#-]*[\w@?^=%&amp;amp;\/~+#-])?/.test(url);
+            },
+            ValidateShortUrl: function (url) {
+                if (/^\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;amp;:\/~+#-]*[\w@?^=%&amp;amp;\/~+#-])?/.test(url)) {
+                    return true;
+                };
+                if (/^[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;amp;:\/~+#-]*[\w@?^=%&amp;amp;\/~+#-])?/.test(url)) {
+                    return true;
+                }
+                return false;
+            }
+        }
+    })
+}());
+var QueryType = function QueryType() {
+    if (!(this instanceof QueryType)) {
+        return new QueryType(arguments[0]);
+    };
+    this.endPoint = arguments[0]["endPoint"];
+    this.envelope = arguments[0]["envelope"];
+    this.type = arguments[0]["type"];
+    this.headers = arguments[0]["headers"];
+    this.callback_success = arguments[0]["callback_success"];
+    this.callback_failure = arguments[0]["callback_failure"];
+    this.timeout = arguments[0]["timeout"];
+    this.username = arguments[0]["username"];
+    this.password = arguments[0]["password"];
+};
+var TaskManager = function () {
+    if (!(this instanceof TaskManager)) {
+        return new TaskManager();
+    };
+    var instance;
+    TaskManager = function () {
+        return instance;
+    };
+    TaskManager.prototype = this;
+    instance = new TaskManager();
+    instance.constructor = TaskManager;
+    function Request() {
+        if (!(this instanceof Request)) {
+            return new Request();
+        };
+        var instance;
+        Request = function () {
+            return instance;
+        };
+        Request.prototype = this;
+        instance = new Request();
+        instance.constructor = Request;
+        var httpRequest = new XMLHttpRequest();
+        instance.send = function (query, callback, errorHandler) {
+            try { netscape.security.PrivilegeManager.enablePrivilege("UniversalBrowserRead"); } catch (e) { };
+            httpRequest.abort();
+            if ((query.username == undefined) || (query.password == undefined)) {
+                httpRequest.open(query.type, query.endPoint.url, true);
+            }
+            else {
+                httpRequest.open(query.type, query.endPoint.url, true, query.username, query.password);
+            };
+            if (query.headers != null) {
+                for (var i = 0; i &lt; query.headers.length; ++i) {
+                    httpRequest.setRequestHeader(query.headers[i][0], query.headers[i][1]);
+                }
+            }
+            else {
+                httpRequest.setRequestHeader("SOAPAction", '""');
+                httpRequest.setRequestHeader("Content-Type", "text/xml");
+            };
+            httpRequest.onreadystatechange = function () {
+                if (httpRequest.readyState == 4) {
+                    if (httpRequest.status == 200) {
+                        callback(httpRequest.responseText);
+                    }
+                    else {
+                        if (errorHandler) {
+                            errorHandler(httpRequest.status, httpRequest.statusText);
+                        }
+                        else {
+                            callback(null);
+                        };
+                    };
+                };
+            };
+            switch (query.type) {
+                case "POST":
+                    httpRequest.send(query.envelope);
+                    break;
+                case "GET":
+                    httpRequest.send(null);
+                    break;
+            }
+        };
+        instance.cancel = function () {
+            httpRequest.abort();
+        };
+        return instance;
+    };
+    var httpHandler = Request();
+    var queryQueue = [];
+    var timeoutID = -1;
+    var startedFlag = false;
+    var currentQuery = null;
+    var start = function () {
+        if (queryQueue.length &gt; 0) {
+            startedFlag = true;
+            currentQuery = queryQueue.shift();
+            httpHandler.send(currentQuery,
+                function (resp) {
+                    if (timeoutID &gt;= 0) {
+                        clearTimeout(timeoutID);
+                        timeoutID = -1;
+                    };
+                    currentQuery.callback_success(resp);
+                    start();
+                },
+                function (resp) {
+                    if (timeoutID &gt;= 0) {
+                        clearTimeout(timeoutID);
+                        timeoutID = -1;
+                    };
+                    currentQuery.callback_failure(resp);
+                    start();
+                }
+            );
+        }
+        else {
+            startedFlag = false;
+        };
+    };
+    instance.add = function (req) {
+        if (req instanceof QueryType) {
+            queryQueue.push(req);
+            if (!startedFlag) {
+                start();
+            };
+            return true;
+        }
+        else {
+            return false;
+        };
+    };
+    instance.stopCurrent = function () {
+        httpHandler.cancel();
+        timeoutID = -1;
+        if ((currentQuery.callback_failure != undefined) &amp;&amp; (currentQuery.callback_failure != null)) {
+            currentQuery.callback_failure("&lt;comm_error&gt;COMM TIMEOUT&lt;/comm_error&gt;");
+        };
+        start();
+    };
+    return instance;
+};
+
+//to send a request it must be
+TaskManager().add(
+    new QueryType({
+        "endPoint": new EndPoint("http://***.***.***.***/api/deviceapi"),
+        "type": "POST",
+        "envelope": '&lt;?xml version="1.0" encoding="UTF-8"?&gt;&lt; ... all xml goes here ',
+        "callback_success": function (wResponse) { /* here we get a response from the server */ },
+        "callback_failure": function (status, statusText) { },
+        "timeout": 60
+    })
+);
+</code></pre>

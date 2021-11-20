@@ -1,0 +1,408 @@
+<p><code>Jboss 7 (AS)</code> has support to either periodic-rotating-file-handler or size-rotating-file-handler but not both. </p>
+
+<p>I get some reference(<a href="http://p1japps.blogspot.com/2012/07/jboss-7-custom-file-handler.html" rel="nofollow">JBoss 7 Custom File Handler</a>) to support periodic and size rotating. It is writing the <code>Custom File Handler</code>. <code>JBoss 7 Custom File Handler</code> is used to create daily rotating size limited log.</p>
+
+<p>But, I update the source some part of original <code>PeriodicSizeHandler.java</code> for my requirement.</p>
+
+<p><strong>My updated source :</strong></p>
+
+<p>PeriodicSizeHandler.java</p>
+
+<pre><code>import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.logging.ErrorManager;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+
+public class PeriodicSizeHandler extends Handler {
+    private int count = 1;
+    protected static Long calculatedBytes;
+    private String maxBytes = "2g";
+    private String logFileName = "server.log";
+    private static String logDirPath;
+    private File logFile;
+    private FileOutputStream outputStream;
+
+    static {
+        logDirPath = System.getenv("JBOSS_HOME") + "\\standalone\\log";
+    }
+
+    public enum Bytes {
+        Byte("b", 1l), KiloBytes("k", (Byte.bytes * 1024)), MegaBytes("m",
+                (KiloBytes.bytes * 1024)), GigaBytes("g",
+                (MegaBytes.bytes * 1024)), ;
+
+        private Bytes(String byteAcronym, Long bytes) {
+            this.byteAcronym = byteAcronym;
+            this.bytes = bytes;
+        }
+
+        private String byteAcronym;
+        private Long bytes;
+
+        public static long getBytes(String maxBytesRep) throws Exception {
+            if (maxBytesRep == null &amp;&amp; "".equals(maxBytesRep)) {
+                throw new Exception(
+                        "The max bytes representation cannot be empty or null");
+            }
+            String uByteRepresentation = maxBytesRep.toLowerCase();
+            for (Bytes b : values()) {
+                if (uByteRepresentation.endsWith(b.byteAcronym)) {
+                    String strNumVal = uByteRepresentation.substring(0,
+                            uByteRepresentation.indexOf(b.byteAcronym));
+                    try {
+                        return getBytes(Double.valueOf(strNumVal), b);
+                    } catch (Exception e) {
+                        throw new Exception(
+                                "The max bytes representation: "
+                                        + maxBytesRep
+                                        + ", is not valid. Shoubl be of the form XXX..(B or b) / M or m /G or g). Ex: '1000b', '100m', '1g'");
+                    }
+                }
+            }
+            // If no acronym is mentioned consider it as Byte representation Ex.
+            // maxBytes = 1000
+            try {
+                return getBytes(Double.valueOf(uByteRepresentation), Bytes.Byte);
+            } catch (Exception e) {
+                throw new Exception(
+                        "The max bytes representation: "
+                                + maxBytesRep
+                                + ", is not valid. Shoubl      be of the form XXX../(B or b) / M or m /G or g). Ex: '1000', '1000b', '100m', '1g'");
+            }
+        }
+
+        public String getByteAcronym() {
+            return this.byteAcronym;
+        }
+
+        public Long getBytes() {
+            return this.bytes;
+        }
+
+        public static long getBytes(double multiple, Bytes bytes) {
+            return Math.round(multiple * bytes.bytes);
+        }
+    }
+
+    public PeriodicSizeHandler() {
+    }
+
+    @Override
+    public void flush() {
+        try {
+            if (outputStream != null) {
+                outputStream.flush();
+            }
+        } catch (IOException e) {
+            reportError(e.getMessage(), e, ErrorManager.FLUSH_FAILURE);
+        }
+    }
+
+    @Override
+    public void close() {
+        if (outputStream != null) {
+            try {
+                outputStream.close();
+            } catch (IOException e) {
+                reportError(e.getMessage(), e, ErrorManager.CLOSE_FAILURE);
+            }
+
+        }
+    }
+
+    @Override
+    public void publish(LogRecord record) {
+        init();
+        if (rollOver(record)) {
+            archiveFile();
+            createLogChannel();
+        }
+        logToFile(record);
+    }
+
+    // Initialize
+    public synchronized void init() {
+        if (outputStream == null) {
+            try {
+                logFile = new File(getFilePath());
+                if (logFile.exists()) {
+                    outputStream = new FileOutputStream(logFile, true);
+                } else {
+                    createLogChannel();
+                }
+            } catch (FileNotFoundException e) {
+                reportError(e.getMessage(), e, ErrorManager.OPEN_FAILURE);
+            }
+        }
+    }
+
+    private String getFilePath() {
+        return getLogDirPath() + File.separator + logFileName;
+    }
+
+    // check the file size
+    private boolean rollOver(LogRecord record) {
+        try {
+            StringBuilder logMessage = new StringBuilder(getFormatter().format(record));
+            if ((outputStream.getChannel().size() + logMessage.length()) &gt; getByteValue(getMaxBytes())) {
+                return true;
+            }
+        } catch (IOException e) {
+            reportError(e.getMessage(), e, ErrorManager.GENERIC_FAILURE);
+        }
+        return false;
+    }
+
+    /**
+     * Rename with date and time stamp
+     */
+    private void archiveFile() {
+        System.out.println("archiveFile..........");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+//      String logDir = getLogDirPath() +  File.separator + simpleDateFormat.format(new Date());
+        String newFilePath = getLogDirPath()  + File.separator + logFileName + "_" + simpleDateFormat.format(new Date()) + "_" + count++;
+        File newFile = new File(newFilePath);
+        try {
+            OutputStream oos = new FileOutputStream(newFile);
+            byte[] buf = new byte[8192];
+            InputStream is = new FileInputStream(logFile);
+            int c = 0;
+            while ((c = is.read(buf, 0, buf.length)) &gt; 0) {
+                oos.write(buf, 0, c);
+                oos.flush();
+            }
+            oos.close();
+            is.close();
+            PrintWriter writer = new PrintWriter(logFile);
+            writer.print("");
+            writer.close();         
+        } catch(Exception e) {
+            reportError("Unable to rename old file: " + logFile.getName()
+                    + " to new file: " + newFile, null, ErrorManager.GENERIC_FAILURE);
+        }
+    }
+
+    private void createLogChannel() {
+        try {
+            // make directories
+            File logDir = new File(getLogDirPath());
+            logDir.mkdirs();
+
+            // create log file
+            System.out.println("getFilePath( : " + getFilePath());
+            logFile = new File(getFilePath());
+            logFile.createNewFile();
+
+            // create the channel
+            outputStream = new FileOutputStream(logFile, true);
+        } catch (FileNotFoundException e) {
+            reportError(e.getMessage(), e, ErrorManager.OPEN_FAILURE);
+        } catch (IOException e) {
+            reportError(e.getMessage(), e, ErrorManager.OPEN_FAILURE);
+        }
+    }
+
+    private synchronized void logToFile(LogRecord record) {
+        StringBuilder logMessage = new StringBuilder(getFormatter().format(record));
+        try {
+            if (outputStream != null) {
+                outputStream.write(logMessage.toString().getBytes());
+                outputStream.flush();
+            }
+        } catch (IOException e) {
+            reportError(e.getMessage(), e, ErrorManager.WRITE_FAILURE);
+        }
+    }
+
+    protected long getByteValue(String maxBytes) {
+        if (calculatedBytes != null) {
+            return calculatedBytes;
+        }
+        try {
+            calculatedBytes = Bytes.getBytes(maxBytes);
+        } catch (Exception e) {
+            logToFile(new LogRecord(Level.INFO, "Failed to get byte value from maxBytes: " + maxBytes + ", exception: " + e));
+            calculatedBytes = getDefaultBytes();
+        }
+        return calculatedBytes;
+    }
+
+    // Use Default - 2GB
+    protected Long getDefaultBytes() {
+        int multiple = 2;
+        logToFile(new LogRecord(Level.INFO, "Using the default: '" + multiple + Bytes.GigaBytes.byteAcronym + "'"));
+        return Bytes.getBytes(multiple, Bytes.GigaBytes);
+    }
+
+    public String getMaxBytes() {
+        return maxBytes;
+    }
+
+    public void setMaxBytes(String maxBytes) {
+        this.maxBytes = maxBytes;
+    }
+
+    public String getLogFileName() {
+        return logFileName;
+    }
+
+    public void setLogFileName(String logFileName) {
+        this.logFileName = logFileName;
+    }
+
+    public File getLogFile() {
+        return logFile;
+    }
+
+    public void setLogFile(File logFile) {
+        this.logFile = logFile;
+    }
+
+    public FileOutputStream getOutputStream() {
+        return outputStream;
+    }
+
+    public void setOutputStream(FileOutputStream outputStream) {
+        this.outputStream = outputStream;
+    }
+
+    public void setLogDirPath(String logDirPath) {
+        this.logDirPath = logDirPath;
+    }
+
+    public String getLogDirPath() {
+        return logDirPath;
+    }
+}
+</code></pre>
+
+<p>PeriodicSizeHandlerTest.java</p>
+
+<pre><code>import java.io.BufferedReader;
+import java.io.FileReader;
+import java.util.logging.Formatter;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+
+import junit.framework.TestCase;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import com.cyc.jboss.logging.PeriodicSizeHandler.Bytes;
+
+public class PeriodicSizeHandlerTest extends TestCase {
+    @Before
+    public void setUp() {
+        PeriodicSizeHandler.calculatedBytes = null;
+    }
+
+    Long bytes = Bytes.getBytes(100, Bytes.Byte);
+
+    @Test
+    public void testPublishRollOverTrue() throws Exception {
+        PeriodicSizeHandler psh = new PeriodicSizeHandler();
+        psh.setMaxBytes("3k");
+        setupFormatter(psh);
+        // text.txt file size is `151k`
+        FileReader fr = new FileReader("D:/temp/test.txt");
+        BufferedReader br = new BufferedReader(fr);
+        String message;
+        while ((message = br.readLine()) != null) {
+            LogRecord logRecord = new LogRecord(Level.INFO, message);
+            psh.publish(logRecord);
+        }
+        fr.close();
+        assertTrue(psh.getOutputStream() != null);
+    }
+
+    private void setupFormatter(PeriodicSizeHandler psh) {
+        Formatter formatr = new Formatter() {
+            @Override
+            public String format(LogRecord record) {
+                return record.getLevel() + " :: " + record.getMessage();
+            }
+        };
+        psh.setFormatter(formatr);
+    }
+
+    public static void main(String[] args) {
+        org.junit.runner.JUnitCore
+                .main(PeriodicSizeHandlerTest.class.getName());
+    }
+}
+</code></pre>
+
+<p>I got my expected output file as below</p>
+
+<pre><code>server.log_2014-01-13_1
+server.log_2014-01-13_2
+server.log_2014-01-13_3
+....
+server.log_2014-01-13_55
+</code></pre>
+
+<p>If you would like use your customize file format, you just need to update <code>archiveFile()</code> method, I think so.</p>
+
+<p><strong>Next solution</strong> : after <strong>James R. Perkins</strong> suggestion.</p>
+
+<p>Download <code>jboss-logmanager-1.5.1.Final.jar</code> <a href="http://grepcode.com/snapshot/repository.jboss.org/nexus/content/repositories/releases/org.jboss.logmanager/jboss-logmanager/1.5.1.Final/" rel="nofollow">here</a>.</p>
+
+<p>Replace old <code>jboss-logmanger-xxxx.jar</code> with <code>jboss-logmanager-1.5.1.Final.jar</code> at <code>&lt;JBOSS_HOME&gt;\modules\org\jboss\logmanager\main</code> directory. </p>
+
+<p>Change your <code>module.xml</code> configuration as below</p>
+
+<pre><code>&lt;module xmlns="urn:jboss:module:1.1" name="org.jboss.logmanager"&gt;
+    &lt;resources&gt;
+        &lt;resource-root path="jboss-logmanager-1.5.1.Final.jar"/&gt;
+        &lt;!-- Insert resources here --&gt;
+    &lt;/resources&gt;
+
+    &lt;dependencies/&gt;
+&lt;/module&gt;
+</code></pre>
+
+<p>Configuration for <code>standalone.xml</code></p>
+
+<pre><code>&lt;subsystem xmlns="urn:jboss:domain:logging:1.1"&gt;
+    .....
+    &lt;custom-handler name="FILE" class="org.jboss.logmanager.handlers.PeriodicSizeRotatingFileHandler" module="org.jboss.logmanager"&gt;
+        &lt;formatter&gt;
+            &lt;pattern-formatter pattern="%d{HH:mm:ss,SSS} %-5p [%c] (%t) %s%E%n"/&gt;
+        &lt;/formatter&gt;
+        &lt;properties&gt;
+            &lt;property name="file" value="D:\temp\server.log"/&gt;  &lt;--- your log directory          
+            &lt;property name="rotateSize" value="50000"/&gt;         &lt;--- 50000 byte
+            &lt;property name="maxBackupIndex" value="50"/&gt;        
+            &lt;property name="append " value="true"/&gt;
+            &lt;property name="suffix" value=".yyyy-MM-dd"/&gt;
+            &lt;property name="autoflush" value="true"/&gt;
+        &lt;/properties&gt;
+    &lt;/custom-handler&gt;
+    ....
+    &lt;root-logger&gt;
+        &lt;level name="INFO"/&gt;
+        &lt;handlers&gt;
+            &lt;handler name="CONSOLE"/&gt;
+            &lt;handler name="FILE"/&gt;
+        &lt;/handlers&gt;
+    &lt;/root-logger&gt;
+&lt;/subsystem&gt;    
+</code></pre>
+
+<p>Output : </p>
+
+<pre><code>server.log.2014-01-16.1 
+server.log.2014-01-16.2 
+server.log.2014-01-16.3 
+</code></pre>

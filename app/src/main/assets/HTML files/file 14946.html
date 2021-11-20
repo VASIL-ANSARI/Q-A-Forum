@@ -1,0 +1,61 @@
+<p>Why are you not using a parameter that has the same name for all your entities like <code>@id</code>. Then you will not need the <code>GetParameters</code> stuff any more. Simply call</p>
+
+<pre><code>command.Parameters.AddWithValue("@id", id);
+</code></pre>
+
+<hr>
+
+<p><strong>UPDATE</strong></p>
+
+<p>If you want to be able to use a different number of parameters, you can use the <code>params</code> keyword, which enables you to pass a varying number of parameters (including zero).</p>
+
+<pre><code>public T Single(params int[] id)
+{ 
+    return ExecuteReader(id).SingleOrDefault();         
+}
+</code></pre>
+
+<p>and</p>
+
+<pre><code>private Collection&lt;T&gt; ExecuteReader(params int[] id)
+{
+    ...
+    for (int i = 0; i &lt; id.Length; i++) {
+        command.Parameters.AddWithValue("@id" + i, id[i]);
+    }
+    ...
+}
+</code></pre>
+
+<p>And you will have to name your parameters <code>@id0, @id1, @id2, ...</code></p>
+
+<pre><code>var coll = ExecuteReader();
+var coll = ExecuteReader(2);
+var coll = ExecuteReader(5, 77);
+...
+
+var result = db.Single(1);
+var result = db.Single(4, 13);
+var result = db.Single(5, 100, 1);
+...
+</code></pre>
+
+<hr>
+
+<p><strong>UPDATE #2</strong></p>
+
+<p>You can also extract parameter names from the SQL text</p>
+
+<pre><code>private Collection&lt;T&gt; ExecuteReader(params object[] p)
+{
+    ...
+    var matches = Regex.Matches(sql, @"@\w+");
+    if (matches.Count != p.Length) {
+        throw new ArgumentException("The # of parameters does not match ...");
+    }
+    for (int i = 0; i &lt; p.Length; i++) {
+        command.Parameters.AddWithValue(matches[i].Value, p[i]);
+    }
+    ...
+}
+</code></pre>

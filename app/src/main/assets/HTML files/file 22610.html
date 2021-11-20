@@ -1,0 +1,10 @@
+<p>I will describe my findings here. I have tested this on an AVD with a fully featured GP installed (GP Store V3.10.10, GP Services 2.0.12, G Services Framework 4.1.2), by pulling the host's plug.</p>
+
+<ul>
+<li>The <code>getPurchases()</code> method returns a cached result if possible (please note that we're <em>not</em> talking about a cache <em>outside of the Service</em> here but a <em>direct</em> call of getPurchases). Of course, this means that one will almost always get a cached result except when the Service is being re-initialized due to the loss of local data -- a case which is not very likely and often needs not be treated in special ways on the application level.</li>
+<li>The <code>consumePurchase()</code> method will return the integer value 6 (<code>BILLING_RESPONSE_RESULT_ERROR</code>) after a presumed internal net timeout of 20 seconds (so add a bit of time until the result code is seen by the caller). I was suspecting this despite <code>BILLING_RESPONSE_RESULT_ERROR</code> being described as a <code>Fatal error during the API action</code> because no other error code would make sense here; unfortunately, the word <em>fatal</em> is still somewhat inappropriate for a temporary condition such as a timeout.</li>
+<li><code>getSkuDetails()</code> appears to behave just like <code>consumePurchase()</code>. <strong>Update</strong>: There's now evidence that <code>getSkuDetails()</code> can access cached information within the local service, too.</li>
+<li>It looks as if <code>getBuyIntent()</code> works fine without connectivity if the item is already known to the service. This explains why Hartok sees a blank GP purchase screen: It's not a problem to get a buy intent from the IAB V3 without connectivity.</li>
+</ul>
+
+<p>Conclusion: The In-App Billing Service V3 appears to work with an internal cache and a server connection timeout of 20 seconds. For server communication errors which the local cache cannot resolve, response code 6 is used.</p>

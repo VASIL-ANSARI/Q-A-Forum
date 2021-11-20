@@ -1,0 +1,60 @@
+<p>For problems like this, the best thing you can do is download the <a href="https://www.microsoft.com/en-us/download/details.aspx?id=30425" rel="nofollow">Open XML SDK productivity tool</a> and compare the documents you made before and after you've made the change. When I use VSTO to add an actionspane and I explore the package in the tool I notice this:</p>
+
+<p><a href="http://i.stack.imgur.com/oM5yE.png" rel="nofollow"><img src="http://i.stack.imgur.com/oM5yE.png" alt="enter image description here"></a></p>
+
+<p>Then I remove the actionspane with the code you gave:</p>
+
+<pre><code>Globals.ThisDocument.XMLSchemaReferences["ActionsPane3"].Delete();
+this.Save();
+</code></pre>
+
+<p>If we look at the package in the tool now we have the following (please do notice the awesome free-hand writing):</p>
+
+<p><a href="http://i.stack.imgur.com/hxEsz.png" rel="nofollow"><img src="http://i.stack.imgur.com/hxEsz.png" alt="enter image description here"></a></p>
+
+<p>Now that we have identified what needs to be removed we can start working with the open xml sdk (<code>using DocumentFormat.OpenXml.Packaging</code> to open the file and <code>using DocumentFormat.OpenXml.Wordprocessing</code> to modify it). It's always convenient to keep the document open in the tool to be able to use the tree structure to build up the code. First I write the code to open and save the document:</p>
+
+<pre><code>byte[] byteArray = File.ReadAllBytes(@"C:\WorkSpace\test\WordTest.docx");
+
+using (var stream = new MemoryStream())
+{
+   stream.Write(byteArray, 0, byteArray.Length);
+   using (WordprocessingDocument doc = WordprocessingDocument.Open(stream, true))
+   {
+       //Logic here
+   }
+
+   using (FileStream fs = new FileStream(@"C:\WorkSpace\test\WordTest_modified.docx", 
+          FileMode.Create))
+   {
+      stream.WriteTo(fs);
+   }
+}
+</code></pre>
+
+<p>To remove the <code>AttachedSchema</code> you need the following code:</p>
+
+<pre><code>doc.MainDocumentPart.DocumentSettingsPart
+                    .Settings
+                    .GetFirstChild&lt;AttachedSchema&gt;()
+                    .Remove();
+</code></pre>
+
+<p>As you see it's very convenient to write this with the tree structure next to you. To remove the <code>SchemaReference</code> you will need this code:</p>
+
+<pre><code>doc.MainDocumentPart.CustomXmlParts.First()
+                    .CustomXmlPropertiesPart
+                    .DataStoreItem
+                    .SchemaReferences
+                    .FirstChild
+                    .Remove();
+</code></pre>
+
+<p>And there you go, the same as if you would have removed it in the VSTO application.</p>
+
+<p><strong>Edit:</strong> If I execute the following line to remove all the <code>/docProps/custom.xml</code> the action pane is gone:</p>
+
+<pre><code>doc.CustomFilePropertiesPart.Properties.RemoveAllChildren();
+</code></pre>
+
+<p>I can't really test if that's the expected behavior for you because I use a test document (no notable change in size), but seeing now my action pane is gone, it might be what you're looking for (the properties contain a reference to my local vsto file). I wish microsoft would document this kind of stuff a little better.</p>

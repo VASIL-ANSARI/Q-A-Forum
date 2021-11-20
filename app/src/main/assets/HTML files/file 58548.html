@@ -1,0 +1,44 @@
+<p>It seems that answer is much more simple than understanding the problem.
+You need no change in procedure - just include 'null' as possible value in optional arrays. It would mean that part wasn't included.</p>
+
+<p>This way there will be arrays with null values returned, but their indexes will represent source. Taking array below for example:</p>
+
+<pre><code>$data = array(
+    'Chassis'   =&gt; array(0, 1, 2),
+    'Mainboard' =&gt; array(3, 4, 5),
+    'PSU'       =&gt; array(6, 7, 8),
+    'Disk'      =&gt; array(null, 9, 10),
+    'GFX'       =&gt; array(null, 11, 12),
+    'Memory'    =&gt; array(null, 13, 14, 15)
+);
+</code></pre>
+
+<p>One of the results would be: <code>[0,3,6,null,11,null]</code>* which means that GFX was included. </p>
+
+<p>You could filter that result if you don't want empty values with</p>
+
+<pre><code>array_filter($combination, 'is_int')
+</code></pre>
+
+<p><code>'is_int'</code> param is needed only to handle <code>0</code> correctly. If <code>0</code> is not valid id then you might skip it (and may use <code>0</code> instead of null then)</p>
+
+<p>*) actually last element jumps to first position because of <code>array_merge()</code> args order</p>
+
+<h2>Edit:</h2>
+
+<p>This generator itself is ~35% faster (same memory usage) and doesn't require filtering which overall becomes twice as fast:</p>
+
+<pre><code>function generateCombinations(array $array) {
+    foreach (array_pop($array) as $id) {
+        if (empty($array)) {
+            yield isset($id) ? [$id] : [];
+            continue;
+        }
+
+        foreach (generateCombinations($array) as $combination) {
+            if (isset($id)) { $combination[] = $id; }
+            yield $combination;
+        }
+    }
+}
+</code></pre>

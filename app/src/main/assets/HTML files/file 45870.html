@@ -1,0 +1,249 @@
+<p>First of all, I wouldn't necessarily compare win/draw/loss counts but a general score:</p>
+
+<p>Win +1, Draw +0, Loss -1</p>
+
+<p>A general score has also the benefit to give you an easier time when checking for the "close score" rule:</p>
+
+<blockquote>
+  <p>In subsequent rounds, each competitor faces an opponent with the same, or almost the same, cumulative score.</p>
+</blockquote>
+
+<p>Next, I'ld break the code up a bit - but that's a personal preference. It's always nice if you have a fast little algorythm, but it can hurt readability and complicate things in the long run. Why don't you just store past matchups in the Player instance, and check if two players already had a matchup (even storing the result)?</p>
+
+<p>I wrote a little example that breaks it up into a bit clearer components (Matches and Players). Of course this can be further optimized and shortened, but it's mainly written out in this way to give you a clear oerview of every step. It's based on the rules on the wiki page provided.</p>
+
+<p><a href="https://jsfiddle.net/ovkktbg6/5/" rel="nofollow">https://jsfiddle.net/ovkktbg6/5/</a></p>
+
+<pre><code>// settings
+var MAX_SCORE_DIFFERENCE = 2;
+
+// match
+function Match(player1, player2, result) {
+    this.player1 = player1
+    this.player2 = player2
+
+    // player1 [won/draw/lost] against player2
+    this.result = result
+
+    // give each player the match results
+    this.player1.addMatch(this)
+    this.player2.addMatch(this)
+
+    console.log(player1.name, result == Match.RESULT_WIN ? 'won' : ( result == Match.RESULT_LOSS ? 'lost' : 'draw' ), 'against', player2.name, '-', player1.score, ':', player2.score)
+}
+
+// possible results
+Match.RESULT_WIN  = 1
+Match.RESULT_DRAW = 0
+Match.RESULT_LOSS = -1
+
+Match.randomResult = function() {
+    return Math.floor( Math.random() * (Match.RESULT_WIN - Match.RESULT_LOSS + 1) ) + Match.RESULT_LOSS;
+}
+
+// player
+function Player(name) {
+    this.name    = name // just to have any identification
+    this.score   = 0
+    this.wins    = 0
+    this.losses  = 0
+    this.draws   = 0
+    this.matches = []
+}
+
+Player.prototype.addMatch = function( match ) {
+    this.matches.push(match)
+
+    if( match.result == Match.RESULT_DRAW ) {
+        this.draws++;
+    } else {
+
+        // check if the first player is this one
+        if( match.player1 == this ) {
+
+            // this player1 has WON against player2
+            if(match.result == Match.RESULT_WIN) {
+                this.wins++;
+                this.score++;
+            } else {
+                this.wins--;
+                this.score--;
+            }
+
+        // this player is player2
+        } else {
+
+            // player1 has LOST against this player2
+            if(match.result == Match.RESULT_LOSS) {
+                this.wins++;
+                this.score++;
+            } else {
+                this.wins--;
+                this.score--;
+            }
+        }
+    }
+}
+
+Player.prototype.hasPlayedAgainst = function( player ) {
+
+    // a player canot play against him/herself
+    if( this == player ) return false;
+
+    // check the other matches
+    for( var i = 0; i &lt; this.matches.length; i++ ) {
+        var match = this.matches[i]
+
+        if( match.player1 == player || match.player2 == player) return true; 
+    }
+
+    return false;
+}
+
+// example
+var playerList = []
+
+playerList.push( new Player('Alex') )
+playerList.push( new Player('Bob') )
+playerList.push( new Player('Charles') )
+playerList.push( new Player('David') )
+playerList.push( new Player('Erik') )
+playerList.push( new Player('Franz') )
+playerList.push( new Player('Georg') )
+playerList.push( new Player('Hans') )
+playerList.push( new Player('Ian') )
+playerList.push( new Player('Jacob') )
+playerList.push( new Player('Karl') )
+playerList.push( new Player('Lars') )
+playerList.push( new Player('Marco') )
+
+// if the matchups should be random each time, the playerList can be:
+// randomly ordered once, here - the tournament will have random matchups
+// or randomly ordered inside the while() loop. Every tournament round will have random matchups then
+
+// play through the tournament
+// pick every player in the playerList and match them against every other player
+var round         = 0
+var matchPossible = true
+
+while( matchPossible ) {
+
+    // this flag is set to true if there was a match
+    // if no match was played, that means that the tournament is over, since every player already competed against each other or there are no similar enough scores to play
+    matchPossible = false;
+
+    // this loop goes through the whole player list the first time, picking player1
+    for( var i = 0; i &lt; playerList.length; i++ ) {
+        var player1 = playerList[i];
+
+        // exclude players who already played this round
+        if( player1.matches.length &gt; round ) {
+            continue;
+        }
+
+        // this loop goes through the whole player list once more, picking player2
+        // the two loops match every player against every player, skipping their match with the conditions below
+        for( var ii = 0; ii &lt; playerList.length; ii++ ) {
+            var player2 = playerList[ii];
+
+            // do not play against him/herself
+            if( player1 == player2 ) {
+                continue;
+            }
+
+            // exclude players who already played this round
+            if( player2.matches.length &gt; round ) {
+                continue;
+            }
+
+            // the two already faced each other
+            if( player1.hasPlayedAgainst( player2 ) ) {
+                continue;
+            }
+
+            // their scores are too far apart
+            if( Math.abs( player1.score - player2.score ) &gt; MAX_SCORE_DIFFERENCE ) {
+                continue;
+            }
+
+            // there was a match!
+            matchPossible = true
+
+            // if we get here, the players should face each other
+            new Match( player1, player2, Match.randomResult() );
+
+            // break out, let the next players have a match
+            break;
+        }
+    }
+
+    // start the next round
+    round++;
+}
+
+// the tournament ended - let's rank them.
+playerList.sort( function( player1, player2 ) {
+    return player2.score - player1.score;
+} ) 
+
+// print the results
+console.log('-----')
+
+for( var i = 0; i &lt; playerList.length; i++ ) {
+    var player = playerList[i];
+
+    console.log('Rank', i + 1, ':', player.name, 'with', player.score, 'points');
+}
+</code></pre>
+
+<p><strong>Edit:</strong> Another advantage of breaking it up like this is that you don't have to worry too much about clever sorting algorithms and stuff like that - every component just does it's job according to the given rules, and in the end you evaluate the results.</p>
+
+<p>It's not intensively tested, so it's quite possible that it still has some hidden bugs, but generaly it should work fine according to the few tests I did.</p>
+
+<p><strong>Edit:</strong> As requested, I'll try to explain the loop a bit further. The two <code>for()</code> loops basically do nothing else than to first pick player1, and then match player1 to every player in the playerList (each called player2). When the current player1 was matched against each player2, the next player1 is selected.</p>
+
+<p>Let's say we have Alex as player1:</p>
+
+<pre><code>Alex (player1) is matched against Alex (player2) [no match - same player]
+Alex (player1) is matched against Bob (player2) [no match - already had a match]
+Alex (player1) is matched against Charles (player2) - they have a match!
+Now the nested `for( var ii )` loop is broken with `break;`, and Alex (player1) is done for the moment. We pick the next player in the playerList:
+Bob (player1) is matched against Alex (player2) [no match - already had a match]
+Bob (player1) is matched against Bob (player2) [no match - same player]
+Bob (player1) is matched against Charles (player2) [no match - charles already had a match this round]
+Bob (player1) is matched against David (player2) - they have a match!
+Now the nested `for( var ii)` loop breaks a second time, and we continue with Charles
+Charles (player1) is matched against Alex (player2) [no match - already had a match]
+etc...
+</code></pre>
+
+<p>Meanwhile, the <code>while( ... )</code> loop goes through each round of the tournament: Each round, all players are checked against each other, until we reach a point where no player is allowed to play against any other player. The tournament is over at that point, and we can sort the playerList according to the scores.</p>
+
+<p><strong>Edit (2):</strong> just to visualize my explanation with the <code>continue</code> and <code>break</code> keywords a bit better, since it's difficult to do in comment: (keep in mind, this is just pseudo-code for presentation purposes.)</p>
+
+<p><strong>Continue</strong></p>
+
+<pre><code>for( loop A ) {
+    for( loop B ) {
+         continue; // just skip to the end of loop B, and go through loop B again!
+
+         ... this stuff is skipped by continue ...
+
+         END OF LOOP &lt;- continue gets us here! loop A is unaffected
+    }
+}
+</code></pre>
+
+<p><strong>Break</strong></p>
+
+<pre><code>for( loop A ) {
+    for( loop B ) {
+         break; // completly jump out of loop B!
+
+         ... this stuff is skipped by break ...
+    }
+    &lt;- break gets us here! loop B is broken out of, we just continue with the code in loop A
+
+    ... stuff that is NOT skipped by break! ...
+}
+</code></pre>

@@ -1,0 +1,26 @@
+<p>The second template parameter used in the declaration of <code>uptr_curl_</code> is <code>void (*)(CURL *)</code></p>
+
+<p>The type of <code>&amp;client::del_curl</code> is <code>void (CURL::*)(CURL*)</code>.</p>
+
+<p>They are not the same. You can change <code>del_curl</code> to a <code>static</code> member function. That will resolve the problem.</p>
+
+<p><strong>Update</strong></p>
+
+<p>You can use a non-<code>static</code> member function with the help of <code>std::function</code> and <code>std::bind</code>.</p>
+
+<pre><code>class client
+{
+   public:
+      client();
+   private:
+      std::unique_ptr&lt;CURL, std::function&lt;void(CURL *)&gt;&gt; uptr_curl_;
+      CURL * init_curl();
+      void del_curl(CURL * ptr_curl);
+};
+
+client::client() : uptr_curl_(init_curl(),
+                              std::bind(&amp;client::del_curl, this, std::placeholders::_1))
+{
+   // ...
+}
+</code></pre>

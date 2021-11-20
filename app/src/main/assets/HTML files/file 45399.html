@@ -1,0 +1,40 @@
+<p>This is a bug in chrome, here is a discussion of it: <a href="https://code.google.com/p/chromium/issues/detail?id=436190" rel="nofollow">Chrome Tab Scroll Bug</a></p>
+
+<p>It is a bug with tabbing to text fields that already have data in them. Creating an input mask on a field with some static text (such as your +7 above) will put text in the field when tabbing to it, thus causing the bug. Even without the input mask, you can reproduce by putting text in plain fields, and tabbing back and forth between them.</p>
+
+<p>I have put together a small, hacky solution that works. The trade-off is that when you tab to the field, there is a very quick 'flash' of the text. Slightly annoying, but way better than scrolling the user off screen!</p>
+
+<p>**Note I'm a javascript newbie, so I'm sure there are better ways to accomplish this.</p>
+
+<pre><code>// create a closure around the field to keep the value scoped
+var ChromeScrollFixForInputMaskTextField = function(text_field, default_value, mask_options)
+
+    // set the starting value
+    var input_value = text_field.val() !== '' ? text_field.val() : default_value;
+
+    text_field.inputmask(mask_options);
+
+    // When tabbing in, clear the value, and add it back after 10 milliseconds.
+    // You can experiment with that time, just has to be long enough for Chrome
+    //  to have acted trying to scroll to a filled text field.
+    text_field.on('focus', function () {
+        text_field.val('');
+        setTimeout(function () {
+            text_field.val(input_value);
+        }, 10);
+    });
+
+    // Save the value when tabbing out so you can 'cheat' later
+    text_field.on('blur', function () {
+        input_value = text_field.val();
+    });
+
+};
+
+// To use, simply grab a text field, and create the closure
+my_text_field = $('#my_text_field');
+mask_options = { mask: "9[999][.][99]", 'placeholder': '', greedy: false }
+new ChromeScrollFixForInputMaskTextField(my_text_field, '1.0', mask_options)
+</code></pre>
+
+<p>You could do this with normal text fields by checking inside this function to see of the mask is present and only setting it if so.</p>

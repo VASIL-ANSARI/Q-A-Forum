@@ -1,0 +1,40 @@
+<p>The best way to do this is to override the <a href="https://developer.apple.com/library/prerelease/ios/documentation/WatchKit/Reference/WKInterfaceController_class/index.html#//apple_ref/occ/instm/WKInterfaceController/contextForSegueWithIdentifier:"><code>contextForSegueWithIdentifier</code></a> method that is called when you segue from one view to the next.</p>
+
+<p>The method of passing data between <code>WKInterfaceController</code>s is a bit different than the method for doing so with <code>UIViewController</code>s in a traditional iOS app.</p>
+
+<p>Normally, you'd do something like this:</p>
+
+<pre><code>override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
+    if segue.identifier == "showDetail" {
+        let controller: DetailViewController = (segue.destinationViewController as UINavigationController).topViewController as DetailViewController
+        controller.myVariable = myValue
+    }
+}
+</code></pre>
+
+<p>However, there is no <code>prepareForSegue</code> method in WatchKit. The <code>contextForSegueWithIdentifier</code> <code>WKInterfaceController</code> method is <em>similar</em>, but it has a glaring difference: it doesn't provide you with an instance of the destination view controller.</p>
+
+<p>Instead, you return data from the method, and access that data within your target class.</p>
+
+<p>So, in your case, it would look like this:</p>
+
+<pre><code>// In InterfaceController
+override func contextForSegueWithIdentifier(segueIdentifier: String) -&gt; AnyObject? {
+    // You may want to set the context's identifier in Interface Builder and check it here to make sure you're returning data at the proper times
+
+    // Return data to be accessed in ResultsController
+    return self.currentValue
+}
+
+// In ResultsController
+override func awakeWithContext(context: AnyObject?) {
+    super.awakeWithContext(context)
+
+    // Make sure data was passed properly and update the label accordingly
+    if let val: String = context as? String {
+        self.totalLabel.setText(val)
+    } else {
+        self.totalLabel.setText("")
+    }
+}
+</code></pre>

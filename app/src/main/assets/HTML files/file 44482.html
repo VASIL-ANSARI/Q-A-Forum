@@ -1,0 +1,39 @@
+<p>I would make a wrapper that accepts a lambda to perform the transformation from <code>Project</code> to compared object.</p>
+
+<p>Note that this assumes that all the involved types implement <code>IComparable&lt;T&gt;</code>.</p>
+
+<pre><code>public static class SortProject
+{
+    public static ProjectSorter&lt;T&gt; By&lt;T&gt;(Func&lt;Project, T&gt; transform)
+    {
+        return new ProjectSorter&lt;T&gt;(transform);
+    }
+}
+
+public class ProjectSorter&lt;T&gt; : IComparer&lt;Project&gt;
+                  where T : IComparable&lt;T&gt;
+{
+    private Func&lt;Project, T&gt; _transform;
+
+    public ProjectSorter(Func&lt;Project, T&gt; transform)
+    {
+        _transform = transform;
+    }
+
+    public int Compare(Project left, Project right)
+    {
+        //Put null first in order, note that this can be changed based on what you want
+        if (left == null) return right == null ? -1 : 0;
+        if (right == null) return 1;
+
+        return _transform(left).CompareTo(_transform(right));
+    }
+}
+</code></pre>
+
+<p>I think with the static method C# can deduce the correct thing here (didn't test, explicit annotations will work).</p>
+
+<p>For instance:</p>
+
+<pre><code>projectList.Sort(SortProject.By(p =&gt; p.Title));
+</code></pre>

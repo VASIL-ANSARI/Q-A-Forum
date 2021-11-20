@@ -1,0 +1,60 @@
+<p><strong>Edit:</strong> Moved my guesswork to the bottom, here comes the normative text why this won't work. TL;DR version:</p>
+
+<blockquote>
+  <p>No conversions allowed if the function parameter contains a deduced template parameter.</p>
+</blockquote>
+
+<hr>
+
+<p><code>Â§14.8.3 [temp.over] p1</code></p>
+
+<blockquote>
+  <p>[...] When a call to that name is written (explicitly, or implicitly using the operator
+  notation), template argument deduction (14.8.2) and checking of any explicit template arguments (14.3) are performed for each function template to find the template argument values (if any) that can be used with that function template to instantiate a function template specialization that can be invoked with the call arguments.</p>
+</blockquote>
+
+<p><code>Â§14.8.2.1 [temp.deduct.call] p4</code></p>
+
+<blockquote>
+  <p>[...] [ <em>Note:</em> as specified in 14.8.1, <strong>implicit conversions will be performed</strong> on a function argument to convert it to the type of the corresponding function parameter <strong>if the parameter contains no <em>template-parameters</em> that participate in template argument deduction</strong>. [...] <em>âend note</em> ]</p>
+</blockquote>
+
+<p><code>Â§14.8.1 [temp.arg.explicit] p6</code></p>
+
+<blockquote>
+  <p>Implicit conversions (Clause 4) will be performed on a function argument to convert it to the type of the corresponding function parameter if the parameter type contains no <em>template-parameters</em> that participate in template argument deduction. [ <em>Note:</em> Template parameters do not participate in template argument deduction if they are explicitly specified. [...] <em>âend note</em> ]</p>
+</blockquote>
+
+<p>Since <code>std::basic_string</code> depends on deduced template parameters (<code>CharT</code>, <code>Traits</code>), no conversions are allowed.</p>
+
+<hr>
+
+<p>This is kind of a chicken and egg problem. To deduce the template argument, it needs an actual instance of <code>std::basic_string</code>. To convert to the wrapped type, a conversion target is needed. That target has to be an actual type, which a class template is not. The compiler would have to test all possible instantiations of <code>std::basic_string</code> against the conversion operator or something like that, which is impossible.</p>
+
+<p>Suppose the following minimal testcase:</p>
+
+<pre><code>#include &lt;functional&gt;
+
+template&lt;class T&gt;
+struct foo{
+    int value;
+};
+
+template&lt;class T&gt;
+bool operator&lt;(foo&lt;T&gt; const&amp; lhs, foo&lt;T&gt; const&amp; rhs){
+    return lhs.value &lt; rhs.value;
+}
+
+// comment this out to get a deduction failure
+bool operator&lt;(foo&lt;int&gt; const&amp; lhs, foo&lt;int&gt; const&amp; rhs){
+    return lhs.value &lt; rhs.value;
+}
+
+int main(){
+    foo&lt;int&gt; f1 = { 1 }, f2 = { 2 };
+    auto ref1 = std::ref(f1), ref2 = std::ref(f2);
+    ref1 &lt; ref2;
+}
+</code></pre>
+
+<p>If we don't provide the overload for an instantiation on <code>int</code>, the deduction fails. If we provide that overload, it's something the compiler can test against with the one allowed user-defined conversion (<code>foo&lt;int&gt; const&amp;</code> being the conversion target). Since the conversion matches in this case, overload resolution succeeds and we got our function call.</p>

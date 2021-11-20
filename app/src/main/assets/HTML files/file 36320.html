@@ -1,0 +1,47 @@
+<p>newFile.txt is a relative path, so the file would show up relative to your map task process's working directory.  This will land somewhere under the directories used by NodeManager for containers.  This is configuration property <code>yarn.nodemanager.local-dirs</code> in yarn-site.xml, or the default inherited from yarn-default.xml, which is under /tmp:</p>
+
+<pre><code>&lt;property&gt;
+  &lt;description&gt;List of directories to store localized files in. An 
+    application's localized file directory will be found in:
+    ${yarn.nodemanager.local-dirs}/usercache/${user}/appcache/application_${appid}.
+    Individual containers' work directories, called container_${contid}, will
+    be subdirectories of this.
+  &lt;/description&gt;
+  &lt;name&gt;yarn.nodemanager.local-dirs&lt;/name&gt;
+  &lt;value&gt;${hadoop.tmp.dir}/nm-local-dir&lt;/value&gt;
+&lt;/property&gt;
+</code></pre>
+
+<p>Here is a concrete example of one such directory in my test environment:</p>
+
+<pre><code>/tmp/hadoop-cnauroth/nm-local-dir/usercache/cnauroth/appcache/application_1363932793646_0002/container_1363932793646_0002_01_000001
+</code></pre>
+
+<p>These directories are scratch space for container execution, so they aren't something that you can rely on for persistence.  A background thread periodically deletes these files for completed containers.  It is possible to delay the cleanup by setting the configuration property <code>yarn.nodemanager.delete.debug-delay-sec</code> in yarn-site.xml:</p>
+
+<pre><code>&lt;property&gt;
+  &lt;description&gt;
+    Number of seconds after an application finishes before the nodemanager's 
+    DeletionService will delete the application's localized file directory
+    and log directory.
+
+    To diagnose Yarn application problems, set this property's value large
+    enough (for example, to 600 = 10 minutes) to permit examination of these
+    directories. After changing the property's value, you must restart the 
+    nodemanager in order for it to have an effect.
+
+    The roots of Yarn applications' work directories is configurable with
+    the yarn.nodemanager.local-dirs property (see below), and the roots
+    of the Yarn applications' log directories is configurable with the 
+    yarn.nodemanager.log-dirs property (see also below).
+  &lt;/description&gt;
+  &lt;name&gt;yarn.nodemanager.delete.debug-delay-sec&lt;/name&gt;
+  &lt;value&gt;0&lt;/value&gt;
+&lt;/property&gt;
+</code></pre>
+
+<p>However, please keep in mind that this configuration is intended only for troubleshooting issues so that you can see the directories more easily.  It's not recommended as a permanent production configuration.  If application logic depends on the delete delay, then that's likely to cause a race condition between the application logic attempting to access the directory and the NodeManager attempting to delete it.  Leaving files lingering from old container executions also risks cluttering the local disk space.</p>
+
+<p>The log messages would go to the stdout/stderr of the map task logs, but I suspect execution isn't hitting those log messages.  Instead, I suspect that you're creating the file successfully, but either it's not easily findable (the directory structure will have somewhat unpredictable things like application ID and container ID managed by YARN), or the file is getting cleaned up before you can get to it.</p>
+
+<p>If you changed the code to use an absolute path pointing to some other directory, then that would help.  However, I don't expect this approach to work well in real practice.  Since Hadoop is distributed, you may have a hard time finding which node in a cluster of hundreds or thousands contains the local file that you want.  Instead, you might be better off writing to HDFS and then pulling the files you need locally to the node where you launched the job.</p>

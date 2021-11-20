@@ -1,0 +1,63 @@
+<p>For a problem like this one, I'd split the query into a small number of simpler ones, I think it's quite possible. Also, I found that MySQL actually may return results faster with this approach.</p>
+
+<p><strong>edit</strong> ...Actually after thinking a bit I see that you need to "annotate on subqueries", which is not possible in Django ORM (not in 1.2 at least). Maybe you have to do plain sql here or use some other tool to build the query.</p>
+
+<p>Tried to rewrite your models in more default django pattern, maybe it will help to understand the problem better. Models Pat and Snp are missing though...</p>
+
+<pre><code>class Clin(models.Model):
+    pat = models.ForeignKey(Pat)
+    class Meta:
+        db_table = u'clin'
+
+class SampToPat(models.Model):
+    samp = models.ForeignKey(Samp)
+    pat = models.ForeignKey(Pat)
+    iso = models.ForeignKey(Clin)
+    class Meta:
+        db_table = u'samptopat'
+        unique_together = ['samp', 'pat']
+
+class Samp(models.Model):
+    samp = models.CharField(max_length=8)
+    snp_set = models.ManyToManyField(Snp, through='SampToSnp')
+    pat_set = models.ManyToManyField(Pat, through='SaptToPat')
+    class Meta:
+        db_table = u'samp'
+
+class SampToSnp(models.Model):
+    samp = models.ForeignKey(Samp)
+    snp = models.ForeignKey(Snp)
+    value = models.CharField(max_length=2)
+    class Meta:
+        db_table = u'samptosnp'
+</code></pre>
+
+<p>The following seems to mean - get count of unique patients per clinic ...</p>
+
+<pre><code>(SELECT COUNT(*)
+   FROM clin AS a
+   LEFT JOIN clin AS b
+       ON a.pat_id = b.pat_id
+   WHERE a.iso = clin.iso
+) AS multiple_iso,
+</code></pre>
+
+<p>Sample count per clinic:</p>
+
+<pre><code>(SELECT COUNT(*)
+   FROM samptopat
+   WHERE samptopat.iso_id = clin.iso
+) AS multiple_samp,
+</code></pre>
+
+<p>This part is harder to understand, but in Django there is no way to do GROUP_CONCAT in plain ORM.</p>
+
+<pre><code>(SELECT GROUP_CONCAT(value ORDER BY snp_id ASC)
+   FROM samptopat
+   RIGHT JOIN samptosnp
+       USING(samp_id)
+   WHERE iso_id = clin.iso
+   GROUP BY samp_id
+   LIMIT 1 -- Return 1st samp only
+) AS snp
+</code></pre>

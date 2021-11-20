@@ -1,0 +1,153 @@
+<p>At this line the <code>Y</code> axis range is set to (-1,1) interval:</p>
+
+<pre><code>plot.getDomainAxis().setRange(0, 1000); //array
+plot.getRangeAxis().setRange(-1,1);//time
+</code></pre>
+
+<p>But <code>Y</code> axis is intended to take the value from <code>totalRuntime</code> which is a time difference given in millis:</p>
+
+<pre><code>if( insSort.isEnabled()) {
+   long startTime = System.currentTimeMillis();
+   insSort(A);
+   long endTime = System.currentTimeMillis();
+   totalRuntime += (endTime - startTime); // this is certainly &gt; 1
+}
+series.add(totalRuntime,A.length);
+dataset.addSeries(series); 
+</code></pre>
+
+<p>This value will be certainly > 1 (unless you have the most powerful computer ever :). So you can see which value is getting <code>totalRuntime</code> and adjust the <code>Y</code> axis range accordingly.</p>
+
+<p>You might also check:</p>
+
+<ul>
+<li>Domain axis range: if the array has more than 1000 elements then you won't see the graphic either.</li>
+<li>Is <code>insSort.isEnabled()</code> actually <code>true</code>? If not so then you'll be adding garbage to <code>dataset</code>.</li>
+</ul>
+
+<h3>Addendum</h3>
+
+<blockquote>
+  <p>I want to graph sorting time versus the number of elements</p>
+</blockquote>
+
+<p>Well you can take a look to the example below. As I haven't the sort methods implementation the example emulates the times using <a href="http://docs.oracle.com/javase/tutorial/uiswing/misc/timer.html" rel="nofollow">Swing timer</a>. The key is adding the values to the series properly and having the right ranges set. </p>
+
+<p><strong>Note:</strong> as times are random generated then the shown info is garbage. The example tries to illustrate the process you should follow to make the graphic work. Pay special attention to <code>fillChart()</code> method: it makes the trick.</p>
+
+<pre><code>import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JToggleButton;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
+
+public class Demo {
+
+    private final XYSeries _timeSeries = new XYSeries("Time Series");
+    boolean _shouldPaint;
+
+    private void createAndShowGUI() {
+
+        JToggleButton fillChart = new JToggleButton("Fill chart") ;
+        fillChart.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JToggleButton toggleButton = (JToggleButton)e.getSource();
+                if(toggleButton.isSelected()) {
+                    _timeSeries.clear();
+                    _shouldPaint = true;
+                    fillChart();
+                } else {
+                    _shouldPaint = false;
+                }
+            }
+        });
+
+        JPanel content = new JPanel(new BorderLayout());
+        content.add(getFreeChartPanel(), BorderLayout.CENTER);
+        content.add(fillChart, BorderLayout.SOUTH);
+
+        JFrame frame = new JFrame("Demo");      
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.getContentPane().add(content);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    private JPanel getFreeChartPanel() {
+        String title = "Time series example";
+
+        XYSeriesCollection dataset = new XYSeriesCollection();
+        dataset.addSeries(_timeSeries); // series is added only once!
+
+        JFreeChart chart = ChartFactory.createXYLineChart(title, "Array elements", "Time (in millis)", dataset, 
+                                                         PlotOrientation.VERTICAL, true, true, false);       
+        XYPlot plot = chart.getXYPlot();
+        plot.setRenderer(new XYLineAndShapeRenderer(true, true));
+        plot.setDomainCrosshairVisible(true);
+        plot.setRangeCrosshairVisible(true);
+        plot.getDomainAxis().setRange(0, 1000); // Number of elements - top visible: 1000
+        plot.getRangeAxis().setRange(0, 4000); // Time employed to do the sort - top visible: 4 seconds (4k millis)        
+
+        return new ChartPanel(chart);
+    }
+
+    /**
+     * You should do your own implementation of this method.
+     */
+    private void fillChart() {
+        Timer timer = new Timer(500, new ActionListener() {
+
+            long lastTimeMillis = System.currentTimeMillis();
+            int domainAxis = 0;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if(_shouldPaint) {
+                    long currentTimeMillis = System.currentTimeMillis();
+                    long rangeAxisValue = (long)((currentTimeMillis - lastTimeMillis) * Math.random());
+                    int domainAxisValue = domainAxis + 100;
+
+                    _timeSeries.add(domainAxisValue, rangeAxisValue);
+                    // Note this is the unique line that has an effect on the graphic
+
+                    lastTimeMillis = currentTimeMillis;
+                    domainAxis = domainAxisValue;
+
+                } else {
+                    Timer timer = (Timer)e.getSource();
+                    timer.stop();
+                }
+            }
+        });
+
+        timer.setDelay(1500);
+        timer.start();
+    }
+
+    public static void main(String[] args) {   
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new Demo().createAndShowGUI();
+            }
+        });
+    }    
+}
+</code></pre>
+
+<h3>Picture</h3>
+
+<p><img src="http://i.stack.imgur.com/7cFgH.jpg" alt="enter image description here"></p>

@@ -1,0 +1,32 @@
+<p>You could use a queue and ensure that only a single task is executing at a time which will process the queue, e.g.:</p>
+
+<pre><code>private readonly object _syncObj = new object();
+private readonly ConcurrentQueue&lt;Action&gt; _tasks = new ConcurrentQueue&lt;Action&gt;();
+
+public void QueueTask(Action task)
+{
+    _tasks.Enqueue(task);
+
+    Task.Factory.StartNew(ProcessQueue);
+}
+
+private void ProcessQueue()
+{
+    while (_tasks.Count != 0 &amp;&amp; Monitor.TryEnter(_syncObj))
+    {
+        try
+        {
+            Action action;
+
+            while (_tasks.TryDequeue(out action))
+            {
+                action();
+            }
+        }
+        finally
+        {
+            Monitor.Exit(_syncObj);
+        }
+    }
+}
+</code></pre>

@@ -1,0 +1,27 @@
+<p>You can avoid the recursion by using a numbers table (just a table that holds values from 1-n).  <code>Table1</code> in my query represents the output of your first query, so you'll have to use a subquery/cte, similarly if you can't build a numbers table you'll have to use a cte/subquery for that too:</p>
+
+<pre><code>    SELECT a.ID
+      ,DATEADD(hour,n-1,start_time) AS Start_Time
+      ,CASE WHEN DATEADD(hour,n,start_time) &lt;= End_Time THEN DATEADD(hour,n,start_time)
+            ELSE End_Time      
+       END as End_Time
+      ,DATEDIFF(ss,DATEADD(hour,n-1,start_time),CASE WHEN DATEADD(hour,n,start_time) &lt;= End_Time THEN DATEADD(hour,n,start_time)
+            ELSE End_Time      
+       END) AS duration
+FROM Table1 a
+JOIN lkp_Numbers b
+  ON b.N BETWEEN 1 AND duration/3600 + 1
+</code></pre>
+
+<p>One of the fastest ways to create a numbers table:</p>
+
+<pre><code>;with a AS (SELECT 1 n UNION ALL SELECT 1 UNION ALL SELECT 1 UNION ALL SELECT 1 UNION ALL SELECT 1 UNION ALL 
+              SELECT 1 UNION ALL SELECT 1 UNION ALL SELECT 1 UNION ALL SELECT 1 UNION ALL SELECT 1)
+SELECT TOP 1000000 IDENTITY(int,1,1) AS N
+INTO lkp_Numbers
+FROM a a, a b, a c, a d, a e, a f 
+</code></pre>
+
+<p>If you have to do it with a cte, you can't use <code>IDENTITY</code> but can use <code>ROW_NUMBER()</code> instead or some other method.  Numbers tables come in handy though.</p>
+
+<p>Demo: <a href="http://www.sqlfiddle.com/#!6/8da9e/3/0" rel="nofollow">SQL Fiddle</a></p>

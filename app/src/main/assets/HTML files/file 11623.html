@@ -1,0 +1,67 @@
+<p>So, I'm going to answer my own question here (since I've figured it out).</p>
+
+<p>My initial premise was that both code blocks are equivalent. So that this</p>
+
+<pre><code>var f = function ( eval ) {};
+</code></pre>
+
+<p>is equivalent to</p>
+
+<pre><code>var f = new Function( 'eval', '' );
+</code></pre>
+
+<p>This is however not true. There are differences. The creation of a function object from a function declaration / expression notation is defined in <a href="http://es5.github.com/#x13.2" rel="nofollow">Chapter 13.2 Creating Function Objects</a>. On the other hand, the creation of a function object from a <code>new Function</code> constructor invocation is defined in <a href="http://es5.github.com/#x15.3.2.1" rel="nofollow">Chapter 15.3.2.1 new Function (p1, p2, â¦ , pn, body)</a>. So there are different algorithms at work here.</p>
+
+<p>The specific part which is relevant to this question is the part which defines the strictness of the created function object. </p>
+
+<p><strong>Function expressions</strong></p>
+
+<p>The strictness of a function object created via a function expression is defined in the semantics of the production <em>FunctionExpression</em> at the beginning of chapter 13:</p>
+
+<blockquote>
+  <p>Pass in true as the Strict flag if the FunctionExpression is contained
+  in strict code or if its FunctionBody is strict code.</p>
+</blockquote>
+
+<p>So the function object will be strict if either one of these conditions is met:</p>
+
+<ul>
+<li>the function expression is contained in strict code</li>
+<li>the function body of the function expression is strict code</li>
+</ul>
+
+<p>so for instance, the function <code>f</code> is strict in both examples below.</p>
+
+<p>Example 1:</p>
+
+<pre><code>(function () {    
+    var f = function () {
+        'use strict';
+        return 'I am strict!';
+    }    
+})();
+</code></pre>
+
+<p>Example 2:</p>
+
+<pre><code>(function () {
+    'use strict';    
+    var f = function () {
+        return 'I am strict!';
+    }    
+})();
+</code></pre>
+
+<p><strong>Function constructor invocation</strong></p>
+
+<p>The strictness of a function object created via a Function constructor invocation is defined in step 9 of the algorithm from Chapter 15.3.2.1 (already linked above): </p>
+
+<blockquote>
+  <p>If body is strict mode code (see 10.1.1) then let strict be true, else let strict be false.</p>
+</blockquote>
+
+<p>So, whether or not the <code>new Function</code> invocation is contained in strict code is <strong>irrelevant</strong>. To create a strict function via this pattern, one has to explicitly define the strictness in the function body (which is the last argument supplied to the constructor.</p>
+
+<pre><code>new Function ( 'a, b', 'return a + b;' ); // not strict
+new Function ( 'a, b', '"use strict"; return a + b;' ); // strict
+</code></pre>

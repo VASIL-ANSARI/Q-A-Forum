@@ -1,0 +1,34 @@
+<p>Its asynchronous issue. <strong><code>signInWithEmail</code></strong> makes an asynchronous call to the server, meaning this call will be loaded in a different network thread, which takes some time to complete, but since your <code>performSegueWithIdentifier</code> is put outside the completionBlock so it get's executed even before sign In could be completed, But when you press your button next time your users had been previously been signed in from your first call, so it segues...  </p>
+
+<p>Just put the </p>
+
+<pre><code>self.performSegueWithIdentifier("emailLoginToSearchSegue", sender: self)
+</code></pre>
+
+<p>inside the <code>signInWithEmail</code> completionBlock().</p>
+
+<pre><code>@IBAction func loginEmailButton(sender: AnyObject) {
+    FIRAuth.auth()?.signInWithEmail(email.text!, password: password.text!, completion: { (user, error) in
+        if error != nil {
+            if let errCode = FIRAuthErrorCode(rawValue: error!.code) {
+                switch errCode {
+                case .ErrorCodeInvalidEmail:
+                    self.emailLoginStatus = "invalid email"
+                case .ErrorCodeUserDisabled:
+                    self.emailLoginStatus = "User account disabled"
+                case .ErrorCodeWrongPassword:
+                    self.emailLoginStatus = "Wrong Password"
+                case .ErrorCodeUserNotFound:
+                    self.emailLoginStatus = "User not found"
+                case .ErrorCodeNetworkError:
+                    self.emailLoginStatus = "Could not connect"
+                default:
+                    self.emailLoginStatus = "Login Error"
+                }
+            }
+        }else{
+            self.performSegueWithIdentifier("emailLoginToSearchSegue", sender: self)
+        }
+    })
+}
+</code></pre>

@@ -1,0 +1,65 @@
+<p>Using</p>
+
+<pre><code>App::setup() {
+    mapArray['ClassName1'] = new ClassName1();
+    mapArray['ClassName2'] = new ClassName2();
+    mapArray['ClassName3'] = new ClassName3();
+}
+</code></pre>
+
+<p>is not a good idea (even after you fix the incorrect syntax of trying to use single quotes to define a string). It breaks the <a href="https://en.wikipedia.org/wiki/Open/closed_principle" rel="nofollow">Open/Closed Principle</a>. If you want to add <code>ClassNameN</code> to your system, you have to come back to modify a working function.</p>
+
+<p>It's better to use a registration mechanism. Declare a function, <code>registerObject</code>, as:</p>
+
+<pre><code>App::registerObject(std::string const&amp; name, BaseClass* ptr);
+</code></pre>
+
+<p>and implement it as:</p>
+
+<pre><code>static std::map&lt;std::string, BaseClass*&gt;&amp; getClassMap()
+{
+   static std::map&lt;std::string, BaseClass*&gt; theMap;
+   return theMap;
+}
+
+App::registerObject(std::string const&amp; name, BaseClass* ptr)
+{
+   getClassMap()[name] = ptr;
+}
+</code></pre>
+
+<p>and then, in the source file that contains the implementation of <code>ClassNameN</code>, make sure to call</p>
+
+<pre><code>App::registerObject("ClassNameN", new ClassNameN());
+</code></pre>
+
+<p>One way to register:</p>
+
+<ol>
+<li>Use a helper class called <code>Initializer</code>, which is defined in the .cpp file.</li>
+<li>Make the call to <code>App::registerObject</code> in the constructor of `Initializer.</li>
+<li>Create a file scoped <code>static</code> instance of <code>Initializer</code> in the .cpp file</li>
+</ol>
+
+<p>ClassName1.cpp:</p>
+
+<pre><code>#include "ClassName1.hpp"
+
+// You can use anonymous namespace but I prefer to use a named
+// namespace. It makes names of the typeinfo object clearer.
+
+namespace ClassName1NS
+{
+   struct Initializer
+   {
+      Initializer();
+   };
+}
+
+static Initializer initializer
+
+Initializer::Initializer()
+{
+   App::registerObject("ClassName1", new ClassName1());
+}
+</code></pre>

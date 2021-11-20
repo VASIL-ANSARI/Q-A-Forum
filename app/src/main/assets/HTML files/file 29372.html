@@ -1,0 +1,38 @@
+<p>So one thing is that <a href="https://github.com/mperham/sidekiq/wiki/FAQ#how-do-i-push-a-job-to-sidekiq-without-ruby">According to the FAQ</a>, "The Sidekiq message format is quite simple and <strong>stable</strong>: it's just a Hash in JSON format." Emphasis mine-- I don't think sending JSON to sidekiq is too brittle to do. Especially when you want fine-grained control around which Redis instance you send the jobs to, as in the OP's situation, I'd probably just write a little wrapper that would let me indicate a Redis instance along with the job being enqueued.</p>
+
+<p>For Kevin Bedell's more general situation to round-robin jobs into Redis instances, I'd imagine you <em>don't</em> want to have the control of which Redis instance is used-- you just want to enqueue and have the distribution be managed automatically. It looks like <a href="https://github.com/mperham/sidekiq/issues/660">only one person has requested this so far</a>, and <a href="https://gist.github.com/xxx/4659986">they came up with a solution</a> that uses <a href="https://github.com/redis/redis-rb/blob/e1881b2fbc7b361aa0aefc9ea520bdee0383f735/lib/redis/distributed.rb"><code>Redis::Distributed</code></a>:</p>
+
+<pre><code>datastore_config = YAML.load(ERB.new(File.read(File.join(Rails.root, "config", "redis.yml"))).result)
+
+datastore_config = datastore_config["defaults"].merge(datastore_config[::Rails.env])
+
+if datastore_config[:host].is_a?(Array)
+  if datastore_config[:host].length == 1
+    datastore_config[:host] = datastore_config[:host].first
+  else
+    datastore_config = datastore_config[:host].map do |host|
+      host_has_port = host =~ /:\d+\z/
+
+      if host_has_port
+        "redis://#{host}/#{datastore_config[:db] || 0}"
+      else
+        "redis://#{host}:#{datastore_config[:port] || 6379}/#{datastore_config[:db] || 0}"
+      end
+    end
+  end
+end
+
+Sidekiq.configure_server do |config|
+  config.redis = ::ConnectionPool.new(:size =&gt; Sidekiq.options[:concurrency] + 2, :timeout =&gt; 2) do
+    redis = if datastore_config.is_a? Array
+      Redis::Distributed.new(datastore_config)
+    else
+      Redis.new(datastore_config)
+    end
+
+    Redis::Namespace.new('resque', :redis =&gt; redis)
+  end
+end
+</code></pre>
+
+<p>Another thing to consider in your quest to get high-availability and fail-over is to get <a href="http://sidekiq.org/pro/">Sidekiq Pro</a> which includes reliability features: "The Sidekiq Pro client can withstand transient Redis outages. It will enqueue jobs locally upon error and attempt to deliver those jobs once connectivity is restored." Since sidekiq is for background processes anyway, a short delay if a Redis instance goes down should not affect your application. If one of your two Redis instances goes down and you're using round robin, you've still lost some jobs unless you're using this feature.</p>

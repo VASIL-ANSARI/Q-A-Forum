@@ -1,0 +1,18 @@
+<p>You can use <a href="https://docs.djangoproject.com/en/dev/topics/http/middleware/" rel="nofollow">Django Middleware</a> for this. Middlewares allow you to modify/process Django's HttpRequest object that is supplied to a view and HttpResponse object that is returned by a view as well as take action when a view raises an exception. You can do variety of tasks with this such as logging of the meta data of the requests you receive, error reporting etc. Django calls <a href="https://docs.djangoproject.com/en/dev/topics/http/middleware/#process-exception" rel="nofollow">process_exception</a> whenever an exception is raised by a view and you can define process_exception() to send a mail to you whenever an exception gets raised.</p>
+
+<pre><code>class ErrorReportingMiddleware(object):
+    def process_exception(self, request, exception):
+        send_mail_to_admin(exception) # you can collect some more information here
+        return HttpResponse('{"result":"error"}') # this response is returned to the user
+</code></pre>
+
+<p>Add this class to your MIDDLEWARE_CLASSES variable in settings.py at the end of that tuple.</p>
+
+<p>Your view would reduce to:</p>
+
+<pre><code>def request_handler(request):
+    code_that_rises_an_exception()
+    return response('{"result":"success"}')
+</code></pre>
+
+<p>Now if an exception is raised by request_handler, Django would call process_exception method of your ErrorReportingMiddleware which will send a mail to the admin about the exception and return a JSON response to the browser instead of a 500 page. I would implement send_mail_to_admin as an asynchronous function so that the processing of the response by django doesn't get blocked due to sending of mail and quick response is returned to the user.</p>

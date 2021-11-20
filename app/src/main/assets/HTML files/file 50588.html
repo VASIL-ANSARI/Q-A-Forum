@@ -1,0 +1,43 @@
+<blockquote>
+  <p>Returns: A pointer <code>p</code> such that <code>p + i == &amp;operator[](i)</code> for each <code>i</code> in <code>[0,size()]</code>.</p>
+</blockquote>
+
+<p><code>std::string::operator[](size_type i)</code> is specified to return "a reference to an object of type <code>charT</code> with value <code>charT()</code> when <code>i == size()</code>, so we know that that pointer points to an object.</p>
+
+<p>5.7 states that "For the purposes of [operators + and -], a pointer to a nonarray object behaves the same as a pointer to the first element of an array of length one with the type of the object as its element type."</p>
+
+<p>So we have a non-array object and the spec guarantees that a pointer one past it will be representable. So we know <code>std::addressof(*end(str)) + 1</code> has to be representable.</p>
+
+<p>However that's not a guarantee on <code>std::string::iterator</code>, and there is no such guarantee anywhere in the spec, which makes it undefined behavior.</p>
+
+<p>(Note that this is not the same as 'ill-formed'. <code>*end(str) + 1</code> is in fact well-formed.)</p>
+
+<p>Iterators can and do implement checking logic that produce various errors when you do things like increment the <code>end()</code> iterator. This is in fact what Visual Studios debug iterators do with <code>end(str) + 1</code>.</p>
+
+<pre><code>#define _ITERATOR_DEBUG_LEVEL 2
+#include &lt;string&gt;
+#include &lt;iterator&gt;
+
+int main() {
+  std::string s = "ssssssss";
+  auto x = std::end(s) + 1; // produces debug dialog, aborts program if skipped
+}
+</code></pre>
+
+<blockquote>
+  <p>And if it isn't, <em>why</em> isn't it?</p>
+  
+  <p>for consistency and interoperability with zero-terminated strings if nothing else</p>
+</blockquote>
+
+<p>C++ specifies some specific things for compatibility with C, but such backwards compatibility is limited to supporting things that can actually be written in C. C++ doesn't necessarily try to take C's semantics and make new constructs behave in some analogous way. Should <code>std::vector</code> decay to an iterator just to be consistent with C's array decay behavior?</p>
+
+<p>I'd say <code>end(std) + 1</code> is left as undefined behavior because there's no value in trying to constrain <code>std::string</code> iterators this way. There's no legacy C code that does this that C++ needs to be compatible with and new code should be prevented from doing it.</p>
+
+<blockquote>
+  <p>New code should be prevented from relying on it... why? [...] What does not allowing it buy you in theory, and how does that look in practice?</p>
+</blockquote>
+
+<p>Not allowing it means implementations don't have to support the added complexity, complexity which provides zero demonstrated value.</p>
+
+<p>In fact it seems to me that supporting <code>end(str) + 1</code> has negative value since code that tries to use it will essentially be creating the same problem as C code which can't figure out when to account for the null terminator or not. C has enough off by one buffer size errors for both languages.</p>

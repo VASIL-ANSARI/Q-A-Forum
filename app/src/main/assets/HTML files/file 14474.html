@@ -1,0 +1,24 @@
+<p>NO.</p>
+
+<p>The first <code>#pragma omp parallel</code> will create a team of parallel threads and the second will then try to create for each of the original threads another team, i.e. a team of teams. However, on almost all existing implementations the second team has just only one thread: the second parallel region is essentially not used. Thus, your code is more like equivalent to</p>
+
+<pre><code>#pragma omp parallel for schedule(dynamic,1)
+for (int x = 0; x &lt; x_max; ++x) {
+    // only one x per thread
+    for (int y = 0; y &lt; y_max; ++y) { 
+        // code here: each thread loops all y
+    }
+}
+</code></pre>
+
+<p>If you don't want that, but only parallelise the inner loop, you can do this:</p>
+
+<pre><code>#pragma omp parallel
+for (int x = 0; x &lt; x_max; ++x) {
+    // each thread loops over all x
+#pragma omp for schedule(dynamic,1)
+    for (int y = 0; y &lt; y_max; ++y) { 
+        // code here, only one y per thread
+    }
+}
+</code></pre>

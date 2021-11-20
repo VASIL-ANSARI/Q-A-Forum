@@ -1,0 +1,85 @@
+<p>I cannot understand your abstraction. </p>
+
+<p>Your second query has condition <code>id = $random</code>, but you bind params in your <code>single()</code> method: <code>$adv_sql, $random['id']</code>.</p>
+
+<p>We don't know your methods work, you should have shown us their implementation.</p>
+
+<p>Anyway, isn't one query better for this?</p>
+
+<pre><code>SELECT * FROM `ADVERTISEMENTS` ORDER BY RAND() LIMIT 1
+</code></pre>
+
+<p>Or without <code>LIMIT</code> if you want to recieve all</p>
+
+<p>If you don't want to show an already loaded image in the second request, you'd need to log which images where shown so far, into a database, cookies or sessions, depending on the needs.</p>
+
+<hr>
+
+<p>Or, bind the shown images to an instance.</p>
+
+<p>This is my test so far:</p>
+
+<pre><code>class Images {
+
+    private $_imagesShown = array("''");
+
+    private function getShownImages() {
+        return implode(',', $this-&gt;_imagesShown);
+    }
+
+    private function setShownImage($row) {
+        $this-&gt;_imagesShown[] = $row['id'];
+    }
+
+    public function getImages() {
+        $query = "SELECT id, image FROM images WHERE id NOT IN ({$this-&gt;getShownImages()})";
+        $result = mysqli_query($query);
+        $row = mysqli_fetch_assoc($result);
+        $this-&gt;setShownImage($row);
+        return $row;
+    }
+}
+
+$img = new Images();
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+var_dump($img-&gt;getImages());
+</code></pre>
+
+<p>Outputs:</p>
+
+<pre><code>array (size=2)
+  'id' =&gt; string '1' (length=1)
+  'img' =&gt; string '0.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '2' (length=1)
+  'img' =&gt; string '1.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '3' (length=1)
+  'img' =&gt; string '2.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '4' (length=1)
+  'img' =&gt; string '3.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '5' (length=1)
+  'img' =&gt; string '4.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '6' (length=1)
+  'img' =&gt; string '12.jpg' (length=1)
+
+array (size=2)
+  'id' =&gt; string '7' (length=1)
+  'img' =&gt; string '55.jpg' (length=1)
+</code></pre>
+
+<p>so each call of <code>getImages()</code> returns a non shown image</p>

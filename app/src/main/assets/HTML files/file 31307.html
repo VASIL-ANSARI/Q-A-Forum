@@ -1,0 +1,27 @@
+<p>You can use modular arithmetic for that at the cost of one extra variable in the innermost loop to serve as counter, while the other will serve as position index. </p>
+
+<pre><code>#define FINAL_X_LEN 150
+
+void Overlapadd(float **final_X, float **all_frames_X, int add_index)
+{
+    for (int i = 0; i &lt; frame_size; i++)
+        for(int j = add_index, int k = 0; k &lt; 32; j = (j+1)%FINAL_X_LEN)
+            final_X[j][i] += all_frames_S[k][i];
+
+}
+</code></pre>
+
+<p>Here, <code>k</code> is used to count iterations, and <code>j</code> is the real position you are indexing.</p>
+
+<p>Be careful with <code>add_index++;</code> in the end of <code>Overlapadd</code>, this will most likely not work the way you expect. Values are passed by copy, so <code>add_index++</code> is only incrementing your local copy of <code>add_index</code>, this change will not be visible to the caller. You must pass <code>add_index</code> as a pointer if you want to simulate pass-by-reference.</p>
+
+<p>Also, note that the way you organized the code is not very friendly for caching. <code>final_X[j][i] += ...</code> is bad because <code>j</code> is changed in every iteration of the innermost loop, this breaks spatial locality and increases cache miss rate. If you access nearby positions in your array, you can increase cache hit time and overall program performance. I suggest copying every frame for each position <code>j</code>, and not copying a frame at a time for every position <code>j</code> (which is what you're doing right now). In this case, this is as simple as swapping the order of the loops:</p>
+
+<pre><code>void Overlapadd(float **final_X, float **all_frames_X, int add_index)
+{
+    for(int j = add_index, int k = 0; k &lt; 32; j = (j+1)%FINAL_X_LEN)
+        for (int i = 0; i &lt; frame_size; i++)
+            final_X[j][i] += all_frames_S[k][i];
+
+}
+</code></pre>

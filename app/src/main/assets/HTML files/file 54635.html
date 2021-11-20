@@ -1,0 +1,135 @@
+<p>This is a well-known category of problem in game engineering and you'll be pleased to know the solution is relatively simple. You'll be pleased to hear there are similar, but much more complicated, problems that are actually solved in the same way. I'll try to explain.</p>
+
+<p>Now here's the thing. It's quite often that the following question comes up...</p>
+
+<blockquote>
+  <p>So I'm working on GTA. I have a humanoid, H, running around. She approaches vehicle V.  She opens the door and gets in and drives off. After that everything goes to hell in Mecanim and all the code stops working. What to do?</p>
+</blockquote>
+
+<p>Surprisingly, the way that is done in games is:</p>
+
+<h1>Surprisingly: you actually swap to totally different models at that point!!!!!</h1>
+
+<p>You have H and V in the game. But then you have an animation (say) for H climbing in to V.  But then, <strong>you literally destroy the game objects of H and V,</strong> and you <strong>Instantiate (or just awake) a new, totally different, game object</strong>, which is D ("a car being driven around by a lady").</p>
+
+<p>(If you think about it, you can see that when you do this, you carefully adjust all the stuff in D, so that it <strong>matches</strong> what was "just then happening" in the frame, in relation to both H and V.  So for example, literally, you copy the transform, twist etc of the car V, to the new car-inside-D, if lady H has the SmearedMakeupEffect, you put the same SmearedMakeupEffect on the lady-within-D, you position all the bones identically, and so on.)</p>
+
+<p>Another simple example of this is, you often get people asking, "my character C gets killed and I want it to become a ragdoll, how to?" In fact you <em>just swap to a totally new game object</em> you have all set up for that passage of the game. Indeed, if you have a character A ("Arnie") in a game, it's normal that you have 4 or 5 "different As" sitting offside the stage, so, there's "ragdoll A", "A who can dance" "A with weapon".  And indeed many of these are combos, you know "A on the horse" "A in the car" and so on.</p>
+
+<p>So interestingly, the "real" solution here is,</p>
+
+<h1>once they become a new connected thing, destroy them both and swap to a new game object altogether!</h1>
+
+<p>if you have made games "until you are blue in the face" from making games, this is just what you would do as a matter of course. Even though its' a simple situation, it's just easier in the long run.  After all, consider all the stuff you have to do when this happens:</p>
+
+<ol>
+<li><p>make hitting object child of the other</p></li>
+<li><p>turn off physics on the child</p></li>
+<li><p>change the way your physics works for the whole thing</p></li>
+<li><p>turn off or change the collider on the hitting object, perhaps making it part of the overall object</p></li>
+<li><p>you'll likely have some sort of new "separation" physics where it can be knocked-off - you'd have to turn all that on</p></li>
+<li><p>likely change minor issues like sound effects, colors etc</p></li>
+</ol>
+
+<p>As you can see it's a huge chore doing all this stuff, and indeed it's one of those things it's just "easier to do properly" and change to a new model.</p>
+
+<hr>
+
+<p>All that being said, I know you want a Quick Script Solution you can Paste In :)  Here it is...</p>
+
+<p>Step 0, You'll create "YourScript" which goes on the "main" cube.  it will "catch" another cube moving around.</p>
+
+<p>YourScript will look basically like this ...</p>
+
+<pre><code>   [System.NonSerialized] public bool isConnectedNow;
+   void OnCollisionEnter(Collision collision)
+      GameObject theThingWeCaught = collision.gameObject
+      Debug.Log("We caught this thing .. " + theThingWeCaught.name)
+      // make it a child of us......
+      theThingWeCaught.transform.parent = transform
+      theThingWeCaught ... set kinematic
+      theThingWeCaught ... probably disable the rigidbody
+      theThingWeCaught ... probably disable the collider
+      isConnectedNow = true;
+</code></pre>
+
+<p>That's really all you have to do. </p>
+
+<p>Step 1, YOUR script must have a <code>public bool</code> like this</p>
+
+<pre><code> [System.NonSerialized] public bool isConnectedNow;
+</code></pre>
+
+<p>Step 2, Here's <code>MyScript</code> which goes on the hitting cube, first we'll unit-test that your <code>isConnectedNow</code> bool is working</p>
+
+<pre><code>public Class MyScript:MonoBehaviour // attach to the "child" cube
+ {
+ public float correctXDistance;
+ public float correctYDistance;
+ public Transform bigCube;
+ public YourScript yourScript;
+
+ void Update()
+  {
+  string message = yourScript.isConnectedNow ? "free" : "stuck";
+  Debug.Log("I am " + message);
+  }
+ }
+</code></pre>
+
+<p>attach, debug, and run.   Make the little cube stick and unstick from the big cube .. Watch the console.  it works?  So add this to <code>MyScript</code></p>
+
+<pre><code>private void DistanceCorrectionX()
+ {
+ float xDistance = bigCube.position.x - transform.position.x;
+ float xSign = Mathf.Sign(xDistance);
+ float xDelta = Mathf.Abs(xDistance);
+ float closenessPercentage = (xDelta/correctXDistance)*100f;
+ if ( closenessPercentage&lt;90f || closenessPercentage&gt;110f)
+    {
+    // they are not close enough to quantize on this axis
+    // this comes in to play when you have multiple axes
+    return;  // do nothing.
+    }
+ float xShouldBe = bigCube.position.x + xSign * correctXDistance;
+ Vector3 p = transform;
+ p.x = xShouldBe; // be careful it's .y, .z etc for other axes
+ transform.position = p;
+ }
+</code></pre>
+
+<p>for now call that in Update() in MyScript like this</p>
+
+<pre><code> void Update()
+  {
+  Debug.Log("I am " yourScript.isConnectedNow ? "free" : "stuck");
+  if (yourScript.isConnectedNow) DistanceCorrectionX();
+  }
+</code></pre>
+
+<p>Now actually Play and make it stick.  Now, since it's running in <code>Update</code> simply while Play look at the Inspector for <code>MyScript</code> and <strong>adjust the value of correctXDistance</strong> to get the exact look you want. When yo have decided on a value, unPlay and put that in as the final value you wish.</p>
+
+<p>Next, in <code>DistanceCorrectionX</code> simply duplicate all the code and do it again for the Y axis <code>DistanceCorrectionX</code>.  If you also do Z, do that.</p>
+
+<p>Finally. Note you will have a lot of messy code, like this...</p>
+
+<pre><code> void Update()
+  {
+  // handle all the DistanceCorrectionX etc as seen above.
+
+  if (yourScript.isConnectedNow)
+      {
+      .. turn off the collider on me
+      }
+  else
+      {
+      .. turn on the collider on me
+      }
+  }
+</code></pre>
+
+<p>and so on, there's "many little things" you'll need to do.</p>
+
+<p>Don't forget also, overwhelmingly you may want to make the hitting object <strong>a child of</strong> the big object, depending on your situation.  (Then of course they would move around together as a unit.)</p>
+
+<p>Note that in the positioning code above I just showed it as position, not local position, for pedagogic clarity.  If you want to do them flinging around, and spinning and so on, you'd make the hitting object a child of the other and you would use <code>localPosition</code> in the same way.  Enjoy.</p>

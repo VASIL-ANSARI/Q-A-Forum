@@ -1,0 +1,140 @@
+<p>According to your question you wish to perform auto-completion when first 4 characters will typed,Then just give check in your insertUpdate() method, that length of the text in the text field is greater than 3,so will get expected output.
+I have modified your code for expected result.</p>
+
+<pre><code> package temp;
+ import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.BadLocationException;
+
+public class JTextFieldAutoCompletion extends JTextField implements DocumentListener, ActionListener{
+
+/**
+ * 
+ */
+private static final long serialVersionUID = 4810213451949301347L;
+
+//Les DonnÃ©es De L'AutoCompletion
+private List&lt;String&gt; data = new ArrayList&lt;String&gt;();
+
+//Un Constructeur Par DÃ©faut
+public JTextFieldAutoCompletion() {
+    //Par Defaut Le Nombre de caractÃ¨re visible dans le champs de texte est 25
+    this(25);
+}
+/**
+ * Un Constructeur ParamÃ©trÃ©
+ * @param columns nombre de caractÃ¨re visible dans le champs de texte
+ */
+public JTextFieldAutoCompletion(int columns) {
+    //passer au constructeur Ã  deux arguments le nombre de colonne visible dans le champs de texte et definir les donnÃ©es de l'autocompletion Ã  null.
+    this(columns, null);
+}
+/**
+ * Constructeur ParamÃ©trÃ© Ã  deux arguments
+ * @param columns nombre de caractÃ¨re visible dans le champs de texte
+ * @param data les donnÃ©es de l'autocompletion
+ */
+public JTextFieldAutoCompletion(int columns, List&lt;String&gt; data) {
+    super(columns);
+    //ici on fait appel Ã  la mÃ©thode setDataCompletion pour definir les donnÃ©es de l'autocompletion
+    this.setDataCompletion(data);
+    //je dÃ©fini l'ecouteur de l'evenement de la saisie
+    this.getDocument().addDocumentListener(this);
+    //je dÃ©fini j'ecouteur de la touche entrer
+    this.addActionListener(this);
+}
+/**
+ * Permet De Redefinir les donnÃ©es de l'autocompletion
+ * @param data les donnÃ©es de l'autocompletion
+ */
+public void setDataCompletion(List&lt;String&gt; data) {
+    //on affecte seulement si data est dÃ©ffirent Ã  null
+    if(data != null)
+        this.data = data;
+    //on va trier les donnÃ©es de l'autocompletion 
+    Collections.sort(this.data);
+}
+/**
+ * Evenement DÃ©clenchÃ© Ã  chaque fois que l'utilisateur tape un caractÃ¨re quelconque, ou fasse une copier/coller dans le champs de texte.
+ */
+@Override
+public void insertUpdate(DocumentEvent e) {
+    // TODO Stub de la mÃ©thode gÃ©nÃ©rÃ© automatiquement
+    //on arrÃ©te l'exÃ©cution de l'evenement si l'utilisateur fasse une copier/coller
+
+    if(this.getText().length()&gt;3){
+    if(e.getLength() != 1) return;
+
+    //on rÃ©cupÃ©re la position du dernier caratÃ¨re saisie en comptant de zÃ©ro, premier caractÃ¨re est en position 0, le deuxiÃ¨me Ã  2 etc..
+    int pos = e.getOffset();
+    String prefix = null;
+    try {
+        //on recupÃ©re dans prefix ce qu'a saisi l'utilisateur jusqu'Ã  prÃ©sent.
+        prefix = this.getText(0, pos + 1);
+    } catch (BadLocationException e1) {}
+
+    //on fait une recherche sur la chaine qu'a saisi l'utilisateur dans les donnÃ©es de l'autocompletion. 
+    //la mÃ©thode binarySearch retourne :
+    //Soit l'index de l'element cherchÃ© s'il est contenu dans la collection.
+    //Soit le nombre d'element de la collection si tous les elements sont infÃ©rieurs Ã  l'element qu'on cherche.
+    //Soit un entier nÃ©gatif qui reprÃ©sente l'index de premier element supÃ©rieur de l'element qu'on cherche.
+    int index = Collections.binarySearch(data, prefix);
+
+    if(index &lt; 0 &amp;&amp; -index &lt;= data.size()) {
+        //Completion TrouvÃ©
+        //On rÃ©cupÃ©re le premier element supÃ©rieur Ã  l'element cherchÃ©. le signe - retourne la valeur absolue de la variable index. 
+        String match = data.get(-index - 1);
+
+        //on s'assure que la chaine dans la variable match commence par la chaine contenu dans la variable prefix c-Ã -d ce qu'a saisi l'utilisateur 
+        if(match.startsWith(prefix)) {
+            //si oui on met on place l'autocompletion sinon on fait rien :).
+            SwingUtilities.invokeLater(new AutoCompletion(pos, match));
+        }
+    } else ;
+        //Aucune Completion TrouvÃ©
+    }
+}
+/**
+ * Permet De Valider L'AutoCompletion En Cliquant Sur La Touche Entrer
+ */
+@Override
+public void actionPerformed(ActionEvent e) {
+    // TODO Stub de la mÃ©thode gÃ©nÃ©rÃ© automatiquement
+    setCaretPosition(getSelectionEnd());
+}
+@Override
+public void removeUpdate(DocumentEvent e) {}
+@Override
+public void changedUpdate(DocumentEvent e) {}
+
+private class AutoCompletion implements Runnable{
+    private int pos;
+    private String completion;
+
+    public AutoCompletion(int pos, String completion) {
+        this.pos = pos;
+        this.completion = completion;
+    }
+    @Override
+    public void run() {
+        // TODO Stub de la mÃ©thode gÃ©nÃ©rÃ© automatiquement
+        //On affecte la chaine trouvÃ© pour l'autocompletion dans le champs de texte
+        setText(completion);
+        //on definit Ã  partir d'oÃ¹ va dÃ©buter la sÃ©lÃ©ction des caractÃ¨res ajoutÃ© comme completion. 
+        //j'ai prÃ©cisÃ© qu'il va dÃ©buter de la fin vers le dernier caractÃ¨re sasie par l'utilisateur
+        setCaretPosition(completion.length());
+        //j'ai appliquÃ© la sÃ©lÃ©ction jusqu'au dernier caractÃ¨re sasie par l'utilisateur
+        moveCaretPosition(pos + 1);
+    }       
+}
+</code></pre>
+
+<p>}</p>

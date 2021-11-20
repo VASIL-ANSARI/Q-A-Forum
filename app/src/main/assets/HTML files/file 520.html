@@ -1,0 +1,68 @@
+<p>By using the <a href="http://www.php.net/wordwrap">wordwrap</a> function. It splits the texts in multiple lines such that the maximum width is the one you specified, breaking at word boundaries. After splitting, you simply take the first line:</p>
+
+<pre><code>substr($string, 0, strpos(wordwrap($string, $your_desired_width), "\n"));
+</code></pre>
+
+<p>One thing this oneliner doesn't handle is the case when the text itself is shorter than the desired width. To handle this edge-case, one should do something like:</p>
+
+<pre><code>if (strlen($string) &gt; $your_desired_width) 
+{
+    $string = wordwrap($string, $your_desired_width);
+    $string = substr($string, 0, strpos($string, "\n"));
+}
+</code></pre>
+
+<hr>
+
+<p>The above solution has the problem of prematurely cutting the text if it contains a newline before the actual cutpoint. Here a version which solves this problem:</p>
+
+<pre><code>function tokenTruncate($string, $your_desired_width) {
+  $parts = preg_split('/([\s\n\r]+)/', $string, null, PREG_SPLIT_DELIM_CAPTURE);
+  $parts_count = count($parts);
+
+  $length = 0;
+  $last_part = 0;
+  for (; $last_part &lt; $parts_count; ++$last_part) {
+    $length += strlen($parts[$last_part]);
+    if ($length &gt; $your_desired_width) { break; }
+  }
+
+  return implode(array_slice($parts, 0, $last_part));
+}
+</code></pre>
+
+<p>Also, here is the PHPUnit testclass used to test the implementation:</p>
+
+<pre><code>class TokenTruncateTest extends PHPUnit_Framework_TestCase {
+  public function testBasic() {
+    $this-&gt;assertEquals("1 3 5 7 9 ",
+      tokenTruncate("1 3 5 7 9 11 14", 10));
+  }
+
+  public function testEmptyString() {
+    $this-&gt;assertEquals("",
+      tokenTruncate("", 10));
+  }
+
+  public function testShortString() {
+    $this-&gt;assertEquals("1 3",
+      tokenTruncate("1 3", 10));
+  }
+
+  public function testStringTooLong() {
+    $this-&gt;assertEquals("",
+      tokenTruncate("toooooooooooolooooong", 10));
+  }
+
+  public function testContainingNewline() {
+    $this-&gt;assertEquals("1 3\n5 7 9 ",
+      tokenTruncate("1 3\n5 7 9 11 14", 10));
+  }
+}
+</code></pre>
+
+<h1><strong>EDIT :</strong></h1>
+
+<p>Special UTF8 characters like 'Ã ' are not handled. Add 'u' at the end of the REGEX to handle it:</p>
+
+<p><code>$parts = preg_split('/([\s\n\r]+)/u', $string, null, PREG_SPLIT_DELIM_CAPTURE);</code></p>

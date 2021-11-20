@@ -1,0 +1,72 @@
+<p>I guess your question is how to detect whether a specific user left or closed the browser. When a user comes in or leaves, send a notification to other users.</p>
+
+<p>I think the problem is you didn't handle <code>OnConnected</code> and <code>OnDisconnected</code> properly.
+To make it work, first you need to know each client connecting to a hub passes a unique connection id. You can retrieve this value in the Context.ConnectionId property of the hub context. When each client comes in, they go through <code>OnConnected</code>, when they leave, they go through <code>OnDisconnected</code>. Below is a working example:</p>
+
+<p><strong>Hub Class</strong></p>
+
+<pre><code>[HubName("ChatHub")]
+    public class ChatHub : Hub
+    {
+        private static List&lt;User&gt; Users = new List&lt;User&gt;();
+        public void Send(string message)
+        {
+            var name = Context.User.Identity.Name;
+            Clients.All.broadcastMessage(name, message, DateTime.Now.ToShortDateString());
+        }
+        public override Task OnConnected()
+        {
+            User user = new User() { Name = Context.User.Identity.Name, ConnectionID = Context.ConnectionId };
+            Users.Add(user);
+            Clients.Others.userConnected(user.Name);
+            return base.OnConnected();
+        }
+        public override Task OnDisconnected()
+        {
+            if (Users.Any(x =&gt; x.ConnectionID == Context.ConnectionId))
+            {
+                User user = Users.First(x =&gt; x.ConnectionID == Context.ConnectionId);
+                Clients.Others.userLeft(user.Name);   
+                Users.Remove(user);
+            }
+            return base.OnDisconnected();
+        }
+    }
+</code></pre>
+
+<p><strong>View</strong></p>
+
+<pre><code>&lt;input type="text" id="message" /&gt;
+&lt;button class="btn"&gt;Send&lt;/button&gt;
+&lt;ul id="contents"&gt;&lt;/ul&gt;
+
+@section scripts
+{
+    &lt;script src="~/Scripts/jquery-1.10.2.js"&gt;&lt;/script&gt;
+    &lt;script src="~/Scripts/jquery.signalR-2.0.1.js"&gt;&lt;/script&gt;
+    &lt;script src="/signalr/hubs"&gt;&lt;/script&gt;
+
+    &lt;script&gt;
+
+        var chatHub = $.connection.ChatHub;
+        chatHub.client.broadcastMessage = function (name, message, time) {
+            var encodedName = $('&lt;div /&gt;').text(name).html();
+            var encodedMsg = $('&lt;div /&gt;').text(message).html();
+            var encodedTime = $('&lt;div /&gt;').text(time).html();
+            $('#contents').append('&lt;li&gt;&lt;strong&gt;' + encodedName + '&lt;/strong&gt;:&amp;nbsp;&amp;nbsp;' + encodedMsg + '&lt;/strong&gt;:&amp;nbsp;&amp;nbsp;' + encodedTime + '&lt;/li&gt;');
+        };
+        chatHub.client.userConnected = function (data) {          
+            $('#contents').append('&lt;li&gt;Wellcome&lt;strong&gt;' + '&lt;/strong&gt;:' + data + '&lt;/li&gt;');
+        };
+        chatHub.client.userLeft = function (data) {
+            $('#contents').append('&lt;li&gt;Bye&lt;strong&gt;' + '&lt;/strong&gt;:' + data + '&lt;/li&gt;');
+        };
+        $(".btn").on("click", function() {
+            chatHub.server.send($("#message").val());
+        });
+        $.connection.hub.start().done(function() {
+            console.log("connected...");
+        });
+    &lt;/script&gt;
+}
+</code></pre>

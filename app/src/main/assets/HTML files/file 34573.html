@@ -1,0 +1,40 @@
+<p>I don't think you need the second argument in <code>deserializeMsg</code>.</p>
+
+<p>Change the signature in the base class to:</p>
+
+<pre><code>virtual void deserializeMsg(const char [256]);
+</code></pre>
+
+<p>Change the implementation in <code>DataMsg</code> to just use <code>this</code> instead of the second argument.</p>
+
+<pre><code>void DataMsg :: deserializeMsg(const char out[256])
+{
+    char type = this-&gt;getType(); // Not sure why you need this.
+                                 // You are overriding its value in the next line.
+    memcpy(&amp;type, out, sizeof(type));
+    out += sizeof(type);
+    uint16_t seq;
+    memcpy(&amp;seq, out, sizeof(seq));
+    this-&gt;seq = ntohs(seq);    
+}
+</code></pre>
+
+<p>You can similar changes to the signature of <code>serializeMsg</code> and its implementation in <code>DataMsg</code>.</p>
+
+<pre><code>virtual void serializeMsg(std :: vector&lt;char&gt;&amp; out);
+// Without using `std::vector&lt;char&gt;&amp;`, any changes you make in 
+// the function to out are only local changes. The changes won't
+// be visible to the calling function.
+
+
+void DataMsg :: serializeMsg(std :: vector&lt;char&gt;&amp; out)
+{
+    char type = this-&gt;getType();
+    char temp [256];
+    uint16_t seq = htons(this-&gt;seq);
+    memcpy(temp, &amp;type, sizeof(type));
+    memcpy(temp + sizeof(type), &amp;seq, sizeof(seq));
+    memcpy(temp + sizeof(seq) + sizeof(type), this-&gt;data.c_str(), this-&gt;data.length());
+    out.assign(temp, temp + sizeof(seq) + sizeof(type) + this-&gt;data.length());
+}
+</code></pre>

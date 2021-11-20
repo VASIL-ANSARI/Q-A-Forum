@@ -1,0 +1,51 @@
+<p>I was able to get the privacyStatus this way, however I cant seem to see anything in their documentation where they show any examples of using a chained get statement like the ones you have.</p>
+
+<pre><code>((JSONObject)((JSONObject)((JSONArray) jsonObject.get("items")).get(0)).get("status")).get("privacyStatus")
+</code></pre>
+
+<p>Edit: I found this little snippet in some android code I have It will work with the <a href="http://json.org/java/" rel="nofollow">http://json.org/java/</a> library (this is very similar if not the same as the android JSON library)</p>
+
+<pre><code>   public static void main(String[] args) 
+{
+    // this is the same JSON string in the OP
+    String jsonString = "{ \"items\": [  {   \"id\": \"uy0nALQEAM4\",   \"kind\": \"youtube#video\",   \"etag\": \"\\\"g-RLCMLrfPIk8n3AxYYPPliWWoo/x3SYRGDdvDsN5QOd7AYVzGOJQlM\\\"\",   \"status\": {    \"uploadStatus\":\"processed\",    \"privacyStatus\": \"public\",    \"license\": \"youtube\",    \"embeddable\": true,    \"publicStatsViewable\": true   }  } ]}";
+    JSONObject object = new JSONObject(jsonString);
+    try {
+        String myValue = (String)getJSONValue("items[0].status.privacyStatus", object);
+        System.out.println(myValue);
+    } catch (JSONException ex) {
+        Logger.getLogger(JavaApplication10.class.getName()).log(Level.SEVERE, null, ex);
+    }
+}
+
+public static Object getJSONValue(String exp, JSONObject obj) throws JSONException {
+    try {
+        String [] expressions = exp.split("[\\.|\\[|\\]]");
+        Object currentObject = obj;
+        for(int i=0; i &lt; expressions.length; i++) {
+            if(!expressions[i].trim().equals("")) {
+                System.out.println(expressions[i] + " " + currentObject);
+
+                if(currentObject instanceof JSONObject) {
+                    Method method = currentObject.getClass().getDeclaredMethod("get", String.class);
+                    currentObject = method.invoke(currentObject, expressions[i]);
+                } else if(currentObject instanceof JSONArray) {
+                    Method method = currentObject.getClass().getDeclaredMethod("get", Integer.TYPE);
+                    currentObject = method.invoke(currentObject, Integer.valueOf(expressions[i]));
+                } else {
+                    throw new JSONException("Couldnt access property " + expressions[i] + " from " + currentObject.getClass().getName());
+                }
+            }
+        }
+        return currentObject;
+    } catch (NoSuchMethodException ex) {
+         throw new JSONException(ex);
+    } catch (IllegalAccessException ex) {
+         throw new JSONException(ex);
+    } catch (IllegalArgumentException ex) {
+         throw new JSONException(ex);
+    } catch (InvocationTargetException ex) {
+         throw new JSONException(ex);
+    }
+}
+</code></pre>

@@ -1,0 +1,47 @@
+<p>I don't think you need to load more cells because it's the natural behavior. If your scroll is not smooth maybe it's because you don't load your images in cells properly.</p>
+
+<p>You must apply the <a href="http://en.wikipedia.org/wiki/Lazy_loading" rel="nofollow">lazy loading pattern</a>. For example, you can do something like this (assuming you have set a <code>NSMutableDictionary* imageDic = [[NSMutableDictionary alloc] init];</code>, your cell have the property <code>@property(nonatomic, retain) UIImageView *imageView;</code> and you are using <a href="https://github.com/AFNetworking/AFNetworking" rel="nofollow">AFNetworking</a>)</p>
+
+<pre><code>- (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView_ cellForItemAtIndexPath:(NSIndexPath *)indexPath{
+
+UICollectionViewCell *cell = [collectionView_ dequeueReusableCellWithReuseIdentifier:@"identifier" forIndexPath:indexPath];
+
+NSString* cellKey = [NSString stringWithFormat:@"%d_%d", indexPath.section, indexPath.row];
+NSString* imgName = [cellKey stringByAppendingPathExtension:@"jpg"];
+NSString *documentsDirectory = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+NSString* imagePath = [documentsDirectory stringByAppendingPathComponent:imgName];
+
+BOOL isDirectory = NO;
+NSFileManager* fm = [NSFileManager defaultManager];
+
+// set image with image in cache (it will be fast!)
+if ([imageDic objectForKey:cellKey])
+{
+    UIImage *img = [imageDic objectForKey:cellKey];
+    cell.imageView.image = img;
+}
+// set image with image saved in document directory and put it in cache
+else if ([fm fileExistsAtPath:imagePath isDirectory:&amp;isDirectory])
+{
+    UIImage *img = [UIImage imageWithContentsOfFile:imagePath];
+    cell.imageView.image = img;
+    [imageDic setObject:img forKey:cellKey];
+}
+// download image at imageURL, save it and put it in cache too. Until then set image with a placeholder
+else
+{
+    __weak UICollectionViewCell* weakCell = cell;
+    [cell.imageView setImageWithURLRequest:[NSURLRequest requestWithURL:imageURL] placeholderImage:[UIImage imageNamed:@"placeholder"] success:^(NSURLRequest *request, NSHTTPURLResponse *response, UIImage *image) {
+        weakCell.imageView.image = image;
+        [weakCell setNeedsLayout];
+
+        [imageDic setObject:img forKey:cellKey];
+        [UIImageJPEGRepresentation(img, 1.f) writeToFile:imagePath atomically:YES];
+    } failure:^(NSURLRequest *request, NSHTTPURLResponse *response, NSError *error) {
+        NSLog(@"failed to dl image");
+    }];
+}
+
+return cell;
+}
+</code></pre>

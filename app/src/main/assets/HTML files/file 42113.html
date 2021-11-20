@@ -1,0 +1,62 @@
+<p>I don't think the object is leaking. Try this out:</p>
+
+<pre><code>class TestObj : public QObject {
+     Q_OBJECT
+public:
+    ~TestObj() { qDebug() &lt;&lt; "destructor called"; }
+};
+
+class Test : public QObject {
+    Q_OBJECT
+public:
+    explicit Test(QObject *parent = 0) : QObject(parent) {}
+public slots:
+    QVariant getObject() {
+        QObject * obj = new TestObj;
+        obj-&gt;setObjectName("that object");
+        connect (obj, &amp;TestObj::destroyed, this, &amp;Test::echo);
+        return QVariant::fromValue(obj);
+    }
+    void echo() { qDebug() &lt;&lt; "it got destroyed"; }
+};
+</code></pre>
+
+<p>and in QML:</p>
+
+<pre><code>function test() {
+    var test = Test.getObject()
+    console.log(test.objectName)
+}
+</code></pre>
+
+<p>After <code>test()</code> the object isn't collected, and when you close the application, the <code>echo()</code> slot is never triggered, but the debug statement from the destructor is indeed showing up in the console:</p>
+
+<pre><code>qml: that object
+destructor called
+</code></pre>
+
+<p>If you call <code>gc()</code> in the scope of the function it doesn't work, probably because the object is still referenced in it:</p>
+
+<pre><code>function test() {
+    var test = Test.getObject()
+    console.log(test.objectName)
+    gc() // doesn't do anything
+}
+</code></pre>
+
+<p>However, if you do it like that:</p>
+
+<pre><code>function test2() {
+    test()
+    gc()
+}
+</code></pre>
+
+<p>It works, because the garbage collection is triggered after the reference to the object has fallen out of scope:</p>
+
+<pre><code>qml: that object
+destructor called
+it got destroyed
+</code></pre>
+
+<p>It seems that when the application exists, it doesn't handle the <code>destroyed()</code> signal, so the <code>echo()</code> slot is never triggered which is probably what misled you into believing the object is leaking unmanaged. I am not sure if this is a product of Qt's design or a bug. The <code>Test</code> object is instantiated on the stack in <code>main()</code> so it should definitely still be "alive" when objects, managed by QML are being destroyed, as should be the event loop it uses, so I would expect to see <code>echo()</code> before the application exits, but it seems this is not the case. But that's not the scope of the question, point of the matter is objects are managed and will be collected when they are no longer referenced and garbage collection is triggered.</p>

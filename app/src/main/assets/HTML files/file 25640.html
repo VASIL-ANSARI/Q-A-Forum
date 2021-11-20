@@ -1,0 +1,39 @@
+<p>The information whether a download is in progress for a certain item or not should be stored
+in some <em>data source</em> (or <em>model</em>) and not in the cell (the <em>view</em>).</p>
+
+<p>Then you can update the cell's appearance in the data source delegate method <code>collectionView:cellForItemAtIndexPath:</code> according to the status of the item at that index
+path and show or hide the progress view of the cell.</p>
+
+<p><strong>ADDED:</strong> The progress, completion and failure block all capture the current cell.
+Therefore they will modify this cell even if it has been reused for a different index path.
+To solve that, you can check if the cell's (current) index path is still equal
+to the original (captured) index path:</p>
+
+<pre><code>[operation setDownloadProgressBlock:^(NSUInteger bytesRead, long long totalBytesRead, long long totalBytesExpectedToRead) {
+
+    float totalProgress = (float)totalBytesRead/(float)totalBytesExpectedToRead;
+    if ([[collectionView indexPathForCell:cell] isEqual:indexPath]) {
+       cell.progressView.alpha = 1.0;
+       cell.progressView.progress = totalProgress;
+    }
+}];
+</code></pre>
+
+<p>and similar for the completion and failure block:</p>
+
+<pre><code>[operation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *operation, id responseObject) {
+    [self.itemPaths setObject:localPath forKey:item.name];
+    [self.progressItems removeObjectForKey:item.name];
+    if ([[collectionView indexPathForCell:cell] isEqual:indexPath]) {
+        cell.imageView.alpha = 1.0;
+        cell.progressView.alpha = 0.0;
+    }
+
+} failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+    NSLog(@"Error: %@", error);
+    [self.progressItems removeObjectForKey:item.name];
+    if ([[collectionView indexPathForCell:cell] isEqual:indexPath]) {
+        cell.progressView.alpha = 0.0;
+    }
+}];
+</code></pre>

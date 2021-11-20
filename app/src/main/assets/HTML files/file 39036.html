@@ -1,0 +1,118 @@
+<p>I'm using Dependency Injection to handle problems like this:</p>
+
+<p>Suppose you have interface like </p>
+
+<pre><code>public interface IDoable {
+  void Do();
+}
+</code></pre>
+
+<p>in Interfaces.dll
+and than you have Production.dll with class like:</p>
+
+<pre><code>namespace Production {
+  internal class Doable : IDoable {
+    public void Do() { Console.Out.WriteLine("Production"); }
+  }
+
+  public static class Bootstrapper {
+    static void Init(IServiceLocator locator) {
+      locator.AddSingleton&lt;IDoable, Doable&gt;();
+    }
+  }
+}
+</code></pre>
+
+<p>and then you have Simulation.dll with class like</p>
+
+<pre><code>namespace Simulation {
+  internal class Doable : IDoable {
+    public void Do() { Console.Out.WriteLine("Simulation"); }
+  }
+
+  public static class Bootstrapper {
+    static void Init(IServiceLocator locator) {
+      locator.AddSingleton&lt;IDoable, Doable&gt;();
+    }
+  }
+}
+</code></pre>
+
+<p>Then in your MainAssembly you can reference both, and resolve what implementation you want to use via configuration (naive example below). Except for the configuration line, you don't really have to care from which assembly the <code>IDoable</code> came from - you just use it.</p>
+
+<pre><code>public static Main()
+{
+    Production.Bootstrapper.Init(ServiceLocator.Instance);
+    // or you can use
+    // Simulation.Bootstrapper.Init(ServiceLocator.Instance);
+    IDoable doable = ServiceLocator.Instance.Resolve&lt;IDoable&gt;();
+    doable.Do();
+}
+</code></pre>
+
+<p>Utility classes (using Microsoft Unity Container from <a href="http://www.microsoft.com/en-us/download/details.aspx?id=38789" rel="nofollow">Enterprise Library</a>):</p>
+
+<pre><code>public interface IServiceLocator {
+  void Add&lt;TFrom, TTo&gt;() where TTo : TFrom;
+  void BuildUp&lt;T&gt;(T instance);
+  void BuildUp(Type type, object instance);
+  void AddSingleton&lt;TFrom, TTo&gt;() where TTo : TFrom;
+  void AddSingleton&lt;TFrom, TTo&gt;(string name) where TTo : TFrom;
+  void AddSingleton(Type from, Type to, string name);
+  void AddInstance&lt;T&gt;(T instance);
+  T Resolve&lt;T&gt;();
+  T Resolve&lt;T&gt;(string name);
+}
+
+public class ServiceLocator : IServiceLocator {
+  private IUnityContainer m_Container = new UnityContainer();
+
+  public void Add&lt;TFrom, TTo&gt;() where TTo : TFrom {
+    m_Container.RegisterType&lt;TFrom, TTo&gt;();
+  }
+
+  public void BuildUp&lt;T&gt;(T instance) {
+    m_Container.BuildUp&lt;T&gt;(instance);
+  }
+
+  public void BuildUp(Type type, object instance) {
+    m_Container.BuildUp(type, instance);
+  }
+
+  public void AddSingleton&lt;TFrom, TTo&gt;() where TTo : TFrom {
+    m_Container.RegisterType&lt;TFrom, TTo&gt;(new ContainerControlledLifetimeManager());
+  }
+
+  public void AddSingleton&lt;TFrom, TTo&gt;(string name) where TTo : TFrom {
+    m_Container.RegisterType&lt;TFrom, TTo&gt;(name, new   ContainerControlledLifetimeManager());
+  }
+
+  public void AddSingleton(Type from, Type to, string name) {
+    m_Container.RegisterType(from, to, name, new ContainerControlledLifetimeManager());
+  }
+
+  public void AddInstance&lt;T&gt;(T instance) {
+    m_Container.RegisterInstance&lt;T&gt;(instance);
+  }
+
+  public T Resolve&lt;T&gt;() {
+    return m_Container.Resolve&lt;T&gt;();
+  }
+
+  public T Resolve&lt;T&gt;(string name) {
+    return m_Container.Resolve&lt;T&gt;(name);
+  }
+
+  private static IServiceLocator s_Instance;
+
+  public static IServiceLocator Instance {
+    get { return s_Instance; }
+  }
+
+  static ServiceLocator() {
+    var instance = new ServiceLocator();
+    instance.AddInstance&lt;IServiceLocator&gt;(instance);
+    s_Instance = instance;
+  }
+}
+</code></pre>

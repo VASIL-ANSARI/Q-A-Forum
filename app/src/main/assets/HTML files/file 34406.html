@@ -1,0 +1,42 @@
+<p>try this:</p>
+
+<p>your creating nor sql query, if you wants to create the sql procedure you should must add the <code>delimiter</code> in the starting and ending in your query. And <code>;</code> add the like my query <code>END;</code> as query is following as:</p>
+
+<pre><code>delimiter //
+CREATE PROCEDURE `conversion`.`usp_MemberToDoList_UpdateForMember` (xml longtext,
+    login varchar(255))
+BEGIN
+    DECLARE v_doc int;
+    DECLARE v_now datetime(3);
+    set v_now = UTC_TIMESTAMP();
+
+    CALL sp_xml_preparedocument(@doc)
+    PREPARE stmt FROM @stmt_str;
+     EXECUTE stmt;
+     DEALLOCATE PREPARE stmt;
+      v_doc OUT, xml;
+
+    UPDATE
+        mtdl
+    SET
+        `taskCompleteDate` = CASE WHEN `isCompleted` = CONVERT(1,UNSIGNED) THEN v_now ELSE NULL END
+ ,`updatedBy` = @login,
+        `dateUpdated` = UTC_TIMESTAMP()
+    FROM
+        `MemberToDoList` `mtdl`
+    JOIN
+        ExtractValue(@doc, '/todos/todo') WITH
+    (
+        `id` int,
+        `isCompleted` bit
+    ) `x` ON [x].[id] = `mtdl`.`memberToDoListId`;
+
+    SET @stmt_str =  `sxml_removedocument`;
+    PREPARE stmt FROM @stmt_str;
+    EXECUTE stmt;`enter code here`
+    DEALLOCATE PREPARE stmt; @doc;
+END; //
+delimiter ; 
+</code></pre>
+
+<p><strong><a href="http://dev.mysql.com/doc/refman/5.0/en/create-procedure.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.0/en/create-procedure.html</a></strong></p>

@@ -1,0 +1,39 @@
+<p>I think you need to manage such a mechanism yourself. For instance if this is a web application where you authenticate once and then associate the authentication with a session. You store the <code>LoginContext</code> in the session. One trick to make it available in other parts of the code would be to make a thread local wrapper that you set/unset at the start/end of every thread invocation (such as a request).</p>
+
+<pre><code>public class LoginContextHolder {
+
+    private static ThreadLocal&lt;LoginContext&gt; ctx = new ThreadLocal&lt;LoginContext&gt;();
+
+    public static void set(LoginContext lc) {
+        ctx.set(lc);
+    }
+
+    public static LoginContext get() {
+        return ctx.get();
+    }
+
+}
+
+
+public class LoginContextFilter implements Filter {
+
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) {
+
+       LoginContext ctx = null;
+       HttpSession sess = (HttpSession)((HttpRequest)request).getSession(false);
+       if (sess != null) {
+          ctx = (LoginContext)sess.getAttribute("ctx");
+       }
+
+       try {
+         LoginContextHolder.set(ctx);
+          chain.doFilter(request, response);
+       } finally {
+         LoginContextHolder.set(null);
+       }
+
+    }
+
+
+}
+</code></pre>

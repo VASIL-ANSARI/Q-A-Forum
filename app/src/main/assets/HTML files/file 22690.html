@@ -1,0 +1,46 @@
+<p>You can use <code>GROUP BY</code> and <code>MAX</code> to simulate pivot. MySQL also supports <code>IF</code> statement.</p>
+
+<pre><code>SELECT  ID,
+        MAX(IF(`order` = 1, data, NULL)) data1,
+        MAX(IF(`order` = 2, data, NULL)) data2
+FROM    TableA
+GROUP   BY ID
+</code></pre>
+
+<ul>
+<li><a href="http://sqlfiddle.com/#!2/70129/2" rel="nofollow">SQLFiddle Demo</a></li>
+</ul>
+
+<p>If you have multiple values of <code>order</code>, dynamic SQL may be more appropriate so that you will not have to modify the query:</p>
+
+<pre><code>SET @sql = NULL;
+SELECT
+  GROUP_CONCAT(DISTINCT
+    CONCAT(
+      'MAX(IF(`order` = ', `order`, ',data,NULL)) AS data', `order`)
+  ) INTO @sql
+FROM TableName;
+
+SET @sql = CONCAT('SELECT  ID, ', @sql, ' 
+                  FROM    TableName
+                  GROUP   BY ID');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+</code></pre>
+
+<ul>
+<li><a href="http://sqlfiddle.com/#!2/70129/13" rel="nofollow">SQLFiddle Demo</a></li>
+<li><a href="http://sqlfiddle.com/#!2/42489/2" rel="nofollow">SQLFiddle Demo (<em>Another example</em>)</a></li>
+</ul>
+
+<p>OUTPUT OF BOTH QUERIES:</p>
+
+<pre><code>ââââââ¦ââââââââ¦ââââââââ
+â ID â DATA1 â DATA2 â
+â âââââ¬ââââââââ¬ââââââââ£
+â  1 â P     â S     â
+â  2 â R     â Q     â
+ââââââ©ââââââââ©ââââââââ
+</code></pre>

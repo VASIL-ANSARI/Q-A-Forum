@@ -1,0 +1,62 @@
+<p>There are a lot of issues with your code.</p>
+
+<p>The most worrying would be SQL injection:
+<a href="http://en.wikipedia.org/wiki/SQL_injection" rel="nofollow">http://en.wikipedia.org/wiki/SQL_injection</a></p>
+
+<p>You are adding two integers together, you could end up with duplicate directories doing this. You want to concatenate the two integers into one string. I created a function for you.</p>
+
+<pre><code>/**
+ * Creates a new directory with a random name based on the time and a randomly
+ * generated number.
+ * 
+ * @param string $baseDirectoryPath The base directory where the new directory will be created
+ * @return string The path to the new directory
+ */
+function createRandomDirctory($baseDirectoryPath) {
+    $randomDirectoryName = time() . '-' . rand(1, 99999);
+    $directoryPath = $baseDirectoryPath . DIRECTORY_SEPERATOR . $randomDirectoryName;
+    if (mkdir($directoryPath)) {
+        return $directoryPath;
+    }
+    throw new Exception('Directory was not created: ' . $directoryPath);
+}
+
+$baseDirectoryPath = '../news_img';
+
+if (!empty($_POST['title'])) {
+
+    if (isset($_FILES['img']['name']) &amp;&amp;
+            $_FILES['img']['type'] == "image/jpeg" ||
+            $_FILES['img']['type'] == "image/jpg") {
+
+        $temp = explode(".", $_FILES['img']['name']);
+        $newFileName = end($temp);
+        $randomDirectory = createRandomDirctory($baseDirectoryPath);
+        $imageDestination = $randomDirectory . DIRECTORY_SEPARATOR . $newFileName;
+
+        move_uploaded_file($_FILES['img']['tmp_name'], $imageDestination);
+
+        $connect = mysqli_connect('localhost', 'root', '', 'project');
+
+        // always escape user input that goes into an SQL statement.
+        foreach($_POST as $key =&gt; $value) {
+            $_POSY[$key] = mysql_real_escape_string($value);
+        }
+
+        $sql = " insert into 
+                          `news`
+                        values(  NULL            ,
+                                 '$_POST[title]' ,
+                                 '$_POST[text]'  ,
+                                 '$_POST[date]'  ,
+                                 '$_POST[cat]'   ,
+                                 '$_POST[sub]'   ,
+                                 '$imageDestination',
+                                 '$_POST[pub]'   ,
+                                 '$_POST[top_or_main]',
+                                '$_POST[src]'  )";
+
+        mysqli_query($connect, $sql);
+    }
+}   
+</code></pre>

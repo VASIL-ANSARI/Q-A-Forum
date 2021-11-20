@@ -1,0 +1,55 @@
+<p>Before you can accept a connection from a socket you have to do three things:</p>
+
+<ol>
+<li>Create the socket, using the <code>socket</code> function. From the comments you seem to be doing this correctly.</li>
+<li>Bind the socket to an address with the <code>bind</code> function. This tells the system on which address you are accepting connections. From the comments it looks like you are doing this correctly, too.</li>
+<li>Mark the socket as "passive" using the <code>listen</code> function. This tells the system that the socket will be used to accept incoming connections.</li>
+</ol>
+
+<p>Here's a complete program that shows all the steps there are to accepting a connection.</p>
+
+<pre><code>#include &lt;sys/types.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;arpa/inet.h&gt;
+
+#include &lt;stdio.h&gt;
+
+int main(void) {
+    int server_fd;
+    struct sockaddr_in server_addr;
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_addr.sin_port = htons(8080);
+
+    if ((server_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        return 1;
+    }
+
+    if (bind(server_fd, (struct sockaddr*) &amp;server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        return 1;
+    }
+
+    if (listen(server_fd, 10) == -1) {
+        perror("listen");
+        return 1;
+    }
+
+    struct sockaddr_in client_addr;
+    socklen_t client_addrlen = sizeof(client_addr);
+
+    int client_fd = accept(server_fd, (struct sockaddr*) &amp;client_addr, &amp;client_addrlen);
+    if (client_fd == -1) {
+        perror("accept");
+        return 1;
+    }
+
+    puts("Connection accepted");
+
+    close(client_fd);
+    close(server_fd);
+}
+</code></pre>

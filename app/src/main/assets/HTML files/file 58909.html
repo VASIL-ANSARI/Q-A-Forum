@@ -1,0 +1,40 @@
+<p>To delete the rows in table_copy that are not present in table_original:</p>
+
+<pre><code>DELETE t1.* FROM table_copy AS t1 
+LEFT OUTER JOIN table_original AS t2 USING (post_id)
+WHERE t2.post_id IS NULL;
+</code></pre>
+
+<p>I recommend you create a dummy table with a few rows so you can experiment with this kind of query and increase your confidence with it before you run it against your real data!</p>
+
+<p>See <a href="http://dev.mysql.com/doc/refman/5.7/en/delete.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.7/en/delete.html</a> for more docs on the multi-table DELETE statement.</p>
+
+<p>To keep them in sync every night automatically, use triggers:</p>
+
+<pre><code>CREATE TRIGGER copy_on_ins AFTER INSERT ON table_original
+FOR EACH ROW
+  INSERT INTO table_copy SET post_id = NEW.post_id, other_columns = NEW.other_column;
+
+CREATE TRIGGER copy_on_upd AFTER UPDATE ON table_original
+FOR EACH ROW
+  UPDATE table_copy SET other_column = NEW.other_column
+  WHERE post_id = NEW.post_id;
+
+CREATE TRIGGER copy_on_del AFTER DELETE ON table_original
+FOR EACH ROW
+  DELETE FROM table_copy WHERE post_id = OLD.post_id;
+</code></pre>
+
+<p>See <a href="http://dev.mysql.com/doc/refman/5.7/en/create-trigger.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.7/en/create-trigger.html</a></p>
+
+<hr>
+
+<p>Re your comment:</p>
+
+<p>Knowing which post_ids were deleted is tricky. Since they are no longer in the database, you'd either need to:</p>
+
+<ul>
+<li>Infer that they were once there, if you find a gap between post_id values that are still in the database. But this is no guarantee, because id values may never be used if an insert fails.</li>
+<li>Check a log of some kind. Some people use a trigger to append to an audit table. Or else code their application that deletes posts to create a log.</li>
+<li>Read through deletion events using the <a href="http://dev.mysql.com/doc/refman/5.7/en/mysqlbinlog.html" rel="nofollow">mysqlbinlog</a> tool. This is kind of advanced.</li>
+</ul>

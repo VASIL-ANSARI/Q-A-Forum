@@ -1,0 +1,30 @@
+<p>This isn't the nicest way of doing it, but since you're asking: The return type of the template function <code>ArraySizeHelper</code> is <code>char[N]</code>, where the argument of the function is a (reference to an) array of size N of type <code>T</code>. Template argument deduction instantiates this template with the matching number N, and so <code>sizeof(char[N])</code> is just N, which is what you get.</p>
+
+<p>A nicer version could be written as follows. (You need C++0x for <code>constexpr</code>; if you omit it, this will not be a constant expression.)</p>
+
+<pre><code>template &lt;typename T, size_t N&gt; constexpr size_t array_size(const T (&amp;)[N]) { return N; }
+</code></pre>
+
+<p>Usage:</p>
+
+<pre><code>int x[20];
+array_size(x); // == 20
+</code></pre>
+
+<hr>
+
+<p><strong>Update:</strong> If you are in C++0x, here is another solution that gives a constexpr, thanks to decltype:</p>
+
+<pre><code>#include &lt;type_traits&gt;
+
+template &lt;typename T&gt; struct array_traits;
+template &lt;typename T, unsigned int N&gt; struct array_traits&lt;T[N]&gt;
+{
+   static const unsigned int size = N;
+   typedef std::decay&lt;T&gt;::type type;
+};
+
+// Usage:
+int x[20];
+array_traits&lt;decltype(x)&gt;::size; // == 20
+</code></pre>

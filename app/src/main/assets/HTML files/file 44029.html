@@ -1,0 +1,92 @@
+<p>You can't do what you want with just <code>ABCMeta</code>. ABC enforcement doesn't do <em>any</em> type checking, only the presence of <em>an attribute</em> with the correct name is enforced.</p>
+
+<p>Take for example:</p>
+
+<pre><code>&gt;&gt;&gt; from abc import ABCMeta, abstractmethod, abstractproperty
+&gt;&gt;&gt; class Abstract(object):
+...     __metaclass__ = ABCMeta
+...     @abstractmethod
+...     def foo(self): pass
+...     @abstractproperty
+...     def bar(self): pass
+... 
+&gt;&gt;&gt; class Concrete(Abstract):
+...     foo = 'bar'
+...     bar = 'baz'
+... 
+&gt;&gt;&gt; Concrete()
+&lt;__main__.Concrete object at 0x104b4df90&gt;
+</code></pre>
+
+<p>I was able to construct <code>Concrete()</code> even though both <code>foo</code> and <code>bar</code> are simple attributes.</p>
+
+<p>The <code>ABCMeta</code> metaclass only tracks how many objects are left with the <code>__isabstractmethod__</code> attribute being true; when creating a class from the metaclass (<code>ABCMeta.__new__</code> is called) the <code>cls.__abstractmethods__</code> attribute is then set to a <code>frozenset</code> object with all the names that are still abstract.</p>
+
+<p><code>type.__new__</code> then tests for that <code>frozenset</code> and throws a <code>TypeError</code> if you try to create an instance.</p>
+
+<p>You'd have to produce your <em>own</em> <code>__new__</code> method here; subclass <code>ABCMeta</code> and add type checking in a new <code>__new__</code> method. That method should look for <code>__abstractmethods__</code> sets on the base classes, find the corresponding objects with the <code>__isabstractmethod__</code> attribute in the MRO, then does typechecking on the current class attributes.</p>
+
+<p>This'd mean that you'd throw the exception when defining the <em>class</em>, not an instance, however. For that to work you'd add a <code>__call__</code> method to your <code>ABCMeta</code> subclass and have that throw the exception based on information gathered by your own <code>__new__</code> method about what types were wrong; a similar two-stage process as what <code>ABCMeta</code> and <code>type.__new__</code> do at the moment. Alternatively, update the <code>__abstractmethods__</code> set on the class to add any names that were implemented but with the wrong type and leave it to <code>type.__new__</code> to throw the exception.</p>
+
+<p>The following implementation takes that last tack; add names back to <code>__abstractmethods__</code> if the implemented type doesn't match (using a mapping):</p>
+
+<pre><code>from types import FunctionType
+
+class ABCMetaTypeCheck(ABCMeta):
+    _typemap = {  # map abstract type to expected implementation type
+        abstractproperty: property,
+        abstractstatic: staticmethod,
+        # abstractmethods return function objects
+        FunctionType: FunctionType,
+    }
+    def __new__(mcls, name, bases, namespace):
+        cls = super(ABCMetaTypeCheck, mcls).__new__(mcls, name, bases, namespace)
+        wrong_type = set()
+        seen = set()
+        abstractmethods = cls.__abstractmethods__
+        for base in bases:
+            for name in getattr(base, "__abstractmethods__", set()):
+                if name in seen or name in abstractmethods:
+                    continue  # still abstract or later overridden
+                value = base.__dict__.get(name)  # bypass descriptors
+                if getattr(value, "__isabstractmethod__", False):
+                    seen.add(name)
+                    expected = mcls._typemap[type(value)]
+                    if not isinstance(namespace[name], expected):
+                        wrong_type.add(name)
+        if wrong_type:
+            cls.__abstractmethods__ = abstractmethods | frozenset(wrong_type)
+        return cls
+</code></pre>
+
+<p>With this metaclass you get your expected output:</p>
+
+<pre><code>&gt;&gt;&gt; class Abstract(object):
+...     __metaclass__ = ABCMetaTypeCheck
+...     @abstractmethod
+...     def foo(self): pass
+...     @abstractproperty
+...     def bar(self): pass
+...     @abstractstatic
+...     def baz(): pass
+... 
+&gt;&gt;&gt; class ConcreteWrong(Abstract):
+...     foo = 'bar'
+...     bar = 'baz'
+...     baz = 'spam'
+... 
+&gt;&gt;&gt; ConcreteWrong()
+Traceback (most recent call last):
+  File "&lt;stdin&gt;", line 1, in &lt;module&gt;
+TypeError: Can't instantiate abstract class ConcreteWrong with abstract methods bar, baz, foo
+&gt;&gt;&gt; 
+&gt;&gt;&gt; class ConcreteCorrect(Abstract):
+...     def foo(self): return 'bar'
+...     @property
+...     def bar(self): return 'baz'
+...     @staticmethod
+...     def baz(): return  'spam'
+... 
+&gt;&gt;&gt; ConcreteCorrect()
+&lt;__main__.ConcreteCorrect object at 0x104ce1d10&gt;
+</code></pre>

@@ -1,0 +1,12 @@
+<p>I was running into the same issue recently. I assume that it is related to the <a href="http://hg.openjdk.java.net/code-tools/jmh/file/a0b4a12cdc55/jmh-samples/src/main/java/org/openjdk/jmh/samples/JMHSample_12_Forking.java" rel="nofollow">JMH's forking</a>. As you can read from your benchmark's output, JMH creates a fork <code>1 of 1</code> where JMH starts a <em>fresh</em> JVM instance for each test row. These JVM's do not longer have your agent attached.</p>
+
+<p>This affects the classes you redefine using your agent which are loaded without the agent on the forked JVMs. Therefore, you get the serialization issues. As you do not define an explicit UID for your classes, these UIDs are calculated implicitly. The forked JVMs will therefore recognize that the original JVM's classes differ to the forked JVM's classes what results in your error. You could avoid these serialization issues by explicitly defining a UID but your classes would still not be instrumented.</p>
+
+<p>Instead, try to annotate the benchmarks with <code>@Fork(0)</code> what disables the forking altogether. You should however be careful if this distorts your results too much. This is the case when your code can be optimized heavily by profiling. This is especially true if you share code between your benchmarks where the profile from the first benchmarks will influence your other benchmarks, usually to the worse.</p>
+
+<p>Another solution is to also apply the agent to the forked JVM. For this purpose, the <code>@Fork</code> annotation offers several parameters. For your example, you could define:</p>
+
+<pre><code>@Fork(jvmArgs = "-javaagent:/home/ssube/btrace/build/btrace-agent.jar=scriptdir=/home/ssube/btrace/scripts/,port=0")
+</code></pre>
+
+<p>Note however that this makes your build dependent on your file system.</p>

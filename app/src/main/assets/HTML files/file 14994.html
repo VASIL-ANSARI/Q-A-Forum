@@ -1,0 +1,62 @@
+<p>If you are using code first you can customize the persistence mapping by using either a fluent code API or use attributes to refine the model. EF can resolve relationships through inference if you were to use a simple key name such as Id; in your case EF needs a hint that PersonID and AddressID are keys.</p>
+
+<p>To use the attribute approach add a reference to System.ComponentModel.DataAnnotations in your project and a corresponding 'using System.ComponentModel.DataAnnotations;' in your source files as necessary. The following sample (EF 4.3.1) will generate a "one-to-many" relationship between the generated Addresses and Persons tables (you don't want a one-to-one in this case). After running the code, you will see the relationships in the SQL Server Database Diagram window.</p>
+
+<pre><code>class Program
+{
+    static void Main(string[] args)
+    {
+        using (ContactsEntities entities = new ContactsEntities())
+        {
+            Address doeaddress = new Address() { Street = "1 Broadway", ZipCode = "01234" };
+            Address doeaddress2 = new Address() { Street = "2 Broadway", ZipCode = "01234" };
+            entities.Addresses.Add(doeaddress);
+            entities.Persons.Add(new Person() { FirstName = "Jane", LastName = "Doe", Address = doeaddress });
+            entities.Persons.Add(new Person() { FirstName = "John", LastName = "Doe", Address = doeaddress });
+            entities.Persons.Add(new Person() { FirstName = "Jim", LastName = "Doe", Address = doeaddress2 });
+            entities.SaveChanges(); 
+        }
+        Console.WriteLine("Press Enter to exit...");
+        Console.ReadLine();
+
+    }
+}
+
+[Table("Addresses")]
+public partial class Address
+{
+    public Address()
+    {
+        this.Persons = new HashSet&lt;Person&gt;();
+    }
+    [Key]
+    public int AddressID { get; set; }
+    [Required]
+    public string Street { get; set; }
+    [RegularExpression(@"^(\d{5}-\d{4}|\d{5}|\d{9})$")]
+    [Required]
+    public string ZipCode { get; set; }
+
+    public virtual ICollection&lt;Person&gt; Persons { get; set; }
+}
+
+[Table("Persons")]
+public partial class Person
+{
+    [Key]
+    public int PersonID { get; set; }
+    public int AddressID { get; set; }
+    [Required]
+    public string FirstName { get; set; }
+    [Required]
+    public string LastName { get; set; }
+    [ForeignKey("AddressID")]
+    public virtual Address Address { get; set; }
+}
+
+public partial class ContactsEntities : DbContext
+{
+    public DbSet&lt;Address&gt; Addresses { get; set; }
+    public DbSet&lt;Person&gt; Persons { get; set; }
+}
+</code></pre>

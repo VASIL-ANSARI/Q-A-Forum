@@ -1,0 +1,76 @@
+<p>You can define a <a href="https://developer.apple.com/reference/mapkit/mklocalsearchcompleter" rel="nofollow">local search completer</a>:</p>
+
+<pre><code>var completer = MKLocalSearchCompleter()
+</code></pre>
+
+<p>And then supply the query fragment:</p>
+
+<pre><code>completer.delegate = self
+completer.region = MKCoordinateRegionMakeWithDistance(currentCoordinate, 10_000, 10_000)
+completer.queryFragment = "300 S Orange"
+</code></pre>
+
+<p>And implement the <code>MKLocalSearchCompleterDelegate</code> protocol</p>
+
+<pre><code>extension ViewController: MKLocalSearchCompleterDelegate {
+
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        let addresses = completer.results.map { result in
+            result.title + ", " + result.subtitle
+        }
+
+        // use addresses, e.g. update model and call `tableView.reloadData()
+    }
+
+}
+</code></pre>
+
+<p>And that yields:</p>
+
+<pre>
+["300 S Orange Grove Blvd, Pasadena, CA, United States",
+ "300 S Orange Ave, Monterey Park, CA, United States",
+ "300 S Orange St, Glendale, CA, United States",
+ "300 S Orange Dr, Los Angeles, CA, United States",
+ "300 S Orange Ave, Azusa, CA, United States",
+ "300 S Orange Grove Ave, Los Angeles, CA, United States",
+ "300 S Orange Ave, Brea, CA, United States",
+ "300 S Orange Ave, Fullerton, CA, United States",
+ "300 S Orange St, Orange, CA, United States",
+ "300 S Orange Ave, Rialto, CA, United States",
+ "300 S Orange Ave, Fallbrook, CA, United States",
+ "300 S Orange St, Escondido, CA, United States",
+ "300 S Orange Ave, El Cajon, CA, United States",
+ "300 S Orange Cir, Tulare, CA, United States",
+ "300 S Orange Ave, Exeter, CA, United States"]
+</pre>
+
+<hr>
+
+<p>Or else, you can do a local search:</p>
+
+<pre><code>let request = MKLocalSearchRequest()
+request.region = MKCoordinateRegionMakeWithDistance(currentCoordinate, 10_000, 10_000)
+request.naturalLanguageQuery = "300 S Pumpkin"
+
+let search = MKLocalSearch(request: request)
+search.start { response, error in
+    let addresses = response?.mapItems.map { item -&gt; String in
+        if let addressLines = item.placemark.addressDictionary?["FormattedAddressLines"] as? [String] {
+            return addressLines.joined(separator: " ")
+        }
+        return item.name ?? "Unknown"
+    }
+    print(addresses)
+}
+</code></pre>
+
+<p>Assuming it finds matches, that shows something like:</p>
+
+<pre>
+["300 S Pumpkin Blvd, Los Angeles, CA  92108, United States",
+ "300 S Pumpkin Pkwy, Los Angeles, CA  92103, United States",
+ "300 S Pumpkin Dr, San Gabriel, CA  91776, United States"])
+</pre>
+
+<p>Now, whether you want the <code>FormattedAddressLines</code>, or extract the individual components from the <code>addressDictionary</code> is up to you, but hopefully this illustrates the idea.</p>

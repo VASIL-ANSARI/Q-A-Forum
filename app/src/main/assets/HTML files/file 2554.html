@@ -1,0 +1,68 @@
+<p>1) Function expressions are evaluated in order just like any other expressions. So your call to <code>__construct()</code> and <code>new tRotate()</code> will fail. Either call it at the end:</p>
+
+<pre><code>tRotate = function () {
+    this.__construct = function () {/* ... */}
+    /* ... */
+
+
+    this.__construct();
+}
+imageRotate = new tRotate();
+</code></pre>
+
+<p>or use function declarations instead of expressions:</p>
+
+<pre><code>imageRotate = new tRotate();
+function tRotate () {
+    __construct();
+
+   function __construct() {/* ... */}
+
+   /* ... */
+}
+</code></pre>
+
+<p>2) The <code>index</code> can be reset if you manually reset it:</p>
+
+<pre><code>imageRotate.index = 0;
+</code></pre>
+
+<p>as long as you don't touch it, it won't be reset.</p>
+
+<p><strong>update</strong>: I just realised, several more things to comment on:</p>
+
+<p>1) In javascript, <code>index</code> does not refer to <code>this.index</code>. So you need to change your methods to:</p>
+
+<pre><code>this.next = function () {
+    this.index ++;
+}
+</code></pre>
+
+<p>2) In javascript, <code>this</code> does not necessarily refer to the object the method belongs to. Specifically, for functions executed by <code>setInterval</code>, <code>this</code> refers to the <code>window</code> object. So you need to capture <code>this</code> in a closure. There are several ways to do this:</p>
+
+<pre><code>function tRotate () {
+    var self = this; // self refers to the correct 'this'
+
+    this.start = function () {
+        self.interval = setInterval(self.next,500);
+             /* note: you need to pass a reference here, a string
+              *       won't work because in the context of the
+              *       window object the variable self is undefined
+              */
+    }
+
+    /* ... */
+}
+</code></pre>
+
+<p>or</p>
+
+<pre><code>function tRotate () {
+    function makeStartMethod (self) {
+        self.interval = setInterval(self.next,500);
+    }
+    this.start = makeStartMethod(this);
+
+    /* ... */
+}
+</code></pre>

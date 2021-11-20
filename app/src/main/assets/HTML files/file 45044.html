@@ -1,0 +1,53 @@
+<p>You can't pass functions to SQL - you would need to declare the function on the actual SQL database and then call that from your code.</p>
+
+<p>What you could do/try is this:</p>
+
+<pre><code>Expression&lt;Func&lt;Result, double&gt;&gt; CalculateCoveragePercentage()
+{
+    return r =&gt; r.PresentCount == 0 ? 0 : (r.ExecutedCount * 100.0 / r.PresentCount);
+}
+</code></pre>
+
+<p>It needs to be <strong>interpreted</strong> instead of <strong>executed</strong> so that EF can translate it to SQL. The problem is, I've only heard of this being possible when it's passed directly into a <code>where</code> clause. </p>
+
+<p>Since you are able to do these calculations when you apply them directly inside of your LINQ query, I'm inclined to think that it should also be possible to declare those calculations as <code>Expression&lt;Func&lt;..., ...&gt;&gt;</code> and them pass them in.</p>
+
+<p>The only way to know for sure is to try (unless you feel like looking into EF's <a href="https://entityframework.codeplex.com/SourceControl/latest#src/EntityFramework/Core/Common/CommandTrees/ExpressionBuilder/DbExpressionBuilder.cs" rel="nofollow">ExpressionBuilder</a>)</p>
+
+<p><strong>UPDATE</strong>:</p>
+
+<p>I should have mentioned that, if this would work, you need to pass this expression into a <code>Select</code> statement:</p>
+
+<pre><code>// Assuming you have Results declared as a DbSet or IDbSet, such as:
+DbSet&lt;Result&gt; Results
+
+// You could do something like this (just to illustrate that
+// it would be interpreted rather than executed):
+List&lt;double&gt; allCoveragePercentages = Results.Select(CalculateCoveragePercentage)
+                                             .ToList();
+</code></pre>
+
+<p><strong>UPDATE #2</strong>:</p>
+
+<p>In order for this to work with individual results (or in any case whatsoever), you need to pass it into a clause that accepts the expression. Examples are <code>Select</code>, <code>Where</code>, <code>Average</code> (apparently), anything that does <strong>not</strong> returns results.</p>
+
+<p>From the top of my head (I'm sure I'm missing a few):</p>
+
+<ul>
+<li><p>List: <code>ToArray</code>, <code>ToDictionary</code>, <code>ToList</code>, <code>ToLookup</code></p></li>
+<li><p>Single result: <code>First</code>, <code>FirstOrDefault</code>, <code>Single</code>, <code>SingleOrDefault</code>, <code>Last</code>, <code>LastOrDefault</code></p></li>
+<li><p>Computation: <code>Count</code>, <code>Sum</code>, <code>Max</code>, <code>Min</code></p></li>
+</ul>
+
+<p>Since the above clauses return results, they (for as far as I know) only accept <code>Predicates</code> (a function that can only return 'true' or 'false')</p>
+
+<p>You may have coincidentally got it right with your <code>.Average(CalculateCoveragePercentage)</code></p>
+
+<p>So if you were to get a single result with <code>.FirstOrDefault()</code>, you would pass in your expression inside of a select clause right before that: <code>.Select(CalculateCoveragePercentage).FirstOrDefault()</code>. That is, if you don't need the actual entity but just the calculation. Be aware though that this particular example will return <code>0</code> if there were no <code>Result</code> results. You may or may not want this behavior.</p>
+
+<p>Of course, if you already have your result (it's not an IQueryable anymore) then you can simple do:</p>
+
+<pre><code>var coveragePercentage = CalculateCoveragePercentage().Compile().Invoke(result);
+</code></pre>
+
+<p>But that would kind of defeat the purpose of the expression - for this situation you should just add a method to your <code>Result</code> class that calculates the CoveragePercentage of a given instance.</p>

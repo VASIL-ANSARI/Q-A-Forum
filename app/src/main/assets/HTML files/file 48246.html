@@ -1,0 +1,31 @@
+<p>Yeah, it's invalid, but not because you're converting a <code>char*</code> to an <code>A*</code>: it's because you are not obtaining a <code>A*</code> that actually points to an <code>A*</code> and, as you've identified, none of the type aliasing options fit.</p>
+
+<p>You probably want something like this:</p>
+
+<pre><code>#include &lt;new&gt;
+#include &lt;iostream&gt;
+
+struct A
+{
+  int t;
+};
+
+char *buf = new char[sizeof(A)];
+
+A* ptr = new (buf) A;
+ptr-&gt;t = 1;
+
+// Also valid, because points to an actual constructed A!
+A *ptr2 = reinterpret_cast&lt;A*&gt;(buf);
+std::cout &lt;&lt; ptr2-&gt;t;
+</code></pre>
+
+<p>Now type aliasing doesn't come into it at all.</p>
+
+<p>Of course, this example is contrived because you'd just create an <code>A</code> in the first place but, assuming <code>buf</code> is actually larger in reality and you're creating an allocator or something similar, this makes sense. <strong>Just make sure you placement-<code>new</code> the <code>A</code> and you'll be good to go.</strong></p>
+
+<ul>
+<li>(<a href="http://coliru.stacked-crooked.com/a/b334df17ae1e98ab" rel="nofollow">live demo with <code>-Wstrict-aliasing=2</code></a>)</li>
+</ul>
+
+<p>(Oddly, when you switch to an automatic storage duration <code>buf</code>, there is still a compiler warning. I can't explain this but it seems like a false alert.)</p>

@@ -1,0 +1,136 @@
+<p>It looks to me like you aren't terminating the child process once it completes, you're just letting it continue the parent's main loop spawning more processes.  Also, you were running a process and waiting for it which buys you nothing over letting your parent process just do the calculations -- instead spawn all the children and wait for them to finish, each in its own time.  I've reworked your code to incorporate the above and some style tweaks:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;sys/wait.h&gt;
+
+int main(int argc, char *argv[]) {
+
+    if (argc == 1) {
+        fprintf(stderr,"Usage: ./a.out &lt;starting value&gt;\n");
+        return EXIT_FAILURE;
+    }
+
+    int j;
+    printf ("How many times would you like this to run?\n");
+    scanf ("%d", &amp;j);
+    (void) fpurge(stdin);
+
+    printf("\nMain program's process ID: %d\n", getpid());
+
+    int n = atoi(argv[1]);
+
+    for (int x = 1; x &lt;= j; x++) {
+        pid_t pid = fork();
+
+        if (pid == -1) {
+            fprintf(stderr, "Unable to fork child\n");
+            return EXIT_FAILURE;
+        } else if (pid == 0) { /* child process */
+            pid_t child_pid = getpid();
+
+            printf("\nChild %d (ID: %d)\n", x, child_pid);
+            printf("\nStart sequence at: %d\n", n);
+            while (n != 1) {
+                n = n % 2 ? 3 * n + 1 : n / 2;
+                printf("\n(Child %d) %d ", x, n);
+            }
+
+            printf("\n\nAbout to end execution (I'm process %d).\n", child_pid);
+
+            return EXIT_SUCCESS; /* child terminates */
+        }
+        else { /* parent process */
+            n = n + 3;
+        }
+    }
+
+    for (int x = 1; x &lt;= j; x++) {
+        wait(NULL);
+    }
+
+    return EXIT_SUCCESS;
+}
+</code></pre>
+
+<p><strong>SAMPLE RUN</strong></p>
+
+<pre><code>&gt; ./a.out 5
+How many times would you like this to run?
+4
+
+Main program's process ID: 1164
+
+Child 1 (ID: 1165)
+
+Start sequence at: 5
+
+(Child 1) 16 
+(Child 1) 8 
+(Child 1) 4 
+(Child 1) 2 
+(Child 1) 1 
+
+About to end execution (I'm process 1165).
+
+Child 3 (ID: 1167)
+
+Start sequence at: 11
+
+(Child 3) 34 
+(Child 3) 17 
+(Child 3) 52 
+(Child 3) 26 
+
+(Child 3) 13 
+Child 2 (ID: 1166)
+(Child 3) 40 
+
+(Child 3) 20 
+Start sequence at: 8
+(Child 3) 10 
+
+(Child 3) 5 
+(Child 2) 4 
+(Child 3) 16 
+(Child 2) 2 
+(Child 3) 8 
+(Child 2) 1 
+(Child 3) 4 
+
+(Child 3) 2 
+About to end execution (I'm process 1166).
+(Child 3) 1 
+
+About to end execution (I'm process 1167).
+
+Child 4 (ID: 1168)
+
+Start sequence at: 14
+
+(Child 4) 7 
+(Child 4) 22 
+(Child 4) 11 
+(Child 4) 34 
+(Child 4) 17 
+(Child 4) 52 
+(Child 4) 26 
+(Child 4) 13 
+(Child 4) 40 
+(Child 4) 20 
+(Child 4) 10 
+(Child 4) 5 
+(Child 4) 16 
+(Child 4) 8 
+(Child 4) 4 
+(Child 4) 2 
+(Child 4) 1 
+
+About to end execution (I'm process 1168).
+&gt; 
+</code></pre>
+
+<p>If the out of order results bother you, consider using threads and returning the results to be printed by the main thread or use some sort of locking to syncronize the output.  Or have the children write the results to temporary files or pipes that the parent summarizes at the end.</p>
+
+<p>One final style note, don't return -1 from <code>main()</code>, nor do <code>exit(-1)</code> -- although returning -1 indicates an error for system subroutines, the value returned by <code>main()</code> to the operating system should be in the range 0 (success) to 255 with 1 (failure) being a generic error indicator.</p>

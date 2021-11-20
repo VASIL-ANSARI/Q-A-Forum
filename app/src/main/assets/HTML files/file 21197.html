@@ -1,0 +1,47 @@
+<p>The command <a href="http://msdn.microsoft.com/en-us/library/hh231256.aspx" rel="nofollow"><code>LAG</code></a> is only supported in SQL Server 2012.</p>
+
+<p>Though I'm surprised by the error if this is the problem.</p>
+
+<p>--Edit--</p>
+
+<p><strong>To replicate your query without using <code>LAG</code>:</strong></p>
+
+<p>This has basically been lifted from the <a href="http://blog.sqlauthority.com/2011/11/24/sql-server-solution-to-puzzle-simulate-lead-and-lag-without-using-sql-server-2012-analytic-function/" rel="nofollow">article</a> I mentioned;</p>
+
+<pre><code>SELECT 
+       a.CaseNo, 
+       (c.Claimant + ' -v- ' + c.Defendant) AS CaseName, 
+       a.Allocation - ISNULL((
+           CASE 
+              WHEN N%2=1 
+              THEN MAX(CASE 
+                   WHEN N%2=0 
+                   THEN a.Allocation 
+                   END) 
+              OVER (Partition BY N/2) 
+              ELSE MAX(CASE 
+                   WHEN N%2=1 
+                   THEN a.Allocation
+                   END) 
+              OVER (Partition BY (N+1)/2) 
+           END
+       ), 0) AS Billing, 
+       a.AllocID 
+FROM tblAllocations AS a
+LEFT JOIN (SELECT 
+    Row_Number() OVER(ORDER BY b.Id) N,
+    b.Id
+  FROM tblAllocations as b) AS RowNum 
+ON RowNum.id=a.id 
+INNER JOIN tblCases AS c 
+ON a.CaseNo = c.CaseNo
+WHERE a.CaseNo &gt; 0 
+AND FeeEarner = @FeeEarner 
+AND a.Date &gt;= @StartDate 
+AND a.Date &lt;= @EndDate 
+ORDER BY a.Date;
+</code></pre>
+
+<p>This is demo'd in the following:</p>
+
+<h1><a href="http://sqlfiddle.com/#!3/62680/8" rel="nofollow"><strong>SQL FIDDLE</strong></a></h1>

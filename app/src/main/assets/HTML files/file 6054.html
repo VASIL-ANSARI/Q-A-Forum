@@ -1,0 +1,64 @@
+<p>Some trial-and-error of this code in <a href="http://www.jslint.com/" rel="nofollow">JSLint</a></p>
+
+<pre><code>"use strict";
+var that="dd";
+function $(x){return x;}
+
+$('#'+ $(this).attr('id').replace('control-', 'legend-')).fadeIn();
+$(this);
+</code></pre>
+
+<p>shows me what's wrong: you're using <code>this</code> as a parameter. Changing both <code>this</code>es to <code>that</code>s doesn't trigger the error.</p>
+
+<p>As <a href="http://ecma262-5.com/ELS5_Annex_C.htm" rel="nofollow">the specification</a> says:</p>
+
+<blockquote>
+  <p>If <strong>this</strong> is evaluated within strict mode code, then the <strong>this</strong> value is not coerced to an object. A <strong>this</strong> value of <strong>null</strong> or <strong>undefined</strong> is not converted to the global object and primitive values are not converted to wrapper objects. <em>The <strong>this</strong> value passed via a function call (including calls made using <strong>Function.prototype.apply</strong> and <strong>Function.prototype.call</strong>) do not coerce the passed <strong>this</strong> value to an object</em> (<a href="http://ecma262-5.com/ELS5_Section_10.htm#Section_10.4.3" rel="nofollow">10.4.3</a>, <a href="http://ecma262-5.com/ELS5_Section_11.htm#Section_11.1.1" rel="nofollow">11.1.1</a>, <a href="http://ecma262-5.com/ELS5_Section_15.htm#Section_15.3.4.3" rel="nofollow">15.3.4.3</a>, <a href="http://ecma262-5.com/ELS5_Section_15.htm#Section_15.3.4.4" rel="nofollow">15.3.4.4</a>). <em>[my emphasis]</em></p>
+</blockquote>
+
+<p>As John Resig <a href="http://ejohn.org/blog/ecmascript-5-strict-mode-json-and-more/#js-7" rel="nofollow">writes</a>,</p>
+
+<blockquote>
+  <p>Finally, a long-standing (and very
+  annoying) bug has been resolved: Cases
+  where null or undefined is coerced
+  into becoming the global object.
+  Strict mode now prevents this from
+  happening and throws an exception
+  instead.</p>
+
+<pre><code>(function(){ ... }).call( null ); // Exception
+</code></pre>
+</blockquote>
+
+<p>As you showed, using your line of code inside a function declaration throws an error in JSLint, whereas using it inside a function expression doesn't. It looks like JSLint erroneously parses the function declaration, sees <code>this</code>, that's still undefined at that moment, and throws an exception.</p>
+
+<p>At this point, I think I have to quote <a href="http://perfectionkills.com/onloadfunction-considered-harmful/#does_it_really_matter" rel="nofollow">Juriy Zaytsev (âkangaxâ)</a>:</p>
+
+<blockquote>
+  <h2>Does it really matter?</h2>
+  
+  <p>Itâs good to understand that <strong>strict mode is not a requirement</strong>, but is
+  merely an option. It is there to
+  provide stricter rules for those who
+  need it, and are willing to cope with
+  (and enjoy) consequences.</p>
+</blockquote>
+
+<hr>
+
+<p><strong>Update:</strong> At last I found an explanation. If you read <a href="http://tech.groups.yahoo.com/group/jslint_com/messages/927?threaded=1&amp;m=e&amp;var=1&amp;tidx=1" rel="nofollow">this thread</a>, especially from message #1512 onwards, you'll read that</p>
+
+<blockquote>
+  <p>The point of ES5/strict is to prohibit
+  leaking of the global object,
+  something that ES3 does promiscuously.
+  ES5/strict does some of its work
+  dynamically, and some of its work
+  statically. JSLint does all of its
+  work statically, so it must be even
+  more restrictive in order to best help
+  you get your program right. <em>[Douglas Crockford in #1553]</em></p>
+</blockquote>
+
+<p>I have to admit that he has a valid point here: if your goal is to avoid global namespace pollution, you shouldn't use function declarations, but function expressions inside a private namespace, anyway. But I agree with others in the mentioned thread that the error message should be more explicit (and probably throw a warning on encountering a function declaration).</p>

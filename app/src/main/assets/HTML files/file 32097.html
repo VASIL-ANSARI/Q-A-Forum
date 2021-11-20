@@ -1,0 +1,13 @@
+<p>After a little more research, it looks like LDD3's statement is outdated, as per a (slightly more recent) LWN:</p>
+
+<ul>
+<li><a href="http://lwn.net/Articles/162860/" rel="nofollow">http://lwn.net/Articles/162860/</a> -- "The evolution of driver page remapping"</li>
+</ul>
+
+<p><em>TL;DR:</em> In the past, drivers may have manually set <code>PG_reserved</code> on pages allocated by <code>kmalloc()</code>/<code>__get_free_pages()</code> and subsequently used <code>remap_pfn_range()</code>, <em>but now drivers should now use <code>vm_insert_page()</code> to do the equivalent thing.</em></p>
+
+<p><code>vm_insert_page()</code> apparently only works on order-0 (single-page) allocations, so if you want to allocate N pages you'll have to call <code>vm_insert_page()</code> N times.</p>
+
+<p>An example of this usage can be seen in the Firewire driver:  <code>drivers/firewire/core-iso.c</code></p>
+
+<p>Note how single pages are allocated by repeatedly calling <code>alloc_page()</code> in <code>fw_iso_buffer_alloc()</code>, and these pages are later mapped into a userspace VMA by repeatedly calling <code>vm_insert_page()</code> in <code>fw_iso_buffer_map_vma()</code>.  (fw_iso_buffer_map_vma() is called by the mmap handler in <code>drivers/firewire/core-cdev.c</code>.)</p>

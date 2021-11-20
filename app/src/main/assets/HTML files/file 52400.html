@@ -1,0 +1,22 @@
+<p>Your assignment operator should be returning a <code>CellPhoneHandler&amp;</code>, not a <code>CellPhoneHandler</code> object.  By returning an object, you're invoking (unnecessarily) the copy constructor.  </p>
+
+<p>In addition, your assignment operator fails to check for self-assignment (assigning a <code>CellPhoneHandler</code> object to itself).  A self-assignment will wind up deleting the object's data, and then attempt to copy from a memory area that was deleted.</p>
+
+<p>The assignment operator will also fail if the call to <code>new[]</code> throws an exception.  You're changing your object's internals before you've issued a call to <code>new[]</code>, thus corrupting the object if something goes wrong and <code>new[]</code> throws an exception.</p>
+
+<p>However, instead of writing all of this code to implement the assignment operator, you could have leveraged the copy constructor and destructor to implement the assignment operator using the <a href="http://stackoverflow.com/questions/3279543/what-is-the-copy-and-swap-idiom">copy / swap idiom</a>:</p>
+
+<pre><code>#include &lt;algorithm&gt;
+//...
+CellPhoneHandler&amp; CellPhoneHandler:: operator=(const CellPhoneHandler &amp;original)
+{
+    CellPhoneHandler temp(original);
+    std::swap(temp.nrOfCellphones, nrOfCellphones);
+    std::swap(temp.cellphone, cellphone);
+    return *this;
+}
+</code></pre>
+
+<p>This now uses the copy constructor by creating a temporary object, and just swapping out the temp object's internals with the current object's internals.  Then the temporary object dies off.  </p>
+
+<p>This is exception safe (since if anything goes wrong with constructing <code>temp</code>, nothing happens to the original object), and no need to check for self assignment (you can do that for a probable optimization, but no need to actually perform this check, unlike your original attempt of the assignment operator).</p>

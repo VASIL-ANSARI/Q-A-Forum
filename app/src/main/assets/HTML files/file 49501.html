@@ -1,0 +1,63 @@
+<p>Let's interpret the CSR (or CRS, for "compressed row storage") structure as a structure of three arrays:</p>
+
+<pre><code>struct csr {
+    size_t row_count;
+    size_t *row_indices;
+    float *values;
+    size_t *column_indices;
+};
+</code></pre>
+
+<p>Here, <code>values</code> and <code>column_indices</code> should point to arrays of the same size (alternatively, you could structure them as one array of <code>int</code>-<code>double</code> pairs), and <code>row_indices</code> should point to an array of indices into these two arrays. <em>(Actually, we're going to take some liberties with <code>row_indices</code>; rather than pointing at the first column/value of a row, we're going to point one past the last column/value of the row.)</em></p>
+
+<p>Your <code>*.txt</code> file format seems to contain a square matrix, and starts with a size parameter (<code>n</code>).</p>
+
+<pre><code>struct csr your_csr;
+size_t n;
+
+fscanf(f, "%d", &amp;n);
+your_csr.row_count = n;
+</code></pre>
+
+<p>After reading this <code>n</code>, we can allocate <code>row_indices</code>. Unfortunately, we don't know how many nonzero values there will be in the matrix. For now, this simple implementation will just allocate <code>n x n</code> elements, and a more conservative approach is left as an exercise to the reader.</p>
+
+<pre><code>your_csr.row_indices     = calloc(n, sizeof(your_csr.row_indices[0]));
+your_csr.values          = calloc(n * n, sizeof(your_csr.values[0]));
+your_csr.column_indices  = calloc(n * n, sizeof(your_csr.column_indices[0]));
+</code></pre>
+
+<p>Now that we have our memory in place, let's deal with the matrix data.</p>
+
+<pre><code>size_t pair_index = 0;
+
+for (size_t row_index = 0; row_index &lt; n; row_index++) {
+    for (size_t column_index = 0; column_index &lt; n; column_index++) {
+        float value;
+        fscanf(f, "%f", &amp;value);
+</code></pre>
+
+<p>For every non-zero value you read, you're going to write what you know into your <code>values</code> and <code>column_indices</code> array</p>
+
+<pre><code>        if (value != 0.0) {
+            your_csr.values[pair_index] = value;
+            your_csr.column_indices[pair_index] = column_index;
+            pair_index++;
+        }
+    }
+</code></pre>
+
+<p>After you've read a row, you're going to write down where the row ends.</p>
+
+<pre><code>    your_csr.row_indices[row_index] = pair_index;
+}
+</code></pre>
+
+<p>Now, <code>your_csr</code> contains all the data you need to know about the matrix:</p>
+
+<ul>
+<li><code>your_csr.row_count</code> contains the number of rows in the matrix.</li>
+<li>The length of the other two arrays is <code>your_csr.row_indices[your_csr.row_count - 1]</code>.</li>
+<li>If you want to know in which column <code>your_csr.values[x]</code> belongs, look at <code>your_csr.column_indices[x]</code>.</li>
+<li>The (non-zero) values of the first row (let's call it row 0; mathematicians would disagree, but zero-based indices are great for programming) can be found in <code>your_csr.values[x]</code>, where <code>0 &lt;= x &amp;&amp; x &lt; your_csr.row_indices[0]</code>.</li>
+<li>The values of any other row <code>r</code> can be found <code>your_csr.values[x]</code>, where <code>your_csr.values[r - 1] &lt;= x &amp;&amp; x &lt; your_csr.row_indices[r]</code>.</li>
+</ul>

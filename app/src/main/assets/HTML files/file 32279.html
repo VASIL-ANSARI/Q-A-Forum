@@ -1,0 +1,50 @@
+<p>Since you've tagged this as C++, I'd use C++:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;algorithm&gt;
+
+struct student { 
+    std::string nim;
+    std::string name;
+    int year;
+
+    bool operator&lt;(student const &amp;other) { 
+        return name &lt; other.name;
+    }
+
+    friend std::istream &amp;operator&gt;&gt;(std::istream &amp;is, student &amp;s) { 
+        std::getline(is, s.nim, '#');
+        std::getline(is, s.name, '#');
+        return is &gt;&gt; s.year;
+    }    
+};
+
+int main() { 
+    std::ifstream in("mhs.txt");
+
+    std::vector&lt;student&gt; students{
+        std::istream_iterator&lt;student&gt;(in),
+        std::istream_iterator&lt;student&gt;()
+    };
+
+    std::sort(students.begin(), students.end());
+}
+</code></pre>
+
+<p>If you want to accomplish roughly the same thing in C, it's probably easiest to do the reading with <code>fscanf</code> using a scanset conversion, like:</p>
+
+<pre><code>fscanf(infile, "%10[^#]#%49[^#]#%d", student.nim, student.name, &amp;student.year);
+</code></pre>
+
+<p>The scanset conversion gives you something like a subset of regular expressions, so the <code>%[^#]</code> converts a string of characters up to (but not including) a <code>#</code>. In this case, I've limited the length of each to one less than the length you gave for the arrays in your struct definition to prevent buffer overruns.</p>
+
+<p>Then you can do the sorting with <code>qsort</code>. You'll need to write a comparison function, and doing that correctly isn't always obvious though:</p>
+
+<pre><code>int cmp(void const *aa, void const *bb) {
+    student const *a = aa;
+    student const *b = bb;
+
+    return strcmp(a-&gt;name, b-&gt;name);
+}
+</code></pre>

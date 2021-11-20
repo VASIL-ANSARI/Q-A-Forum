@@ -1,0 +1,17 @@
+<p>I presume you have the ability to modify the <code>Stagefright</code> sources and hence, I have a proposed solution for your problem, but one which requires a customization.</p>
+
+<p><strong>Background:</strong></p>
+
+<p>When an <code>encoder</code> completes encoding, the first buffer will have the <code>csd</code> information which is usually tagged with <code>OMX_BUFFERFLAG_CODECCONFIG</code> flag. When such a buffer is returned to the <code>MediaCodec</code>, it shall store the same as <code>csd-0</code> in <a href="http://androidxref.com/5.0.0_r2/xref/frameworks/av/media/libstagefright/MediaCodec.cpp#2191" rel="nofollow"><code>MediaCodec::amendOutputFormatWithCodecSpecificData</code></a>.</p>
+
+<p><strong>Now</strong>, when this buffer is given to <code>MediaMuxer</code>, the same is processed as part of <code>addTrack</code>,in which <a href="http://androidxref.com/5.0.0_r2/xref/frameworks/av/media/libstagefright/MediaMuxer.cpp#94" rel="nofollow"><code>convertMessageToMetadata</code></a> is invoked. If you refer to the implementation of the same, we can observe that only <code>AVC</code> is handled for <code>video</code> and defaults to <code>audio</code> for <code>ESDS</code> creation.</p>
+
+<p><strong>EDIT:</strong></p>
+
+<p>Here, my recommendation is to modify this <a href="http://androidxref.com/5.0.0_r2/xref/frameworks/av/media/libstagefright/Utils.cpp#559" rel="nofollow">line</a> as below and try your experiment</p>
+
+<pre><code>} 
+if (mime.startsWith("audio/") || (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4)) {
+</code></pre>
+
+<p>With this change, I feel it should work for <code>MPEG4</code> video track also. The change is to convert the <code>else if</code> into <code>if</code> as the previous check for <code>video</code> will also try to process the data, but only for <code>AVC</code>.</p>

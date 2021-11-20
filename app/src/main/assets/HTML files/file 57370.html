@@ -1,0 +1,71 @@
+<p>We investigated more thoroughly understood how search works weights.</p>
+
+<p>According to <a href="https://docs.djangoproject.com/en/dev/ref/contrib/postgres/search/#weighting-queries" rel="nofollow">documents</a> you can be assigned weights according to the fields and they can even be assigned weights, and similarly we can use <a href="https://docs.djangoproject.com/en/dev/ref/contrib/postgres/search/#trigram-similarity" rel="nofollow">trigrams</a> to filter by similarity or distance.</p>
+
+<p>However not specify an example of using the two and investigating further it understood nor much as weights work.</p>
+
+<p>A little logic tells us that if we seek a common word in all we will all ranks 0, similarity varies much more than ranges, however tends to lower values ââthat range.</p>
+
+<p>Now, text search, as far as we understand, it is carried out based on the text contained in the fields you want to filter even more than in the language that is placed in the configuration. Example is that putting titles, the used model had a title field and a content field, whose most common words were <code>how change</code>, reviewing weighted words (ranges function as query, so we can use <code>values</code> ââor <code>values_list</code> to review the ranks and similarities, which are numerical values, we can view weighted words viewing vector object), we saw that if weights were allocated, but combinations of splitted words: found 'perfil' and 'cambi', however we did not find 'cambiar' or 'como'; however, all models had contained the same text as 'lorem ipsun ...', and all the words of that sentence if they were whole and with weights B; We conclude with this that the searches are done based on the contents of the fields to filter more than the language with which we configure searches.</p>
+
+<p>That said, here we present the code we use for everything.</p>
+
+<p>First, we need to use Trigrams the extent necessary to enable the database:</p>
+
+<pre><code>from __future__ import unicode_literals
+
+from django.db import migrations, models
+import django.db.models.deletion
+from django.contrib.postgres.operations import UnaccentExtension
+from django.contrib.postgres.operations import TrigramExtension
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+    ]
+
+    operations = [
+      ...
+      TrigramExtension(),
+      UnaccentExtension(),
+
+    ]
+</code></pre>
+
+<p>Import operations for migration from <code>postgres</code> packages and run from any file migration .</p>
+
+<p>The next step is to change the code of the question so that the filter returns one of the querys if the second fails:</p>
+
+<pre><code>def get_queryset(self):
+        search_query = SearchQuery(self.request.GET.get('q', ''))
+
+        vector = SearchVector(
+            'name',
+            weight='A',
+            config=settings.SEARCH_LANGS[settings.LANGUAGE_CODE],
+        ) + SearchVector(
+            'content',
+            weight='B',
+            config=settings.SEARCH_LANGS[settings.LANGUAGE_CODE],
+        )
+
+        if self.request.user.is_authenticated:
+            queryset = Article.actives.all()
+        else:
+            queryset = Article.publics.all()
+
+        return queryset.annotate(
+          rank=SearchRank(vector, search_query)
+          similarity=TrigramSimilarity(
+              'name', search
+            ) + TrigramSimilarity(
+              'content', search
+            ),
+        ).filter(Q(rank__gte=0.3) | Q(similarity__gt=0.3)).order_by('-rank')[:20]
+</code></pre>
+
+<p>The problem with the above code was seeping one query after another, and if the word chosen not appear in any of the two searches the problem is greater . We use a <code>Q</code> object to filter using an <code>OR</code> connector so that if one of the two does not return a desired value , send the other in place.</p>
+
+<p>With this is enough, however they are welcome clarifications depth on how these weights and trigramas work, to explitar the most of this new advantage offered by the latest version of Django.</p>

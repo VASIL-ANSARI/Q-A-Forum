@@ -1,0 +1,30 @@
+<p>The comments show that this can actually be a difficult problem, as stated. So what if we take this problem from different angles:</p>
+
+<ol>
+<li>Why are the observers of this collection take so long? They should only do fast things in response to individual changes. E.g. if it's for a UI change, it could wait until the next UI redraw before caring about the changes. That should let the whole reorder finish in one go. Or</li>
+<li>Use something like <a href="http://stackoverflow.com/q/670577/781792"><code>ObservableRangeCollection&lt;T&gt;</code></a> so that you've got an <code>AddRange</code> on observable collections. Some simple code can determine if the collection is <code>List&lt;T&gt;</code> or <code>ObservableRangeCollection&lt;T&gt;</code> to use <code>AddRange</code> if possible.</li>
+</ol>
+
+<p>E.g.</p>
+
+<pre><code>public static void SmartSort&lt;T&gt;(IList&lt;T&gt; source)
+{
+    var sortedList = source.OrderBy(x =&gt; x).ToList();
+    if (source.SequenceEqual(sortedList))
+        return;
+    var list = source as List&lt;T&gt;;
+    var collection = source as ObservableRangeCollection&lt;T&gt;;
+    if (list != null)
+    {
+        list.Clear();
+        list.AddRange(sortedList);
+    }
+    else if (collection != null)
+        collection.ReplaceRange(sortedList);
+    else
+    {
+        for (int i = 0; i &lt; source.Count; i++)
+            source[i] = sortedList[i];
+    }
+}
+</code></pre>

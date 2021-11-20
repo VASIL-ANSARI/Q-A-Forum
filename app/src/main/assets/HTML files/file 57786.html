@@ -1,0 +1,64 @@
+<p>You can use the <strong>"not contains"</strong> and <strong>"list_append"</strong> for your requirement.</p>
+
+<p>The below code inserts the new friend to list if the friend is NOT already present in the list.</p>
+
+<p>If the friend is already present in the list, it would throw "conditional request failed".</p>
+
+<p><strong>Error message if condition fails:-</strong></p>
+
+<pre><code>Unable to update item. Error JSON: {
+  "message": "The conditional request failed",
+  "code": "ConditionalCheckFailedException",
+  "time": "2016-06-22T08:18:36.483Z",
+  "requestId": "86805965-240b-43e0-8fdc-77fb9ae1b15c",
+  "statusCode": 400,
+  "retryable": false,
+  "retryDelay": 0
+}
+</code></pre>
+
+<p>The below code works fine. It has been tested successfully.</p>
+
+<p><strong>Code Sample:</strong></p>
+
+<pre><code>var AWS = require("aws-sdk");
+
+AWS.config.update({
+    region : "us-west-2",
+    endpoint : "http://localhost:8000"
+});
+
+var docClient = new AWS.DynamoDB.DocumentClient();
+
+var table = "users";
+
+var userid = 1;
+var friendId = ["f4"];
+var friendIdStr = "f4";
+
+
+//Add the new DOCUMENT TYPE attribute to the table
+var params = {
+    TableName : table,
+    Key: {
+        "id" : userid 
+    },
+    "UpdateExpression": "set friends = list_append (friends, :friendId)",
+    "ConditionExpression": "not contains (friends, :friendIdStr)",
+    "ExpressionAttributeValues": { 
+        ":friendId": friendId,
+        ":friendIdStr" : friendIdStr
+    },
+    "ReturnValues" : "UPDATED_NEW"
+};
+
+console.log("Updated an item...");
+docClient.update(params, function(err, data) {
+    if (err) {
+        console.error("Unable to update item. Error JSON:", JSON.stringify(err,
+                null, 2));
+    } else {
+        console.log("Updated item:", JSON.stringify(data, null, 2));
+    }
+});
+</code></pre>

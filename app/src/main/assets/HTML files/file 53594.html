@@ -1,0 +1,30 @@
+<p>OK so I've gotten a bit further and thought I'd post in case anyone else wants to achieve the same. </p>
+
+<p>1) <strong>defaulting the changelog to "record created"</strong> </p>
+
+<p>This is possible, I was just missing that you need @class and @type to DEFAULT, but only relevant fields to ADD. 
+New line:</p>
+
+<pre><code>ALTER PROPERTY E.changelog DEFAULT [{'@type':'d','@class':'ChangeHistory', 'changetype':'initial creation'}];
+</code></pre>
+
+<p>2) <strong>trapping update user and updated fields</strong></p>
+
+<p>Solved this one too, by adding a schemaless prop to the updating record, getting it from the JS function object</p>
+
+<pre><code>doc.field("updater")
+</code></pre>
+
+<p>and passing this to the changelog before removing the record-level prop. This also works for the updated fields, if you pass in only the fields which are being updated. The full function creation SQL is below (updater only, not updated fields)</p>
+
+<pre><code>CREATE FUNCTION recordUpdated "
+var graph = orient.getGraphNoTx(); 
+var updater = graph.command( 'sql', 'SELECT FROM OUser WHERE name = \"' + doc.field('updater') + '\"'); 
+graph.command( 'sql', 'UPDATE ' + doc.field('@rid') + ' ADD changelog = [{\"user\":\"' + updater[0].getId() + '\", \"changetype\":\"Update\"}]');
+graph.command( 'sql', 'UPDATE ' + doc.field('@class') + ' REMOVE updater WHERE @rid = \"' + doc.field('@rid') + '\"');
+" LANGUAGE JAVASCRIPT;
+</code></pre>
+
+<p>3) <strong>getGraphNoTx()</strong></p>
+
+<p>I could not find proof of getGraphNoTx() being safe, but my understanding is that it just prevents the function itself from running as a transaction. worst case scenario seems to be that changelog entries recieve the wrong updater? </p>

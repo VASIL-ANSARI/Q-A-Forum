@@ -1,0 +1,165 @@
+<p>My guess is that you have multiple threads trying to use the clients at the same time, and I'm not entirely sure that bulletproof. You might try to use the async interface as well as construct a threadsafe resource pool for accessing your clients.</p>
+
+<p>Using Thrift-0.5.0.0, here is an example of creating an AsyncClient for your thrift generated code:</p>
+
+<pre><code>Factory fac = new AsyncClient.Factory(new TAsyncClientManager(), new TProtocolFactory() {
+    @Override
+    public TProtocol getProtocol( TTransport trans ) {
+        return new TBinaryProtocol(trans);
+    }
+});
+AsyncClient cl = fac.getAsyncClient( new TNonblockingSocket( "127.0.0.1", 12345 ));
+</code></pre>
+
+<p>However, if you look through the source, you'll notice that it's got a single thread message handler, even though it uses a NIO socket, you might find this to be a bottleneck. To get more, you'll have to make more async clients, check them out, and return them correctly.</p>
+
+<p>To simplify this, I've made a quick little class to manage them. The only thing you need to do to modify it to fit your needs is to include your packages and it should work for you, even though I have not really tested it much (at all, really):</p>
+
+<pre><code>public class Thrift {
+
+    // This is the request
+    private static abstract class ThriftRequest {
+
+        private void go( final Thrift thrift, final AsyncClient cli ) {
+            on( cli );
+            thrift.ret( cli );
+        }
+
+        public abstract void on( AsyncClient cli );
+    }
+
+    // Holds all of our Async Clients
+    private final ConcurrentLinkedQueue&lt;AsyncClient&gt;   instances = new ConcurrentLinkedQueue&lt;AsyncClient&gt;();
+    // Holds all of our postponed requests
+    private final ConcurrentLinkedQueue&lt;ThriftRequest&gt; requests  = new ConcurrentLinkedQueue&lt;ThriftRequest&gt;();
+    // Holds our executor, if any
+    private Executor                                 exe       = null;
+
+    /**
+     * This factory runs in thread bounce mode, meaning that if you call it from 
+     * many threads, execution bounces between calling threads depending on when        
+     * execution is needed.
+     */
+    public Thrift(
+            final int clients,
+            final int clients_per_message_processing_thread,
+            final String host,
+            final int port ) throws IOException {
+
+        // We only need one protocol factory
+        TProtocolFactory proto_fac = new TProtocolFactory() {
+
+            @Override
+            public TProtocol getProtocol( final TTransport trans ) {
+                return new TBinaryProtocol( trans );
+            }
+        };
+
+        // Create our clients
+        Factory fac = null;
+        for ( int i = 0; i &lt; clients; i++ ) {
+
+            if ( fac == null || i % clients_per_message_processing_thread == 0 ) {
+                fac = new AsyncClient.Factory(
+                    new TAsyncClientManager(),
+                    proto_fac );
+            }
+
+            instances.add( fac.getAsyncClient( new TNonblockingSocket(
+                host,
+                port ) ) );
+        }
+    }
+    /**
+     * This factory runs callbacks in whatever mode the executor is setup for,
+     * not on calling threads.
+     */
+    public Thrift( Executor exe,
+            final int clients,
+            final int clients_per_message_processing_thread,
+            final String host,
+            final int port ) throws IOException {
+        this( clients, clients_per_message_processing_thread, host, port );
+        this.exe = exe;
+    }
+
+    // Call this to grab an instance
+    public void
+            req( final ThriftRequest req ) {
+        final AsyncClient cli;
+        synchronized ( instances ) {
+            cli = instances.poll();
+        }
+        if ( cli != null ) {
+            if ( exe != null ) {
+                // Executor mode
+                exe.execute( new Runnable() {
+
+                    @Override
+                    public void run() {
+                        req.go( Thrift.this, cli );
+                    }
+
+                } );
+            } else {
+                // Thread bounce mode
+                req.go( this, cli );
+            }
+            return;
+        }
+        // No clients immediately available
+        requests.add( req );
+    }
+
+    private void ret( final AsyncClient cli ) {
+        final ThriftRequest req;
+        synchronized ( requests ) {
+            req = requests.poll();
+        }
+        if ( req != null ) {
+            if ( exe != null ) {
+                // Executor mode
+                exe.execute( new Runnable() {
+
+                    @Override
+                    public void run() {
+                        req.go( Thrift.this, cli );
+                    }
+                } );
+            } else {
+                // Thread bounce mode
+                req.go( this, cli );
+            }
+            return;
+        }
+        // We did not need this immediately, hold onto it
+        instances.add( cli );
+
+    }
+
+}
+</code></pre>
+
+<p>An example of how to use it:</p>
+
+<pre><code>// Make the pool
+Thrift t = new Thrift( 10, "localhost", 8000 );
+// Use the pool
+t.req( new ThriftRequest() {
+
+    @Override
+    public void on( AsyncClient cli ) {
+        cli.MyThriftMethod( "stringarg", 111, new AsyncMethodCallback&lt;AsyncClient.MyThriftMethod_call&gt;() {
+            @Override
+            public void onError( Throwable throwable ) {
+                }
+
+            @Override
+            public void onComplete( MyThriftMethod_call response ) {
+            }
+        });
+    }
+} );
+</code></pre>
+
+<p>You might want to experiment with different server modes like the THsHaServer to see what works best for your environment.</p>

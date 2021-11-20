@@ -1,0 +1,74 @@
+<blockquote>
+  <p>It seams to be a difference between <code>e("A, B, C")</code> or <code>~"A, B, C"</code> and <code>A, B, C</code></p>
+</blockquote>
+
+<p>Yes, both <code>e("A, B, C")</code> and <code>~"A, B, C"</code> create so-called "anonymous value" type which is never considered as a meaningful type (it's not a list, not a number, not even a string). Basically an escaped values are just something like "Don't touch me" or "I know what I'm doing!" stuff, they are just being output "as is" and the compiler never tries to understand what's inside. This is basically what exactly the <a href="http://lesscss.org/features/#features-overview-feature-escaping" rel="nofollow">escaped values</a> are for: "print" out something the compiler can't understand.</p>
+
+<p>In general notice that you can use both comma and space as the value delimiter in a list. For example you can use <code>.loop-strings(A B C, 1 2 3, X Y Z;);</code> (two-dimensional list as a single parameter, so with a multi-argument mixin you even can get a tree-dimensional list in one line). Is there any particular reason you need to use quoted and/or escaped values? For example you could write it just as:</p>
+
+<pre><code>test {
+    .loop-lists(A, B, C; 1, 2, 3; X, Y, Z);
+}
+
+.loop-lists(@lists...) {
+    .loop(length(@lists));
+    .loop(@i) when (@i &gt; 0) {
+        .loop((@i - 1));
+        .do-something-with(extract(@lists, @i));
+    }
+}
+
+.do-something-with(@list) {
+    v1: extract(@list, 1);
+    v2: extract(@list, 2);
+    v3: extract(@list, 3);
+}
+</code></pre>
+
+<h1>---</h1>
+
+<blockquote>
+  <p>extract(A, B, C, 2);</p>
+</blockquote>
+
+<p>For the moment this is incorrect <code>extract</code> syntax, <code>extract</code> accepts only two parameters so you could write this as:</p>
+
+<pre><code>extract(A B C, 2);
+</code></pre>
+
+<p>Or as:</p>
+
+<pre><code>@list: A, B, C;
+extract(@list, 2);
+</code></pre>
+
+<h1>---</h1>
+
+<p>Here's an example with couple of additional generic hints:</p>
+
+<pre><code>test {
+    .do-something(A B C, 1 2 3, X Y Z; foo bar, baz; banana);
+}
+
+.do-something(@p1, @p2, @p3) {
+    args1: @arguments;                                     // 3D list
+    args2: extract(@arguments, 1);                         // 2D list: A B C, 1 2 3, X Y Z
+    args3: extract(extract(@arguments, 1), 1);             // 1D list: A B C
+    args4: extract(extract(extract(@arguments, 1), 1), 1); // single value: A
+
+    p1- :   @p1;               // A B C, 1 2 3, X Y Z
+    p1-1:   extract(@p1, 1);   // A B C
+    p1-3:   extract(@p1, 3);   // X Y Z
+
+   @p2-1:   extract(@p2, 1);   // foo bar
+    p2-1:   @p2-1;             // foo bar
+    p2-1-2: extract(@p2-1, 2); // bar
+    p2-2:   extract(@p2, 2);   // baz
+
+    p3- :   @p3;               // banana
+    p3-1:   extract(@p3, 1);   // banana
+    // etc.
+
+    quoted-p2: "@{p2}"; // if you need a quoted string do it in reverse (i.e. non-quoted list to a quoted string)
+}
+</code></pre>

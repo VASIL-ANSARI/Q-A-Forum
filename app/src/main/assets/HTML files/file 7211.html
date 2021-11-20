@@ -1,0 +1,52 @@
+<p>I'm pretty sure you're looking for:</p>
+
+<pre><code>var staticClass = new CodeTypeDeclaration("Extensions")
+    {
+        Attributes = MemberAttributes.Public|MemberAttributes.Static
+    };
+</code></pre>
+
+<p>However, this appears not to work. Interestingly enough:</p>
+
+<pre><code>provider.Supports(GeneratorSupport.StaticConstructors);
+// True
+
+provider.Supports(GeneratorSupport.PublicStaticMembers);
+// True
+</code></pre>
+
+<p>But yet when you go and output it, no changes even though the Attributes property clearly changes from <code>0x00005002</code> to <code>0x00006003</code>.</p>
+
+<p><a href="http://connect.microsoft.com/VisualStudio/feedback/details/526505/microsoft-csharp-csharpcodegenerator-outputtypeattributes-does-not-write-static-class-when-codetypedefinition-has-typeattributes-abstract-typeattributes-sealed" rel="nofollow">Per Microsoft Connect this is not possible</a>:</p>
+
+<blockquote>
+  <p>Thanks for reporting this. Unfortunately, it doesn't look like we can support static classes for CodeDom. </p>
+  
+  <p>The reason is that one of the design goals of CodeDom is to be language-independent, so that any code generated for one language can easily be generated for a different language. While static classes are used often in C#, VB does not support them. Therefore, adding support for static classes will mean that some code that can compile for C# won't be compilable for VB, which goes against our goals. </p>
+  
+  <p>While we can't act on this issue, we ask that you please continue to provide feedback in the future to help us improve.</p>
+</blockquote>
+
+<hr>
+
+<p>A dirty workaround:</p>
+
+<pre><code>var type = new CodeTypeDeclaration("Extensions");
+type.Attributes = MemberAttributes.Public;
+type.StartDirectives.Add(
+    new CodeRegionDirective(CodeRegionMode.Start, "\nstatic"));
+type.EndDirectives.Add(
+    new CodeRegionDirective(CodeRegionMode.End, String.Empty));
+</code></pre>
+
+<p>Produces:</p>
+
+<pre><code>#region
+static
+public class Extensions
+{
+}
+#endregion
+</code></pre>
+
+<p>Which compiles.</p>

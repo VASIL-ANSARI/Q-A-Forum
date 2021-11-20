@@ -1,0 +1,90 @@
+<p>One of the possible patterns is:</p>
+
+<pre><code>[DllImport("containsdojob.dll", CallingConvention = CallingConvention.Cdecl)]
+public static extern Int32 doJob(out IntPtr buffer);
+
+[DllImport("containsdojob.dll", CallingConvention = CallingConvention.Cdecl)]
+public static extern void freeMemory(IntPtr buffer);
+</code></pre>
+
+<p>and </p>
+
+<pre><code>IntPtr buffer = IntPtr.Zero;
+string str = null;
+
+try
+{
+    doJob(out buffer);
+
+    if (buffer != IntPtr.Zero)
+    {
+        str = Marshal.PtrToStringAnsi(buffer);
+    }
+}
+finally
+{
+    if (buffer != IntPtr.Zero)
+    {
+        freeMemory(buffer);
+    }
+}
+</code></pre>
+
+<p>Note that you'll need a <code>freeMemory</code> method to free the memory allocated by <code>doJob</code>.</p>
+
+<p>There are other possible patterns, for example based on <code>BSTR</code> and <code>SysAllocString</code> that are easier to implement C#-side (but more difficult to implement C-side)</p>
+
+<p>The "pattern" for using BSTR:</p>
+
+<p>C-side:</p>
+
+<pre><code>char *str = "Foo"; // your string
+int len = strlen(str);
+int wslen = MultiByteToWideChar(CP_ACP, 0, str, len, 0, 0);
+BSTR bstr = SysAllocStringLen(NULL, wslen);
+MultiByteToWideChar(CP_ACP, 0, str, len, bstr, wslen);
+// bstr is the returned string
+</code></pre>
+
+<p>C#-side:</p>
+
+<pre><code>[DllImport("containsdojob.dll", CallingConvention = CallingConvention.Cdecl)]
+public static extern Int32 doJob([MarshalAs(UnmanagedType.BStr)] out string buffer);
+
+string str;
+doJob(out str);
+</code></pre>
+
+<p>The memory is automatically handled (freed) by the CLR.</p>
+
+<p>If you are using Visual C++ you can even</p>
+
+<pre><code>char *str = "Foo"; // your string
+_bstr_t bstrt(str);
+BSTR bstr = bstrt.Detach(); 
+// bstr is the returned string
+</code></pre>
+
+<p>Or C-side you could use one of the two allocators that can be freed C#-side: <a href="https://msdn.microsoft.com/en-us/library/aa366723.aspx" rel="nofollow">LocalAlloc</a> or <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms692727%28v=vs.85%29.aspx?f=255&amp;MSPPError=-2147217396" rel="nofollow">CoTaskMemAlloc</a>:</p>
+
+<pre><code>char *str = "Foo"; // your string
+char *buf = (char*)LocalAlloc(LMEM_FIXED, strlen(str) + 1);
+// or char *buf = (char*)CoTaskMemAlloc(strlen(str) + 1);
+strcpy(buf, str);
+// buf is the returned string
+</code></pre>
+
+<p>Then you use the first example, but instead of calling </p>
+
+<pre><code>freeMemory(buffer);
+</code></pre>
+
+<p>you call:</p>
+
+<pre><code>Marshal.FreeHGlobal(buffer); // for LocalAlloc
+</code></pre>
+
+<p>or</p>
+
+<pre><code>Marshal.FreeCoTaskMem(buffer); // for CoTaskMemAlloc
+</code></pre>

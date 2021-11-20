@@ -1,0 +1,49 @@
+<blockquote>
+  <p>The <code>n =&gt; n</code> ... what does that do?</p>
+</blockquote>
+
+<p>It just maps any value to itself. It's an identity function.</p>
+
+<blockquote>
+  <p>Why not just say OrderBy(n)?</p>
+</blockquote>
+
+<p>Because <code>n</code> isn't a variable in scope - it wouldn't be valid to call it like that. That's not a lambda expression, so it would just try to use <code>n</code> as a normal method argument.</p>
+
+<p>Your code <em>is</em> just trying to say "order this sequence by the whole of each element" rather than projecting each element to some other value, but there's no way of saying that directly.</p>
+
+<p><code>OrderBy</code> <em>requires</em> a projection from the element type to the ordering key type - it's just that in this case we want the identity projection.</p>
+
+<p>You could write your own extra extension method:</p>
+
+<pre><code>public static IEnumerable&lt;T&gt; OrderNaturally&lt;T&gt;(this IEnumerable&lt;T&gt; source)
+{
+    return source.OrderBy(item =&gt; item);
+}
+</code></pre>
+
+<p>And then change your original statement to:</p>
+
+<pre><code>IEnumerable&lt;int&gt; numQuery2 = numbers.Where(num =&gt; num % 2 == 0).OrderNaturally();
+</code></pre>
+
+<p>if you found that more readable.</p>
+
+<p>Alternatively, you could create a <code>Functions</code> class with some useful static readonly fields:</p>
+
+<pre><code>public static class Functions&lt;T&gt;
+{
+    public static readonly Func&lt;T, T&gt; Identity = x =&gt; x;
+    public static readonly Func&lt;T, T&gt; DefaultValue =&gt; x =&gt; default(T);
+    public static readonly Func&lt;T, string&gt; ToString = x =&gt; x == null ? null : x.ToString();
+    ...
+}
+</code></pre>
+
+<p>Then:</p>
+
+<pre><code>IEnumerable&lt;int&gt; numQuery2 = numbers.Where(num =&gt; num % 2 == 0)
+                                    .OrderBy(Functions&lt;int&gt;.Identity)
+</code></pre>
+
+<p>I don't think I <em>would</em> do that... I'm just suggesting things to think about :)</p>

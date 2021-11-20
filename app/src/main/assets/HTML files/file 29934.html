@@ -1,0 +1,70 @@
+<p>I think you may be over-complicating this just a bit.  There is no need for all of the JS redirect stuff, you can just point your forms action attribute to your csv_export php code and use POST to send your data.</p>
+
+<p>if needed, you can modify the max size of a post request by editing the post_max_size option in your php.ini.  heres what mine looks like:</p>
+
+<pre><code>; Maximum size of POST data that PHP will accept.
+; Its value may be 0 to disable the limit. It is ignored if POST data reading
+; is disabled through enable_post_data_reading.
+; http://php.net/post-max-size
+post_max_size = 8M
+</code></pre>
+
+<p>as for writing to a temporary file, php has built in  I/O streams to handle that.   for your purposes you'll probably want to use php://memory or php://temp (more info on those here: <a href="http://www.php.net/manual/en/wrappers.php.php" rel="nofollow">http://www.php.net/manual/en/wrappers.php.php</a>)</p>
+
+<p>so you can do something like this:</p>
+
+<p>SAMPLE HTML:</p>
+
+<pre><code>&lt;html&gt;
+&lt;head&gt;
+&lt;!-- include jquery because you say you are using it --&gt;
+&lt;script src="//code.jquery.com/jquery-1.10.2.min.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+//just a dummy function to represent your js to extract csv data from a table
+function extract_table_data(){
+    var csv = "field1,field2,field3\n\
+value1,value2,value3\n\
+value4,value5,value5";
+    return csv;
+}
+
+$( document ).ready(function() {
+    //export link click handler
+    $('#export_link').click(function() {
+        $('#csv_data').val(extract_table_data());
+        $('#theform').submit();
+    });
+});
+&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;a id='export_link'&gt;Export CSV&lt;/a&gt;
+&lt;form id='theform' method='post' action='dropcsv.php'&gt;
+    &lt;input type='hidden' name='csv_data' id='csv_data'/&gt;
+&lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<hr>
+
+<p>dropcsv.php </p>
+
+<pre><code>//filename for our csv attachment
+$export_filename = 'thefile.csv';
+//grab csv data
+$csv_data = $_POST['csv_data'];
+//open file in memory
+$f = fopen('php://memory', 'w'); //use php://temp if you want a tmp file instead
+//load up csv file
+fwrite($f, $csv_data);
+// go back to the beginning of the file
+fseek($f, 0);
+header('Content-Type: application/csv');
+header('Content-Disposition: attachement; filename="'.$export_filename.'"');
+fpassthru($f);
+fclose($f);
+</code></pre>
+
+<p>of course don't forget to add your error checking and sanitize the input.</p>

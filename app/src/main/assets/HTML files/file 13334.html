@@ -1,0 +1,96 @@
+<p>It is hard to work through all that code you posted (most of which has not to do with your question), but as far as I can tell you have not even set up a ViewPager from your code or it is hidden in some XML file that you didn't post.</p>
+
+<p>What you need to do is create a ViewPager instance. For example in your fragment's XML layout file, like:</p>
+
+<pre><code>&lt;android.support.v4.view.ViewPager
+    android:id="@+id/pager" 
+    android:layout_width="fill_parent"
+    android:layout_height="0dp" 
+    android:layout_weight="1" /&gt;
+</code></pre>
+
+<p>Now, in your Fragment you create an adapter that specifies the pages that you want (similarly to how a ListAdapter specifies items to a ListView). For that, create a class (you can do that inline in the Fragment code) that inherits from PagerAdapter. For example, something like:</p>
+
+<pre><code>private class MyPagerAdapter extends PagerAdapter implements TitleProvider {
+
+    private ListView pagerListView1;
+    private ListView pagerListView2;
+
+    public MyPagerAdapter() {
+        LayoutInflater inflater = getActivity().getLayoutInflater();
+        pagerListView1 = (ListView) inflater.inflate(R.layout.fragment_pagerlist, null);
+        pagerListView2 = (ListView) inflater.inflate(R.layout.fragment_pagerlist, null);
+    }
+
+    @Override
+    public int getCount() {
+        return 2;
+    }
+
+    @Override
+    public Object instantiateItem(View container, int position) {
+        switch (position) {
+        case 0:
+            ((ViewPager) container).addView(pagerListView1, 0);
+            return pagerListView1;
+        case 1:
+            ((ViewPager) container).addView(pagerListView2, 0);
+            return pagerListView2;
+        }
+        return null;
+    }
+
+    @Override
+    public void destroyItem(View container, int position, Object object) {
+        ((ViewPager) container).removeView((View) object);
+    }
+
+    @Override
+    public boolean isViewFromObject(View view, Object object) {
+        return view == (View) object;
+    }
+
+    @Override
+    public void finishUpdate(View container) {
+    }
+
+    @Override
+    public Parcelable saveState() {
+        return null;
+    }
+
+    @Override
+    public void startUpdate(View container) {
+    }
+
+    @Override
+    public void restoreState(Parcelable state, ClassLoader loader) {
+    }
+
+}
+</code></pre>
+
+<p>Note that I hard-coded 2 pages/lists in this pager. You can fill those as you would with any other ListView. The layout of the pages is just a simple ListView that is inflated from the fragment_pagerlist XML file, which looks something like:</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;ListView xmlns:android="http://schemas.android.com/apk/res/android" 
+    android:id="@+id/list"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
+    android:cacheColorHint="@color/BackgroundLight" /&gt;
+</code></pre>
+
+<p>Finally, you bind the ViewPager's adapter somewhere in your onActivityCreated method:</p>
+
+<pre><code>@Override
+public void onActivityCreated(Bundle savedInstanceState) {
+    super.onActivityCreated(savedInstanceState);
+
+    ViewPager pager = (ViewPager) getView().findViewById(R.id.pager);
+    pager.setAdapter(new MyPagerAdapter());
+}
+</code></pre>
+
+<p>Note that this does not yet give you a ViewPagerIndicator. Check Jake Wharton's excellent library for that.</p>
+
+<p>If you want the code to a fully implemented and working version, with multiple lists (and other views) in a ViewPager and a ViewPagerIndicator, take a look at the open source RateBeer for Android project; specifically <a href="http://code.google.com/p/ratebeerforandroid/source/browse/RateBeerForAndroid/src/com/ratebeer/android/gui/fragments/SearchFragment.java#486">http://code.google.com/p/ratebeerforandroid/source/browse/RateBeerForAndroid/src/com/ratebeer/android/gui/fragments/SearchFragment.java#486</a> for a real-world PagerAdapter.</p>

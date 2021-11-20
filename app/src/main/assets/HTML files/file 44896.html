@@ -1,0 +1,112 @@
+<h2>Update</h2>
+
+<p>This is what I got from your comment:<br></p>
+
+<pre><code>function return_row_number() {
+ // Loop through the Array;  Get Row Number for the current issue global  $result,$issuenum, $rowcount; 
+ $count =0; 
+ mysqli_data_seek($result, 0); 
+ while($row=mysqli_fetch_array($result, MYSQL_ASSOC)) { 
+     ++$count; 
+     if($issuenum == $row['IssueIDNUM']) { 
+      return $count -1; break; 
+     } 
+   } 
+ }
+</code></pre>
+
+<p>Now the mystery value is <code>$issuenum</code>.<br></p>
+
+<p>And there is a terminology problem. This is not "Looping through an Array" it is querying the database and and looping through the query results.<br>  </p>
+
+<p>This is a rather inefficient method of finding the next record.  But before correcting that, you need to explain where the value for <code>$issuenum</code> is coming from.<br></p>
+
+<p>It would also help to know more about the  database table especially: <br>
+How many issue records? <br>
+What is the numbering scheme? <br>
+How often does a new issue get added?<br> </p>
+
+<p><strong>end of update</strong></p>
+
+<hr>
+
+<p>With this line of code you will always get a value of 1<br></p>
+
+<p><code>$current_record_number=$current_record_number +1;</code></p>
+
+<p>because <code>$current_record_number</code> = 0.</p>
+
+<hr>
+
+<p>You should add the current issue to the <code>href</code> where xx=current record #.<br>
+I changed "id" to "cycle"<br>
+added <code>content=</code> to Next <code>href</code>.</p>
+
+<pre><code>&lt;a href="index.php?content=main_window&amp;cycle=1&amp;rec=xx" 
+
+title="Show More Recent Issue" &gt;    &amp;#60; Next (Newer) Issue&lt;/a&gt;
+&amp;nbsp &amp;nbsp &amp;nbsp &amp;nbsp &amp;nbsp &amp;nbsp
+
+&lt;a href="index.php?content=main_window&amp;cycle=-1&amp;rec=xx
+
+title ="Show Older Issue" &gt;Prior (Older)) Issue &amp;#62;&lt;/a&gt;
+</code></pre>
+
+<p>Then add this to your PHP:<br></p>
+
+<pre><code>$current_record_number = intval($_GET['rec']);
+</code></pre>
+
+<p>And change:</p>
+
+<pre><code>$cycle_direction = trim($_REQUEST['id']); 
+</code></pre>
+
+<p>To:</p>
+
+<pre><code>$cycle_direction= intval($_GET['cycle']);
+</code></pre>
+
+<hr>
+
+<p>Instead of <code>trim</code> and <code>isset</code> you should just  use <code>intval()</code><br></p>
+
+<pre><code>$cycle_direction = intval($_REQUEST['id']); 
+</code></pre>
+
+<p>Also instead of  <code>$current_record_number=$current_record_number +1;</code><br></p>
+
+<p>You could use: <code>$current_record_number += $cycle_direction</code><br>
+and eliminate the switch.<br></p>
+
+<hr>
+
+<p>Unconventional approach<br></p>
+
+<p>Let's say issues have values from 1 to 10.<br></p>
+
+<pre><code>$next[-1] = array(0,10,1,2,3,4,5,6,7,8,9,1);
+$next[1] = array(0,2,3,4,5,6,7,8,9,10,1);
+$next[0] = array(0,1,2,3,4,5,6,7,8,9,10); 
+
+$nextIssue = $next[intval($_REQUEST['id'])];
+</code></pre>
+
+<p>If issues are numbered 2001 to 2010  </p>
+
+<pre><code>$nextIssue = 2000 + $next[intval($_REQUEST['id'])];
+</code></pre>
+
+<p>No matter how many issues you have there is no need to use a database.<br></p>
+
+<p>Create the $next array as shown above, then save the array.</p>
+
+<pre><code>$fp = fopen('next.ser','w');
+fwrite($fp,serialize($next));
+fclose($fp);
+</code></pre>
+
+<p>When you need the $next array in an app use:<br></p>
+
+<pre><code>$next= unserialize(file_get_contents('next.ser'));
+</code></pre>

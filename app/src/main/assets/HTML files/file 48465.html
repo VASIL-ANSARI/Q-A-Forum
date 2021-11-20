@@ -1,0 +1,43 @@
+<p>The main problem when we are trying to send data to the APNS (Apple Push Notification Service) servers is the <strong>SSL certificates</strong>.</p>
+
+<p>APNS uses this technology in order to serve more secure connection to its users.</p>
+
+<p>As it is said at <a href="https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ProvisioningDevelopment.html#//apple_ref/doc/uid/TP40008194-CH104-SW1" rel="nofollow">APNS documentation</a>: "<em>Each certificate is limited to a single app and is also limited to one of two development environments, each with its own assigned hostname</em>". So you can use two environments</p>
+
+<ul>
+<li><p><strong>Development</strong> (testing environment): <code>ssl://gateway.sandbox.push.apple.com:2195</code></p></li>
+<li><p><strong>Production</strong> (once the app is launched): <code>ssl://gateway.push.apple.com:2195</code></p></li>
+</ul>
+
+<p>If you want to test if you can connect to APNS server, just try the following command:</p>
+
+<pre><code>$ telnet gateway.sandbox.push.apple.com 2195
+Trying 17.172.232.226...
+Connected to gateway.sandbox.push-apple.com.akadns.net.
+Escape character is '^]'.
+</code></pre>
+
+<p>If you get an error then make sure your firewall allows outgoing connections on port 2195.</p>
+
+<p>Then you can test if your SSL certificate and private key are working and it can be set up a secure connection:</p>
+
+<pre><code>$ openssl s_client -connect gateway.sandbox.push.apple.com:2195 -cert YourDevCert.pem -key YourPrivateKey.pem
+Enter pass phrase for YourPrivateKey.pem: ******
+</code></pre>
+
+<p>If this works it means that your certificates are correctly set up (you should see a whole bunch of output, which is openssl letting you know what is going on under the hood).</p>
+
+<p>Once knowing all of this information, I see that you have one mistake in your code and also you should check something else:</p>
+
+<ul>
+<li>Check if you have a good connection with APNS server.</li>
+<li>Check that your <code>$payload</code> variable is a json string.</li>
+<li>Check that you have a correct <code>$deviceToken</code>.</li>
+<li>Check that you are using the right certificate with the right environtment. In this case, you are setting a <code>apns-dev.pem</code> certificate and you are sending it to the <strong>production</strong> environment (I interpret that your production certificate is <code>apns-prod.pem</code> so check it).</li>
+<li>Check that your PHP file can find your certificate.</li>
+<li>One of <strong>your problems</strong>, you haven't set any password for your private key. You should add the following line once you have added your certificate: </li>
+</ul>
+
+<p><code>stream_context_set_option($ctx, "ssl", "passphrase", "your_private_key");</code></p>
+
+<p>If you have some troubles or doubts, I followed <a href="http://www.raywenderlich.com/32960/apple-push-notification-services-in-ios-6-tutorial-part-1" rel="nofollow">this tutorial</a> to send my first APNS Push Notifications.</p>

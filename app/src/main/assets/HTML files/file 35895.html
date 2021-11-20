@@ -1,0 +1,40 @@
+<p>I'm not a big fan of <code>q</code>. I think is too much magic, so I rather use the native (on node@0.11.x) <code>Promise</code> instead.</p>
+
+<p>But if I understood it right, <code>q.nbind</code> is a wrapper around the node's standard function call.<br>
+Maybe I would mimic its behavior using the new promise API as something like this.</p>
+
+<pre><code>promise = function () {
+  return new Promise(function(resolve, reject){
+    newUser.save(function(err, data){
+      if (err) return reject(err)
+      resolve(data)
+
+    })
+  })
+}
+</code></pre>
+
+<p>I'm assuming that the <code>newUser</code> is a mongoose model, and <code>newUSer.save</code> only call the callback with an error parameter. Since <code>data</code> is undefined, maybe <code>q</code> doesn't call resolve with a falsy value.</p>
+
+<p>I would try running your tests with this version of <code>addUsers</code> instead.</p>
+
+<pre><code>var Promise = Promise || require('es6-promise').Promise // polyfill
+, mongoose = require('mongoose')
+;
+
+function addUsers (users) {
+  return Promise.all(users.map(function(user){
+    return new Promise(function(resolve, reject){
+      var newUser = new User(user)
+      ;
+      newUser.save(function(err){
+        if (err) return reject(err)
+        resolve()
+      })
+    })
+  }))
+}
+</code></pre>
+
+<p>On the side, It looks like that the cool kids are using <code>bluebird</code> this days for their promise fix.<br>
+It has great error handling (which is a problem with the native promise) and allow for custom builds.</p>

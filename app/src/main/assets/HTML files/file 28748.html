@@ -1,0 +1,27 @@
+<p>The problem is that not enough space was allocated for your string - when you declare the string, you say "it will be no more than n bytes long" (including the terminating <code>'\0'</code>). Writing bytes in memory that doesn't belong to the string will give rise to the error you see.</p>
+
+<p>There is no universal solution when you use C - in your example, you start out with a constant string (defined up front with <code>"each line ends with: "</code>) and the compiler only allocates that much space. If you think you might need more space, you could do something like this:</p>
+
+<pre><code>char mySpace[101];  // allocates 101 bytes : 100 characters + terminating '\0'
+strncpy(mySpace, "each line ends with: ", 100); / copy at most 100 bytes
+</code></pre>
+
+<p>Now you can increase the length of <code>mySpace</code> by one character (unlike the original string, which was a constant because of the way you created it, you can do what you want with the copy as long as you stay within the limits of the memory you allocated for it):</p>
+
+<pre><code>int length;
+length = strlen(mySpace);
+mySpace[length] = '$';
+mySpace[length+1] = '\0';
+</code></pre>
+
+<p>Does that make sense?</p>
+
+<p><strong>EDIT</strong> Just realized another problem:  </p>
+
+<p>In the code snippet</p>
+
+<pre><code>s[strlen(s)] = c;
+s[strlen(s)+1] = '\0';
+</code></pre>
+
+<p>In the first line you overwrite the terminating <code>'\0'</code> character of the string: when you then call <code>strlen</code> in the second line, that function tries to find the end of line character (that no longer exists) and it runs off into the distance, all the way to a segmentation fault (which means roughly "the program ended up trying to access memory that did not belong to it"). When I wrote my code snippet I had instinctively done that the right way - then I looked at your code again and saw the problem stare me in the face.</p>

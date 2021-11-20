@@ -1,0 +1,37 @@
+<p><strong><a href="http://docs.jboss.org/hibernate/entitymanager/3.6/reference/en/html/transactions.html#transactions-basics" rel="nofollow">5.1. Entity manager and transaction scopes</a>:</strong></p>
+
+<blockquote>
+  <p>An EntityManager is an inexpensive, non-threadsafe object that should be used once, for a 
+  single business process, a single unit of work, and then discarded.</p>
+</blockquote>
+
+<p>This answers perfectly your question. Don't share EMs over threads. Use one EM for several transactions as long as those transactions are part of a <em>unit of work</em>.</p>
+
+<p>Furthermore you can't use an EntityManger after you've <a href="http://docs.oracle.com/javaee/7/api/javax/persistence/EntityManager.html#close%28%29" rel="nofollow">closed</a> it:</p>
+
+<blockquote>
+  <p>After the close method has been invoked, all methods on the EntityManager instance and any Query, TypedQuery, and StoredProcedureQuery objects obtained from it will throw the IllegalStateException.</p>
+</blockquote>
+
+<p>Consider something like this:</p>
+
+<pre><code>public class Controller {
+
+    private EntityManagerFactory emf;
+
+    public void doSomeUnitOfWork(int id) {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+
+        CrudDao dao = new CrudDao(em);
+
+        Entity entity = dao.get(id);
+        entity.setName("James");
+        dao.save(entity);
+
+        em.getTransaction.commit();
+        em.close();
+    }
+
+}
+</code></pre>

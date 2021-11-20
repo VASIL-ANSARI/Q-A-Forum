@@ -1,0 +1,89 @@
+<p>The <code>%extend</code> syntax you are using in your final example should be correct, this is a technique we are using in <a href="https://github.com/NREL/OpenStudio/blob/develop/openstudiocore/src/utilities/core/CommonImport.i#L104" rel="nofollow">OpenStudio</a></p>
+
+<p>I believe the problem is that you are defining the template 2 times, once in your <code>%import</code> directive and once in your <code>.i</code> file. The first definition is the one that SWIG is using.</p>
+
+<p>While not ideal, I believe that you'll need to drop the <code>%include "foo.hpp"</code> directive and define specifically the interface you want. Your new <code>.i</code> file becomes now something like:</p>
+
+<pre><code>%{
+#include &lt;sstream&gt;
+#include &lt;iostream&gt;
+#include "foo.hpp"
+%}
+
+%include "std_iostream.i"
+
+// Don't let SWIG directly parse foo.hpp
+// %include "foo.hpp"
+
+
+
+template &lt;int d&gt; class Foo {
+
+public:
+  // include here prototypes for all functions
+  // you want exposed. You don't need the implementation like in 
+  // a normal C++ template declaration
+
+  // include here any extensions you want to add
+  %extend {
+    const char *__str__() {
+
+      std::ostringstream oss(std::ostringstream::out);
+      oss &lt;&lt; *self;
+      return oss.str().c_str();
+    }
+  }
+};
+
+/* Instantiate a few different versions of the template */
+%template(Foo2) Foo&lt;2&gt;;
+%template(Foo3) Foo&lt;3&gt;;
+</code></pre>
+
+<hr>
+
+<p>Alternatively, you could place the SWIG code in your hpp file directly and save having to maintain two APIs:</p>
+
+<p>New .i file:</p>
+
+<pre><code>%{
+#include &lt;sstream&gt;
+#include &lt;iostream&gt;
+#include "foo.hpp"
+%}
+
+%include "std_iostream.i"
+
+// let swig directly parse foo.hpp
+%include "foo.hpp"
+
+
+/* Instantiate a few different versions of the template */
+%template(Foo2) Foo&lt;2&gt;;
+%template(Foo3) Foo&lt;3&gt;;
+</code></pre>
+
+<p>New .hpp file:</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+template &lt;int d&gt; class Foo {
+
+public:
+#ifdef SWIG
+  %extend {
+    const char *__str__() {
+
+      std::ostringstream oss(std::ostringstream::out);
+      oss &lt;&lt; *self;
+      return oss.str().c_str();
+    }
+  }
+#endif
+
+  friend std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, const Foo &amp;m) {
+    os &lt;&lt; "Inside Foo class!" &lt;&lt; std::endl;
+    return os;
+  }
+};
+</code></pre>

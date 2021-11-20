@@ -1,0 +1,65 @@
+<p>This is how I did it. Note: I was <strong><em>NOT</em></strong> in production, so I did not have to worry about information already in the tables. If you currently have data that you need to keep in the linking table, <strong><em>back up your data first</em></strong>. Also, I was using Django 1.9, but I think that everything referenced here is in 1.8 too.</p>
+
+<p>The issue with the many-to-many relationship is the intermediate tables. Using RemoveField and AddField handled that.</p>
+
+<p>The myapp migration for the model rename probably looks something like this:
+<div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>class Migration(migrations.Migration):
+
+    dependencies = [
+        ('Foo', '0001_initial.py'),
+    ]
+
+    operations = [
+        migrations.RenameModel(
+            old_name='Foo',
+            new_name='Bar',
+        ),
+    ]</code></pre>
+</div>
+</div>
+</p>
+
+<p>Next you would run:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>python manage.py makemigrations --empty myotherapp</code></pre>
+</div>
+</div>
+</p>
+
+<p>Then you would put this code in the new migration:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>dependencies = [
+        ('myotherapp', '0001_initial.py'),
+        ('myapp', '0002_whateverthismigrationwasnamed')
+    ]
+
+    operations = [
+        migrations.RemoveField(
+            model_name='YetAnotherModel',
+            name='Foo'
+        ),
+        migrations.AddField(
+            model_name='YetAnotherModel',
+            name='Bar',
+            field=models.ManyToManyField(blank=True, null=True, to='myapp.Bar'),
+        ),
+    ]</code></pre>
+</div>
+</div>
+</p>
+
+<p>It's important to make sure that you add the rename model migration from myapp as a dependency so it runs first.</p>
+
+<p>Now, if you are in production you should <strong><em>NOT</em></strong> use this method without taking precautions. It straight up deletes the linking table. This from the <a href="https://docs.djangoproject.com/en/1.10/ref/migration-operations/#removefield" rel="nofollow">django docs</a> on RemoveField:</p>
+
+<blockquote>
+  <p>Bear in mind that when reversed, this is actually adding a field to a model. The operation is reversible (<strong>apart from any data loss, which of course is irreversible</strong>) if the field is nullable or if it has a default value that can be used to populate the recreated column.</p>
+</blockquote>
+
+<p>If you are in production, you will want to take steps to backup the data so you can restore it into the new table.</p>

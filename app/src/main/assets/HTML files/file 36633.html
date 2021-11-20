@@ -1,0 +1,69 @@
+<p>I'm definitely seeing what you're seeing and as @mkl said in your other post, the problem comes down to the appearance's <code>BBOX</code> entry not being set to the same size as the field. I can't really find too many examples of <code>FieldPositioningEvents</code> in the wild and the ones that do exist appear to be copy-and-paste's of each other for the most part.</p>
+
+<p>Anyway, if you read the actual code for <a href="http://sourceforge.net/p/itextsharp/code/HEAD/tree/trunk/src/core/iTextSharp/text/pdf/events/FieldPositioningEvents.cs" rel="nofollow"><code>FieldPositioningEvents</code></a> you'll see that it can be used for both page events as well as cell events which makes me think it was intended for broader purposes possibly, but that's just a guess on my part.</p>
+
+<p>One solution is to just write your own subclass of <code>IPdfPCellEvent</code>. Below is an example of that that follows the example provided by <code>FieldPositioningEvents</code> however it is specific to <code>TextFields</code> since we're interested in setting the <code>/BBOX</code> entry. It has two constructors, one that works very similar to <code>FieldPositioningEvents</code> that takes a <code>PdfWriter</code> and a <code>TextField</code> and one that just takes the most commonly set properties of a <code>TextFields</code> and actually creates it for you. The <code>CellLayout</code> is part of the interface contract and actually figures out where the annotation should be drawn.</p>
+
+<pre><code>public class SingleCellFieldPositioningEvent : IPdfPCellEvent {
+
+    public TextField Field { get; set; }
+    public PdfWriter Writer { get; set; }
+    public float Padding { get; set; }
+
+    public SingleCellFieldPositioningEvent(PdfWriter writer, TextField field) {
+        this.Field = field;
+        this.Writer = writer;
+    }
+
+    public SingleCellFieldPositioningEvent(PdfWriter writer, string fieldName, string text = "", BaseFont font = null, float fontSize = 14 ) {
+        //The rectangle gets changed later so it doesn't matter what we use
+        var rect = new iTextSharp.text.Rectangle(1, 1);
+
+        //Create the field and set various properties
+        this.Field = new TextField(writer, rect, fieldName);
+        this.Field.Text = text;
+        if (null == font) {
+            font = BaseFont.CreateFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.EMBEDDED);
+        }
+        this.Field.Font = font;
+        this.Field.FontSize = fontSize;
+
+        this.Writer = writer;
+    }
+
+    public void CellLayout(PdfPCell cell, iTextSharp.text.Rectangle rect, PdfContentByte[] canvases) {
+        //Create the field's rectangle based on the current cell and requested padded
+        var newRect = new PdfRectangle(rect.GetLeft(Padding), rect.GetBottom(Padding), rect.GetRight(Padding), rect.GetTop(Padding));
+
+        //Set the appearance's rectangle to the same as the box
+        Field.Box = newRect.Rectangle;
+
+        //Get the raw field
+        var tf = this.Field.GetTextField();
+
+        //Change the field's rectangle
+        tf.Put(PdfName.RECT, newRect);
+
+        //Add the annotation to the writer
+        Writer.AddAnnotation(tf);
+    }
+}
+</code></pre>
+
+<p>You can use this in two different ways. Either manually create a field and set various properties:</p>
+
+<pre><code>//The rectangle is actually changed in the cell event so it doesn't matter what we use
+TextField tf = new TextField(writer, new iTextSharp.text.Rectangle(1, 1), "cellTextBox");
+tf.Text = "test";
+tf.Font = bfHelvetica;
+tf.FontSize = 14;
+PdfPCell tbCell = new PdfPCell(new Phrase(" ", helvetica12));
+tbCell.CellEvent = new SingleCellFieldPositioningEvent(writer, tf);
+</code></pre>
+
+<p>Or just pass the properties in:</p>
+
+<pre><code>PdfPCell tbCell = new PdfPCell(new Phrase(" ", helvetica12));
+tbCell.CellEvent = new SingleCellFieldPositioningEvent(writer, "cellTextBox", "test", bfHelvetica, 14);
+myTable.AddCell(tbCell);
+</code></pre>

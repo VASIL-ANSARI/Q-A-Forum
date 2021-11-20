@@ -1,0 +1,96 @@
+<p><strong>Edit</strong> <em>Oh, I mentioned the obvious in chat:</em></p>
+
+<blockquote>
+  <p>@EthanSteinberg: lambdas? </p>
+
+<pre><code>[] (int realparam, int dummy) { return foo(realparam); }
+</code></pre>
+</blockquote>
+
+<p>But it was dismissed, which is why I jump to:</p>
+
+<p><strong>Edit</strong> I just realized a much simpler approach: <strong><a href="http://ideone.com/pPWZk" rel="nofollow">http://ideone.com/pPWZk</a></strong></p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;functional&gt;
+using namespace std::placeholders;
+
+int foo(int i)
+{
+    return i*2;
+}
+
+int main(int argc, const char *argv[])
+{
+    std::function&lt;int(int, int)&gt; barfunc = std::bind(foo, (_1, _2));
+    std::cout &lt;&lt; barfunc(-999, 21) &lt;&lt; std::endl;
+
+    // or even (thanks Xeo)
+    barfunc = std::bind(foo, _2);
+    std::cout &lt;&lt; barfunc(-999, 21) &lt;&lt; std::endl;
+}
+</code></pre>
+
+<hr>
+
+<p><sub></p>
+
+<h3>Variadic Templates <a href="http://ideone.com/8KIsW" rel="nofollow">http://ideone.com/8KIsW</a></h3>
+
+<p>A somewhat longer answer based on variadic templates would result in possibly smaller code at the call site (if you wanted to wrap functions with a long argument list).</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;functional&gt;
+
+int foo(int i)
+{
+    return i*2;
+}
+
+template &lt;typename Ax, typename R, typename... A&gt;
+struct Wrap
+{
+    typedef R (*F)(A...);
+    typedef std::function&lt;R(A...)&gt; Ftor;
+
+    Wrap(F f) : _f(f) { }
+    Wrap(const Ftor&amp; f) : _f(f) { }
+
+    R operator()(Ax extra, A... a) const
+    { return _f(a...); /*just forward*/ }
+
+    Ftor _f;
+};
+
+template &lt;typename Ax=int, typename R, typename... A&gt;
+std::function&lt;R(Ax, A...)&gt; wrap(R (f)(A...))
+{
+    return Wrap&lt;Ax,R,A...&gt;(f);
+}
+
+template &lt;typename Ax=int, typename R, typename... A&gt;
+std::function&lt;R(Ax, A...)&gt; wrap(std::function&lt;R(A...)&gt; functor)
+{
+    return Wrap&lt;Ax,R,A...&gt;(functor);
+}
+
+int main(int argc, const char *argv[])
+{
+    auto bar = wrap(foo);
+    std::function&lt;int(int, int)&gt; barfunc = wrap(foo);
+
+    std::cout &lt;&lt; barfunc(-999, 21) &lt;&lt; std::endl;
+
+    // wrap the barfunc?
+    auto rewrap = wrap(barfunc);
+    std::cout &lt;&lt; rewrap(-999, -999, 21) &lt;&lt; std::endl;
+
+    return 0;
+}
+</code></pre>
+
+<p>Generalizing from this would require some more heavy lifting. I think I've seen in the past helpers to 'dissect' (using meta-programming) the signature of a std::function&lt;> and you should be able to make it recognize non-void functions, and perhaps even adding a parameter <em>at the end or in the middle</em> (tricky, as far as I can tell now).</p>
+
+<p>But for your simple case from the OP, it looks like you're covered</p>
+
+<p></sub></p>

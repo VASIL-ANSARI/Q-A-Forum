@@ -1,0 +1,29 @@
+<p>Couldn't get <code>renderer.getMarker(cluster)</code> to return a marker in that case above. A work around was to create:</p>
+
+<pre><code>Map &lt;Cluster&lt;MyObject&gt;, Marker&gt; clusterMarkerMap = new HashMap&lt;&gt;();
+</code></pre>
+
+<p>then add them on the <code>DefaultClusterRenderer</code> callback because the marker is never null there:</p>
+
+<pre><code>@Override
+protected void onClusterRendered(Cluster&lt;MyObject&gt; cluster, Marker marker) {
+    super.onClusterRendered(cluster, marker);
+    clusterMarkerMap.put(cluster, marker);
+}
+</code></pre>
+
+<p>Because the <code>DefaultClusterManager</code> clears them when the camera position changes, wipe the cluster marker map before it creates new ones:</p>
+
+<pre><code> googleMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
+        @Override
+        public void onCameraChange(CameraPosition cameraPosition) {
+            // Clear the map here because the markers will be recreated
+            // when the manager is notified of a (zoom level) camera change
+            if(zoomLevelChanged)
+                 clusterMarkerMap.clear();
+            mClusterManager.onCameraChange(cameraPosition);
+        }
+    });
+</code></pre>
+
+<p>Now I can get the marker successfully <code>clusterMarkerMap.get(cluster)</code></p>

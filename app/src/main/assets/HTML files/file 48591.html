@@ -1,0 +1,29 @@
+<p>I have a similar issue with Oracle 12c and EF6: I cannot get automatic migrations to work. I found, however, the following partial success factors: - I needed to set</p>
+
+<pre><code>modelBuilder.HasDefaultSchema("")
+</code></pre>
+
+<p>on my DbContext in order to get the runtime see the tables in the logon schema of the particular user - For the update-database it was necessary to set the MyHistoryContext parameters like that:</p>
+
+<pre><code>public class MyHistoryContext : HistoryContext
+{
+    public MyHistoryContext(DbConnection dbConnection, string defaultSchema)
+        : base(dbConnection, defaultSchema)
+    {
+    }
+
+    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.HasDefaultSchema("L2SRVRIZ");
+    }
+}
+</code></pre>
+
+<p>NOTE: You need to hard-code the schema name there. In this way, update-database does not try to use dbo as schema (but still no automatic migrations are possible, they will drop your MigrationHistory table and mess up everything). This is in my opinion a nasty bug inside either EF6 or the Oracle custom class. As I have no maintenance contract with them, I cannot file a ticket.</p>
+
+<p>For your case, I think its not possible somehow by design to avoid the error message with automatic migrations. EF6 thinks, for some reason, that if you use a custom schema name, that you actually moving the __MigrationHistory table from the default dbo schema, which is of course not true.</p>
+
+<p>Or, did you find a solution for that?</p>
+
+<p>BR Florian</p>

@@ -1,0 +1,44 @@
+<p>Well after a bunch of research and re-creating from the ground-up a basic QuickLook viewer, I found that the error was still logged even from that BUT the documents were actually being displayed which they weren't from my original project.</p>
+
+<p>I then tried putting the QLPreviewController inside a NavigationController before presenting it and ended up with the same issue. I was wrapping the QLPreviewController in a UINavigationController before presenting it because that seemed to be the way to assign the navigationItem a custom button. That worked fine in iOS 5.1 (as stated above) but apparently iOS 6.0 does not like this.</p>
+
+<p>Removing the extra code that wrapped the QLPreviewController in a UINavigationController seemed to allow the document to display. </p>
+
+<p>Example of controller being wrapped: </p>
+
+<pre><code>QLPreviewController* previewer = [[QLPreviewController alloc] init];
+previewer.dataSource = self;
+previewer.delegate = self;
+[previewer setCurrentPreviewItemIndex:0];
+
+UINavigationController* previewNavCtrl = [[UINavigationController alloc] init];
+[previewNavCtrl pushViewController:previewer animated:NO];
+
+[self presentModalViewController:previewNavCtrl animated:YES];
+</code></pre>
+
+<p>Change to:</p>
+
+<pre><code>QLPreviewController* previewer = [[QLPreviewController alloc] init];
+previewer.dataSource = self;
+previewer.delegate = self;
+[previewer setCurrentPreviewItemIndex:0];
+
+[self presentModalViewController:previewer animated:YES];
+</code></pre>
+
+<p>Note: again the Proxy error still seems to show up in the log however</p>
+
+<p>ALSO: Any UIBarButtonItem customizations seem to no longer work without the NavigationController =/</p>
+
+<p><strong>UPDATE: I found that using fileURLWithpath to generate the fileURL for previewItemAtIndex made the original error go away. However, the same problem occurs still where the document will not load.</strong></p>
+
+<p>A new error (one I've seen other people having as well) is:</p>
+
+<blockquote>
+  <p>Couldn't issue file extension for path:
+  /Users/me/Library/Application%20Support/iPhone%20Simulator/6.0/Applications/339DDF48-AF93-41B5-B81E-A39440A131C6/Documents/temp/Welcome1.docx</p>
+</blockquote>
+
+<p><strong>FINAL UPDATE: Ok the extension issue/error was because I was trying to manually add %20 to the spaces (using <code>[NSString stringByAddingPercentEscapesUsingEncoding]</code> etc) when the <code>[NSURL fileURLWithPath]</code> must handle that already. Once I removed that, this worked and I am now on iOS 6 yay!
+So the real problem was nothing to do with the UINavigationController but actually the file URL being passed via previewItemAtIndex.</strong></p>

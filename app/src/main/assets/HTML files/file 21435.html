@@ -1,0 +1,12 @@
+<p>While I was writing up this question (or rather, almost immediately after I finished), I found the answer to my question in the form of <a href="http://lists.gnu.org/archive/html/gnustep-dev/2010-01/msg00054.html" rel="nofollow">GNUStep's implementation of Core Foundation's CFSTR() macro</a>. My similar implementation looks like this:</p>
+
+<pre><code>#define MY_STR(str) ({\
+    static struct { const char *buffer; my_bool shouldFree; my_bool mutable; my_bool constant; } s = {NULL, MY_FALSE, MY_FALSE, MY_TRUE};\
+    s.buffer = str;\
+    (my_string *)&amp;s;\
+})
+</code></pre>
+
+<p>The reason this works is because the block of code gets inlined during compile time, which means it creates a statically-allocated struct relative to the local scope. Thus, if (e.g.) a function containing <code>MY_STR("Hello, world!")</code> is called multiple times, the same statically-allocated struct will always be returned, resulting in our desired behavior.</p>
+
+<p>This concept could easily be extended beyond things like strings, allowing you to easily create your own statically-allocated object types. Neat!</p>

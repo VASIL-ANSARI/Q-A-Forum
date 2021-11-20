@@ -1,0 +1,26 @@
+<p>MapReduce runs within the MongoDB instance.</p>
+
+<p>You can't use any other programming language or platform to create a MapReduce right now. You could simulate the concept I suppose, but it would mean all data was transferred to your application, etc. </p>
+
+<p>The body of the function is transferred from the Node.JS process to MongoDB (and shards, etc.) by calling <code>toString</code> on the provided <code>map</code> function (see <a href="https://github.com/mongodb/node-mongodb-native/blob/master/lib/mongodb/collection.js#L1201" rel="nofollow">here</a>).</p>
+
+<pre><code>if ('function' === typeof map) {
+    map = map.toString();
+}
+</code></pre>
+
+<p>You could embed functions in the <code>map</code> function, but you'd want to confirm that the performance met your needs as the complexity of the function increases. But, it still would be limited to the function you passed, and could not access other script in Node.JS that might be executing. </p>
+
+<p><strong>Edit:</strong></p>
+
+<p>Also, you could use the <code>scope</code> parameter of the <code>mapReduce</code> call to attach additional functions. If for example, you passed a <code>scope</code> as:</p>
+
+<pre><code>{ add10: function(v) { return v + 10; } }
+</code></pre>
+
+<p>The function called <code>add10</code> would be available in the <code>map</code> call (and also the <code>reduce</code> and <code>finalize</code> functions):</p>
+
+<pre><code>var fancyMath = add10(this.total);
+</code></pre>
+
+<p>So, using that technique, you could pass some limited functionality. It does get serialized as BSON and sent to the MongoDB servers, so it needs to be self-contained (and not reference other JavaScript functions that won't be available locally).</p>

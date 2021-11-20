@@ -1,0 +1,34 @@
+<p>On .NET a <code>float</code> is represented using an <a href="http://en.wikipedia.org/wiki/Single_precision_floating-point_format">IEEE binary32</a> single precision floating number stored using 32 bits. Apparently the code constructs this number by assembling the bits into an <code>int</code> and then casts it to a <code>float</code> using <code>unsafe</code>. The cast is what in C++ terms is called a <code>reinterpret_cast</code> where no conversion is done when the cast is performed - the bits are just reinterpreted as a new type.</p>
+
+<p><img src="http://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Float_example.svg/590px-Float_example.svg.png" alt="IEEE single precision floating number"></p>
+
+<p>The number assembled is <code>4019999A</code> in hexadecimal or <code>01000000 00011001 10011001 10011010</code> in binary:</p>
+
+<ul>
+<li>The sign bit is 0 (it is a positive number).</li>
+<li>The exponent bits are <code>10000000</code> (or 128) resulting in the exponent 128 - 127 = 1 (the fraction is multiplied by 2^1 = 2).</li>
+<li>The fraction bits are <code>00110011001100110011010</code> which, if nothing else, almost have a recognizable pattern of zeros and ones.</li>
+</ul>
+
+<p>The float returned has the exact same bits as 2.4 converted to floating point and the entire function can simply be replaced by the literal <code>2.4f</code>.</p>
+
+<p>The final zero that sort of "breaks the bit pattern" of the fraction is there perhaps to make the float match something that can be written using a floating point literal?</p>
+
+<hr>
+
+<p>So what is the difference between a regular cast and this weird "unsafe cast"?</p>
+
+<p>Assume the following code:</p>
+
+<pre><code>int result = 0x4019999A // 1075419546
+float normalCast = (float) result;
+float unsafeCast = *(float*) &amp;result; // Only possible in an unsafe context
+</code></pre>
+
+<p>The first cast takes the integer <code>1075419546</code> and converts it to its floating point representation, e.g. <code>1075419546f</code>. This involves computing the sign, exponent and fraction bits required to represent the original integer as a floating point number. This is a non-trivial computation that has to be done.</p>
+
+<p>The second cast is more sinister (and can only be performed in an unsafe context). The <code>&amp;result</code> takes the address of <code>result</code> returning a pointer to the location where the integer <code>1075419546</code> is stored. The pointer dereferencing operator <code>*</code> can then be used to retrieve the value pointed to by the pointer. Using <code>*&amp;result</code> will retrieve the integer stored at the location however by first casting the pointer to a <code>float*</code> (a pointer to a <code>float</code>) a float is instead retrieved from the memory location resulting in the float <code>2.4f</code> being assigned to <code>unsafeCast</code>. So the narrative of <code>*(float*) &amp;result</code> is <em>give me a pointer to <code>result</code> and assume the pointer is pointer to a <code>float</code> and retrieve the value pointed to by the pointer</em>.</p>
+
+<p>As opposed to the first cast the second cast doesn't require any computations. It just shoves the 32 bit stored in <code>result</code> into <code>unsafeCast</code> (which fortunately also is 32 bit).</p>
+
+<p>In general performing a cast like that can fail in many ways but by using <code>unsafe</code> you are telling the compiler that you know what you are doing.</p>

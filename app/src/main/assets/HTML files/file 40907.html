@@ -1,0 +1,42 @@
+<p>No, the <code>dill._objects</code> module is just a list of types dill can and cannot pickle. Adding to that will just make <code>dill</code> think it can do more, while remaining the same functionally.</p>
+
+<p>If you want to add a pickler, use <code>dill.register</code> (usally as a decorator). It takes a function which does the breaking down. E.g. given an unpicklable class:</p>
+
+<pre><code>class A:
+    def __init__(self, a):
+        self.a = a
+    def __reduce__(self):
+        raise GoAwayError()
+</code></pre>
+
+<p>Trying to pickle an instance of <code>A</code> will give you:</p>
+
+<pre><code>Traceback (most recent call last):
+  File "d.py", line 9, in &lt;module&gt;
+    dill.dumps(A(1))
+  File "/home/matthew/GitHub/dill/dill/dill.py", line 192, in dumps
+    dump(obj, file, protocol, byref, fmode)#, strictio)
+  File "/home/matthew/GitHub/dill/dill/dill.py", line 182, in dump
+    pik.dump(obj)
+  File "/usr/lib/python3.4/pickle.py", line 410, in dump
+    self.save(obj)
+  File "/usr/lib/python3.4/pickle.py", line 497, in save
+    rv = reduce(self.proto)
+  File "d.py", line 7, in __reduce__
+    raise GoAwayError()
+NameError: name 'GoAwayError' is not defined
+</code></pre>
+
+<p>You can define a pickler like:</p>
+
+<pre><code>def recreate_A(a):
+    return A(a)
+
+@dill.register(A)
+def save_A(pickler, obj):
+    pickler.save_reduce(recreate_A, (obj.a,), obj=obj)
+</code></pre>
+
+<p><code>recreate_A</code> is the function used for reconstruction, and <code>(obj.a,)</code> is a tuple of args which will be passed to your reconstructer function when loading.</p>
+
+<p>This is probably the most flexible way of doing it, as you can use any function for <code>recreate_A</code>, including <code>A.__init__</code> if you need to, but as you are trying to pickle a more complex type, you may need to do pre/post-processing. The functionality for skipping objects is <a href="https://github.com/uqfoundation/dill/issues/66" rel="nofollow">still in the works</a>, so you'll have to wait if you want to do it that way. If you want to achieve the same effect, you could just define <code>recreate_A</code> to return None, and take no args.</p>

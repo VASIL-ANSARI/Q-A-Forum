@@ -1,0 +1,28 @@
+<p>You're never actually executing the query. <code>sqlite3_prepare_v2</code> "compiles" the query, but doesn't actually <em>run</em> it. You're probably going to want to call <code>sqlite3_step</code> to actually execute the query.  You're also not calling <code>sqlite3_finalize</code> on your compiled statement, so you're also leaking memory with this code.  This might help:</p>
+
+<pre><code>+ (float)rateFrom:(NSString *)from to:(NSString *)to
+{
+    float retVal = -1;
+    if (sqlite3_open([sqlPath UTF8String], &amp;database) == SQLITE_OK) {
+
+        const char *sql = [[NSString stringWithFormat:@"SELECT %@ FROM Units WHERE code = '%@'", to, from] UTF8String];
+        sqlite3_stmt *selectstmt;
+
+        if(sqlite3_prepare_v2(database, sql, -1, &amp;selectstmt, NULL) == SQLITE_OK &amp;&amp; 
+           sqlite3_step(selectstmt) == SQLITE_ROW) {
+            retVal = (float)sqlite3_column_double(selectstmt, 0);
+        }
+        if (selectstmt) {
+            sqlite3_finalize(selectstmt);
+        }
+        sqlite3_close(database);
+        database = NULL;
+    }
+
+    return retVal;
+}
+</code></pre>
+
+<p>Also, while were at it, if the strings in <code>to</code> and <code>from</code> come from user input, you probably don't want to use them literally in queries, as this is vulnerable to SQL injection attacks. </p>
+
+<p>You could also consider using <a href="https://github.com/ccgus/fmdb" rel="nofollow">FMDB</a> which is a nice Objective-C wrapper for the SQLite API.</p>

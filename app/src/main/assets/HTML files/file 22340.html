@@ -1,0 +1,57 @@
+<p>I believe that you need to make sure that none of the entities which remain in your context, reference any of those which have been detached. So if say, something else references a detached instance of Pair, the context will quite happily find it, traverse its navigation properties and add the whole lot back in.</p>
+
+<p>Rather than setting the State property have you tried:</p>
+
+<pre><code>((IObjectContextAdapter)maMdbEntities).ObjectContext.Detach(item);
+</code></pre>
+
+<p>This is supposed to detach any links to the item being detached in addition to the item itself. </p>
+
+<p>EDIT</p>
+
+<p>Ok, lets look at the "detach any links to the item being detached ...", ObjectContext.Detach ultimately calls this method:</p>
+
+<pre><code>// System.Data.Objects.EntityEntry
+internal void Detach()
+    {
+    base.ValidateState();
+    bool flag = false;
+    RelationshipManager relationshipManager = this._wrappedEntity.RelationshipManager;
+    flag = (base.State != EntityState.Added &amp;&amp; this.IsOneEndOfSomeRelationship());
+    this._cache.TransactionManager.BeginDetaching();
+    try
+        {
+        relationshipManager.DetachEntityFromRelationships(base.State);
+        }
+    finally
+        {
+        this._cache.TransactionManager.EndDetaching();
+        }
+    this.DetachRelationshipsEntries(relationshipManager);
+    IEntityWrapper wrappedEntity = this._wrappedEntity;
+    EntityKey entityKey = this._entityKey;
+    EntityState state = base.State;
+    if (flag)
+        {
+        this.DegradeEntry();
+        }
+    else
+        {
+        this._wrappedEntity.ObjectStateEntry = null;
+        this._cache.ChangeState(this, base.State, EntityState.Detached);
+        }
+    if (state != EntityState.Added)
+        {
+        wrappedEntity.EntityKey = entityKey;
+        }
+    }
+</code></pre>
+
+<p>DetachEntityFromRelationships breaking down all the links.
+The documentation on ObjectContext.Detach is not specific about the tearing down of links <a href="http://msdn.microsoft.com/en-us/library/system.data.objects.objectcontext.detach.aspx" rel="nofollow">http://msdn.microsoft.com/en-us/library/system.data.objects.objectcontext.detach.aspx</a> it does say "After the Detach method is called, the system will no longer keep references that point to this object and it can be collected by the garbage collector", which implies all LinkDescriptors will also have been removed.</p>
+
+<p>With regards your 3rd comment "Do you think IObjectContextAdapter will enable full detachment. Or there will always be other object in context that I will misss and not detach?" there are two things here; there is the property of the object and the LinkDescriptor which the context uses to track to the relationship. Detach merely stops tracking an object's relationships by detaching the LinkDescriptors, it doesn't detach the object at the other end of the relationship. Neither does it set such properties to null, if you inspect the object after detaching it will still have those properties set.</p>
+
+<p>Is this the best approach? Detaching and reattaching is difficult to get right. If you need to detach and reattach I would suggest you  move your deep detach rountines into the classes themselves rather than in a generic method. </p>
+
+<p>That said, you wrote "On the next request I get the group from the cache..."  which leads to me wonder what would be the longest period of time between two requests? Could you be introducing concurrency issues by caching? Are you hosting your WCF service in IIS? Could you use IIS's caching if concurrency will not be a problem? Are you handling all requests on the same thread? You might not be aware that ObjectContext instance methods are not thread safe.</p>

@@ -1,0 +1,134 @@
+<p>That's Spirit Classic (aka. v1.x). <br/><sup>PS. <em>No clue, but you could try <code>(+(alnum_p | ch_p('-')))</code> instead of  <code>(+alnum_p | '-')</code></em></sup></p>
+
+<p>You should get to this century, and use Spirit V2 (roughly ten years since it superseded v1):</p>
+
+<h2>Spirit V2</h2>
+
+<p><strong><kbd><a href="http://coliru.stacked-crooked.com/a/a78dc18095c7ed4c" rel="nofollow">Live On Coliru</a></kbd></strong></p>
+
+<pre><code>#include &lt;boost/spirit/include/qi.hpp&gt;
+
+int main() {
+    for (std::string const sample : {
+            "url(#myRadialGradient)",
+            "url(#my-RadialGradient4)",
+            "url('#my-RadialGradient4')",
+            "url(\"#my-RadialGradient4\")",
+            })
+    {
+        std::cout &lt;&lt; " -- parsing '" &lt;&lt; sample &lt;&lt; "'\n";
+        std::string o_rPaintUri;
+
+        bool ok;
+        {
+            using namespace boost::spirit::qi;
+            ok = parse(sample.begin(), sample.end(),
+                    "url(" &gt;&gt; -char_("'\"") &gt;&gt; "#" &gt;&gt; +(alnum|char_('-')) &gt;&gt; -char_("'\"") &gt;&gt; ")",
+                    o_rPaintUri);
+        }
+
+        if (ok)
+            std::cout &lt;&lt; "Parsed: '" &lt;&lt; o_rPaintUri &lt;&lt; "'\n";
+        else
+            std::cout &lt;&lt; "Parse failed\n";
+    }
+}
+</code></pre>
+
+<p>Prints</p>
+
+<pre><code>-- parsing 'url(#myRadialGradient)'
+Parsed: 'myRadialGradient'
+-- parsing 'url(#my-RadialGradient4)'
+Parsed: 'my-RadialGradient4'
+-- parsing 'url('#my-RadialGradient4')'
+Parsed: ''my-RadialGradient4''
+-- parsing 'url("#my-RadialGradient4")'
+Parsed: '"my-RadialGradient4"'
+</code></pre>
+
+<h2>Spirit X3</h2>
+
+<p>Same, but replace <code>qi</code> with <code>x3</code>. I'd suggest some improvements:</p>
+
+<ul>
+<li>now support any characters withing quotes (except the quote char)</li>
+<li>now expect all syntax elements and report useful errors</li>
+</ul>
+
+<p><strong><kbd><a href="http://coliru.stacked-crooked.com/a/af82c690d7412d87" rel="nofollow">Live On Coliru</a></kbd></strong></p>
+
+<pre><code>#include &lt;boost/spirit/home/x3.hpp&gt;
+#include &lt;boost/exception/all.hpp&gt;
+#include &lt;iostream&gt;
+
+namespace x3 = boost::spirit::x3;
+
+int main() {
+    for (std::string const sample : {
+            "url(#myRadialGradient)",
+            "url(#my-RadialGradient4)",
+            "url('#my-RadialGradient4')",
+            "url(\"#my-RadialGradient4\")",
+            // extra
+            "url('#my-RadialGradient4\")",
+            "url('#my-Radial_Gradient4')",
+            "url('#my-Radial_Gradient4'",
+            "url(oops)",
+            "url('oops')",
+            "url(\"oops\")",
+            "oops",
+            })
+    {
+        std::cout &lt;&lt; " -- parsing " &lt;&lt; sample &lt;&lt; "\n";
+        std::string o_rPaintUri;
+
+        bool ok = false;
+        try {
+            using namespace x3;
+
+            auto q = [](auto quote) { return quote &gt; as_parser('#') &gt; *(char_ - quote) &gt; quote; };
+
+            auto u = rule&lt;struct url, std::string&gt; { "#anchor|'#anchor'|\"#anchor\"" } // FOR ERROR INFO ONLY
+                   = q("'") | q('"') | '#' &gt;&gt; *~char_(')');
+
+            ok = parse(sample.begin(), sample.end(), eps &gt; "url(" &gt; u &gt; ")", o_rPaintUri);
+
+            if (ok)
+                std::cout &lt;&lt; "Parsed: '" &lt;&lt; o_rPaintUri &lt;&lt; "'\n";
+            else
+                std::cout &lt;&lt; "Parse failed\n";
+
+        } catch (x3::expectation_failure&lt;std::string::const_iterator&gt; const&amp; e) {
+            std::cout &lt;&lt; "    Error: '" &lt;&lt; std::string(e.where(), sample.end()) &lt;&lt; "', expecting " &lt;&lt; e.which() &lt;&lt; "\n";
+        }
+
+    }
+}
+</code></pre>
+
+<p>Prints</p>
+
+<pre><code>-- parsing url(#myRadialGradient)
+Parsed: 'myRadialGradient'
+-- parsing url(#my-RadialGradient4)
+Parsed: 'my-RadialGradient4'
+-- parsing url('#my-RadialGradient4')
+Parsed: 'my-RadialGradient4'
+-- parsing url("#my-RadialGradient4")
+Parsed: 'my-RadialGradient4'
+-- parsing url('#my-RadialGradient4")
+    Error: '', expecting "'"
+-- parsing url('#my-Radial_Gradient4')
+Parsed: 'my-Radial_Gradient4'
+-- parsing url('#my-Radial_Gradient4'
+    Error: '', expecting ')'
+-- parsing url(oops)
+    Error: 'oops)', expecting #anchor|'#anchor'|"#anchor"
+-- parsing url('oops')
+    Error: 'oops')', expecting '#'
+-- parsing url("oops")
+    Error: 'oops")', expecting '#'
+-- parsing oops
+    Error: 'oops', expecting "url("
+</code></pre>

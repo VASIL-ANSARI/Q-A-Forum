@@ -1,0 +1,27 @@
+<p>There is no built-in way to apply time zone changes globally in a .NET application.  It would be dangerous if it was such a mechanism, as different parts of an application may need to work with time zones other than just the one assigned to a specific user.</p>
+
+<p>However, you have bigger problems to solve.  You stated in comments that your time zones are stored as a numerical value, <code>time_in_minutes</code>.  That only will represent a time zone <em>offset</em>, not an actual <em>time zone</em>.</p>
+
+<p>There is a significant difference between an offset and a time zone.  Any solution that only tracks an offset will not be able to properly convert times around the world, primarily due to daylight saving time.  See "Time Zone != Offset" in <a href="http://stackoverflow.com/tags/timezone/info">the timezone tag wiki</a> and the graphs in <a href="http://stackoverflow.com/tags/dst/info">the dst tag wiki</a>.</p>
+
+<p>Also, you implied that the times store in the database were in the local time of the time zone referenced by the time zone id.  That is also a problem, as you could be storing ambiguous values during the fall-back DST transition.</p>
+
+<p>You should instead be doing the folowing:</p>
+
+<ul>
+<li><p>Store your values either in UTC or in a <code>datetimeoffset</code> data type. (See <a href="http://stackoverflow.com/a/14268167/634824">DateTime vs DateTimeOffset</a> if you're not sure which to use.)</p></li>
+<li><p>In your time zone table, you should store a string containing a time zone identifier.  You can choose between Windows time zones or IANA time zones.</p>
+
+<ul>
+<li><p>For Windows time zones, the identifiers contain values like <code>"Eastern Standard Time"</code>, even when they actually represent the full US Eastern Time zone, including EST and EDT  (don't get caught up in the naming discrepancies).   If you use these, then you would use the <a href="https://msdn.microsoft.com/en-us/library/system.timezoneinfo.aspx" rel="nofollow"><code>TimeZoneInfo</code></a> class in your .NET code to do the conversions.</p></li>
+<li><p>For IANA time zones, the identifiers are more sensible, such as <code>"America/New_York"</code>, or <code>"Asia/Tokyo"</code>.  You can find <a href="http://en.wikipedia.org/wiki/List_of_tz_database_time_zones" rel="nofollow">a list of them here</a>.  In .NET, they easiest way to work with these is with the <a href="http://nodatime.org/" rel="nofollow">Noda Time</a> library.  Given the choice, this would be my recommendation.</p></li>
+</ul></li>
+</ul>
+
+<p>You should read through the <a href="http://stackoverflow.com/tags/timezone/info">timezone</a> and <a href="http://stackoverflow.com/tags/dst/info">dst</a> wiki's thoroughly.  I'll also recommend the following videos:</p>
+
+<ul>
+<li><a href="https://www.youtube.com/watch?v=-5wpm-gesOY" rel="nofollow">The Problem with Time &amp; Timezones</a> - A short and funny video by Computerphile.</li>
+<li><a href="https://www.youtube.com/watch?v=84aWtseb2-4" rel="nofollow">Daylight Saving Time Explained</a> - A short and informative video by CGP Grey</li>
+<li><a href="http://www.pluralsight.com/courses/date-time-fundamentals" rel="nofollow">Date and Time Fundamentals</a> - A comprehensive Pluralsight training course, authored by me.</li>
+</ul>

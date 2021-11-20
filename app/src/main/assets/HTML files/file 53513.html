@@ -1,0 +1,68 @@
+<p>I'm afraid I went with the ugly approach. I'm still looking for a nicer way to do this, but this code works:</p>
+
+<pre><code>app.directive('lightboxPopup', function ($compile) {
+    var box = require('fg/lightbox'); // our custom jquery lightbox
+
+    var defaultSettings = {
+        title: 'Popup',
+        buttons: {
+            confirm: 'OK'
+        }};
+
+    var directiveSettings = {};
+
+    function lightboxSettings(settings) {
+        directiveSettings = settings;
+    }
+
+    return {
+        scope: {
+            popupCondition: '=',
+            popupDirective: '@lightboxPopup',
+            popupData: '='
+        },
+        link: function (scope, element, attrs) {
+            if (scope.popupCondition === true) {
+                scope[attrs.popupData] = scope.popupData;
+                scope.lightboxSettings = lightboxSettings;
+                var el = $compile( "&lt;"+scope.popupDirective+"&gt;&lt;/"+scope.popupDirective+"&gt;" )( scope );
+                element.bind('click', function () {
+                    var settings = angular.extend(defaultSettings, directiveSettings, scope.popupOptions);
+                    var popup = box(settings).setHtml(el).open();
+                });
+            }
+        }
+    };
+});
+</code></pre>
+
+<p>The juggling with scopes and data to ensure the directive with the content for the popup has access to the data it needs, and can access the api from this directive to register its own callbacks, is pretty horrible in my opinion. But it works.</p>
+
+<pre><code>&lt;tr ng-repeat="job in ctrl.jobs" lightbox-popup="popup-content-directive" popup-condition="job.status == 'pending'" popup-data="job"&gt;
+    &lt;td ng-repeat="tableColumn in ctrl.columnNames"&gt;{{ job[tableColumn] }} &lt;/td&gt;
+&lt;/tr&gt;
+</code></pre>
+
+<p>The included directive with the content registers its lightbox configuration like this:</p>
+
+<pre><code>app.directive('popupContentDirective', function (updateService) {
+
+    return {
+        link: function (scope, element, attrs) {
+            scope.lightboxSettings({
+                title: "Update job",
+                buttons: {
+                    cancel: "cancel",
+                    confirm: "OK"
+                },
+                confirm: function() {
+                    updateService.update(scope.job);
+                }
+            });
+        },
+        templateUrl: 'partials/popupContentDirective.html'
+    };
+});
+</code></pre>
+
+<p>The settings can also be overridden from the view. All in all, the functionality is what I want, but I think there should be a cleaner and prettier way to do this, so please post a better answer if you've got one.</p>

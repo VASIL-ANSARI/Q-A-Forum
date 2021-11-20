@@ -1,0 +1,56 @@
+<p>Change your clone method to:</p>
+
+<pre><code>public TreeNode clone(){
+  try {
+    TreeNode node = (TreeNode) super.clone();
+    node.trackers = (HashMap&lt;Integer, SomeOtherClass&gt;) trackers.clone();
+    return node;
+  } catch (CloneNotSupportedException e) {
+    return null;      
+  }
+}
+</code></pre>
+
+<p>Before, both copies of TreeNode had a reference to the same trackers HashMap, hence changing one would change the other. By explicitly making a new copy of trackers however, the two nodes now have two copies of the HashMap, so changing one won't affect the other.</p>
+
+<p>This is assuming that the objects contained in the HashMap aren't being changed. If they are, those changes will be reflected in both copies.</p>
+
+<p>For a more detailed explanation of copying in Java, see the second answer to <a href="http://stackoverflow.com/questions/869033/how-do-i-copy-an-object-in-java">How do I copy an object in Java?</a></p>
+
+<p>-- Edit --</p>
+
+<p>If the existing elements in trackers are being modified by foo, you'll need to make copies of each of those too. At the moment you have two copies of a hashmap, but each one has references which are pointing to the same object. Hence editing an object in one hashmap changes that object in the other. You could do something like:</p>
+
+<pre><code>public TreeNode clone(){
+  try {
+    TreeNode node = (TreeNode) super.clone();
+    HashMap&lt;Integer, SomeOtherClass&gt; newTrackers = new HashMap&lt;&gt;();
+    for (Integer key : trackers.keySet()) {
+      newTrackers.put(key, trackers.get(key).clone());
+    }
+    node.trackers = newTrackers;
+    return node;
+  } catch (CloneNotSupportedException e) {
+    return null;      
+  }
+} 
+</code></pre>
+
+<p>However, this relies on the fact that the objects of SomeOtherClass in trackers themselves have a properly implemented clone method. Otherwise you will end up with the same problem, where any object that they refer to will be the same as the ones in the original hashmap. Unfortunately in Java, there seems to be no easy way of creating a deep clone without explicitly coding it out for all the objects used.</p>
+
+<p>-- Edit 2 --</p>
+
+<p>Change your Tracker clone to:</p>
+
+<pre><code>public Tracker clone() {
+  try {
+    Tracker newTracker = (Tracker) super.clone();
+    newTracker.player = player.clone();
+    return newTracker;
+  } catch (CloneNotSupportException e){
+  }
+  return null;
+}
+</code></pre>
+
+<p>Any time an object has references to another object, you'll need to clone those as well. As Player has no references to objects, only primitive types, this should work properly now. </p>

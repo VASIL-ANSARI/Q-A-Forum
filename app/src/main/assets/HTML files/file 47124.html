@@ -1,0 +1,88 @@
+<p>With <a href="https://github.com/angular-ui/ui-router/wiki/URL-Routing" rel="nofollow">Angular ui-router</a> you could do it with resolving your backend data before the state controller gets called.</p>
+
+<p>Please have a look at the demo below or in this <a href="http://jsfiddle.net/awolf2904/3LsLfdh6/" rel="nofollow">jsFiddle</a>.</p>
+
+<p>It's with-out datatables but that's probably the easier part to add.</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>(function() {
+'use strict';
+
+angular.module('demoApp', ['ui.router', 'angularSpinner'])
+    .run(StartUp)
+    .factory('jobsDataService', JobsDataFactory)
+    .config(Config);
+
+function JobsDataFactory($http) {
+    var backendUrl = 'http://jsonplaceholder.typicode.com';
+    
+    return {
+        get: function(id) {
+            return $http.jsonp(backendUrl + '/posts/'+id +'?callback=JSON_CALLBACK')
+                .then(function(response) {
+                    return response.data;
+            });
+        }
+    };
+}
+
+function Config($urlRouterProvider, $stateProvider) {
+    $urlRouterProvider.otherwise('/jobs/1');
+    
+    $stateProvider
+        .state('jobs',
+               {
+                   url: '/jobs/:id',
+                   templateUrl: 'partials/post.html',
+                   resolve: {
+                       job: function(jobsDataService, $stateParams) {
+                           console.log($stateParams.id);
+                           return jobsDataService.get($stateParams.id);
+                       }
+                   },
+                   controller: function($scope, job) {
+                       console.log(job);
+                       $scope.job = job;
+                   }
+               });
+}
+
+function StartUp($rootScope){
+    // only used for loading spinner
+    $rootScope
+        .$on('$stateChangeStart', 
+            function(event, toState, toParams, fromState, fromParams){ 
+                $rootScope.loading = true;
+        });
+
+    $rootScope
+        .$on('$stateChangeSuccess',
+            function(event, toState, toParams, fromState, fromParams){ 
+                $rootScope.loading = false;
+        });
+
+}
+    
+})();</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.3/angular.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.1/spin.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/angular-spinner/0.6.2/angular-spinner.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.15/angular-ui-router.js"&gt;&lt;/script&gt;
+
+&lt;div ng-app="demoApp"&gt;
+    &lt;span us-spinner="" ng-if="loading"&gt;&lt;/span&gt;
+    &lt;a href="#" ui-sref='jobs({id: 1})'&gt;job 1&lt;/a&gt;
+    &lt;a href="#" ui-sref='jobs({id: 2})'&gt;job 2&lt;/a&gt;
+    &lt;a href="#" ui-sref='jobs({id: 3})'&gt;job 3&lt;/a&gt;
+    &lt;div ui-view=""&gt;&lt;/div&gt;
+    
+    &lt;script type="text/ng-template" id="partials/post.html"&gt;
+        &lt;p&gt;debug id = {{job.id}}&lt;/p&gt;
+        &lt;h1&gt;{{job.title}}&lt;/h1&gt;
+        &lt;p&gt;{{job.body}}&lt;/p&gt;
+    &lt;/script&gt;
+&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

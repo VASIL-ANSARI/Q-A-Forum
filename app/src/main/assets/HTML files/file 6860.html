@@ -1,0 +1,24 @@
+<p>For the record, I did <a href="http://database.ittoolbox.com/groups/technical-functional/sql-server-l/permissions-on-tempdb-194586" rel="nofollow">find a way to do this</a>.</p>
+
+<p>The issue is that the tempdb is recreated from the model db each time the service restarts. The gist of the solution is to create a stored procedure that does the job, and then make that procedure run at startup.</p>
+
+<p>Source code (credit to the link above) is as follows:</p>
+
+<pre><code>use master
+go
+
+-- remove an old version
+drop proc AddAppTempDBOwner
+go
+
+-- the sp
+create proc AddAppTempDBOwner as
+declare @sql varchar(200)
+select @sql = 'use tempdb' + char(13) + 'exec sp_addrolemember ''db_owner'', ''app'''
+exec (@sql)
+go
+
+-- add it to the startup
+exec sp_procoption 'AddAppTempDBOwner', 'startup', 'true'
+go
+</code></pre>

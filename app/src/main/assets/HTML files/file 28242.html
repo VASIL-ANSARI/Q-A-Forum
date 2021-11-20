@@ -1,0 +1,56 @@
+<p>You can use the Cor Pattern for the validation "Behavior" : Each of your validators would implement a base <code>ChainedValidator</code> interface (some of the behavior can be moved to a parent abstract class as it is the same for all chain members):</p>
+
+<pre><code>    public class MyFirstValidator implements ChainedValidator{
+        //This CoR implementation has also a 'Composite' background
+        ChainedValidator nextValidator;
+
+        @Override
+        private void doValidate(Request request) throws ValidationException
+        {
+              if(badSituation){
+                    //throw validation exception
+              }
+        }
+
+        @Override
+        public void doChainValidate(Request request) throws ValidationException
+        {//This method can be moved to a parent abstract class
+              doValidate(request);
+              if(nextValidator!=null){
+                    nextValidator.doChainValidate(request);
+              }
+        }
+
+        private void attachValidator(ChainedValidator newValidator) throws ValidationException
+        {//same as previous method
+              if(nextValidator!=null){
+                    nextValidator.attachValidator(request);
+              }else{
+                    nextValidator=newValidator;
+              }
+        }
+        //setters &amp; other methods
+    }
+</code></pre>
+
+<p>On your Controllers/Web tier Service classes, you can inject the first <code>ChainedValidator</code> of the validation chain and call <code>doChainValidate</code> :</p>
+
+<pre><code>public class WebTierService{
+
+    ChainedValidator validator;
+
+    public Response serviceMethod(Request request){
+        try{
+            //...
+            validator.doChainValidate(request);
+            //...
+        }catch(ValidationException e){
+
+            return Response.status(400).entity(e.getMessage()).build();
+        }
+
+    }
+}
+</code></pre>
+
+<p>As you can see, the logic is 'fluid' (No if else check depending on type of validation error) and adding a new validator is relatively simple (<code>validator.attachValidator()</code>) which makes the logic extensible and clean.</p>

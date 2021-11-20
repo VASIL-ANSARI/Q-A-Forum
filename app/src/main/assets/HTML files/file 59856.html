@@ -1,0 +1,49 @@
+<p>There are various places where you can do this.Say you are doing something like below to register the user</p>
+
+<pre><code>var user = new ApplicationUser { UserName = model.RegisterEmail.ToLower(), Email = model.RegisterEmail.ToLower(), PhoneNumber = model.RegisterPhoneNumber, EmailConfirmed = true, PhoneNumberConfirmed = true };
+var addUserResult = await UserManager.CreateAsync(user, model.RegisterPassword);
+
+
+if (!addUserResult.Succeeded)
+{
+    ApplicationUser user = await UserManager.FindByEmailAsync(model.RegisterEmail.ToLower());
+    if(!user.EmailConfirmed)
+    {
+       var code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
+       //Send the new link
+       //return the error message accordingly.
+    }       
+}
+</code></pre>
+
+<p>You can do samething during Login</p>
+
+<pre><code>ApplicationUser user = await UserManager.FindAsync(model.UserName.ToLower(), model.Password);   
+if(user != null &amp;&amp; !user.EmailConfirmed)
+{
+       var code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
+    //Send the new link
+    //return the error message accordingly.
+}
+</code></pre>
+
+<p>Or if you are using SigninManager (this is from default MVC template)</p>
+
+<pre><code>var result = await SignInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, shouldLockout: false);
+switch (result)
+{
+    case SignInStatus.Success:
+        return RedirectToLocal(returnUrl);
+    case SignInStatus.LockedOut:
+        return View("Lockout");
+    case SignInStatus.RequiresVerification:
+        //redirecting to a different page
+        return RedirectToAction("SendCode", new { ReturnUrl = returnUrl, RememberMe = model.RememberMe });
+    case SignInStatus.Failure:
+    default:
+        ModelState.AddModelError("", "Invalid login attempt.");
+        return View(model);
+}
+</code></pre>
+
+<p>Hope this helps.    </p>

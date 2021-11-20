@@ -1,0 +1,82 @@
+<p>It seems like you might be getting mixed up between your DataSet and your TableAdapterManager.</p>
+
+<p>First, we need to get the values from the text boxes.</p>
+
+<pre><code>            empID = EmployeeIDTxt.Text
+            dob = DateOfBirthTxt.Text
+            mailStation = MailStationTxt.Text
+            eFirst = FNameTxt.Text
+            prefName = PrefNameTxt.Text
+            eLast = LNameTxt.Text
+            homeAddress = Address1Txt.Text
+            city = CityTxt.Text
+            state = StateTxt.Text
+            zip = ZipTxt.Text
+            payGroup = PayGroupTxt.Text
+            fileNo = FileNoTxt.Text
+            begDT = BegDtTxt.Text
+</code></pre>
+
+<p>Now, we can reference the fields in our Update query as variables, and add parameters to them so we can prevent <a href="http://stackoverflow.com/questions/601300/what-is-sql-injection">SQL Injection</a>.</p>
+
+<pre><code>     'This is your update statement
+     Dim updateQry As String = String.Empty 
+     updateQry = "UPDATE YOURTABLE"
+     updateQry &amp;= " SET  EMPL_ID = @EmployeeID,EMPL_LAST_NM = @LastName, EMPL_FIRST_NM = @FirstName, EMPL_PREFRD_NM = @PrefName,"
+     updateQry &amp;= "      EMPL_BIRTH_DT = @DateOfBirth, EMPL_MAIL_STN_CD = @MS, EMPL_ADDR1_TXT = @HomeAddress,"
+     updateQry &amp;= "       EMPL_ADDR2_TXT = @Add2, EMPL_CITY_NM = @City, EMPL_STATE_CD = @State, EMPL_POSTL_CD = @Zip,"
+     updateQry &amp;= " WHERE EMPL_ID = @EmployeeID ;"
+
+     'Declare Connection String
+      Using sqlConnection As New OleDBConnection(myConn)
+         Using cmd As New OleDBCommand()
+             'Declare variable for SQL command
+                With cmd
+                   .Connection = sqlConnection
+                   .CommandType = CommandType.Text
+                   .CommandText = updateQry
+                   'Prevent against SQL Injection -&gt; Add Parameters
+                     With .Parameters
+                        .AddWithValue("@EmployeeID", empID)
+                        .AddWithValue("@FirstName", eFirst)
+                        .AddWithValue("@LastName", eLast)
+                        .AddWithValue("@PrefName", prefName)
+                        .AddWithValue("@DateOfBirth", dob)
+                        .AddWithValue("@MS", mailStation)
+                        .AddWithValue("@HomeAddress", homeAddress)
+                        .AddWithValue("@City", city)
+                        .AddWithValue("@State", state)
+                        .AddWithValue("@Zip", zip)
+                     End With
+                End With
+
+                Try
+                    sqlConnection.Open()
+                    cmd.ExecuteNonQuery()
+                Catch ex As Exception
+                    MessageBox.Show("Error Updating " &amp; ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                End Try
+            End Using
+       End Using
+   End If
+Catch ex As Exception
+    MsgBox(ex.Message)
+ Finally
+    MsgBox("" &amp; FNameTxt.Text &amp; " " &amp; LNameTxt.Text &amp; " has been updated")
+End Try
+</code></pre>
+
+<p>Now, we need to change a few things.</p>
+
+<ol>
+<li>Replace myConn with your connection string and open it in this instance (in the btnUpdate sub)</li>
+<li>Change all of the fields in the Parameter list to your variables. ("EmployeeID" is the parameter I am providing for the variable empID)</li>
+<li>Your <code>WHERE</code> clause is going to depend on what records you want to update. That's for you to decide. Is there a primary key you can reference like I do with EmployeeID?</li>
+</ol>
+
+<p>Replace EMPL_ fields with your field names.
+For clarification, the "@EmployeeID" parameter is the safe way of writing to the database of adding empID directly.</p>
+
+<p>There are a couple other ways to do this, such as OleDbUpdateCommand, etc.</p>
+
+<p>Hope this helps you.</p>

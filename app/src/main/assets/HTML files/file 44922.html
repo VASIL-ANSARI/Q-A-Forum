@@ -1,0 +1,29 @@
+<p>First, the exception is documented as possible:</p>
+
+<blockquote>
+  <p>A call to the Dispose method marks the end of the transaction scope. Exceptions that occur after calling this method may not affect the transaction.</p>
+</blockquote>
+
+<p>This is in the documentation on the TransactionScope class (<a href="https://msdn.microsoft.com/en-us/library/system.transactions.transactionscope%28v=vs.110%29.aspx" rel="nofollow">https://msdn.microsoft.com/en-us/library/system.transactions.transactionscope%28v=vs.110%29.aspx</a>).</p>
+
+<p>One other thing I noticed is that the complete on the transaction is being before the connection is closed. I'd change this to close the connection and then complete the transaction.</p>
+
+<pre><code>using (TransactionScope scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted }))
+{
+  using (var dbConn = GetDbFactory().Create())
+  {
+    foreach (MyDTO dto in dtoList)
+    {
+        var tableDAO= new TableDAO(dbConn);
+        MyEntity entity = new MyEntity()
+        {
+            Field1 = dto.Field1,
+            Field2 = dto.Field2
+        };
+        tableDAO.AddOrUpdate(entity);
+     }
+  }
+     // Commit changes
+  scope.Complete();
+}
+</code></pre>

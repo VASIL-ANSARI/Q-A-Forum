@@ -1,0 +1,44 @@
+<p>Let's begin with the fact that your query is actually calculating top 5 names that had the <em>lowest</em> number of votes. To get the top 5 with the highest number, you'll need to change this condition:</p>
+
+<pre><code>(a.votes_yay+a.votes_nay) &gt;= (b.votes_yay+b.votes_nay)
+</code></pre>
+
+<p>into this:</p>
+
+<pre><code>(a.votes_yay+a.votes_nay) &lt;= (b.votes_yay+b.votes_nay)
+</code></pre>
+
+<p>or, perhaps, this (which is the same):</p>
+
+<pre><code>(b.votes_yay+b.votes_nay) &gt;= (a.votes_yay+a.votes_nay)
+</code></pre>
+
+<p>(The latter form would seem to me preferable, but merely because it would be uniform with the other two comparisons which have a <code>b</code> column on the left-hand side and an <code>a</code> column on the right-hand side. That is perfectly irrelevant to the correctness of the logic.)</p>
+
+<p>Logically, what's happening is this. For every row in <code>results</code>, the server will be looking for rows in the same table that match <code>id</code> and <code>time_of_midnight</code> of the given row and have the same or <em>higher</em> number of total votes than that in the given row. It will then count the found rows and check if the result is not greater than 5, i.e. if no more than 5 rows in the same <code>(id, time_of_midnight)</code> group have the same or higher number of votes as in the given row.</p>
+
+<p>For example, if the given row happens to be one with the most votes in its group, the subquery will find only that same row (assuming there are no ties) and so the count will be 1. That is fewer than 5 â therefore, the given row will qualify for output.</p>
+
+<p>If the given row will be the second most voted item in a group, the subquery will find the same row <em>and</em> the top-voted item (again, assuming no ties), which will give the count of 2. Again, that matches the <code>count &lt;= 5</code> condition, and so the row will be returned in the output.</p>
+
+<p>In general, if a row is ranked as # <em>N</em> in its group according to the total number of votes, it means there are <em>N</em> rows in that group where the vote number is the same or higher than the number in the given row (we are still assuming there are no ties). So, when you are counting votes in this way, you are effectively calculating the given row's ranking.</p>
+
+<p>Now, if there are ties, you may get fewer results per group using this method. In fact, if a group had 6 or more rows tied at the maximum number of rows, you would get <em>no rows</em> for that group in the output, because the subquery would never return a count value less than 6.</p>
+
+<p>That is because effectively all the top-voted items would be ranked as 6 (or whatever their number would be) rather than as 1. To rank them as 1 instead, you could try the following modification of the same query:</p>
+
+<pre><code>SELECT name, time_of_midnight, votes_yay, votes_nay, (votes_yay+votes_nay) AS total_votes
+FROM results a
+WHERE id=1 AND (
+    SELECT <b>COUNT(*) + 1</b>
+    FROM results b
+    WHERE b.id=a.id AND b.time_of_midnight=a.time_of_midnight
+      AND <b>(b.votes_yay+b.votes_nay) > (a.votes_yay+a.votes_nay)</b>) &lt;= 5
+ORDER BY time_of_midnight DESC, total_votes DESC;
+</code></pre>
+
+<p>Now the subquery will be looking <em>only</em> for rows with the higher number of votes than in the given row. The resulting count will be increased by 1 and that will be the given row's ranking (and the value to compare against 5).</p>
+
+<p>So, if the counts were e.g. 10, 10, 8, 7 etc., the rankings would be calculated as 1, 1, 3, 4 etc. rather than as 2, 2, 3, 4 etc., as with the original version.</p>
+
+<p>That, of course, means that the output might now have <em>more</em> than 5 rows per group. For instance, if votes were distributed as 10, 9, 8, 8, 8, 8, 6 etc., you would get 10, 9 and all the 8s (because the rankings would be 1, 2, 3, 3, 3, 3, 7...). To return <em>exactly</em> 5 names per group (assuming there are at least 5 of them), you'd probably need to consider a different method altogether.</p>

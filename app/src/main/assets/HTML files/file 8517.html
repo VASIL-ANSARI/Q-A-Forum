@@ -1,0 +1,55 @@
+<p>driver.get() is actually supposed to block until the page has finished loading. However sometimes it doesn't for example if JavaScript continues to load after the main HTML has loaded. In this case you'll sometimes get problems with clicking elements which have not appeared yet. You can either use WebDriverWait() to wait for the element to appear or increase the implicit wait time with:</p>
+
+<pre><code>driver.manage().timeouts().implicitlyWait(X, TimeUnit.SECONDS);
+</code></pre>
+
+<p>Here is the equivalent using WebDriverWait:</p>
+
+<pre><code>public void waitAndClick(WebDriver driver, By by) {
+    WebDriverWait wait = new WebDriverWait(driver, 10000);
+    Function&lt;WebDriver, Boolean&gt; waitForElement = new waitForElement(by);
+    wait.until(waitForElement);
+
+    Actions builder = new Actions(driver);
+    builder.click(driver.findElement(by)).perform();
+}
+</code></pre>
+
+<p>And the waitForElement class:</p>
+
+<pre><code>public class waitForElement implements Function&lt;WebDriver, Boolean&gt; {
+    private final By by;
+
+    private String text = null;
+
+    public waitForElement(By by) {
+        this.by = by;
+    }
+
+    public waitForElement(By by, String text) {
+        this.by = by;
+        this.text = text;
+    }
+
+    @Override
+    public Boolean apply(WebDriver from) {
+        if (this.text != null) {
+            for (WebElement e : from.findElements(this.by)) {
+                if (e.getText().equals(this.text)) {
+                    return Boolean.TRUE;
+                }
+            }
+
+            return Boolean.FALSE;
+        } else {
+            try {
+                from.findElement(this.by);
+            } catch (Exception e) {
+                return Boolean.FALSE;
+            }
+
+            return Boolean.TRUE;
+        }
+    }
+}
+</code></pre>

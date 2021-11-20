@@ -1,0 +1,277 @@
+<p>here is code for name, email and phone number</p>
+
+<pre><code>    -(NSMutableArray*)getEmailAndPhoneOfPhoneContacts
+    {
+
+        NSLog(@"getPhoneContacts");
+
+        NSAutoreleasePool *pool= [[NSAutoreleasePool alloc] init];
+
+        NSMutableArray *tempArray=[[NSMutableArray alloc] init];
+        ABAddressBookRef iPhoneAddressBook=ABAddressBookCreate();
+        if(!iPhoneAddressBook)
+        {
+            DLog(@"unable to open addressBook");
+        }
+
+
+        CFArrayRef allPeople=ABAddressBookCopyArrayOfAllPeople(iPhoneAddressBook);
+        NSMutableArray *peopleArray=[NSMutableArray  arrayWithArray:(NSMutableArray*)allPeople];
+
+        BOOL shouldReleasePool=NO;
+
+        NSInteger i;
+        NSLog(@"Num of people while getting from address bool %d and syncing",[peopleArray count]);
+        for(i=0;i&lt;[peopleArray count];i++)
+        {
+
+
+
+            ABRecordRef record=[peopleArray objectAtIndex:i];
+
+            Contact *objPhoneContact=[[Contact alloc] init];
+            objPhoneContact.contactType=STATIC_CONTACT;
+
+
+
+
+        CFStringRef prefixName=ABRecordCopyValue(record, kABPersonPrefixProperty);
+        CFStringRef firstName=ABRecordCopyValue(record, kABPersonFirstNameProperty);
+        CFStringRef middleName=ABRecordCopyValue(record, kABPersonMiddleNamePhoneticProperty);
+        CFStringRef lastName=ABRecordCopyValue(record, kABPersonLastNameProperty);
+        CFStringRef suffixName=ABRecordCopyValue(record, kABPersonSuffixProperty);
+        NSMutableString *contactname =[[NSMutableString alloc] init];
+
+
+
+        // concating all the names
+        if (prefixName) {
+            [contactname appendString:[NSString stringWithString:(NSString*)prefixName]];
+            CFRelease(prefixName);
+        }
+        if (firstName) {
+            [contactname appendString:[NSString stringWithString:(NSString*)firstName]];
+            CFRelease(firstName);
+        }
+        if (middleName) {
+            [contactname appendString:[NSString stringWithString:(NSString*)middleName]];
+            CFRelease(middleName);
+        }
+        if (lastName) {
+            [contactname appendString:[NSString stringWithString:(NSString*)lastName]];
+            CFRelease(lastName);
+        }
+        if (suffixName) {
+            [contactname appendString:[NSString stringWithString:(NSString*)suffixName]];
+            CFRelease(suffixName);
+        }
+        // if emty then get the organization property
+        if (contactname == nil || [contactname length]&lt;1) {
+            CFStringRef orgName=ABRecordCopyValue(record, kABPersonOrganizationProperty);
+            if (orgName) {
+                [contactname appendString:[NSString stringWithString:(NSString*)orgName]];
+                CFRelease(orgName);
+            }
+
+        }
+        //if still empty then assign (no name) to it
+        if (contactname == nil || [contactname length]&lt;1)
+            [contactname setString:@"(no name)"];
+
+            objPhoneContact.mContactName = [contactname stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+
+            [contactname release];
+            contactname = nil;
+            ABMutableMultiValueRef multi;
+            int multiCount=0;
+
+
+
+            multi = ABRecordCopyValue(record, kABPersonPhoneProperty);
+
+            NSUInteger phoneIndex_mobile=11;
+            NSUInteger phoneIndex_iPhone=31;
+            NSUInteger phoneIndex_home=51;
+            NSUInteger phoneIndex_work=71;
+            NSUInteger phoneIndex_main=91;
+            NSUInteger phoneIndex_home_fax=111;
+            NSUInteger phoneIndex_work_fax=131;
+            NSUInteger phoneIndex_pager=151;
+            NSUInteger phoneIndex_other=171;  
+
+            multiCount=ABMultiValueGetCount(multi);
+            if(multiCount ==0)
+            {
+                //objPhoneContact.mPhoneNum=@"";
+            }
+            else 
+            {
+                for( int i=0; i &lt; multiCount; i++)
+                {
+
+                    ContactProperty* objPhoneContactProperty=[[ContactProperty alloc] init];
+
+                    objPhoneContactProperty.mContactPropertyString=(NSString*)ABMultiValueCopyValueAtIndex(multi, i);
+                    objPhoneContactProperty.mDisplayName=(NSString*)ABMultiValueCopyLabelAtIndex(multi, i);
+                    objPhoneContactProperty.mDisplayName=[objPhoneContactProperty.mDisplayName stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"_$!&lt;&gt;"]];
+
+                    //          DLog(@"Display name %@",objPhoneContactProperty.mDisplayName);
+
+
+
+                    if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"mobile"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_mobile;
+                        phoneIndex_mobile++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"iPhone"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_iPhone;
+                        phoneIndex_iPhone++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"home"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_home;
+                        phoneIndex_home++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"work"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_work;
+                        phoneIndex_work++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"main"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_main;
+                        phoneIndex_main++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"HomeFAX"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_home_fax;
+                        phoneIndex_home_fax++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"WorkFAX"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_work_fax;
+                        phoneIndex_work_fax++;
+                    }
+                    else if([objPhoneContactProperty.mDisplayName caseInsensitiveCompare:@"pager"]==NSOrderedSame)
+                    {
+                        objPhoneContactProperty.mContactPropId=phoneIndex_pager;
+                        phoneIndex_pager++;
+                    }
+                    else
+                    {
+                        NSRange range1,range2,range3;
+
+                        range1=[objPhoneContactProperty.mDisplayName rangeOfString:@"mobile" options:NSCaseInsensitiveSearch];
+                        range2=[objPhoneContactProperty.mDisplayName rangeOfString:@"home" options:NSCaseInsensitiveSearch];
+                        range3=[objPhoneContactProperty.mDisplayName rangeOfString:@"work" options:NSCaseInsensitiveSearch];
+
+                        if (range1.location!=NSNotFound) 
+                        {
+                            objPhoneContactProperty.mContactPropId=phoneIndex_mobile;
+                            phoneIndex_mobile++;
+                        }
+                        else if (range2.location!=NSNotFound) 
+                        {
+                            objPhoneContactProperty.mContactPropId=phoneIndex_home;
+                            phoneIndex_home++;
+                        }
+                        else if (range3.location!=NSNotFound) 
+                        {
+                            objPhoneContactProperty.mContactPropId=phoneIndex_work;
+                            phoneIndex_work++;
+                        }
+                        else 
+                        {
+                            objPhoneContactProperty.mContactPropId=phoneIndex_other;
+                            phoneIndex_other++;
+                        }
+                    }
+
+                    objPhoneContactProperty.mContactDataType=@"Phone";
+
+                    [objPhoneContact.mPropertyArray addObject:objPhoneContactProperty];
+                    [objPhoneContactProperty release];
+                }
+            }
+
+            if(multi)
+                CFRelease(multi);
+
+
+
+            multi=ABRecordCopyValue(record,kABPersonEmailProperty);
+
+            NSUInteger emailIndex_home=301;
+            NSUInteger emailIndex_work=321;
+            NSUInteger emailIndex_other=341;  //~400
+
+            multiCount=ABMultiValueGetCount(multi);
+            if(multiCount ==0)
+            {
+                //objPhoneContact.mEmailId=@"";
+            }
+            else 
+            {
+                for( int i=0; i &lt; multiCount; i++)
+                {
+                    ContactProperty* objEmailContactProperty=[[ContactProperty alloc] init];
+
+                    objEmailContactProperty.mContactPropertyString=(NSString*)ABMultiValueCopyValueAtIndex(multi, i);
+                    objEmailContactProperty.mDisplayName=(NSString*)ABMultiValueCopyLabelAtIndex(multi, i);
+                    objEmailContactProperty.mDisplayName=[objEmailContactProperty.mDisplayName stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"_$!&lt;&gt;"]];
+
+
+                    if([objEmailContactProperty.mDisplayName caseInsensitiveCompare:@"home"]==NSOrderedSame)
+                    {
+                        objEmailContactProperty.mContactPropId=emailIndex_home;
+                        emailIndex_home++;
+                    }
+                    else if([objEmailContactProperty.mDisplayName caseInsensitiveCompare:@"work"]==NSOrderedSame)
+                    {
+                        objEmailContactProperty.mContactPropId=emailIndex_work;
+                        emailIndex_work++;
+                    }
+                    /*
+                     else if([objEmailContactProperty.mDisplayName caseInsensitiveCompare:@"other"]==NSOrderedSame)
+                     {
+                     objEmailContactProperty.mContactPropId=[NSString stringWithFormat:@"%d",emailIndex_other];
+                     emailIndex_other++;
+                     }
+                     */
+                    else 
+                    {
+                        objEmailContactProperty.mContactPropId=emailIndex_other;
+                        emailIndex_other++;
+                    }
+
+                    objEmailContactProperty.mContactDataType=@"Email";
+
+                    [objPhoneContact.mPropertyArray addObject:objEmailContactProperty];
+                    [objEmailContactProperty release];
+                }
+            }
+
+            if(multi)
+                CFRelease(multi);
+
+            [tempArray addObject:objPhoneContact];
+            [objPhoneContact release];
+
+            if(shouldReleasePool)
+            {
+                [innerPool drain];
+                shouldReleasePool=NO;
+            }
+
+        }
+        self.mPhoneContactArray=tempArray;
+        CFRelease(iPhoneAddressBook);
+        CFRelease(allPeople);
+
+
+        [pool drain];
+        return [tempArray autorelease];
+    }
+</code></pre>

@@ -1,0 +1,44 @@
+<p>My C is terribly rusty, and structs with members containing unions (like <code>struct sockaddr_in6</code>) no longer fit in my brain, so in the best cut and paste traditions I adapted <a href="http://stackoverflow.com/a/4139893/1068283">chrisaycock's answer</a> to use <code>getnameinfo()</code> instead, with some help from the <code>getifaddrs()</code> man page (which has a better example):</p>
+
+<pre><code>#define _GNU_SOURCE    # required for NI_NUMERICHOST
+#include &lt;arpa/inet.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;ifaddrs.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;netdb.h&gt;
+
+int main ()
+{
+  struct ifaddrs *ifap, *ifa;
+  struct sockaddr_in6 *sa;
+  char addr[INET6_ADDRSTRLEN];
+
+  getifaddrs (&amp;ifap);
+  for (ifa = ifap; ifa; ifa = ifa-&gt;ifa_next) {
+    if (ifa-&gt;ifa_addr-&gt;sa_family==AF_INET6) {
+      sa = (struct sockaddr_in6 *) ifa-&gt;ifa_addr;
+      getnameinfo(ifa-&gt;ifa_addr, sizeof(struct sockaddr_in6), addr,
+                  sizeof(addr), NULL, 0, NI_NUMERICHOST);
+      printf("Interface: %s\tAddress: %s\n", ifa-&gt;ifa_name, addr);
+    }
+  }
+
+  freeifaddrs(ifap);
+  return 0;
+}
+</code></pre>
+
+<p>The output on my system:</p>
+
+<pre><code>Interface: lo   Address: ::1
+Interface: br0  Address: fdbf:e684:d5fb:6:6e62:6dff:fed1:dfad
+Interface: br0  Address: 2001:db8:1f80:81c6:6e62:6dff:fed1:dfad
+Interface: br0  Address: fe80::6e62:6dff:fed1:dfad%br0
+Interface: virbr1       Address: fe80::5054:ff:fece:bfec%virbr1
+Interface: virbr0       Address: fe80::5054:ff:fef9:c92e%virbr0
+Interface: virbr2       Address: fe80::5054:ff:fedd:ea18%virbr2
+Interface: vnet0        Address: fe80::fc54:ff:fe90:de19%vnet0
+Interface: vnet1        Address: fe80::fc54:ff:fede:b69c%vnet1
+</code></pre>
+
+<p>Remember to add error checking to everything; it has been omitted from this example.</p>

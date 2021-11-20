@@ -1,0 +1,29 @@
+<p>Okay I figured this one out. I'm answering here so I can hopefully help someone someday, but the problem was a basic oversight on the difference between Has Many Through and Has And Belongs To Many Associations.</p>
+
+<p>You if you want to handle checkboxes or multiselect lists in a Has Many Through, there is no '_ids' method generated for you by the association and you need to write one for yourself.</p>
+
+<p>See Paul Barry's article here:
+<a href="http://paulbarry.com/articles/2007/10/24/has_many-through-checkboxes" rel="nofollow">http://paulbarry.com/articles/2007/10/24/has_many-through-checkboxes</a></p>
+
+<p>Polymorphic stuff can be complicated, but if you're stuck real good maybe take a step back and make sure it's not something even more basic that's messing you up-- worked for me!</p>
+
+<p>Below is the code modified from Paul's blog on how to handle this if you're dealing with a polymorphic has many through (basically you just need to use the attributes hash and write your polymorphic_type attribute):</p>
+
+<pre><code>attr_accessor :store_ids
+after_save :update_stores
+
+#after_save callback to handle group_ids
+def update_stores
+  unless store_ids.nil?
+    self.staffings.each do |staffing|
+      staffing.destroy unless store_ids.include?(staffing.staffable_id.to_s)
+      store_ids.delete(staffing.staffable_id.to_s)
+    end 
+    store_ids.each do |s|
+      self.staffings.create(attributes = {:staffable_id =&gt; s, :staffable_type =&gt; 'Store'}) unless s.blank?
+    end
+    reload
+    self.store_ids = nil
+  end
+end 
+</code></pre>

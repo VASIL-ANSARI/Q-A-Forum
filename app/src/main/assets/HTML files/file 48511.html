@@ -1,0 +1,71 @@
+<p>Well, after many hours, here's the solution to my problem for those ending up with the same problem.</p>
+
+<p>Turns out that resConfig is not for what I though. The proper and only way I found to force the locale for a specific flavor is like this:</p>
+
+<p>First, make sure all your activities extends a common activity which will be responsible to force the locale. (<em>I had to create 2 since I have some activities extending FragmentActivity and some extending Activity. I also don't really like doing so in the Activities constructor but since I have to call applyOverrideConfiguration before any call is done on getResources, I need to call it before the activity's onStart</em>).</p>
+
+<pre><code>public class LocaleMainActivity extends Activity {
+
+    public LocaleMainActivity() {
+        ActivityUtils.forceLocale(this);
+    }
+}
+
+public class LocaleMainFragmentActivity extends FragmentActivity {
+
+    public LocaleMainFragmentActivity() {
+        ActivityUtils.forceLocale(this);
+    }
+}
+
+//Method from ActivityUtils
+public static void forceLocale(ContextThemeWrapper contextThemeWrapper) {
+    Configuration configuration = new Configuration();
+    Locale defaultLocale = new Locale(BuildConfig.LOCALE);
+    configuration.locale = defaultLocale;
+    contextThemeWrapper.applyOverrideConfiguration(configuration);      
+}
+</code></pre>
+
+<p>Next, you need to define the locale in your build.gradle flavors</p>
+
+<pre><code>productFlavors {
+
+    myFrenchFlavor {
+     buildConfigField "String", "LOCALE", "\"fr\""
+    }
+    myEnglishFlavor {
+      buildConfigField "String", "LOCALE", "\"en\""
+    }
+}
+</code></pre>
+
+<p>I tested the solution on API 19+. Works when you change language while in the app too.</p>
+
+<p><br/><br/>
+<strong>Alternate solution</strong> (<em>won't work on Android M+ <a href="https://code.google.com/p/android-developer-preview/issues/detail?can=2&amp;start=0&amp;num=100&amp;q=&amp;colspec=ID%20Type%20Status%20Owner%20Summary%20Stars&amp;groupby=&amp;sort=&amp;id=2070" rel="nofollow">see android bug report</a></em>)
+This solution is wide spreaded on stackOverflow but I faced a wall while implementing this on Android M so keep this in mind.</p>
+
+<p>In the onCreate() of your AndroidApplication you can call updateConfiguration with the locale set.</p>
+
+<pre><code>Locale myLocale = new Locale(BuildConfig.LOCALE);
+Resources res = getResources();
+Configuration conf = res.getConfiguration();
+conf.locale = myLocale;
+res.updateConfiguration(conf, res.getDisplayMetrics());
+</code></pre>
+
+<p>You will also need to reset it if you defined onConfigurationChanged()</p>
+
+<pre><code>@Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);            
+        Configuration config = new Configuration(newConfig);
+        config.locale = new Locale(BuildConfig.LOCALE);
+        getBaseContext().getResources().updateConfiguration(config, getBaseContext().getResources().getDisplayMetrics());
+    }
+</code></pre>
+
+<p><strong>EDIT:</strong> Be aware that this applyOverrideConfiguration currently has a side effect which is explained here <a href="http://stackoverflow.com/questions/32050784/chromium-webview-does-not-seems-to-work-with-android-applyoverrideconfiguration">Chromium webview does not seems to work with Android applyOverrideConfiguration</a>. The Chromium team are currently working on it!</p>
+
+<p>Thanks.</p>

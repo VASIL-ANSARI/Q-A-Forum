@@ -1,0 +1,144 @@
+<p>Here's a list of differences. I've highlighted Oracle-specific features, and hopefully the community can add in other vendors' specific difference also. Differences that are common to most vendors can go directly below the headings, with differences highlighted below.</p>
+
+<p><hr></p>
+
+<h1>General Overview</h1>
+
+<p>If you want to quickly delete all of the rows from a table, and you're really sure that you want to do it, and you do not have foreign keys against the tables, then a TRUNCATE is probably going to be faster than a DELETE.</p>
+
+<p>Various system-specific issues have to be considered, as detailed below.</p>
+
+<p><hr></p>
+
+<h1>Statement type</h1>
+
+<p>Delete is DML, Truncate is DDL</p>
+
+<p><hr></p>
+
+<h1>Commit and Rollback</h1>
+
+<p>Variable by vendor</p>
+
+<p><strong>SQL*Server</strong></p>
+
+<p>Truncate can be rolled back.</p>
+
+<p><strong>PostgreSQL</strong></p>
+
+<p>Truncate can be rolled back.</p>
+
+<p><strong>Oracle</strong></p>
+
+<p>Because a TRUNCATE is DDL it involves two commits, one before and one after the statement execution. Truncate can therefore not be rolled back, and a failure in the truncate process will have issued a commit anyway.</p>
+
+<p>However, see Flashback below.</p>
+
+<p><hr></p>
+
+<h1>Space reclamation</h1>
+
+<p>Delete does not recover space, Truncate recovers space</p>
+
+<p><strong>Oracle</strong></p>
+
+<p>If you use the REUSE STORAGE clause then the data segments are not de-allocated, which can be marginally more efficient if the table is to be reloaded with data. The high water mark is reset.</p>
+
+<p><hr></p>
+
+<h1>Row scope</h1>
+
+<p>Delete can remove only some rows. Truncate removes all rows.</p>
+
+<p><strong>Oracle</strong></p>
+
+<p>When a table is partitioned, the individual partitions can be truncated in isolation, thus a partial removal of all the table's data is possible.</p>
+
+<p><hr></p>
+
+<h1>Object types</h1>
+
+<p>Delete can be applied to tables and tables inside a cluster. Truncate applies only to tables or the entire cluster. (May be Oracle specific)</p>
+
+<p><hr></p>
+
+<h1>Data Object Identity</h1>
+
+<p><strong>Oracle</strong></p>
+
+<p>Delete does not affect the data object id, but truncate assigns a new data object id <em>unless</em> there has never been an insert against the table since its creation Even a single insert that is rolled back will cause a new data object id to be assigned upon truncation.</p>
+
+<p><hr></p>
+
+<h1>Flashback (Oracle)</h1>
+
+<p>Flashback works across deletes, but a truncate prevents flashback to states prior to the operation.</p>
+
+<p>However, from 11gR2 the FLASHBACK ARCHIVE feature allows this, except in Express Edition</p>
+
+<p><a href="http://stackoverflow.com/questions/25950145/use-of-flashback-in-oracle">Use of FLASHBACK in Oracle</a>
+<a href="http://docs.oracle.com/cd/E11882_01/appdev.112/e41502/adfns_flashback.htm#ADFNS638">http://docs.oracle.com/cd/E11882_01/appdev.112/e41502/adfns_flashback.htm#ADFNS638</a></p>
+
+<p><hr></p>
+
+<h1>Privileges</h1>
+
+<p>Variable</p>
+
+<p><strong>Oracle</strong></p>
+
+<p>Delete can be granted on a table to another user or role, but truncate cannot be without using a DROP ANY TABLE grant.</p>
+
+<p><hr></p>
+
+<h1>Redo/Undo</h1>
+
+<p>Delete generates a small amount of redo and a large amount of undo. Truncate generates a negligible amount of each.</p>
+
+<p><hr></p>
+
+<h1>Indexes</h1>
+
+<p><strong>Oracle</strong></p>
+
+<p>A truncate operation renders unusable indexes usable again. Delete does not.</p>
+
+<p><hr></p>
+
+<h1>Foreign Keys</h1>
+
+<p>A truncate cannot be applied when an enabled foreign key references the table. Treatment with delete depends on the configuration of the foreign keys.</p>
+
+<p><hr></p>
+
+<h1>Table Locking</h1>
+
+<p><strong>Oracle</strong></p>
+
+<p>Truncate requires an exclusive table lock, delete requires a shared table lock. Hence disabling table locks is a way of preventing truncate operations on a table.</p>
+
+<p><hr></p>
+
+<h1>Triggers</h1>
+
+<p>DML triggers do not fire on a truncate.</p>
+
+<p><strong>Oracle</strong></p>
+
+<p>DDL triggers are available.</p>
+
+<p><hr></p>
+
+<h1>Remote Execution</h1>
+
+<p><strong>Oracle</strong></p>
+
+<p>Truncate cannot be issued over a database link.</p>
+
+<p><hr></p>
+
+<h1>Identity Columns</h1>
+
+<p><strong>SQL*Server</strong></p>
+
+<p>Truncate resets the sequence for IDENTITY column types, delete does not.</p>

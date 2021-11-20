@@ -1,0 +1,14 @@
+<p><a href="http://dev.mysql.com/doc/refman/5.7/en/string-comparison-functions.html" rel="nofollow">MySQL LIKE</a> is a "string comparison function" and as such compares one string to another, using "simple pattern matching".</p>
+
+<p>If you check the <a href="https://en.wikipedia.org/wiki/SQL:2003" rel="nofollow">SQL standard</a>, you'll notice that the <a href="http://savage.net.au/SQL/sql-2003-2.bnf.html#xref-LIKE" rel="nofollow">BNF grammar for <code>LIKE</code></a> accepts only "character-like" and "octet-like" arguments, both of which are essentially what we'd call strings. (There is some detail around the fact that <code>LIKE</code> performs a binary, character-for-character match on the RHS, which is different than how <code>=</code> operates: <code>foo LIKE 'bar'</code> and <code>foo='bar'</code> may produce different results.)</p>
+
+<p>All this means you <em>can't</em> do <code>LIKE ('a', 'b')</code> because the columnar expression <code>('a', 'b')</code> is not string-like. Or in geeky standard language, it's cardinality (2) differs from the expected cardinality (1). However, you can do this in MySQL and SQLite (maybe other engines):</p>
+
+<pre><code>WHERE foo LIKE ('%bar')
+</code></pre>
+
+<p>because the cardinality of the RHS is 1 (there is one column), which is what <code>LIKE</code> expects.</p>
+
+<p>You're wanting something effectively similar to <code>foo LIKE IN ('a', 'b')</code>, but that doesn't exist either (for the SQL standard reason mentioned above). <a href="http://stackoverflow.com/q/1127088/2908724">This Q&amp;A</a> shows some workarounds for that behavior, <code>REGEXP</code> based being the accepted answer.</p>
+
+<p>So, to get around this error, you need to rewrite your query to use multiple <code>LIKE</code>, or a <code>REGEXP</code>, or maybe even something like <a href="http://dev.mysql.com/doc/refman/5.7/en/string-functions.html#function_find-in-set" rel="nofollow"><code>FIND_IN_SET</code></a>.</p>

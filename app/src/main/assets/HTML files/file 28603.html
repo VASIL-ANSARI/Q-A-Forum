@@ -1,0 +1,47 @@
+<p>I think I found a good enough solution that allows me to use the database as a semaphore, and doesn't required me to install additional software on the server.</p>
+
+<p>It gos like this:</p>
+
+<p>------ The custom command ------</p>
+
+<pre><code>from django.db import transaction
+
+def run_one_job():
+    candidate_jobs = Job.objects.filter(status='PENDING')
+    job = lock_one_job_from_list(candidate_jobs)
+    if job:
+        process(job)  # whatever that means
+        job.status = 'DONE'
+        job.save()
+
+def lock_one_job_from_list(jobs):
+    for job in jobs:
+        _job = attempt_lock_job(job.id)
+        if _job:
+            return _job
+
+
+@transaction.commit_on_success
+def attempt_lock_job(id):
+    j = Job.objects.select_for_update(id=id)[0]  # wait until you get a write lock for that record
+    if j.status == 'PENDING':
+        j.status = 'RUNNING'
+        j.save()
+        return j
+</code></pre>
+
+<p>------ worker.sh -------</p>
+
+<pre><code>while [ 1 ]
+do
+./manage.py runJobs
+sleep 1
+done
+</code></pre>
+
+<p>Then I can spawn as many worker.sh instances as cores are available.
+This is not ideal because there will be a bunch of workers polling the database every second,
+but it does solve the biggest risk: running the same job twice.
+I'll think I'll go with this :-).</p>
+
+<p>Please let me know if you see any holes in this approach.</p>

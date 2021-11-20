@@ -1,0 +1,83 @@
+<p>This cannot be done in the way you want, but you can achieve something similar using reflection. Here is an example offering two possible solutions to your problem (<strong>updated</strong>):</p>
+
+<pre><code>abstract class Foo
+{
+    protected abstract string _ElementName { get; }
+
+    public static string GetElementName&lt;T&gt;() where T : Foo, new()
+    {
+        return typeof(T).GetProperty("_ElementName", BindingFlags.Instance | BindingFlags.NonPublic)?
+                        .GetValue(new T()) as string;
+    }
+
+    public static string GetStaticElementName&lt;T&gt;() where T : Foo, new()
+    {
+        return typeof(T).GetProperty("ElementName", BindingFlags.Static | BindingFlags.NonPublic)?
+                        .GetValue(null) as string;
+    }
+}
+
+class Bar : Foo
+{
+    protected static string ElementName
+    {
+        get
+        {
+            return "StaticBar";
+        }
+    }
+
+    protected override string _ElementName
+    {
+        get
+        {
+            return "Bar";
+        }
+    }
+}
+
+class FooBar : Bar
+{
+    protected static string ElementName
+    {
+        get
+        {
+            return "StaticFooBar";
+        }
+    }
+
+    protected override string _ElementName
+    {
+        get
+        {
+            return "FooBar";
+        }
+    }
+}
+
+class Baz&lt;T&gt; where T : Foo, new()
+{
+    public string ElementName
+    {
+        get
+        {
+            return Foo.GetElementName&lt;T&gt;();
+        }
+    }
+
+    public string StaticElementName
+    {
+        get
+        {
+            return Foo.GetStaticElementName&lt;T&gt;();
+        }
+    }
+}
+
+...
+
+Console.WriteLine(new Baz&lt;Bar&gt;().ElementName); // Bar
+Console.WriteLine(new Baz&lt;FooBar&gt;().ElementName); // FooBar
+Console.WriteLine(new Baz&lt;Bar&gt;().StaticElementName); // StaticBar
+Console.WriteLine(new Baz&lt;FooBar&gt;().StaticElementName); // StaticFooBar
+</code></pre>

@@ -1,0 +1,22 @@
+<p>The question does not make it clear whether the <code>WS_OVERLAPPEDWINDOW</code> main window is either a dialog, or subclassed to work like a dialog (i.e. based on <code>DefDlgProc</code>). Some hints about TAB navigation and DM_SETDEFID in the OP and following comments appear to indicate that it's a dialog(-styled) window.</p>
+
+<p>For dialogs, the correct way to move the input focus between child controls is by sending the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms645432.aspx" rel="nofollow">WM_NEXTDLGCTL message</a>, rather than calling <code>SetFocus</code> directly. As noted in the docs:</p>
+
+<blockquote>
+  <p>This message performs additional dialog box management operations beyond those performed by the SetFocus function WM_NEXTDLGCTL updates the default pushbutton border, sets the default control identifier, and automatically selects the text of an edit control (if the target window is an edit control).</p>
+</blockquote>
+
+<p>More details at <a href="https://blogs.msdn.microsoft.com/oldnewthing/20040802-00/?p=38283" rel="nofollow">How to set focus in a dialog box</a>, including this part:</p>
+
+<blockquote>
+  <p>As the remarks to the DM_SETDEFID function note, messing directly with the default ID carelessly can lead to odd cases like a dialog box with two default buttons. Fortunately, you rarely need to change the default ID for a dialog.</p>
+  
+  <p>A bigger problem is using SetFocus to shove focus around a dialog. If you do this, you are going directly to the window manager, bypassing the dialog manager. This means that you can create âimpossibleâ situations like having focus on a pushbutton without that button being the default!</p>
+  
+  <p>To avoid this problem, donât use SetFocus to change focus on a dialog. Instead, use the WM_NEXTDLGCTL message.</p>
+</blockquote>
+
+<p><hr>
+[EDIT] &nbsp;After the OP edit, the main window turns out to be a regular window, not a dialog. The newly posted code, however, does not remember the focused child (nor does it remove/restore the default pushbutton style) after the main window is deactivated and reactivated, relegates keyboard navigation such as VK_TAB to child controls etc. Those introduce inconsistencies with the default dialog-like behaviors.</p>
+
+<p>In order to make the main window behave <em>like</em> a dialog (and do it right), the WNDPROC would need to mimic the relevant parts of DefDlgProc,  at least those that pertain to navigation. From <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms644995.aspx" rel="nofollow">Dialog Box Programming Considerations</a>, among the messages such a WNDPROC would need special handling for are <code>DM_GETDEFID</code>, <code>DM_SETDEFID</code>, <code>WM_ACTIVATE</code>, <code>WM_NEXTDLGCTL</code>, <code>WM_SHOWWINDOW</code>, <code>WM_SYSCOMMAND</code>. Once that's done, my original answer still applies.</p>

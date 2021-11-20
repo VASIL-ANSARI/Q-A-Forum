@@ -1,0 +1,75 @@
+<p>As I mentioned in my comment, directives:</p>
+
+<ul>
+<li>Are not functions</li>
+<li>Cannot be called</li>
+<li>Are static parts of your website, unless you use <code>ng-if</code> or <code>ng-switch</code></li>
+<li>Should not perform any business logic</li>
+</ul>
+
+<p>It appears your problem is an XY problem, so let's start over. What are you trying to do?</p>
+
+<p>From the looks of it, you want to set a directive as disabled or enabled based on the result of a HTTP call. Instead of performing the HTTP call inside of your directive, how about you pass the directive a variable from an isolation scope and alter that variable from a parent controller? This makes your code less coupled and lets you adhere to best angular practises.</p>
+
+<pre><code>// usage: &lt;enclose disabled="someScopeVariable"&gt;&lt;/enclose&gt;
+.directive('enclose', function() {
+  return {
+    scope: {
+      value: '=',
+      // One time binding is only supported natively in 1.3+.
+      maxLength: '::'
+    },
+    link: function ($scope, $elem, $attrs) {
+      var maxLength = parseInt($scope.maxLength);
+      // What purpose does $scope.$last serve here?
+      if(!$scope.$last) return;
+      $scope.$watch('value', function(newValue, oldValue) {
+        if(newValue === oldValue) {
+          return;
+        }
+
+        if(oldValue.length &gt; maxLength) {
+          $elem.removeAttribute('disabled');
+        } else {
+          $elem.setAttribute('disabled', 'disabled');
+        }
+      });
+    }
+  }
+})
+.controller('YourController', function($scope, attachmentService) {
+  $scope.regulationGrid = {
+    onRegisterApi: function(gridApi) {
+      .....
+      $scope.gridApi.pagination.on.paginationChanged($scope, function() {
+        $scope.currentPage = $scope.gridApi.pagination.getPage();
+        // $http call is moved to external service.
+        attachmentService.get($scope.row.entity.id)
+          .then(function(data) {
+            $scope.enclosedData = data;
+          });
+      });
+    }
+  };
+
+})
+.service('attachmentService', function() {
+  this.get = function get(rowId) {
+    // Why are you using getCurrentPath, by the way? That seems very hacky.
+    // An alternative would be to use /api and then use a http interceptor to
+    // rewrite /api to wherever the base path actually is. Either way,
+    // the service shouldn't do this because of code duplication.
+    return $http.get('/api/' + rowId + '/attachment').then(function(response) {
+      return response.data;
+    });
+  };
+});
+</code></pre>
+
+<p>Then your html MIGHT look like this:</p>
+
+<pre><code>&lt;div ng-controller='YourController'&gt;
+  &lt;enclose value="enclosedData" max-length="30"&gt;
+  &lt;/enclose&gt;
+&lt;/div&gt;
+</code></pre>

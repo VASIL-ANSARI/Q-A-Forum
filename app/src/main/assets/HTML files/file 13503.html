@@ -1,0 +1,47 @@
+<p>You are telling spring to overwrite the <code>id</code> field on the User object that is there, with a different value of <code>id</code> taken from the JSP.  If you want to change the owner, you need to get the entire User object that is the new owner, and change the reference to point to it on the parent record.  You can't just change the ID number on an existing object.</p>
+
+<p>There are a number of ways to accomplish this, commonly a <code>PropertyEditor</code> is used so you bind a number directly to the value 'owner' and supply a class that tells spring how to turn a number into an instance of User.  </p>
+
+<p>On the form, bind to 'owner' instead of 'id':</p>
+
+<pre><code>&lt;form:select path="owner" id="owner"&gt;
+  &lt;form:options items="${owners}" itemValue="id" /&gt;
+&lt;/form:select&gt;
+</code></pre>
+
+<p>In the controller, initialize a property editor:</p>
+
+<pre><code>@InitBinder
+private void registerPropertyEditor(DataBinder binder) {
+    binder.registerCustomEditor(User.class, "owner", new UserPropertyEditor(userService));
+}
+</code></pre>
+
+<p>Then you make a class that tells spring how to turn ID numbers into users:</p>
+
+<pre><code>public class UserPropertyEditor extends PropertyEditorSupport {
+
+    private UserService userService;
+
+    public UserPropertyEditor(UserService userService) {
+        this.userService = userService;
+    }
+
+    @Override
+    public String getAsText() {
+        //Handle null value, value of incorrect type, etc here
+
+        return String.valueOf(((User) getValue()).getId());
+    }
+
+    @Override
+    public void setAsText(String id) throws IllegalArgumentException {
+        //handle empty string, number format exception, etc
+
+        User user = userService.getUser(integerId);
+
+        setValue(user);
+    }
+
+}
+</code></pre>

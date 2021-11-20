@@ -1,0 +1,56 @@
+<p>I created own class to clear test database</p>
+
+<pre><code>class CleanTestDatabase
+
+  TABLE_TO_EXCLUDE = ['spatial_ref_sys', 'schema_migrations']
+  CONNECTION = ActiveRecord::Base.connection
+
+  def self.clean(*tenants)
+    tenants.each{ |tenant| delete_all_in_tenant(tenant) }
+  end
+
+  def self.drop_all_schemas
+    schemas = ActiveRecord::Base.connection.select_values &lt;&lt;-SQL
+        SELECT
+          schema_name
+        FROM
+          information_schema.schemata
+        WHERE
+          schema_name NOT IN ('information_schema','public', 'postgis') AND
+          schema_name NOT LIKE 'pg%'
+    SQL
+    schemas.each { |schema| Apartment::Tenant.drop(schema) }
+  end
+
+  private
+
+    def self.delete_all_in_tenant(tenant)
+      CONNECTION.disable_referential_integrity do
+        tables_to_clean(tenant).each do |table|
+          delete_from(table) if table_has_new_rows?(table)
+        end
+      end
+    end
+
+    def self.tables_to_clean(tenant)
+      tables = CONNECTION.tables - TABLE_TO_EXCLUDE
+      tables.map{ |table| "#{tenant}.#{table}" }
+    end
+
+    def self.table_has_new_rows?(table_name)
+      CONNECTION.select_value("SELECT count(*) FROM #{table_name}").to_i &gt; 0
+    end
+
+    def self.delete_from(table_name)
+      CONNECTION.execute("DELETE FROM #{table_name}")
+    end
+end
+</code></pre>
+
+<p>spec/rails_helper.rb</p>
+
+<pre><code>  config.before(:each) do
+    CleanTestDatabase.clean('public', 'app')
+    Apartment::Tenant.switch!('app')
+  end
+</code></pre>

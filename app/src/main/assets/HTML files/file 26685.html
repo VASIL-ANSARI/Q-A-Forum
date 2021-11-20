@@ -1,0 +1,67 @@
+<p>I'll give you the code for the simplest version first, then explain it so you can expand it as needed.</p>
+
+<pre><code>class Canvas_On:    
+    def __init__(self, master):
+        # ... your original code here ...
+        self.c.bind('&lt;Button-1&gt;', self.click)
+        self.c.bind('&lt;B1-Motion&gt;', self.drag)
+
+    def click(self, event):
+        self.c.scan_mark(event.x, event.y)
+
+    def drag(self, event):
+        self.c.scan_dragto(event.x, event.y)
+</code></pre>
+
+<p>First, the easy part: scrolling the canvas manually. As the <a href="http://effbot.org/tkinterbook/canvas.htm#Tkinter.Canvas.xview-method" rel="nofollow">documentation</a> explains, you use the <code>xview</code> and <code>yview</code> methods, exactly as your scrollbar <code>command</code>s do. Or you can just directly call <code>xview_moveto</code> and <code>yview_moveto</code> (or the <code>foo_scroll</code> methods, but they don't seem to be what you want here). You can see that I didn't actually use these; I'll explain below.</p>
+
+<p>Next, to capture click-and-drag events on the canvas, you just bind <code>&lt;B1-Motion&gt;</code>, as you would for a normal drag-and-drop.</p>
+
+<p>The tricky bit here is that the drag event gives you screen pixel coordinates, while the <code>xview_moveto</code> and <code>yview_moveto</code> methods take a fraction from 0.0 for the top/left to 1.0 for the bottom/right. So, you'll need to capture the coordinates of the original click (by binding <code>&lt;Button-1&gt;</code>; with that, the coordinates of the drag event, and the canvas's bbox, you can calculate the <code>moveto</code> fractions. If you're using the <code>scale</code> method and want to drag appropriately while zoomed in/out, you'll need to account for that as well.</p>
+
+<p>But unless you want to do something unusual, the <code>scan</code> helper methods do exactly that calculation for you, so it's simpler to just call them.</p>
+
+<hr>
+
+<p>Note that this will also capture click-and-drag events on the items on the canvas, not just the background. That's probably what you want, unless you were planning to make the items draggable within the canvas. In the latter case, add a background rectangle item (either transparent, or with whatever background you intended for the canvas itself) below all of your other items, and <code>tag_bind</code> that instead of <code>bind</code>ing the canvas itself. (IIRC, with older versions of Tk, you'll have to create a tag for the background item and <code>tag_bind</code> thatâ¦ but if so, you presumably already had to do that to bind all your other items, so it's the same here. Anyway, I'll do that even though it shouldn't be necessary, because tags are a handy way to create groups of items that can all be bound together.)</p>
+
+<p>So:</p>
+
+<pre><code>class Canvas_On:    
+    def __init__(self, master):
+        # ... your original code here ...
+        self.c.tag_bind('bg', '&lt;Button-1&gt;', self.click)
+        self.c.tag_bind('bg', '&lt;B1-Motion&gt;', self.drag)
+        self.c.tag_bind('draggable', '&lt;Button-1&gt;', self.click_item)
+        self.c.tag_bind('draggable', '&lt;B1-Motion&gt;', self.drag_item)
+    # ... etc. ...
+    def click_item(self, event):
+        x, y = self.c.canvasx(event.x), self.c.canvasy(event.y)
+        self.drag_item = self.c.find_closest(x, y)
+        self.drag_x, self.drag_y = x, y
+        self.tag_raise(item)
+    def drag_item(self, event):
+        x, y = self.c.canvasx(event.x), self.c.canvasy(event.y)
+        self.c.move(self.drag_item, x-self.drag_x, y-self.drag_y)
+        self.drag_x, self.drag_y = x, y
+
+class Drawing_Utility:
+    # ...
+    def drawer(self, canvas):
+        self.c.create_rectangle(0, 0, 5000, 5000, 
+                                fill='black', tags='bg')
+        self.c.create_oval(50,50,150,150, fill='orange', tags='draggable')
+        self.c.create_oval(1000,1000,1100,1100, fill='orange', tags='draggable')
+</code></pre>
+
+<p>Now you can drag the whole canvas around by its background, but dragging other items (the ones marked as 'draggable') will do whatever else you want instead.</p>
+
+<hr>
+
+<p>If I understand your comments correctly, your remaining problem is that you're trying to use window coordinates when you want canvas coordinates. The section Coordinate Systems in the docs explains the distinction. </p>
+
+<p>So, let's say you've got an item that you placed at 500, 500, and the origin is at 0, 0. Now, you scroll the canvas to 500, 0. The window coordinates of the item are now 0, 500, but its canvas coordinates are still 500, 500. As the docs say:</p>
+
+<blockquote>
+  <p>To convert from window coordinates to canvas coordinates, use the <code>canvasx</code> and <code>canvasy</code> methods</p>
+</blockquote>

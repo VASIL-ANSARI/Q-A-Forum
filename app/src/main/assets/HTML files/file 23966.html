@@ -1,0 +1,86 @@
+<p>I also asked this question in <a href="http://mail.python.org/pipermail/distutils-sig/2013-May/020963.html" rel="nofollow">Distutils-SIG</a>.
+A mention there of <code>setup_requires</code> led me to
+<a href="http://stackoverflow.com/a/12061891/6364">http://stackoverflow.com/a/12061891/6364</a>, which gave me the hint
+I needed: create a separate <code>Distribution</code> object before calling <code>setup</code>
+which defines the <code>setup_requires</code> entries.</p>
+
+<p>Jam's <code>setup.py</code> now looks like:</p>
+
+
+
+<pre class="lang-python prettyprint-override"><code>from setuptools import setup, dist
+
+dist.Distribution(dict(setup_requires='Bread'))
+
+from bread.setup_topping import *
+
+setup(
+    name='Jam',
+    version='0.2',
+    long_description=open('README.md').read(),
+    **topping_setup_options
+)
+
+# Remove *.egg left by bootstrapping Bread
+cleanup_bread_bootstrap()
+</code></pre>
+
+<hr>
+
+<p>EDIT: a better explanation of what's happening in Jam's <code>setup.py</code> is needed:</p>
+
+<ul>
+<li>The initial <code>Distribution(setup_requires='Bread')</code> is using <code>easy_install</code>
+to install Bread and its dependencies in the <em>current directory</em>.</li>
+<li>The call to <code>setup()</code> triggers the <code>bdist_egg</code> below, which uses Bread
+to build Jam's <code>output</code>. Bread is found in the current directory.</li>
+<li><code>setup()</code> later installs Jam, Bread, and all the dependencies,
+in the correct location.</li>
+<li>The call to <code>cleanup_bread_bootstrap()</code> removes all the Eggs that were
+laid in the current directory by the initial <code>Distribution</code>.</li>
+</ul>
+
+<hr>
+
+<p>And <code>bread/setup_topping.py</code> looks like:</p>
+
+<pre class="lang-python prettyprint-override"><code>from setuptools.command.bdist_egg import bdist_egg as _bdist_egg
+import os, fnmatch, glob, shutil
+
+def recursive_data_files(treeroot, pattern):
+    results = []
+    for base, dirs, files in os.walk(treeroot):
+        goodfiles = fnmatch.filter(files, pattern)
+        if goodfiles:
+            results.append((base, [os.path.join(base, f) for f in goodfiles]))
+    return results
+
+def make_data_files(output='output'):
+    return (
+        [('', ['bread.yaml'])]
+        + recursive_data_files(output, '*')
+    )
+
+class bdist_egg(_bdist_egg):
+    def initialize_options(self):
+        bake_bread()    # build files to './output'
+        self.distribution.data_files = make_data_files()
+        _bdist_egg.initialize_options(self)
+
+topping_setup_options = dict(
+    cmdclass={
+        'bdist_egg': bdist_egg,
+    },
+    install_requires=[
+        'Bread',
+    ],
+    zip_safe=False,
+)
+
+def cleanup_bread_bootstrap(root='.'):
+    for f in glob.glob(os.path.join(os.path.abspath(root), '*.egg')):
+        if os.path.isdir(f):
+            shutil.rmtree(f)  # Egg directory
+        else:
+            os.remove(f)      # Zipped Egg
+</code></pre>

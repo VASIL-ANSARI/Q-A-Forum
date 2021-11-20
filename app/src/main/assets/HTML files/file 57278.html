@@ -1,0 +1,28 @@
+<p>It looks like you want to filter out records that have two values for <code>sub_id</code>.  This suggests using analytic functions:</p>
+
+<pre><code>select e.*
+from (select e.*,
+             count(distinct sub_id) over (partition by c_id) as numcid
+      from e_table e
+     ) e
+where numcid = 1;
+</code></pre>
+
+<p>Also, your sample code has date logic in it, but the question doesn't mention that at all.</p>
+
+<p>If the above isn't quite the right logic, I'm pretty sure analytic functions can do what you want.</p>
+
+<p>EDIT:</p>
+
+<p>If you are just looking for places where a "1" occurs after a "2", then use conditional aggregation:</p>
+
+<pre><code>select e.c_id
+from (select e.c_id,
+             min(case when sub_id = 1 then e_date end) as sub1_date,
+             min(case when sub_id = 2 then e_date end) as sub2_date
+      from e_table e
+     ) e
+where sub1_date &gt; sub2_date;
+</code></pre>
+
+<p>You can readily modify this to get the original rows.</p>

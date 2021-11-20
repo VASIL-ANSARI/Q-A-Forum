@@ -1,0 +1,199 @@
+<p>Here's my own solution, using elements of c++0x that the current version of VS2010 allows for:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;numeric&gt;
+#include &lt;string&gt;
+
+#include &lt;initializer_list&gt;
+
+template &lt;typename enumT&gt;
+class FlagSet
+{
+    public:
+
+        typedef enumT                     enum_type;
+        typedef decltype(enumT()|enumT()) store_type;
+
+        // Default constructor (all 0s)
+        FlagSet() : FlagSet(store_type(0))
+        {
+
+        }
+
+        // Initializer list constructor
+        FlagSet(const std::initializer_list&lt;enum_type&gt;&amp; initList)
+        {
+            // This line didn't work in the initializer list like I thought it would.  It seems to dislike the use of the lambda.  Forbidden, or a compiler bug?
+            flags_ = std::accumulate(initList.begin(), initList.end(), store_type(0), [](enum_type x, enum_type y) { return x | y; })
+        }
+
+        // Value constructor
+        explicit FlagSet(store_type value) : flags_(value)
+        {
+
+        }
+
+        // Explicit conversion operator
+        operator store_type() const
+        {
+            return flags_;
+        }
+
+        operator std::string() const
+        {
+            return to_string();
+        }
+
+        bool operator [] (enum_type flag) const
+        {
+            return test(flag);
+        }
+
+        std::string to_string() const
+        {
+            std::string str(size(), '0');
+
+            for(size_t x = 0; x &lt; size(); ++x)
+            {
+                str[size()-x-1] = (flags_ &amp; (1&lt;&lt;x) ? '1' : '0');
+            }
+
+            return str;
+        }
+
+        FlagSet&amp; set()
+        {
+            flags_ = ~store_type(0);
+            return *this;
+        }
+
+        FlagSet&amp; set(enum_type flag, bool val = true)
+        {
+            flags_ = (val ? (flags_|flag) : (flags_&amp;~flag));
+            return *this;
+        }
+
+        FlagSet&amp; reset()
+        {
+            flags_ = store_type(0);
+            return *this;
+        }
+
+        FlagSet&amp; reset(enum_type flag)
+        {
+            flags_ &amp;= ~flag;
+            return *this;
+        }
+
+        FlagSet&amp; flip()
+        {
+            flags_ = ~flags_;
+            return *this;
+        }
+
+        FlagSet&amp; flip(enum_type flag)
+        {
+            flags_ ^= flag;
+            return *this;
+        }
+
+        size_t count() const
+        {
+            // http://www-graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
+
+            store_type bits = flags_;
+            size_t total = 0;
+            for (; bits != 0; ++total)
+            {
+                bits &amp;= bits - 1; // clear the least significant bit set
+            }
+            return total;
+        }
+
+        /*constexpr*/ size_t size() const   // constexpr not supported in vs2010 yet
+        {
+            return sizeof(enum_type)*8;
+        }
+
+        bool test(enum_type flag) const
+        {
+            return (flags_ &amp; flag) &gt; 0;
+        }
+
+        bool any() const
+        {
+            return flags_ &gt; 0;
+        }
+
+        bool none() const
+        {
+            return flags == 0;
+        }
+
+    private:
+
+        store_type flags_;
+
+};
+
+template&lt;typename enumT&gt;
+FlagSet&lt;enumT&gt; operator &amp; (const FlagSet&lt;enumT&gt;&amp; lhs, const FlagSet&lt;enumT&gt;&amp; rhs)
+{
+    return FlagSet&lt;enumT&gt;(FlagSet&lt;enumT&gt;::store_type(lhs) &amp; FlagSet&lt;enumT&gt;::store_type(rhs));
+}
+
+template&lt;typename enumT&gt;
+FlagSet&lt;enumT&gt; operator | (const FlagSet&lt;enumT&gt;&amp; lhs, const FlagSet&lt;enumT&gt;&amp; rhs)
+{
+    return FlagSet&lt;enumT&gt;(FlagSet&lt;enumT&gt;::store_type(lhs) | FlagSet&lt;enumT&gt;::store_type(rhs));
+}
+
+template&lt;typename enumT&gt;
+FlagSet&lt;enumT&gt; operator ^ (const FlagSet&lt;enumT&gt;&amp; lhs, const FlagSet&lt;enumT&gt;&amp; rhs)
+{
+    return FlagSet&lt;enumT&gt;(FlagSet&lt;enumT&gt;::store_type(lhs) ^ FlagSet&lt;enumT&gt;::store_type(rhs));
+}
+
+template &lt;class charT, class traits, typename enumT&gt;
+std::basic_ostream&lt;charT, traits&gt; &amp; operator &lt;&lt; (std::basic_ostream&lt;charT, traits&gt;&amp; os, const FlagSet&lt;enumT&gt;&amp; flagSet)
+{
+    return os &lt;&lt; flagSet.to_string();
+}
+</code></pre>
+
+<p>The interface is modeled after <a href="http://www.cplusplus.com/reference/stl/bitset/">std::bitset</a>. My aim was to be true to the c++ ethos of type safety and minimal (if any) overhead.  I'd welcome any feedback on my implementation.</p>
+
+<p>Here's a minimal example:</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+enum KeyMod
+{
+    Alt     = 1 &lt;&lt; 0,  // 1
+    Shift   = 1 &lt;&lt; 1,  // 2
+    Control = 1 &lt;&lt; 2   // 4
+};
+
+void printState(const FlagSet&lt;KeyMod&gt;&amp; keyMods)
+{
+    std::cout &lt;&lt; "Alt is "     &lt;&lt; (keyMods.test(Alt)     ? "set" : "unset") &lt;&lt; ".\n";
+    std::cout &lt;&lt; "Shift is "   &lt;&lt; (keyMods.test(Shift)   ? "set" : "unset") &lt;&lt; ".\n";
+    std::cout &lt;&lt; "Control is " &lt;&lt; (keyMods.test(Control) ? "set" : "unset") &lt;&lt; ".\n";
+}
+
+int main(int argc, char* argv[])
+{
+    FlagSet&lt;KeyMod&gt; keyMods(Shift | Control);
+
+    printState(keyMods);
+
+    keyMods.set(Alt);
+    //keyMods.set(24);    // error - an int is not a KeyMod value
+    keyMods.set(Shift);
+    keyMods.flip(Control);
+
+    printState(keyMods);
+
+    return 0;
+}
+</code></pre>

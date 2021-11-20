@@ -1,0 +1,43 @@
+<p>I assume what you would like to know is how to handle concurrency, <em>preventing</em> race conditions which can occur where two parts of the application modify and accidentally overwrite the same data.</p>
+
+<p>You have mostly two strategies for this: pessimistic locking and optimistic locking:</p>
+
+<h2>Pessimistic locking</h2>
+
+<p>here you assume that the likelyhood that two threads overwrite the same data is high, so you would like it to handle it in a transparent way. To handle this, increase the isolation level of your Spring transactions from it's default value of <code>READ_COMMITTED</code> to for example <code>REPEATABLE_READ</code> which should be sufficient in most cases:</p>
+
+<pre><code>@Transactional(isolation=Isolation.REPEATEABLE_READ)
+public void yourBusinessMethod {
+    ...
+}
+</code></pre>
+
+<p>In this case if you read some data in the beginning of the method, you are sure that noone can overwrite the data in the database while your method is ongoing. Note that it's still possible for another thread to insert extra records to a query you made (a problem known as phantom reads), but not change the records you already read.</p>
+
+<p>If you want to protect against phantom reads, you need to upgrade the isolation level to <code>SERIALIZABLE</code>. The improved isolation comes at a performance cost, your program will run slower and will more frequently 'hang' waiting for the other part of the program to finish.</p>
+
+<h2>Optimistic Locking</h2>
+
+<p>Here you assume that data access colisions are rare, and that in the rare cases they occur they are easilly recoverable by the application. In this mode, you keep all your business methods in their default <code>REPEATABLE_READ</code> mode.</p>
+
+<p>Then each Hibernate entity is marked with a version column:</p>
+
+<pre><code>@Entity
+public SomeEntity {
+    ...
+    @Version
+    private Long version;
+}
+</code></pre>
+
+<p>With this each entity read from the database is versioned using the version column. When Hibernate write changes to an entity in the database, it will check if the version was incremented since the last time that transaction read the entity.</p>
+
+<p>If so it means someone else modified the data, and decisions where made using stale data. In this case a <code>StaleObjectException</code> is thrown, that needs to be caught by the application and handled, ideally at a central place.</p>
+
+<p>In the case of a GUI, you usuall catch the exception, show a message saying <code>user xyz changed this data while you where also editing it, your changes are lost. Press Ok to reload the new data.</code></p>
+
+<p>With optimistic locking your program will run faster but the applications needs to handle some concurrency aspects that would otherwise be transparent with pessimistic locking: version entities, catch exceptions.</p>
+
+<p>The most frequently used method is optimistic locking, as it seems to be acceptable in most applications. With pessimistic locking it's very easy to cause performance problems, specially when data access colisions are rare and can be solved in a simple way.</p>
+
+<p>There are no constraints to mix the use of the two concurrency handling methods in the same application if needed.</p>

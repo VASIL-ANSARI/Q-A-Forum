@@ -1,0 +1,134 @@
+<p><strong>Note:</strong> throughout the comments this answer has changed drastically. Please view the earlier revisions if you would like to see the evolution of this answer.</p>
+
+<p>After getting a hold of your JsFiddle example I was able to get it working in a way I think you wanted.</p>
+
+<p><a href="http://jsfiddle.net/6agqrw60/3/" rel="nofollow"><strong>Working Demo</strong></a></p>
+
+<p><strong>HTML:</strong></p>
+
+<pre><code>&lt;body&gt;
+    &lt;div id="wrapper"&gt;
+        &lt;div id="player-placeholder"&gt;&lt;!-- rendered template goes here --&gt;&lt;/div&gt;
+
+        &lt;!-- handlebars template: --&gt;
+        &lt;script id="player-template" type="text/x-handlebars-template"&gt;
+            {{#each tracks}}
+                &lt;div class="track"&gt;
+                    &lt;header class="header"&gt;
+                        &lt;span class="artist"&gt;{{user.username}}&lt;/span&gt; - &lt;span class="title"&gt;{{title}}&lt;/span&gt;
+                    &lt;/header&gt;
+                    &lt;section class="player" data-uri="{{permalink_url}}"&gt;
+                    &lt;/section&gt;
+                &lt;/div&gt;
+            {{/each}}
+        &lt;/script&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+</code></pre>
+
+<p><strong>JavaScript:</strong></p>
+
+<pre><code>$(document).ready(function() {
+
+  /*
+    get your template string See:
+
+    http://api.jquery.com/id-selector/
+    http://api.jquery.com/html/
+  */
+  var source = $('#player-template').html();
+
+  // compile the template into a handlebars function
+  var template = Handlebars.compile(source);
+
+  // initialize sound cloud api
+  SC.initialize({
+    client_id: '90fb9e15c1e26f39b63f57015ab8da0d'
+  });
+
+  /*
+    This function will be called once the HTTP transaction
+    started by SC.get(...) completes. Note, there's nothing
+    wrong with doing this as an anonymous function, I'm
+    simply assigning it to a variable to show that this
+    is a distinct function that's called later
+  */
+  var callback = function(tracksResponse){
+    /*
+       once a response has been received, we'll use the response
+       to generate a new context to pass to the template function.
+       Note, you can use the template function in here because its
+       within a closure. See:
+       https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures
+    */
+    var context = { tracks: tracksResponse };
+    var html = template(context);
+
+    /*
+      assign the rendered html to your placeholder on the page
+      see: http://api.jquery.com/html/
+    */
+    $('#player-placeholder').html(html);
+
+    /*
+      Now that the html is rendered and on the page, its time to
+      setup the sound cloud players. Note the css classes I assigned
+      to the track/player. This line selects all of the player's and
+      runs the function over each. See:
+
+      http://api.jquery.com/class-selector/
+      http://api.jquery.com/each/
+    */
+    $('.track .player').each(function(index, e){
+      var $this = $(this); // jQuery reference to the current object in 'each loop'
+
+      /*
+        I assigned the permalink_url of each track to an attribute called 'data-uri'
+        This line gets the value of that attribute. See:
+
+        http://api.jquery.com/data/#data2
+      */
+      var permalink = $this.data('uri'); 
+      var urlParameters = '/&amp;maxheight=100&amp;maxwidth=300&amp;format=json&amp;sharing=false';
+
+      /*
+        finally we call the sound cloud oEmbed function feeding it the url
+        stored in the element, as well as the actual element.
+
+        (see the second argument of the each function: http://api.jquery.com/each/)
+      */
+      SC.oEmbed(permalink + urlParameters, e);
+    });
+  };
+
+  // get tracks for your artist
+  // Note the "limit" in the object controls the number of items returned
+  // by sound cloud
+  SC.get("/users/theshins/tracks", {limit: 5}, callback);
+});
+</code></pre>
+
+<hr>
+
+<p><strong>What went wrong?</strong></p>
+
+<p>JavaScript is a single-threaded, asynchronous, event-driven language. That giant mouth-full means JavaScript doesn't really have a notion of threading (I'm intentionally ignoring WebWorkers). To work around that limitation, almost all IO in JavaScript is non-blocking (asynchronous).</p>
+
+<p>Whenever an asynchronous IO transaction begins it immediately returns to the caller and code execution continues. Almost all IO transactions take a 'callback' or have an event that will be called when the IO transaction completes. That means the basic pattern for all IO operations follows something like this:</p>
+
+<ul>
+<li>Create a callback function</li>
+<li>Call IO operation, passing it the arguments it requires to complete, plus the callback</li>
+<li>Execution returns immediately</li>
+<li>Sometime in the future, the callback function is called</li>
+</ul>
+
+<p>In your original example <code>$(document).ready(function() { ... })</code> queues an anonymous function to fire when the document.onReady event is raised. Your original example, however, had two callbacks assigned. This isn't a problem, an in fact <code>.ready(...)</code> is designed to accept and queue many callbacks. However, where you went wrong is you had two separate blocks of code that called <code>SC.get(...)</code>.</p>
+
+<p>Technically if done right this wouldn't be a problem, but your first on ready callback's purpose was tasked to setup the page's HTML while your second callback tried to initialize the player controls based on html on the page. Remember these events and IO operations are asynchronous, they'll fire in whatever order. Essentially this became a timing issue, you were attempting to initialize controls on the page, and generate HTML to display on the page at the same time. </p>
+
+<p><strong>How it was fixed</strong></p>
+
+<p>To fix the timing issue you need to synchronize when you get your info, when you build your template HTML, and when you initialize your controls. There's a lot of ways to do this and many frameworks support the idea of <a href="http://api.jquery.com/category/deferred-object/" rel="nofollow">promises</a> to help gain control over the order that asynchronous events are fired, and their callbacks called.</p>
+
+<p>I took the simple route and combined all of your <code>SC.get</code> calls in to one, then within it's callback I render the handlebars template and initialize the SoundCloud players.</p>

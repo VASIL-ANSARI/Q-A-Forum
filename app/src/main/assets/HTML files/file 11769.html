@@ -1,0 +1,56 @@
+<p>OK. So this answer should give you everything you need apart from the 'months since last range end' field. Maybe you can build on it and figure it out yourself ;-). I've renamed the <code>#data</code> table (referred to in the Consecutive Streak of Dates post) as as <code>payment</code>:</p>
+
+<pre><code>CREATE TABLE payment
+(
+Contact_reference VARCHAR(55),
+Date_payment DATETIME,
+Payment_value double
+);
+
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2003-06-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2004-06-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2004-12-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-04-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-05-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-06-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-07-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-08-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-09-08',12.82);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-10-10',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-11-10',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2005-12-10',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2006-01-10',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2006-02-10',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2006-02-28',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2006-04-12',12.8205);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2006-05-10',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-06-11',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-07-10',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-08-09',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-09-10',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-10-09',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-11-09',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2007-12-10',19.2308);
+INSERT INTO payment VALUES ('18EC3CD2-3065-4FF4-BE40-000004228590','2008-01-10',19.2308);
+
+select Contact_reference,
+consecStartDate as Range_start,
+max(Date_payment) as Range_end,
+count(*) as Payments,
+sum(Payment_value) as value
+from
+(
+select Contact_reference,
+case when year(Date_payment)*12 + month(Date_payment) - @curMonthNum  &lt;= 1 and @curRef = Contact_reference then 'Y' else 'N' end as consec,
+case when year(Date_payment)*12 + month(Date_payment) - @curMonthNum  &lt;= 1 and @curRef = Contact_reference then @consecStartDate := @consecStartDate else @consecStartDate := Date_payment  end as consecStartDate,
+Date_payment,Payment_value,
+@curMonthNum := year(Date_payment)*12 + month(Date_payment),
+@curRef := Contact_reference
+from payment
+inner join (SELECT @consecStartDate := null,@curMonthNum := null,@consecStart := null,@curRef := null) as t
+order by Contact_reference desc,Date_payment asc
+) n
+group by Contact_reference,consecStartDate;
+</code></pre>
+
+<p>Like I said - it won't give you the interval since last range end but I figured that part of an answer was better than none!</p>

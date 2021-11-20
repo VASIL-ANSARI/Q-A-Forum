@@ -1,0 +1,43 @@
+<p>You cannot call Builder.Build before you finish registering types.</p>
+
+<p>in your example you are calling Builder.Build before you call builder.RegisterInstance which explains why it cannot infer the type at runtime.</p>
+
+<p>I came up with this after hitting the same issue today, but it is work in progress as it doesnt resolve my implementations yet...</p>
+
+<pre><code>builder.RegisterSource(new ContravariantRegistrationSource());
+        builder.RegisterAssemblyTypes(typeof(IMediator).Assembly).AsImplementedInterfaces();
+        builder.RegisterAssemblyTypes(typeof(HomePageThumbnail).Assembly).AsImplementedInterfaces();
+
+        var lifetimeScope = new Lazy&lt;ILifetimeScope&gt;(() =&gt; builder.Build());
+        var lazy = new Lazy&lt;IServiceLocator&gt;(() =&gt; new AutofacServiceLocator(lifetimeScope.Value));
+
+        var serviceLocatorProvider = new ServiceLocatorProvider(() =&gt; lazy.Value);
+        builder.RegisterInstance(serviceLocatorProvider);
+
+
+        DependencyResolver.SetResolver(new AutofacDependencyResolver(lifetimeScope.Value));
+
+        app.UseAutofacMiddleware(lifetimeScope.Value);
+        app.UseAutofacMvc();
+</code></pre>
+
+<p>I am creating the container in a separate <code>Lazy&lt;T&gt;</code> and passing that around.</p>
+
+<p>While this builds and the site loads, it cannot infer which handler to use for the request in my controller action...</p>
+
+<pre><code>var response = _mediator.Send(new RecentActivityThumbnailsQuery());
+</code></pre>
+
+<p>which raises the exception...</p>
+
+<pre><code>    An exception of type 'Microsoft.Practices.ServiceLocation.ActivationException' occurred in Microsoft.Practices.ServiceLocation.dll but was not handled in user code
+
+Additional information: Activation error occurred while trying to get instance of type IRequestHandler`2, key ""
+</code></pre>
+
+<p>This is using the same convention based registration provided in the Autofac examples project included in MediatR, and i have also tried registering it explicitly....</p>
+
+<pre><code>builder.RegisterType&lt;RecentActivityThumbnailsHandler&gt;().As&lt;IRequestHandler&lt;RecentActivityThumbnailsQuery, RecentActivityThumbnailsResults&gt;&gt;();
+</code></pre>
+
+<p>I will update when i get it working.  Please do the same if you figure it out before i do.</p>

@@ -1,0 +1,94 @@
+<p>You need to strip your strings, and you can use <a href="https://docs.python.org/2/library/csv.html#csv.DictWriter" rel="nofollow"><code>csv.DictWriter()</code></a> to write dictionaries in a specific order to an output file.</p>
+
+<p>Refactoring your code to use more a more Pythonic approach and all the Schema.org item properties offered:   </p>
+
+<pre><code>for numb in range(1):
+    params = {
+        'cg_multi': [3020, 3100, 3120, 3060, 3070],
+        'save_search': 1, 'l': 0, 'md': 'th', 'ca': 11, 'w': 3,
+        'f': ['p', 'c', 'b'],
+        'o': numb + 1,
+    }
+    url = "http://www.blocket.se/bostad/uthyres"
+    r = requests.get(url, params=params)
+    soup = BeautifulSoup(r.content, 'html.parser')
+
+    # All your entries live in the itemOffered div
+    data = soup.select('div[itemtype=http://schema.org/Offer] div[itemprop=itemOffered]')
+
+    out = StringIO.StringIO()
+    fields = ('category', 'address', 'size', 'monthly_rent', 'rooms', 'time', 'weekly_rent_offseason')
+    csv_writer = csv.DictWriter(out, fieldnames=fields)
+
+    for entry in data:
+        row = {}
+        for field in fields:
+            if field == 'time':
+                time_elem = entry.find('time')
+                value = (time_elem or {}).get('datetime', 'NaN')
+            else:
+                span_elem = entry.find(class_=field)
+                value = span_elem.text.strip() if span_elem else 'NaN'
+            row[field] = value
+        csv_writer.writerow(row)
+
+    print out.getvalue()
+</code></pre>
+
+<p>Note that the <code>data</code> variable already selects the <code>itemprop="itemOffer"</code> div elements, rather than having to navigate to <code>.contents[3]</code> each time.</p>
+
+<p>I also opted to extract the <code>datetime</code> attribute for the <code>&lt;time&gt;</code> elements rather than use the 'human readable' relative time version in the visible text; having the actual date and time is more useful when extracting than <em>today</em>. </p>
+
+<p>This produces:</p>
+
+<pre class="lang-none prettyprint-override"><code>lÃ¤genhet,Sundsvall,170 mÂ²,NaN,7 rum,2015-04-03 14:43:34,NaN
+radhus,Gotland,66 mÂ²,NaN,2 rum,2015-04-03 14:43:15,NaN
+lÃ¤genhet,GÃ¤vle,12 mÂ²,3 200 kr/mÃ¥n,1 rum,2015-04-03 14:34:46,NaN
+lÃ¤genhet,Sundbyberg,30 mÂ²,4 500 kr/mÃ¥n,1 rum,2015-04-03 14:29:07,NaN
+villa,ÃsterÃ¥ker,9 mÂ²,3 500 kr/mÃ¥n,1 rum,2015-04-03 14:25:28,NaN
+villa,SÃ¶derkÃ¶ping,75 mÂ²,2 700 kr/mÃ¥n,3 rum,2015-04-03 14:00:25,NaN
+lÃ¤genhet,"Stockholms stad - ÃlvsjÃ¶, Farsta, VantÃ¶r",NaN,3 800 kr/mÃ¥n,1 rum,2015-04-03 13:58:22,NaN
+radhus,"Stockholms stad - Kista, HÃ¤sselby, VÃ¤llingby, SpÃ¥nga",NaN,4 700 kr/mÃ¥n,1 rum,2015-04-03 13:47:37,NaN
+villa,Vellinge,250 mÂ²,NaN,8 rum,2015-04-03 13:46:35,NaN
+lÃ¤genhet,"Stockholms stad - Kista, HÃ¤sselby, VÃ¤llingby, SpÃ¥nga",25 mÂ²,6 000 kr/mÃ¥n,1 rum,2015-04-03 13:41:42,NaN
+lÃ¤genhet,Ãrebro,NaN,3 500 kr/mÃ¥n,1 rum,2015-04-03 13:40:02,NaN
+lÃ¤genhet,Helsingborg,10 mÂ²,3 000 kr/mÃ¥n,1 rum,2015-04-03 13:29:44,NaN
+villa,VingÃ¥ker,140 mÂ²,7 500 kr/mÃ¥n,4 rum,2015-04-03 13:27:53,NaN
+villa,SvalÃ¶v,200 mÂ²,9 800 kr/mÃ¥n,5 rum,2015-04-03 13:26:38,NaN
+lÃ¤genhet,Sigtuna,49.5 mÂ²,6 000 kr/mÃ¥n,1 rum,2015-04-03 13:24:49,NaN
+lÃ¤genhet,Kristianstad,NaN,NaN,1 rum,2015-04-03 13:14:14,NaN
+villa,Stockholms stad - Bromma,125 mÂ²,25 000 kr/mÃ¥n,4 rum,2015-04-03 13:13:34,NaN
+lÃ¤genhet,Oskarshamn,18 mÂ²,3 000 kr/mÃ¥n,1 rum,2015-04-03 13:05:50,NaN
+villa,GÃ¶teborgs stad - VÃ¤stra GÃ¶teborg,10 mÂ²,NaN,1 rum,2015-04-03 13:02:07,NaN
+gÃ¥rd,Sala,140 mÂ²,NaN,7 rum,2015-04-03 13:00:34,NaN
+lÃ¤genhet,"Stockholms stad - Vasastan, Norrmalm",36 mÂ²,14 900 kr/mÃ¥n,"1,5 rum",2015-04-03 12:57:55,NaN
+lÃ¤genhet,Solna,60 mÂ²,12 500 kr/mÃ¥n,2 rum,2015-04-03 12:48:57,NaN
+lÃ¤genhet,Danderyd,50 mÂ²,11 000 kr/mÃ¥n,1 rum,2015-04-03 12:46:05,NaN
+lÃ¤genhet,LuleÃ¥,80 mÂ²,6 500 kr/mÃ¥n,3 rum,2015-04-03 12:45:03,NaN
+villa,SÃ¶derhamn,172 mÂ²,NaN,6 rum,2015-04-03 12:42:33,NaN
+lÃ¤genhet,"Stockholms stad - Enskede, Ãrsta, SkarpnÃ¤ck",51 mÂ²,14 000 kr/mÃ¥n,2 rum,2015-04-03 12:39:09,NaN
+lÃ¤genhet,UmeÃ¥,13 mÂ²,2 400 kr/mÃ¥n,1 rum,2015-04-03 12:37:43,NaN
+lÃ¤genhet,LinkÃ¶ping,65 mÂ²,6 300 kr/mÃ¥n,2 rum,2015-04-03 12:36:02,NaN
+lÃ¤genhet,Botkyrka,58.5 mÂ²,NaN,2 rum,2015-04-03 12:34:11,NaN
+lÃ¤genhet,Upplands VÃ¤sby,80 mÂ²,5 000 kr/mÃ¥n,3 rum,2015-04-03 12:32:21,NaN
+lÃ¤genhet,StrÃ¶msund,105 mÂ²,4 000 kr/mÃ¥n,3 rum,2015-04-03 12:32:21,NaN
+lÃ¤genhet,Lund,86 mÂ²,6 500 kr/mÃ¥n,3 rum,2015-04-03 12:32:18,NaN
+lÃ¤genhet,Uppsala,68 mÂ²,6 000 kr/mÃ¥n,2 rum,2015-04-03 12:28:13,NaN
+lÃ¤genhet,"Stockholms stad - Maria, Gamla Stan, HÃ¶galid",NaN,25 000 kr/mÃ¥n,2 rum,2015-04-03 12:24:45,NaN
+lÃ¤genhet,Halmstad,21 mÂ²,3 300 kr/mÃ¥n,1 rum,2015-04-03 12:21:28,NaN
+lÃ¤genhet,Uppsala,40 mÂ²,5 000 kr/mÃ¥n,2 rum,2015-04-03 12:20:40,NaN
+lÃ¤genhet,Uppsala,92 mÂ²,NaN,3 rum,2015-04-03 12:17:53,NaN
+lÃ¤genhet,Eskilstuna,NaN,NaN,1 rum,2015-04-03 11:48:42,NaN
+lÃ¤genhet,Helsingborg,66 mÂ²,7 350 kr/mÃ¥n,3 rum,2015-04-03 11:44:17,NaN
+villa,GÃ¶teborgs stad - Hisingen,110 mÂ²,9 500 kr/mÃ¥n,4 rum,2015-04-03 11:43:30,NaN
+lÃ¤genhet,GÃ¶teborgs stad - VÃ¤stra GÃ¶teborg,53 mÂ²,10 000 kr/mÃ¥n,"2,5 rum",2015-04-03 11:20:36,NaN
+lÃ¤genhet,"Stockholms stad - Kista, HÃ¤sselby, VÃ¤llingby, SpÃ¥nga",NaN,4 900 kr/mÃ¥n,1 rum,2015-04-03 11:17:11,NaN
+lÃ¤genhet,"Stockholms stad - HÃ¤gersten, Liljeholmen",55 mÂ²,12 500 kr/mÃ¥n,2 rum,2015-04-03 11:16:07,NaN
+lÃ¤genhet,Ãrebro,70 mÂ²,4 000 kr/mÃ¥n,3 rum,2015-04-03 11:15:02,NaN
+lÃ¤genhet,LinkÃ¶ping,"46,5 mÂ²",NaN,1 rum,2015-04-03 11:13:13,NaN
+lÃ¤genhet,Kristinehamn,34 mÂ²,3 600 kr/mÃ¥n,"1,5 rum",2015-04-03 11:09:05,NaN
+lÃ¤genhet,JÃ¶nkÃ¶ping,NaN,NaN,1 rum,2015-04-03 11:02:07,NaN
+lÃ¤genhet,GÃ¶teborgs stad - Innerstaden,42 mÂ²,7 000 kr/mÃ¥n,1 rum,2015-04-03 10:47:58,NaN
+lÃ¤genhet,UmeÃ¥,70 mÂ²,NaN,4 rum,2015-04-03 10:39:31,NaN
+lÃ¤genhet,GÃ¶teborgs stad - VÃ¤stra Centrum,55 mÂ²,7 000 kr/mÃ¥n,2 rum,2015-04-03 10:16:53,NaN
+</code></pre>

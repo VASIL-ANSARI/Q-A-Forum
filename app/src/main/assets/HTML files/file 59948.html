@@ -1,0 +1,21 @@
+<p>If you are adding code at the end of a method, you are adding it after its last instruction which is always a goto, switch, throw or return statement when compiling Java code. Even when compiling a method without an explicit return statement like</p>
+
+<pre><code>void foo() { }
+</code></pre>
+
+<p>you are actully compiling </p>
+
+<pre><code>void foo() { return; }
+</code></pre>
+
+<p>where the final return is implicit. With your additions, you change the method to</p>
+
+<pre><code>void foo() {
+  return;
+  System.out.println("hey");
+}
+</code></pre>
+
+<p>Such unreachable code is forbidden by <em>javac</em> but perfectly legal in byte code. For unreachable code, it is however required that you are prepending it with a <a href="http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.4" rel="nofollow">stack map frame</a> that describes the state of the stack and the local variable array at that point. It would be easy enough to add a description of an empty frame at this point but I assume that you want to add the code before the return statement. </p>
+
+<p>To implement this, <a href="http://asm.ow2.org/asm50/javadoc/user/org/objectweb/asm/commons/AdviceAdapter.html" rel="nofollow">ASM offers an <code>AdviceAdapter</code></a> that allows you to add code before return statements. As far as I know, there is nothing similar for the tree API but you can simply look for a return node within any method's instruction list and add the code prior to it.</p>

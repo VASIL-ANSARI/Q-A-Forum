@@ -1,0 +1,41 @@
+<p>Ok, Alex, it looks like you can use WMI to find this out:</p>
+
+<pre><code>using System.Management;
+
+public bool IsServerVersion()
+{
+    var productType = new ManagementObjectSearcher("SELECT * FROM Win32_OperatingSystem")
+            .Get().OfType&lt;ManagementObject&gt;()
+            .Select(o =&gt; (uint)o.GetPropertyValue("ProductType")).First();
+
+    // ProductType will be one of:
+    // 1: Workstation
+    // 2: Domain Controller
+    // 3: Server
+
+    return productType != 1;
+}
+</code></pre>
+
+<p>You'll need a reference to the System.Management assembly in your project.</p>
+
+<p>Or the .NET 2.0 version without any LINQ-type features:</p>
+
+<pre><code>public bool IsServerVersion()
+{
+    using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT * FROM Win32_OperatingSystem"))
+    {
+        foreach (ManagementObject managementObject in searcher.Get())
+        {
+            // ProductType will be one of:
+            // 1: Workstation
+            // 2: Domain Controller
+            // 3: Server
+            uint productType = (uint)managementObject.GetPropertyValue("ProductType");
+            return productType != 1;
+        }
+    }
+
+    return false;
+}
+</code></pre>

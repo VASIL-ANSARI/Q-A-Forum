@@ -1,0 +1,66 @@
+<p>Whoa, lots of questions there. =)</p>
+
+<p>Hard to be specific for such a broad question, specially not knowing how familiar you are with the tool.</p>
+
+<p>If I understood correctly, you have a spider and a middleware.
+I didn't get exactly what is your middleware code doing, but for a proof of concept I'd start with code all in one spider (and perhaps util functions), leaving you free to use different callbacks for the different extraction techniques.</p>
+
+<p>Once you have that working, then you can look into making a generic middleware if needed (premature abstraction is often just as bad as premature optimization).</p>
+
+<p>Here are a few ideas:</p>
+
+<h2>For implementing different extraction code for each response</h2>
+
+<p>If you know beforehand which code you want to call for handling each request, just set the appropriate callback for that request:</p>
+
+<pre><code>def parse(self, response):
+    yield scrapy.Request('http://example.com/file.pdf', self.handle_pdf)
+    yield scrapy.Request('http://example.com/next_page', self.handle_next_page)
+
+def handle_pdf(self, response):
+    "process the response for a PDF request"
+
+def handle_next_page(self, response):
+    "process the response for next page"
+</code></pre>
+
+<p>If you don't know beforehand, you can implement a callback that dispatch to other appropriate callbacks accordingly:</p>
+
+<pre><code>def parse(self, response):
+    if self.should_grab_images(response):
+        for it in self.grab_images(response):
+            yield it
+    if self.should_follow_links(response):
+        for it in self.follow_links(response):
+            yield it
+</code></pre>
+
+<h2>Is lxml enough?</h2>
+
+<p>Probably, yeah. However, it's a good idea to learn XPath, if you haven't already, to take full advantage of it.
+<a href="http://www.slideshare.net/scrapinghub/xpath-for-web-scraping" rel="nofollow">Here is a good starting point</a>.</p>
+
+<p>Unless you need to execute Javascript code, and then you might want to try plugging into Selenium/PhantomJS or <a href="https://github.com/scrapinghub/scrapy-splash" rel="nofollow">Splash</a>.</p>
+
+<p>If you don't need to execute Javascript code, but need to parse data that is inside JS code, you can use <a href="https://github.com/redapple/js2xml" rel="nofollow">js2xml</a>.</p>
+
+<h2>How do I handle robots and wait delays to avoid blocking?</h2>
+
+<p>To obey <code>robots.txt</code>, set <a href="http://doc.scrapy.org/en/latest/topics/settings.html#robotstxt-obey" rel="nofollow"><code>ROBOTSTXT_OBEY</code></a> to <code>True</code>.</p>
+
+<p>To configure a delay, set <a href="http://doc.scrapy.org/en/latest/topics/settings.html#download-delay" rel="nofollow"><code>DOWNLOAD_DELAY</code></a>. You may also try out the <a href="http://doc.scrapy.org/en/latest/topics/autothrottle.html" rel="nofollow">autothrottle extension</a> and look into the <a href="http://doc.scrapy.org/en/latest/topics/settings.html#concurrent-requests" rel="nofollow">concurrent requests settings</a>.</p>
+
+<h2>Does it make sense to add a message queue?</h2>
+
+<p>Well, it depends on your use case, really.
+If you have a really big crawl (hundreds of millions of URLs or more), it might make sense.</p>
+
+<p>But you already get a lot for free with standalone Scrapy, including a disk-based queue when existing memory isn't enough to hold all pending URLs.</p>
+
+<p>And you can configure <a href="http://doc.scrapy.org/en/latest/faq.html#does-scrapy-crawl-in-breadth-first-or-depth-first-order" rel="nofollow">the backends the scheduler will use for the memory and disk queues</a> and also completely swap the <a href="http://doc.scrapy.org/en/latest/topics/settings.html#std:setting-SCHEDULER" rel="nofollow">scheduler with your own version</a>.</p>
+
+<h2>Conclusion</h2>
+
+<p>I'd start with Scrapy and a working spider and iterate from that, improving where it's really needed.</p>
+
+<p>I hope this helps.</p>

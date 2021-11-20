@@ -1,0 +1,97 @@
+<p>This works. Not sure what you want to do with the data, but this prints to screen.</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+#define MAXLINE 1000
+#define MAXARG 20
+
+FILE *f1;
+
+int main(int argc, char *argv[])
+{
+    char FileName[MAXARG];
+    char line[MAXLINE];
+
+    if (argc &lt;= 1) {
+        printf("Usage - reads FileName and prints\n");
+        return 0;
+    }
+    else {
+        strcpy(FileName, *++argv);
+    }
+
+    f1 = fopen(FileName, "r");
+
+    while (fgets(line, MAXLINE, f1)) {
+        printf("%s", line);
+    }
+}
+</code></pre>
+
+<p>NB: to call it, you have to type the program name followed by the name of your file.</p>
+
+<p>If instead you want to run through and save data for parsing, try this (re-appropriated version of <a href="http://stackoverflow.com/questions/18036686/c-read-space-separated-values-from-file">C read space-separated values from file</a>):</p>
+
+<pre><code>#define _XOPEN_SOURCE
+#include &lt;stdio.h&gt;
+#include &lt;time.h&gt;
+#include &lt;string.h&gt;
+
+typedef struct  
+{  
+    char status[9];
+    time_t timestamp;
+    long int number;
+    int duration_mins; 
+    time_t call_time;
+} Call; 
+
+void dump_call(FILE *fp, const char *tag, const Call *c);
+int inputLine(FILE *fp, Call *c);
+
+enum { MAXCALL = 100 };
+
+int main(void)
+{
+    char line[4096];
+    Call calls[MAXCALL];
+
+    if (fgets(line, sizeof(line), stdin) == 0)
+        return 1;
+    for (int i = 0; i &lt; MAXCALL &amp;&amp; inputLine(stdin, &amp;calls[i]) != 0; i++)
+        dump_call(stdout, "Call", &amp;calls[i]);
+    return 0;
+}
+
+int inputLine(FILE *fp, Call *c)
+{  
+    struct tm tm;
+    // time_t epoch;
+    int out;
+    char temp[20], date_temp[9], time_temp[9];;
+    if ((out = fscanf(fp, "%ld %s %s %s %d", 
+        &amp;c-&gt;number, date_temp, time_temp, c-&gt;status, &amp;c-&gt;duration_mins)) == 5) {
+        sprintf(temp, "%s %s", date_temp, time_temp);
+        if ( strptime(temp, "%d-%m-%Y %H:%M:%S", &amp;tm) != NULL )
+            c-&gt;timestamp = mktime(&amp;tm);
+        return -1;
+        }
+    return 0;
+}
+
+void dump_call(FILE *fp, const char *tag, const Call *c)  
+{  
+    char date_time[20];
+    strftime(date_time, 20, "%d-%m-%Y %H:%M:%S", localtime(&amp;(c-&gt;timestamp)));
+    fprintf(fp, "%s: %-10ld %-24s %-17s %3d\n",  
+               tag, c-&gt;number, date_time, c-&gt;status, c-&gt;duration_mins);
+}
+</code></pre>
+
+<p>This time, to call it, type name of program followed by <code>&lt;</code> and then name of data file; i.e:</p>
+
+<pre><code>read.exe &lt; test_mobil.dat
+</code></pre>
+
+<p>Hope this helps mate - I've learnt quite a bit as well - so thanks for that.</p>

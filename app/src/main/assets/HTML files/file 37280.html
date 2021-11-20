@@ -1,0 +1,49 @@
+<p>Code is untested, see the comments:</p>
+
+<pre><code>//You're fetching everything anyway, so why not do it in a single step?
+$categories = $db-&gt;prepare('SELECT id, title, parent FROM categories');
+$articles = $db-&gt;prepare('SELECT id, title, content, catid FROM articles');
+
+$categories-&gt;execute();
+$articles-&gt;execute();
+
+//Now we've got a mess, let's organize it
+$categoriesById = array();
+$childrenCategories = array();
+$articlesByCategory = array();
+
+while($cat = $categories-&gt;fetch(PDO::FETCH_OBJ)) {
+    $categoriesById[$cat-&gt;id] = $cat;
+    if ($cat-&gt;parent) $childrenCategories[$cat-&gt;parent] = $cat;
+}
+while($article = $articles-&gt;fetch(PDO::FETCH_OBJ)) {
+    $articlesByCategory[$article-&gt;catid][] = $article;
+}
+
+//A function for printing the categories, so that we can call it recursively
+function printCategory($category, $childrenCategories, $articlesByCategory) {
+   echo '&lt;div class="list"&gt;';
+   echo $category-&gt;title;
+
+    foreach($childrenCategories as $childrenCategory) {
+        printCategory($childrenCategory, array(), $articlesByCategory);
+    }
+
+    if (!empty($articlesByCategory[$category-&gt;id])) {
+        $article = $articlesByCategory[$category-&gt;id];
+        echo $article-&gt;title;
+    } 
+
+   echo '&lt;/div&gt;';
+}
+
+//Print out stuff
+foreach($categoriesById as $id =&gt; $category) {
+    if ($category-&gt;parent) continue; //Skip subcategories
+    printCategory(
+        $category,
+        !empty($childrenCategories[$id]) ? $childrenCategories[$id] : array(),
+        $articlesByCategory
+    );
+}
+</code></pre>

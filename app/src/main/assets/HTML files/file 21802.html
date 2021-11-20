@@ -1,0 +1,51 @@
+<p>You could start by placing this form inside a partial (<code>_SaveCallRecordingForm.ascx</code>):</p>
+
+<pre><code>&lt;% using (Html.BeginForm("SaveCallRecording", "Recording", FormMethod.Post, new { id = "frmAddCallRecording", name = "frmAddCallRecording" })) { %&gt;
+    &lt;tr&gt;
+        &lt;td&gt;&lt;/td&gt;
+        &lt;td&gt;
+            &lt;input type="button" id="btnCall" title="Call" value="Call" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" /&gt;
+            &lt;input type="button" id="btnNewCall" title="New Call" value="New Call" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" /&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;% } %&gt;
+</code></pre>
+
+<p>Also if you expect to be able to do some validations I would recommend you to make this partial strongly typed to your CallRecording model and use Html helpers to generate the input fields in this form. You could also use the validationMessageFor helper to generate placeholders for the errors. </p>
+
+<p>And then you could AJAXify this form:</p>
+
+<pre><code>else {
+    var $form = $("#frmAddCallRecording");
+    $.ajax({
+        url: $form.attr('action'), 
+        type: $form.attr('method'),
+        data: $form.serialize(),
+        success: function(result) {
+            if (result.success) {
+                alert('Thanks for submitting');
+            } else {
+                $('#someContainerOfYourForm').html(result);
+            }
+        }
+    });
+}
+</code></pre>
+
+<p>and have your controller action perform the validation and return either a JsonResult (in case of success) or a PartialView with the list of errors:</p>
+
+<pre><code>[Authorize]
+[HttpPost]
+public ActionResult SaveCallRecording(CallRecording recording)
+{
+    if (!ModelState.IsValid)
+    {
+        // There were validation errors =&gt; let's redisplay the form
+        return PartialView("_SaveCallRecordingForm", recording);
+    }
+
+    // at this stage we know that the model is valid =&gt; do some processing
+    // and return a JsonResult to indicate the success
+    return Json(new { success = true });
+}
+</code></pre>

@@ -1,0 +1,27 @@
+<p>As Luke stated, you are not checking <code>lpCallerData</code> for NULL before dereferencing it.  That is why your code is crashing.</p>
+
+<pre><code>int CALLBACK ConditionalAccept(LPWSABUF lpCallerId,LPWSABUF lpCallerData,LPQOS lpSQOS,
+                           LPQOS lpGQOS,LPWSABUF lpCalleeId,LPWSABUF lpCalleeData,
+                           GROUP *g,DWORD_PTR dwCallbackData)
+{
+    WSABUF buffer = {0};
+
+    if (lpCallerData != NULL) { // &lt;-- add this check!
+        buffer = *lpCallerData;
+    }
+
+    if (lpSQOS != NULL) {
+        RtlZeroMemory(lpSQOS, sizeof(QOS));
+        return CF_ACCEPT;
+    } else
+        return CF_REJECT;
+}
+</code></pre>
+
+<p>However, <code>lpCallerData</code> is meaningless in TCP/IP and will <strong>always</strong> be NULL.  TCP/IP does not support exchanging caller/callee data during connection establishment. This is clearly stated in the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms741559.aspx" rel="nofollow"><code>WSAConnect()</code></a> documentation:</p>
+
+<blockquote>
+  <p>The <code>lpCallerData</code> parameter contains a pointer to any user data that is to be sent along with the connection request (called connect data). This is additional data, not in the normal network data stream, that is sent with network requests to establish a connection. This option is used by legacy protocols such as DECNet, OSI TP4, and others. </p>
+  
+  <p><strong>Note Connect data is not supported by the TCP/IP protocol in Windows. Connect data is supported only on ATM (RAWWAN) over a raw socket.</strong> </p>
+</blockquote>

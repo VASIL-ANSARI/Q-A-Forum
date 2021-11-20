@@ -1,0 +1,24 @@
+<p>Both must be thread local.</p>
+
+<p>As to why you need both, well, it's a (imho poorly thought) design choice.
+They <strong>could</strong> (should?) have hidden the state inside random_data, especially since random_data has to be big enough to hold the state for srandom_r (ie a buffer with size=128).</p>
+
+<pre><code>#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+int main()
+{
+        int32_t i32;
+        struct random_data r;
+        srandom_r(1, &amp;r);
+        random_r(&amp;r, &amp;i32);
+        return i32;
+}
+</code></pre>
+
+<p>Except that the above segfaults (even if you zero the <code>r</code> vaiable first): by reading <a href="https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=stdlib/random_r.c;hb=656b84c2ef525e3b69802c9057c5897e327b0332" rel="nofollow">https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=stdlib/random_r.c;hb=656b84c2ef525e3b69802c9057c5897e327b0332</a> it looks like they expect you to provide storage for the random array, ie srandom() picks a default size of 128, srandom_r expects you to have provided space for the state array.</p>
+
+<p>The rationale, I guess, is that the state array can be "big" (max 256 bytes), so they won't be allocating potentially wasted space (some people bother keeping a small stack size for their threads).</p>
+
+<p>About the difference between <code>statebuf</code> and <code>buf</code>: <code>statebuf</code> holds the information you need for random_r, ie the state array and its metadata (size, whatever) in a packed format (opaque, traditionally squeezed in <code>statebuf[0]</code> - eg: 1st byte=size, 2nd byte=...), while <code>buf</code> is the "unpacked" version of <code>statebuf</code>, so it's more convenient for implementing random_r.</p>
+
+<p>I see this is turning more into a rant than an answer - let me know if anything is particularly incomprehensible :)</p>

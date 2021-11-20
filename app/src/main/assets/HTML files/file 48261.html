@@ -1,0 +1,49 @@
+<p>Straight from the <a href="https://github.com/nodejitsu/node-http-proxy"><code>node-http-proxy</code> docs</a>, this is quite simple. You can test it simply by making an HTTP request to port 3000 -- if you get the same response as you do on port 3001, it's working:</p>
+
+<pre><code>var http = require('http'),
+    httpProxy = require('http-proxy');
+
+//
+// Create a proxy server with custom application logic
+//
+var proxy = httpProxy.createProxyServer({});
+
+var server = http.createServer(function(req, res) {
+  // You can define here your custom logic to handle the request
+  // and then proxy the request.
+  proxy.web(req, res, {
+    // Your real Node app
+    target: 'http://127.0.0.1:3001'
+  });
+});
+
+console.log("proxy listening on port 3000")
+server.listen(3000);
+</code></pre>
+
+<p>I highly recommend you write a suite of integration tests using some thing like <a href="/questions/tagged/mocha" class="post-tag" title="show questions tagged &#39;mocha&#39;" rel="tag">mocha</a> for your project as well - in this way, you can run your tests both against your server directly and against your proxy. If tests pass against both, then you can be assured your proxy is behaving as expected.</p>
+
+<p>A unit test using <a href="/questions/tagged/mocha" class="post-tag" title="show questions tagged &#39;mocha&#39;" rel="tag">mocha</a> and <a href="/questions/tagged/should.js" class="post-tag" title="show questions tagged &#39;should.js&#39;" rel="tag">should.js</a> would look something like this:</p>
+
+<pre><code>var should = require('should');
+
+describe('server', function() {
+    it('should respond', function(done) {
+                                 // ^ optional synchronous callback
+        request.get({
+            url: "http://locahost:3000"
+                                // ^ Port of your proxy
+        }, function(e, r, body) {
+            if (e)
+                throw new Error(e);
+            body.result.should.equal("It works!");
+            done(); // call the optional synchronous callback
+        });
+    });
+});
+</code></pre>
+
+<p>You then simply run your test (once Mocha is installed):</p>
+
+<pre><code>$ mocha path/to/your/test.js
+</code></pre>

@@ -1,0 +1,89 @@
+<p>First we have to compute relative scroll position for every section. We do that by computing how far is window bottom from the section top. It starts at 0 when the section appears at the bottom of the window and ends at 1 when the section top traveled (WINDOW_HEIGHT + SECTION_HEIGHT) pixels. At this point the section is no longer visible in the window.</p>
+
+<p>That's it. We then use the section relative scroll position to move bubbles by setting their css top positions.</p>
+
+<p>We can play with it more and introduce options which allow us to set when bubble appears and disappears in terms of section relative scroll position. So for example we want a bubble to appear when a section is 0.5 scrolled and disappear when the section is 0.8 scrolled. We do this by manipulating length of a path (and top offset) that the bubble has to travel.</p>
+
+<p>See this JsFiddle for details: <a href="http://jsfiddle.net/jkk7t7Lk/10/" rel="nofollow">http://jsfiddle.net/jkk7t7Lk/10/</a> (note: this example uses jQuery)</p>
+
+<h2>Javascript</h2>
+
+<pre><code>function moveBubbles() {
+    var windowHeight = $(window).height();
+    var scrollTop = $(window).scrollTop();
+    var scrollBottom = scrollTop + windowHeight;
+
+    $('.section').each(function() {
+        var sectionHeight = $(this).outerHeight(true);
+
+        var sectionTop = $(this).position().top;
+        var sectionBottom = sectionTop + sectionHeight;
+
+        var in_window = (sectionTop &gt;= scrollTop &amp;&amp; sectionTop &lt;= scrollBottom) 
+                        || (sectionBottom &gt;= scrollTop &amp;&amp; sectionBottom &lt;= scrollBottom) 
+                        || (sectionTop &lt;= scrollTop &amp;&amp; sectionBottom &gt;= scrollBottom);
+
+        if (in_window)
+        {                
+            var pathHeight = sectionHeight + windowHeight;
+            var position = (scrollBottom - sectionTop) / pathHeight; // &lt;0, 1&gt;
+
+            $(this).find('.bubble').each(function() {
+                var bubbleHeight = $(this).outerHeight(true);
+                var start = parseFloat($(this).data('start'));                
+                var speed = 1 / (parseFloat($(this).data('end')) - start);                
+                var bubble_path = (sectionHeight + bubbleHeight) * speed;                
+                var offset_top =  start * bubble_path;
+
+                var top = bubble_path * position - bubbleHeight - offset_top;
+
+                $(this).css('top', top);
+            });
+        }
+    });
+}
+
+$(document).ready(moveBubbles);
+$(window).resize(moveBubbles);
+$(window).scroll(moveBubbles);
+</code></pre>
+
+<h2>HTML</h2>
+
+<pre><code>&lt;div class="section"&gt;
+        &lt;span class="bubble" style="left: 50px;" data-start="0.5" data-end="0.75"&gt;&lt;/span&gt;
+    Section 1
+&lt;/div&gt;
+&lt;div class="section"&gt;
+    &lt;span class="bubble" style="left: 30px;" data-start="0.3" data-end="0.6"&gt;&lt;/span&gt;
+    &lt;span class="bubble" style="left: 100px;" data-start="0.4" data-end="1"&gt;&lt;/span&gt;
+    &lt;span class="bubble" style="left: 200px;" data-start="0" data-end="1"&gt;&lt;/span&gt;
+    &lt;span class="bubble" style="left: 300px;" data-start="0.2" data-end="0.55"&gt;&lt;/span&gt;
+    Section 2
+&lt;/div&gt;
+&lt;div class="section"&gt;
+            &lt;span class="bubble" style="left: 50px;" data-start="0.7" data-end="0.71"&gt;&lt;/span&gt;
+    Section 3
+&lt;/div&gt;
+&lt;div class="section"&gt;
+    Section 4
+&lt;/div&gt;
+</code></pre>
+
+<h2>CSS</h2>
+
+<pre><code>.section {
+    height: 100vh;
+    border: 1px solid red;
+    position: relative;
+    overflow: hidden;
+}
+
+.bubble {
+    background-image: url(http://www.i2clipart.com/cliparts/9/2/6/b/clipart-bubble-926b.png);
+    width: 128px;
+    height: 128px;
+    position: absolute;
+    display: block;
+}
+</code></pre>

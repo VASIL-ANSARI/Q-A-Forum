@@ -1,0 +1,143 @@
+<p>I think i know your problem:</p>
+
+<p>the module the function is defiined in is called </p>
+
+<pre><code>'__main__'
+</code></pre>
+
+<p>it exists in all running versions of python.</p>
+
+<p>pickle does not transfer the source code but a reference</p>
+
+<pre><code>__main__.square
+</code></pre>
+
+<p>so you have two possibilities:</p>
+
+<p>source square out and make the main module as short as possible such as:</p>
+
+<pre><code># main.py
+
+def square(x): 
+   return x**2
+
+import Pyro4
+def main():
+    remoteServer = Pyro4.Proxy('PYRONAME:server')
+
+
+    print remoteServer.evaluate(square, 4)
+</code></pre>
+
+<p>and:</p>
+
+<pre><code># __main__.py
+import main
+main.main()
+</code></pre>
+
+<p>Then the server can import exactly the same module from the file.</p>
+
+<p>or create a module with my code:</p>
+
+<pre><code>class ThisShallNeverBeCalledError(Exception):
+    pass
+
+class _R(object):
+    def __init__(self, f, *args):
+        self.ret = (f, args)
+    def __reduce__(self):
+        return self.ret
+    def __call__(self, *args):
+        raise ThisShallNeverBeCalledError()
+
+    @classmethod
+    def fromReduce(cls, value):
+        ret = cls(None)
+        ret.ret = value
+        return ret
+
+
+def dump_and_load(obj):
+    '''pickle and unpickle the object once'''
+    s = pickle.dumps(obj)
+    return pickle.loads(s)
+
+# this string creates an object of an anonymous type that can
+# be called to create an R object or that can be reduced by pickle
+# and creates another anonymous type when unpickled
+# you may not inherit from this MetaR object because it is not a class
+PICKLABLE_R_STRING= "type('MetaR', (object,), " \
+                    "       {'__call__' : lambda self, f, *args: "\
+                    "          type('PICKLABLE_R', "\
+                    "               (object,), "\
+                    "               {'__reduce__' : lambda self: (f, args), "\
+                    "                '__module__' : 'pickleHelp_', "\
+                    "                '__name__'   : 'PICKLABLE_R', "\
+                    "                '__call__'   : lambda self: None})(), "\
+                    "        '__reduce__' : lambda self: "\
+                    "           self(eval, meta_string, "\
+                    "                {'meta_string' : meta_string}).__reduce__(), "\
+                    "        '__module__' : 'pickleHelp_', "\
+                    "        '__name__' : 'R'})()".replace('  ', '')
+PICKLABLE_R = _R(eval, PICKLABLE_R_STRING, \
+                {'meta_string' : PICKLABLE_R_STRING})
+R = dump_and_load(PICKLABLE_R)
+del PICKLABLE_R, PICKLABLE_R_STRING
+
+PICKLABLE___builtins__ = R(vars, R(__import__, '__builtin__'))
+PICKLABLE_FunctionType = R(type, R(eval, 'lambda:None'))
+
+##R.__module__ = __name__
+##R.__name__ = 'PICKLABLE_R'
+
+
+def packCode(code, globals = {}, add_builtins = True, use_same_globals = False, \
+             check_syntax = True, return_value_variable_name = 'obj',
+             __name__ = __name__ + '.packCode()'):
+    '''return an object that executes code in globals when unpickled
+use_same_globals
+    if use_same_globals is True all codes sent through
+    one pickle connection share the same globals
+    by default the dont
+return_value_variable_name
+    if a variable with the name in return_value_variable_name exists
+    in globals after the code execution
+    it is returned as result of the pickling operation
+    if not None is returned
+__name__
+
+'''
+    if check_syntax:
+        compile(code, '', 'exec')
+    # copying locals is important
+    # locals is transferred through pickle for all code identical
+    # copying it prevents different code from beeing executed in same globals
+    if not use_same_globals:
+        globals = globals.copy()
+    if add_builtins:
+        globals['__builtins__'] = PICKLABLE___builtins__
+    globals.setdefault('obj', None)
+    # get the compilation code
+    # do not marshal or unmarshal code objects because the platforms may vary
+    code = R(compile, code, __name__, 'exec')
+    # the final object that can reduce, dump and load itself
+    obj = R(R(getattr, tuple, '__getitem__'), (
+            R(R(PICKLABLE_FunctionType, code, globals)),
+            R(R(getattr, type(globals), 'get'), globals, \
+              returnValueVariableName, None)
+            ), -1)
+    return obj
+</code></pre>
+
+<p>and then send this to the other side:</p>
+
+<pre><code>packCode('''
+def square(...):
+    ...
+''', return_value_variable_name = 'square')
+</code></pre>
+
+<p>and the function will come out on the other side, no module code is needed to transefer this python function to the other server side.</p>
+
+<p>If something does not work out please tell me.</p>

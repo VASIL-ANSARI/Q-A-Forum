@@ -1,0 +1,74 @@
+<p>Your class would like like this...</p>
+
+<pre><code>public class Clsdatasource
+{
+    public bool Str1 { get; set; }
+    public bool Str2 { get; set; }
+    public bool Str3 { get; set; }
+    public Clsdatasource(){}
+    public Clsdatasource(bool s1, bool s2, bool s3)
+    {
+        Str1 = s1;
+        Str2 = s2;
+        Str3 = s3;
+    }
+}
+</code></pre>
+
+<p>And your collection of those would look like this...</p>
+
+<pre><code>public class ClsdataSourceCollection : ObservableCollection&lt;Clsdatasource&gt;
+{
+    private const string FileName = "MyData.xml";
+    private readonly XmlSerializer _serializer = new XmlSerializer(typeof(List&lt;Clsdatasource&gt;));
+    public void LoadData(Action onCompleted)
+    {
+        using (StreamReader sr = new StreamReader(FileName))
+        {
+            var s = _serializer.Deserialize(sr) as List&lt;Clsdatasource&gt;;
+            if (s != null)
+            {
+                Clear();
+                s.ForEach(Add);
+            }
+        }
+        onCompleted();
+    }
+    public void SaveData(Action onCompleted)
+    {
+        using (StreamWriter sw = new StreamWriter(FileName))
+        {
+            List&lt;Clsdatasource&gt; tosave = new List&lt;Clsdatasource&gt;();
+            tosave.AddRange(this);
+            _serializer.Serialize(sw, tosave);
+        }
+        onCompleted();
+    }
+}
+</code></pre>
+
+<p>And you could see what's going on with this snippet...</p>
+
+<pre><code>private static void TestSaving()
+{
+    ClsdataSourceCollection collection = new ClsdataSourceCollection();
+    for (int i = 0; i &lt; 100; i++)
+    {
+        collection.Add(new Clsdatasource(true, true, true));
+    }
+    collection.SaveData(()=&gt; Console.WriteLine("Saved"));
+}
+private static void TestLoading()
+{
+    ClsdataSourceCollection collection = new ClsdataSourceCollection();
+    collection.LoadData(() =&gt; Console.WriteLine("Loaded"));
+}
+</code></pre>
+
+<p>Those two methods just do a create, save, and load.  The artefact is an XML file in the root app directory called MyData.xml.  You need to code in all the corner cases and error detection and races.</p>
+
+<p>The last step in the whole shebang is to set this.dg1.ItemsSource = collection;  </p>
+
+<p>Remember that if you want real-time updates to your grid, the Clsdatasource class has to inherit from INotifyPropertyChanged, which is a different question altogether.</p>
+
+<p>That should get you started with serialization.  It comes 'out of the box' since about .NET 3 or so....</p>

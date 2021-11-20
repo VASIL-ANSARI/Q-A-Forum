@@ -1,0 +1,44 @@
+<p>It sounds like the sound is playing every time AVFoundation recognizes the barcode, which is many times a second for as long as your camera is pointed at that barcode.  </p>
+
+<p>I assume that you have an AVCaptureSession that you start running at some point (this is what causes captureOutput: to run), as well as a preview layer to see what the camera sees on screen, like this:</p>
+
+<pre><code>@property (strong, nonatomic) AVCaptureSession *session;
+@property (strong, nonatomic) AVCaptureVideoPreviewLayer *prevLayer;
+
+...
+
+- (void)viewDidLoad
+{
+    [_session startRunning];
+
+...
+</code></pre>
+
+<p>If you called stopRunning: right after a successful scan, like this:</p>
+
+<pre><code>if(detectionString !=nil &amp;&amp; ![lblresult.text isEqual:@""]){
+    [self playSound];
+    [_session stopRunning];
+}
+</code></pre>
+
+<p>then it should only play the sound one time.  However,you'll also be left with a preview layer frozen on the last frame it captured, so you may want to consider calling:</p>
+
+<pre><code>[self.prevLayer removeFromSuperlayer];
+</code></pre>
+
+<p>This would remove the frozen image from the view entirely, and then the preview layer could be added back and scanning could be re-enabled by:</p>
+
+<pre><code>[self.barcodeScanAreaView.layer addSublayer:_prevLayer];
+[_session startRunning];
+</code></pre>
+
+<p>Alternatively, you could include some logic to disable barcode recognition after a scan just occurred.  Create a BOOL property and change its value after a successful scan, like:</p>
+
+<pre><code>if(detectionString !=nil &amp;&amp; !wasJustScanned &amp;&amp; ![lblresult.text isEqual:@""]){
+    [self playSound];
+    wasJustScanned = YES;
+}
+</code></pre>
+
+<p>The big question, is, of course, when to re-enable scanning.  Perhaps you want the user to confirm that they want to keep what they just scanned (so maybe a button under the view), or perhaps the preview/ scanning view is a modal view that is popped right after a successful scan. I'd recommend looking at existing apps to see what they do.  Fundamentally, though, the key to not repeating the beep is by either disabling capture or disabling processing of a captured barcode after the first successful recognition of the barcode.</p>

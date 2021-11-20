@@ -1,0 +1,21 @@
+<p>I just fought the python &lt;-> Mouser cart API battle and won today. Here is what I learned.</p>
+
+<ol>
+<li><p>The timeout is caused by an incorrect endpoint at the bottom of the WSDL. It specifies     port 9001, but there is nothing listening there. Overriding the suds client location to remove the port specification makes it work.</p>
+
+<pre><code>url = 'https://mews.mouser.com/cartservice.asmx?WSDL'
+location = 'https://mews.mouser.com/cartservice.asmx'
+client = Client(url, location=location, cache=None)
+</code></pre></li>
+<li><p><code>client.service.UpdateCart()</code> wants a <em>string</em> XML document. This is what worked for me:</p>
+
+<pre><code>xmlCartMessage = Document()
+xmlCartMessage.append(cartMessage)
+result = client.service.UpdateCart(xmlCartMessage.plain())
+</code></pre></li>
+<li><p>The response from Mouser is also textâa <code>suds.sax.text.Text</code> XML fragment. See <a href="https://lists.fedoraproject.org/pipermail/suds/2011-October/001537.html" rel="nofollow">https://lists.fedoraproject.org/pipermail/suds/2011-October/001537.html</a> for a description of this behavior. I used <a href="https://github.com/martinblech/xmltodict" rel="nofollow">https://github.com/martinblech/xmltodict</a> to wrangle it into a dict.</p>
+
+<pre><code>import xmltodict
+d = xmltodict.parse(result)
+</code></pre></li>
+</ol>

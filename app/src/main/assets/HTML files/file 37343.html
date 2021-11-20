@@ -1,0 +1,76 @@
+<p>A join does indeed seem to be your best bet, since there is no way in PouchDB to just update "part" of a document &ndash; you have to update the whole thing.</p>
+
+<p>How about something like this? Let's say you have owners and cars.</p>
+
+<pre><code>var owner = {
+  _id: 'owner_1', // could be 'owner_' + Math.random() or whatever
+  name: 'Cookie Monster',
+  type: 'owner'
+};
+
+var car = {
+  _id: 'car_1', // ditto
+  name: 'Mach 5',
+  type: 'car',
+  ownerId: 'owner_1' // Cookie Monster drives the Mach 5 :)
+};
+
+var db = new PouchDB('mydb');
+
+db.bulkDocs([owner, car]).then(function () {
+  return db.put({
+    _id: '_design/owners_and_cars',
+    views: {
+      owners_and_cars: {
+        map: function (doc) {
+          if (doc.type === 'car') {
+            emit(doc._id, {_id: doc.ownerId});
+          }
+        }.toString()
+      }
+    }
+  }).catch(function (err) {
+    if (err.status !== 409) {
+      // 409 means already exists
+      throw err;
+    }
+  });
+}).then(function () {
+  return db.query('owners_and_cars', {include_docs: true});
+}).then(function (res) {
+  console.log(JSON.stringify(res));
+}).catch(function (err) { 
+  /* ... */
+});
+</code></pre>
+
+<p>This prints:</p>
+
+<pre><code>{
+  "total_rows": 1,
+  "offset": 0,
+  "rows": [
+    {
+      "id": "car_1",
+      "key": "car_1",
+      "value": {
+        "_id": "owner_1"
+      },
+      "doc": {
+        "name": "Cookie Monster",
+        "type": "owner",
+        "_id": "owner_1",
+        "_rev": "1-f702c1d279add84b30c6464070d8a985"
+      }
+    }
+  ]
+}
+</code></pre>
+
+<p>This may be slow if you have a lot of data, though, because secondary indexes are slow. In that case, you can just explicitly do an <code>allDocs</code> query:</p>
+
+<pre><code>db.allDocs({startkey: 'car_', endkey: 'car_\uffff'}); // finds all cars
+db.allDocs({startkey: 'owner_', endkey: 'owner_\uffff'}); // finds all owners
+</code></pre>
+
+<p>Then you would manually do the join.</p>

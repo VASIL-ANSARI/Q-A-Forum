@@ -1,0 +1,68 @@
+<p>Just add a new generic parameter in the <code>Exists</code> method. This type will be inferred by the compiler so there is no real impact in usability:</p>
+
+<pre><code>public abstract class BaseClass&lt;TExists&gt; where TExists : BaseExists
+{
+    // needs to be overridden by child
+    protected abstract bool InternalExistsCheck&lt;T&gt;(TExists existsData, out T existingElement) where T : BaseClass&lt;TExists&gt;, new();
+
+    // static method to be invoked without any need of an instance
+    public static bool Exists&lt;T&gt;(TExists existsData, out T existingElement) where T : BaseClass&lt;TExists&gt;, new()
+    {
+        T temp; // &lt;-- how to set the type here?
+        existingElement = null;
+
+        // create a concrete instance
+        var instance = new T();
+
+        // call the concrete implementation
+        if (instance.InternalExistsCheck(existsData, out temp))
+        {
+            existingElement = temp;
+            return true;
+        }
+
+        return false;
+    }
+}
+</code></pre>
+
+<p>Note that if you don't change the protected <code>Exists</code> method, you'll get an ambigous call compile time error (VS 2013).</p>
+
+<p>Now, its perfectly fine to do:</p>
+
+<pre><code>public class ChildClass : BaseClass&lt;ChildClassExists&gt;
+{
+    protected override bool InternalExistsCheck&lt;T&gt;(ChildClassExists exists, out T existingElement)
+    {
+        ....
+    }
+}
+</code></pre>
+
+<p>and</p>
+
+<pre><code>ChildClass existing;
+
+if (ChildClass.Exists(new ChildClassExists(), out existing))
+{
+     // do things here with the existing element of type 'ChildClass'
+}
+</code></pre>
+
+<p><em>UPDATE</em></p>
+
+<p>Adressing your concern about not being able to assign a <code>ChildInstance</code> to <code>existing</code> in the overriden <code>ChildClass.InternalExistsCheck(,)</code>, yes you can by simply doing:</p>
+
+<pre><code>existing = new T();
+</code></pre>
+
+<p>If <code>T</code> is <code>ChildClass</code> (inferred by the compiler) then you will be creating a <code>ChildClass</code> instance. Bear in mind though that you are getting a <code>BaseClass&lt;ChildExists&gt;</code> typed reference, not a <code>ChildClass</code> one.</p>
+
+<p>If you absolutely need a <code>ChildClass</code> typed reference then there is a workaround (if you need to do this, its probably because generics is not the right tool for you):</p>
+
+<pre><code>var childClassTypedReference = (object)existing as ChildClass.
+</code></pre>
+
+<p>Do realize that the whole solution is not as type safe as you'd maybe wish; you <em>must</em> consider the possibility of<code>existing</code> not being a <code>ChildClass</code> typed reference (and therefore <code>childClassTypedReference</code> being <code>null</code>). There is nothing preventing <code>existing</code> from being <em>any</em> type extending <code>BaseClass&lt;ChildExists&gt;</code>.</p>
+
+<p>I don't have the whole picture of your code but I really think you are misusing generics here. I think a non generic approach with an <code>IExists</code> interface dependency would be a much cleaner approach.</p>

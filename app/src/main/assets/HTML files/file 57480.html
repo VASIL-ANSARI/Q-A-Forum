@@ -1,0 +1,41 @@
+<p>Assuming that your <code>process</code> function is declared (in your plugin code) as</p>
+
+<pre><code>int process(int, int, int);
+</code></pre>
+
+<p>Then, you'll better <a href="http://stackoverflow.com/a/9143434/841108">define</a> a <code>typedef</code> for its signature (within the main program doing the <code>dlsym</code>):</p>
+
+<pre><code>typedef int process_sig_t (int, int, int); 
+</code></pre>
+
+<p>And you'll use that to declare the function pointer (there are some "direct" ways to declare in C a function <a href="http://en.cppreference.com/w/c/language/pointer" rel="nofollow">pointer</a> without using a <code>typedef</code> for its signature, but I find them less readable).</p>
+
+<pre><code>process_sig_t *fnptr = NULL;
+</code></pre>
+
+<p>The compiler would then know the signature of the function referenced by that pointer.</p>
+
+<p><sup>(the initialization of <code>fnptr</code> to <code>NULL</code> could be omitted; it makes the code more readable and less error prone, since with a more reproducible behavior)</sup></p>
+
+<p>which you would fill using <code>dlsym</code> e.g.</p>
+
+<pre><code>if (!(fnptr=dlsym(descriptor_bib, "process"))) {
+  fprintf(stderr, MYNAME": %s\n", dlerror());
+  return(1);
+}
+</code></pre>
+
+<p>The use it</p>
+
+<pre><code>printf("Number of chars read: %d\n", (*fnptr) (a1, a2, a3));
+</code></pre>
+
+<p>BTW, function pointers could be called directly:</p>
+
+<pre><code>// less readable code, we don't know that fnptr is a function pointer
+printf("Number of chars read: %d\n", fnptr (a1, a2, a3));
+</code></pre>
+
+<p><sup>(it is better to end most <code>printf</code> format strings with <code>\n</code>; otherwise call <a href="http://man7.org/linux/man-pages/man3/fflush.3.html" rel="nofollow">fflush(3)</a> since <code>stdout</code> is often line-buffered)</sup></p>
+
+<p>BTW, your question is mostly about understanding function pointers (it would be relevant if the function pointer was obtained thru something else than <code>dlsym</code>, e.g. using some <a href="https://en.wikipedia.org/wiki/Just-in-time_compilation" rel="nofollow">JIT compiling</a> library like <a href="https://gcc.gnu.org/onlinedocs/jit/" rel="nofollow">GCCJIT</a>).</p>

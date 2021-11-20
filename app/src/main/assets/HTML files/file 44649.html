@@ -1,0 +1,71 @@
+<p>you can try something like this</p>
+
+<pre><code>SELECT InitiatorID,
+MAX(CASE WHEN VriHistoryEventID = 7 THEN OccurredAt ELSE NULL END) [Login],
+MAX(CASE WHEN VriHistoryEventID = 8 THEN OccurredAt ELSE NULL END) [Logout]
+FROM @table
+GROUP BY InitiatorID,CONVERT(DATE,OccurredAt)
+</code></pre>
+
+<p><strong>EDIT 2</strong>
+This query will show multiple login and logouts in a day</p>
+
+<pre><code>DECLARE @table TABLE
+(
+    VriHistoryID INT,
+    OccurredAt DATETIME,
+    VriHistoryEventID INT,
+    InitiatorID INT
+)
+INSERT INTO @table values(1,'2012-08-23 03:28:32.000',8,NULL)
+INSERT INTO @table values(4,'2012-08-24 03:47:19.640',8,5)
+INSERT INTO @table values(5,'2012-08-24 03:47:50.170',7,5)
+INSERT INTO @table values(7,'2012-08-24 03:48:05.407',8,5)
+
+;WITH CTE AS 
+(
+SELECT
+    InitiatorID,
+    VriHistoryEventID,
+    (CASE WHEN VriHistoryEventID = 7 THEN OccurredAt ELSE NULL END) [Login],
+    (CASE WHEN VriHistoryEventID = 8 THEN OccurredAt ELSE NULL END) [Logout],
+    ROW_NUMBER() OVER(PARTITION BY InitiatorID,VriHistoryEventID ORDER BY OccurredAt) rn
+FROM @table
+)
+SELECT InitiatorID,MIN(Login) Login,MIN(Logout) Logout
+FROM CTE C1
+GROUP BY InitiatorID,rn
+ORDER BY InitiatorID,rn
+</code></pre>
+
+<p><strong>EDIT 3</strong> Updated the sample SQL as per updated output expected.
+See <a href="http://sqlfiddle.com/#!6/6ae81/1" rel="nofollow">SQL Fiddle</a></p>
+
+<pre><code>CREATE TABLE #table
+(
+    VriHistoryID INT,
+    OccurredAt DATETIME,
+    VriHistoryEventID INT,
+    InitiatorID INT
+)
+INSERT INTO #table values(1,'2012-08-23 03:28:32.000',8,NULL)
+INSERT INTO #table values(4,'2012-08-24 03:47:19.640',8,5)
+INSERT INTO #table values(5,'2012-08-24 03:47:50.170',7,5)
+INSERT INTO #table values(7,'2012-08-24 03:48:05.407',8,5)
+
+;WITH CTE AS 
+(
+SELECT
+    InitiatorID,
+    VriHistoryEventID,
+    CONVERT(DATE,OccurredAt) OccurredDate,
+    (CASE WHEN VriHistoryEventID = 7 THEN OccurredAt ELSE NULL END) [Login],
+    (CASE WHEN VriHistoryEventID = 8 THEN OccurredAt ELSE NULL END) [Logout],
+    ROW_NUMBER() OVER(PARTITION BY InitiatorID,CONVERT(DATE,OccurredAt), VriHistoryEventID ORDER BY OccurredAt) rn
+FROM #table
+)
+SELECT InitiatorID,OccurredDate ,LEFT(CONVERT(VARCHAR(10),MIN([Login]),114),5) Login,LEFT(CONVERT(VARCHAR(10),MIN([Logout]),114),5) Logout
+FROM CTE C1
+GROUP BY InitiatorID,OccurredDate,rn
+ORDER BY InitiatorID,OccurredDate,rn
+</code></pre>

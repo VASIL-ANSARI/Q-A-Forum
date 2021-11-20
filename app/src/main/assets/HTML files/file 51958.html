@@ -1,0 +1,67 @@
+<blockquote>
+  <p>Is there some kind of function that can detect if a value is true while sleeping?</p>
+</blockquote>
+
+<p>No there isn't such method to break out a <code>std::this_thread::sleep_for()</code> call within the same thread. The thread is suspended for more or less the time specified in the <code>std::chrono::duration</code> argument.</p>
+
+<blockquote>
+  <p>Whats the easiest way to exit this While loop while its still sleeping?<br>
+  Or do I set up a small sleep in a loop and check to exit if not sleep some  more? if so how would I do that?</p>
+</blockquote>
+
+<p>Do not let it sleep (that long) at all.</p>
+
+<p>Instead of the <code>sleep_for()</code> You can use a condition variable and <a href="http://en.cppreference.com/w/cpp/thread/condition_variable/wait_for" rel="nofollow"><code>wait_for()</code></a> for signalling to exit the loop (from another thread).</p>
+
+<hr>
+
+<p>As you have clarified that in your <a href="http://stackoverflow.com/questions/35658000/exit-during-long-sleep/35658198#comment58997857_35658000">comment</a>, instead of using the <code>std::atomic&lt;bool&gt;</code> you should reorganize your code a bit (again using a condition variable):</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;chrono&gt;
+#include &lt;thread&gt;
+#include &lt;condition_variable&gt;
+#include &lt;mutex&gt;
+
+const std::chrono::seconds  MainDelay = std::chrono::seconds(5);
+const std::chrono::seconds  WorkerTimeResolution = std::chrono::seconds(2);
+std::mutex cv_m;
+std::condition_variable cv;
+bool _execute = false;
+
+void worker_thread() {
+   std::unique_lock&lt;std::mutex&gt; lk(cv_m);
+   while (cv.wait_for(lk,WorkerTimeResolution,[](){return _execute ;})) {
+        // do stuff as long _execute is true, 
+        // may be with more varying timing conditions than sleep_for() ...
+        std::cout &lt;&lt; "Worker thread executing ..." &lt;&lt; std::endl;
+        std::this_thread::sleep_for(WorkerTimeResolution);
+   }     
+}
+
+int main() {
+    std::thread t(worker_thread);
+    _execute = true;
+    cv.notify_all();
+
+    for(int i = 0; i &lt; 3; ++i) {
+        // Do other stuff, may be with more varying timing conditions ...
+        std::this_thread::sleep_for(MainDelay);
+        std::cout &lt;&lt; "Main thread executing ..." &lt;&lt; std::endl;
+    }
+    _execute = false;
+    cv.notify_all();
+    t.join();
+}
+</code></pre>
+
+<p><a href="http://ideone.com/iXREqg" rel="nofollow"><kbd>Online Demo</kbd></a></p>
+
+<hr>
+
+<p>Note that there are a number of possible operations rather than <code>std::this_thread::sleep_for()</code>, that might be synchronized in </p>
+
+<pre><code>// Do stuff ...
+</code></pre>
+
+<p>and cause the current thread being suspended.</p>

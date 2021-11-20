@@ -1,0 +1,34 @@
+<p>You're iterating over <em>every line</em> of every file passed to <code>fileinput.input(...)</code>, right? And you perform the <code>if</code> statement for every line. If the condition is true, then you <code>break</code>, but if the condition is false, you don't break, but write to <code>temp</code>. So for every line in <code>fileinput.input</code> that doesn't match the condition, you write a line to <code>temp</code> and print <code>output</code>. (Actually, the above is wrong -- see edit below.)</p>
+
+<p>Also, <code>elif str(result) not in line:</code> will have strange results -- just use <code>else</code> as others have suggested. If <code>result</code> evaluates to false in this situation, then <code>result == None</code>, which means that <code>str(result) == 'None'</code>, which means that if a line contains <code>None</code>, then you'll have unexpected results.</p>
+
+<p><strong>Edit</strong>: Ok, actually, looking more closely at your actual code the above is wrong, strictly speaking. But the point remains -- <code>fileinput.input()</code> returns a <code>FileInput</code> object that in essence concatenates the files and iterates over every line in turn. Since in some cases you don't want to perform an action per line, but per file, you'll have to iterate over them individually. You could do this without <code>fileinput</code> but since that's what you're using, we'll stick with that:</p>
+
+<pre><code>for filename in walk_dir(directory, (".log", ".txt")):
+    for line in fileinput.input(filename):
+        result = regex.search(whitespace.sub('', line))
+        if result:
+            template = "\nLine: {0}\nFile: {1}\nString Type: {2}\n\n"
+            output = template.format(fileinput.filelineno(), fileinput.filename(), result.group())
+            print output
+            break   # (assuming you only want to print the first result)
+    else:
+        ouput = fileinput.filename()
+        print output
+        temp.write(output)
+        break
+</code></pre>
+
+<p>The way this works: for every file in the list, this prints the first match in the file, or prints the filename if no match was found. You can use <code>else</code> with a <code>for</code> loop in python; the <code>else</code> block at the end of the loop is executed if the loop is not broken. Since no match was found, the filename is printed. </p>
+
+<p>If you wanted to print out <em>all</em> matches in a file, you could save the matches in a list, and instead of using <code>else</code>, you could test the list. Simplified example:</p>
+
+<pre><code>matches = []
+for line in fileinput.input(filename):
+    if searchline(line):
+        matches.append(line)
+if matches:
+    print template.format(matches)
+else:
+    print fileinput.filename()
+</code></pre>

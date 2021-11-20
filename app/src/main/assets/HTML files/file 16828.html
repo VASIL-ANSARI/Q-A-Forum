@@ -1,0 +1,50 @@
+<p>In your <code>DbContext</code> override you can do something like this:</p>
+
+<pre><code>public class MyContext : DbContext
+{
+    public DbSet&lt;Doo&gt; Doos { get; set; }
+    public DbSet&lt;Foo&gt; Foos { get; set; }
+
+    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        modelBuilder.Configurations.Add(new DooConfiguration());
+        modelBuilder.Configurations.Add(new FooConfiguration());
+    }
+}
+
+internal class DooConfiguration : EntityTypeConfiguration&lt;Doo&gt;
+{
+    public DooConfiguration()
+    {
+        // your other property mappings here
+
+        HasMany(m =&gt; m.Foo)
+        .WithMany(m =&gt; m.Doo)
+        .Map(m =&gt; { 
+            m.MapLeftKey("fooID"); 
+            m.MapRightKey("dooID"); 
+            m.ToTable("ManyToManyTableName"); 
+        });
+    }
+}
+
+internal class FooConfiguration : EntityTypeConfiguration&lt;Foo&gt;
+{
+    public FooConfiguration()
+    {
+        // your other property mappings here
+
+        HasMany(m =&gt; m.Doo)
+        .WithMany(m =&gt; m.Foo)
+        .Map(m =&gt; { 
+            m.MapLeftKey("dooID"); 
+            m.MapRightKey("fooID"); 
+            m.ToTable("ManyToManyTableName"); 
+        });
+    }
+}
+</code></pre>
+
+<p>Where your <code>ManyToManyTableName</code> is of course the database table you'll be storing your many-to-many associations. You are telling which primary keys to return with the <code>MapLeftKey</code> and <code>MapRightKey</code> associations.</p>
+
+<p><a href="http://www.codeproject.com/Articles/234606/Creating-a-Many-To-Many-Mapping-Using-Code-First" rel="nofollow">This article</a> has some great further information.</p>

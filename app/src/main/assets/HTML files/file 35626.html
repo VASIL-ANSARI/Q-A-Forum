@@ -1,0 +1,31 @@
+<p>The application you are trying to read from may be sending console output to stderr, in which case you have a few options:</p>
+
+<ul>
+<li><p>just read from stderr outright:  process.readAllStandardError()</p></li>
+<li><p>set the read channel to read only from stderr: process.setReadChannel(QProcess::StandardError)</p></li>
+<li><p>read from stderr and stdout with reckless abandon! : process.setProcessChannelMode(QProcess::MergedChannels)</p></li>
+</ul>
+
+<p>Another possibility is that you are feeding incorrect arguments into your QProcess. It seems you are trying to pipe data above, the proper way to do this with QProcess is like this:</p>
+
+<pre><code>#include &lt;QCoreApplication&gt;
+#include &lt;QProcess&gt;
+#include &lt;QDebug&gt;
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication app(argc, argv);
+
+    QProcess pactl;
+    QProcess grep;
+    pactl.setStandardOutputProcess(&amp;grep);
+    pactl.start("pactl list sinks short");
+    grep.start("grep 10_B7_F6_02_1B_4A");
+
+    pactl.waitForFinished();
+    grep.waitForFinished();
+
+    qDebug() &lt;&lt; grep.readAll();
+    return EXIT_SUCCESS;
+}
+</code></pre>

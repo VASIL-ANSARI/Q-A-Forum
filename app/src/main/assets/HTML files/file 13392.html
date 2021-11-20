@@ -1,0 +1,22 @@
+<p>We had the same issue (on devices running iOS 4.x only btw..)
+The cause of it has been the use of mutable objects in the cache. We put a NSMutableDictionary in the cache and and manipulated it afterwards. Then when the cache was released (to be deallocated) something seems to have happened that later crashed the app on suspend.</p>
+
+<p>Hope this also solves your issue!</p>
+
+<hr>
+
+<p><strong>Update:</strong></p>
+
+<p>We found a solution thanks to <a href="https://devforums.apple.com/message/421845#421845" rel="nofollow">this dev forum entry</a>. It appears that <code>NSCache</code> prior to iOS 4.3 was not unregistering itself from the notification center.</p>
+
+<p>We worked around this issue by creating a simple subclass of <code>NSCache</code> and implement the <code>-dealloc</code> method like so (ARC version):</p>
+
+<pre><code>- (void)dealloc;
+{
+    // NSCache had an issue on iOS prior to 4.3 where it didn't unregister from notifications and caused crashes
+    // see https://devforums.apple.com/message/421845#421845
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+</code></pre>
+
+<p>Now use this class instead of <code>NSCache</code> and you should be okay. Fingers crossed. :)</p>

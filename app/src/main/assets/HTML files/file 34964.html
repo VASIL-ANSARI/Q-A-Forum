@@ -1,0 +1,38 @@
+<p>In your sample code it is not the call to <code>QueueUserWorkItem</code> which throws an exception, it is the call to <code>await myHttpWebRequest.GetResponseAsync()</code> which throws the exception.  If you look at the exception detail you can see exactly what method is throwing this exception</p>
+
+<pre><code>System.InvalidOperationException was unhandled by user code
+  _HResult=-2146233079
+  _message=There were not enough free threads in the ThreadPool to complete the operation.
+  HResult=-2146233079
+  IsTransient=false
+  Message=There were not enough free threads in the ThreadPool to complete the operation.
+  Source=System
+  StackTrace:
+       at System.Net.HttpWebRequest.BeginGetResponse(AsyncCallback callback, Object state)
+       at System.Threading.Tasks.TaskFactory`1.FromAsyncImpl(Func`3 beginMethod, Func`2 endFunction, Action`1 endAction, Object state, TaskCreationOptions creationOptions)
+       at System.Threading.Tasks.TaskFactory`1.FromAsync(Func`3 beginMethod, Func`2 endMethod, Object state)
+       at System.Net.WebRequest.&lt;GetResponseAsync&gt;b__8()
+       at System.Threading.Tasks.Task`1.InnerInvoke()
+       at System.Threading.Tasks.Task.Execute()
+    --- End of stack trace from previous location where exception was thrown ---
+       at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+       at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+       at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+       at ConsoleApplication1.Program.&lt;PoolFunc&gt;d__0.MoveNext() in c:\Users\Justin\Source\Repos\Azure\ConsoleApplication1\ConsoleApplication1\Program.cs:line 39
+  InnerException: 
+</code></pre>
+
+<p>Indeed, if we look at the <a href="http://referencesource.microsoft.com/#System/net/System/Net/HttpWebRequest.cs#613ffcf7266252eb"><code>HttpWebRequest.BeginGetResponse</code> method</a> we can see the following</p>
+
+<pre><code>if (!RequestSubmitted &amp;&amp; NclUtilities.IsThreadPoolLow())
+{
+    // prevent new requests when low on resources
+    Exception exception = new InvalidOperationException(SR.GetString(SR.net_needmorethreads));
+    Abort(exception, AbortState.Public);
+    throw exception;
+}
+</code></pre>
+
+<p>The moral of the story is that the thread pool is a shared resource that other code (including parts of the .Net framework) also uses - setting the maximum number of threads to 2 is what Raymond Chen would call a global solution to a local problem and as a result is breaking the expectation of other parts of the system.</p>
+
+<p>If you want explicit control over what threads are being used then you should create your own implementation, however unless you really know what you are doing you are better off letting the .Net framework handle thread management.</p>

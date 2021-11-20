@@ -1,0 +1,38 @@
+<p>The ideal way to solve this would be using the <code>resolve</code> feature from ng-route or ui-router, as the views/controllers are not instantiated until the data from the <code>resolve</code> is available.</p>
+
+<p>You can do the same thing, albeit in a less elegant way:</p>
+
+<pre><code>&lt;div ng-if="dataIsAvailable&gt;
+  &lt;div ng-controller="MyController"&gt;&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>In the above, <code>MyController</code> won't be instantiated until the expression in the <code>ng-if</code> is true.</p>
+
+<p>Now you need to pre-load your resource files and make their data available to other application components. Simple example:</p>
+
+<pre><code>angular.factory('MyLocaleService', function(locale) {
+
+  var  MyLocaleService = function() {};
+  var localeData = {};
+
+  MyLocaleService.prototype.loadResource = function() {
+    locale.ready('ResourceFile').then(function() {
+      // get the data from the resource file and iterate over it to
+      // store the data in a local var... For this example only doing
+      // a simple assignment
+      localeData['myString'] = locale.getString('myString');
+    });
+  }
+
+  MyLocaleService.prototype.getString = function(string) {
+    return localeData[string];
+  }
+
+  return new MyLocaleService();
+});
+</code></pre>
+
+<p><strong>Putting it all together</strong>:</p>
+
+<p>When your app starts, pre-load the URL's (MyLocaleService.loadResource()). Defer instantiation of the views/controllers until the data is available using <code>ng-if</code> or something similar. Inject <code>MyLocaleService</code> into your controllers and use it to fetch the resource bundle strings.</p>

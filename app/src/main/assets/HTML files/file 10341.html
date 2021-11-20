@@ -1,0 +1,27 @@
+<p>I had a similar problem; you can either set up IIS to add a <a href="http://www.microsoft.com/technet/prodtechnol/WindowsServer2003/Library/IIS/0fc16fe7-be45-4033-a5aa-d7fda3c993ff.mspx?mfr=true" rel="nofollow">content-expiration header</a> for the CSS files so they never get cached, or you can use the solution presented in this SO question <a href="http://stackoverflow.com/questions/2019807/add-url-parameter-to-css-file-in-asp-themes-folder/2021224#2021224">here</a></p>
+
+<p>You can also add a method to each of your pages to go through the controls in your page.header (perhaps even in your Master.Page!) to do something like:</p>
+
+<pre><code>protected override void OnPreRender(System.EventArgs e)    
+{        
+        foreach (Control link in Page.Header.Controls)        
+        {                       
+            if (link is HtmlLink)            
+            {                  
+                HtmlLink cssLink = link as HtmlLink;
+                //Check if CSS link 
+                if (cssLink.Attributes["type"].Equals("text/css", StringComparison.CurrentCultureIgnoreCase))                
+                {                    
+                    if (cssLink.Attributes["href"].Equals(String.Format("~/App_Themes/{0}/{0}.css", Page.Theme), StringComparison.CurrentCultureIgnoreCase))                    
+                    {      
+                        //perhaps add the version of your app here.                                                                
+                        cssLink.Attributes["href"] += "?v1.1";                                          
+                    }                
+                }            
+            }        
+        }
+        base.OnPreRender(e);     
+    }
+</code></pre>
+
+<p>Another technique would be to include a version number in the theme name - for example MyTheme1_1 or similar. Each release would then be loading content from a "new" url and hence the content should be requested again for each user. Obviously, this is more work, but is should be once per release and doesn't have the overheads you mention below.</p>

@@ -1,0 +1,62 @@
+<p>You should call</p>
+
+<pre><code>ui-&gt;nameEdit-&gt;setText(texto); //here it is the problem
+ui-&gt;diagEdit-&gt;setText(names);
+ui-&gt;dateEdit-&gt;setDate(fechas);
+</code></pre>
+
+<p>in the first window (ventana), but now you're calling it inside pacientes. So you have to send the path to the file from the pacientes to ventana and set the text in ventana.</p>
+
+<p>In pacientes you should have something like this:</p>
+
+<pre><code>void pacientes::on_pacienteAceptar_clicked()
+{
+    QString pathToDirectory = "C://Users//Jaime//Desktop//interfaz//pacientes";
+    QString currentFileName = ui-&gt;pacienteLista-&gt;currentText();
+    QString pathToFile = QString("%1//%2").arg(pathToDirectory, currentFileName);
+    emit customSignalSetText( pathToFile );
+}
+</code></pre>
+
+<p>In ventana you make a custom slot that does all the work:</p>
+
+<pre><code>void ventana::customSlotSetText( QString const &amp; text )
+{
+    if(!text.isEmpty())
+    {
+        QFile file(text);
+        ...
+    }
+}
+</code></pre>
+
+<p>And in your application where you have pacientes and ventana, you connect your custom signal from pacientes to your custom slot in ventana.</p>
+
+<p>EDIT:
+This signal-slot connect must happen in a place where you have access to an instance of pacientes and an instance of ventana.</p>
+
+<p>EDIT2:
+The <code>connect</code> must also happen within a <code>QObject</code>.</p>
+
+<pre><code>int main(...)
+{
+    ...
+    ventana1 w;
+    w.show();
+    pacientes pacientesObj(w);
+    ...
+}
+</code></pre>
+
+<p>In the constructor of <code>pacientes</code>:</p>
+
+<pre><code>pacientes::pacientes( ventana1 receiver, QWidget* parent )
+{
+    ...
+    connect( this, SIGNAL( customSignalSetText( QString ) ), &amp;receiver, SLOT( customSlotSetText( QString ) ) );
+}
+</code></pre>
+
+<p>Note that you can not connect signals and slots between classes, only between instances of those classes.</p>
+
+<p>As for emitting the signal, look <a href="http://qt-project.org/doc/qt-4.8/signalsandslots.html" rel="nofollow">here</a>. It is probably one of the following: (1) you did not use the <code>Q_OBJECT</code> macro or (2) you did not declare the signal correctly (with <code>signals:</code>). If it was the first, you'll have to run <code>qmake</code> again.</p>

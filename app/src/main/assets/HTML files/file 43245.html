@@ -1,0 +1,25 @@
+<p>The problem is that you are referring to a field without performing an aggregation on it. All fields that aren't a part of the _id need to be aggregated. You'll notice that Month and Product are already part of the _id, so there is no need to ask for them again in the grouping statement. I'd suggest doing this instead:</p>
+
+<pre><code>var group = project.Group(
+    key =&gt; new { key.Month, key.Product },
+    g =&gt; new
+    {
+         MonthAndProduct = g.Key,
+         TotalSales = g.Sum(o =&gt; o.Value)
+    });
+</code></pre>
+
+<p>If you need to flatten this out afterwards, you can change the above to return an anonymous type and then either do projecting client-side or with another $project.</p>
+
+<pre><code>var project = group.Project(x =&gt; new OrderSummary
+{
+     Month = x.MonthAndProduct.Month, 
+     Product = x.MonthAndProduct.Product, 
+     TotalSales = x.TotalSales
+});
+</code></pre>
+
+<p>If you still feel this is a bug in the driver, please file a bug/feature request ticket at jira.mongodb.org under the CSHARP project.</p>
+
+<p>Thanks,
+Craig</p>

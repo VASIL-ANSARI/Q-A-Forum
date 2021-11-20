@@ -1,0 +1,49 @@
+<p>What is your <strong>Android device</strong> and <strong>Android version</strong>? 
+If it's Android 4.2, they're now using Broadcom as I understood and so we're only able to create SDP connection. </p>
+
+<p>I'm having the same problem while making a bluetooth connection between my Nexus 7 (Android 4.2.2 with CyanogenMod ROM 10) and a Wiimote. This is an HID device so I need to use L2CAP. Last versions of Android were able to create this connection (we can figure out just by looking at the market). If you search an application to handle this on the market, you'll see by looking at the description that all devices with Android version 4.0+ are not supported. </p>
+
+<p>I just found this post few minutes ago which could help you: <a href="http://stackoverflow.com/a/7838587/1772805">stackoverflow.com/a/7838587/1772805</a></p>
+
+<p>Let me know if you solve this. I'll keep you in touch if I found anything. </p>
+
+<p><strong>EDIT #1:</strong> I tried the solution on the link above. I changed it to use a different constructor like this: </p>
+
+<pre><code>private static final int TYPE_RFCOMM = 1;
+private static final int TYPE_SCO = 2;
+private static final int TYPE_L2CAP = 3;
+
+/**
+ * Create a BluetoothSocket using L2CAP protocol
+ * Useful for HID Bluetooth devices
+ * @param BluetoothDevice
+ * @return BluetoothSocket
+ */
+private static BluetoothSocket createL2CAPBluetoothSocket(BluetoothDevice device){
+  int type        = TYPE_L2CAP; // L2CAP protocol
+  int fd          = -1;         // Create a new socket
+  boolean auth    = false;      // No authentication
+  boolean encrypt = false;      // Not encrypted
+  int port        = 0;          // port to use (useless if UUID is given)
+  ParcelUuid uuid = new ParcelUuid(wiimoteUuid); // Bluetooth UUID service
+
+  try {
+    Constructor&lt;BluetoothSocket&gt; constructor = BluetoothSocket.class.getDeclaredConstructor(
+      int.class, int.class, boolean.class, boolean.class,
+      BluetoothDevice.class, int.class, ParcelUuid.class);
+    constructor.setAccessible(true);
+    BluetoothSocket clientSocket = (BluetoothSocket) constructor.newInstance(
+      type, fd, auth, encrypt, device, port, uuid);
+    return clientSocket;
+  } catch (Exception e) {
+    e.printStackTrace();
+    return null;
+  }
+}
+</code></pre>
+
+<p>I succeeded to create the socket but when I call the method <code>connect()</code>, I get this error: <code>bt l2cap socket type not supported, type:3</code>. This log is a very bad new for me because I found this <a href="https://groups.google.com/forum/?fromgroups=#!topic/android-developers/zJYMoiLLF0M">thread</a> which says <strong>Android 4.2 does not support L2CAP</strong> (or just disabled by Google..).</p>
+
+<p>Because my device is rooted with CyanogenMod 10, the feature will maybe come back on a new release. I hope.. </p>
+
+<p><strong>EDIT #2:</strong> Here's a link pointing on the C file containing the reason of the problem: <a href="https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/master/btif/src/btif_sock.c">btif_sock.c</a>. If anyone knows if it's possible re-write this file or how to add the L2CAP feature to Android with an external C library. I'm afraid it's not a simple task. </p>

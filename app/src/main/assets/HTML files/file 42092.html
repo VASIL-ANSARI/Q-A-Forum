@@ -1,0 +1,24 @@
+<p>You need to use <em>SQL parameters</em> and have the database adapter handle quoting for you:</p>
+
+<pre><code>ins_stmt = ("INSERT  INTO VOLUMES (VOLUMEID, NAME, TYPE, SERVERID,"
+        "SIZE, DEVICENAME, CREATIONDATE) VALUES (?, 'TBC',"
+        "%s, %s, %s, %s, %s);")
+params = (volume.id, volume.type,
+        volume.attach_data.instance_id, volume.size,
+        volume.attach_data.device, volume.create_time)
+cursor.execute(to_execute, params)
+</code></pre>
+
+<p>Not only does this ensure that you don't run into problems with pre-existing quoting characters in your strings, it also avoids SQL injection attacks (where a user crafts data that breaks out of the quoting and issues additional SQL statements you did not intent to allow). Don't let Little Bobby Tables get you!</p>
+
+<p><a href="http://xkcd.com/327/" rel="nofollow"><img src="http://imgs.xkcd.com/comics/exploits_of_a_mom.png" alt="Little Bobby Tables comic from XKCD" title="Her daughter is named Help I&#39;m trapped in a driver&#39;s license factory."></a></p>
+
+<p>Next, make sure your timestamps are in a format that <a href="http://dev.mysql.com/doc/refman/5.6/en/datetime.html" rel="nofollow">MySQL supports</a>; your timestamp appears to have a 3-digit fraction and a timezone specifier; MySQL 5.6.4 and up appears to expect a 6 digit fraction, a space instead of the <code>T</code>, and no timezones, so perhaps you should remove that portion from your <code>volume.create_time</code> string:</p>
+
+<pre><code>params = (volume.id, volume.type,
+          volume.attach_data.instance_id, volume.size,
+          volume.attach_data.device,
+          volume.create_time.replace('T', ' ').partition('.')[0])
+</code></pre>
+
+<p>The message you see is telling you that MySQL won't accept the date as formatted. Your MySQL client is either only issuing a <em>warning</em> (instead of an error), or it is configured to allow invalid dates (<a href="http://dev.mysql.com/doc/refman/5.0/en/sql-mode.html#sqlmode_allow_invalid_dates" rel="nofollow"><code>ALLOW_INVALID_DATES</code></a> is set). If a warning was set you need to ask MySQL for the warning with <code>show warnings</code> in the client.</p>

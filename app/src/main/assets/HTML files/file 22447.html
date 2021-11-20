@@ -1,0 +1,27 @@
+<p>This:</p>
+
+<pre><code>def form_valid(self, form):
+    # call form.save manually: creates "i am: foxmask"
+    self.object = form.save(user=self.request.user)
+
+    # Call parent form_valid(), CreateView.form_valid() ...
+    # ... which also calls form.save() without user argument !!
+    # So, it should create "i am: None" because the default value for 
+    # the user argument of the save() method of your form is None.
+    return super(TriggerServiceCreateView, self).form_valid(form)
+</code></pre>
+
+<p>And <a href="https://github.com/django/django/blob/1.4.3/django/views/generic/edit.py#L111" rel="nofollow"><code>CreateView.form_valid()</code></a> calls <code>TriggerServiceForm.save()</code> with <code>user=None</code>.</p>
+
+<p>So you can't use super() here as it will call the direct parent.</p>
+
+<p>Why not keep it simple:</p>
+
+<pre><code>from django import http
+
+# ...
+
+def form_valid(self, form):
+    self.object = form.save(user=self.request.user)
+    return http.HttpResponseRedirect(self.get_success_url())
+</code></pre>

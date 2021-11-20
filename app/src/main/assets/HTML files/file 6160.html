@@ -1,0 +1,56 @@
+<p><code>800+ records requires about 5 minutes</code> = query problem.  </p>
+
+<p>look at your execution plan:</p>
+
+<p>In SSMS, run:</p>
+
+<p><code>SET SHOWPLAN_ALL ON</code></p>
+
+<p>then run your query, it will not produce the expected result set, but an exceution plan on how the database is retrieving your data.  Most bad queries usually table scan (look at every row in the table, which is slow), so look for the word "SCAN" in the <code>StmtText</code> column.  Try to figure out why the index is not being used on that table (name will be in there by the word "SCAN").  If you join in multiple tables and have multiple SCANs concentrate on the largest tables first.</p>
+
+<p>Without more info this is the best "generic" help you can get.</p>
+
+<p><strong>EDIT</strong><br>
+From reading your question, I'm not sure if you mean it is always fast from SSMS no matter the rows, but slow from VB as the rows increase. If that is the case check this: <a href="http://www.google.com/search?q=sql+server+fast+from+ssms+slow+from+application&amp;hl=en&amp;num=100&amp;lr=&amp;ft=i&amp;cr=&amp;safe=images" rel="nofollow">http://www.google.com/search?q=sql+server+fast+from+ssms+slow+from+application&amp;hl=en&amp;num=100&amp;lr=&amp;ft=i&amp;cr=&amp;safe=images</a></p>
+
+<p>could be something like: parameter sniffing or inconsistent connection parameters (ANSI nulls, arithabort, etc)</p>
+
+<p>for the connection settings, try running these from SSMS and from VB6 (add them to the result set) and see if there are any differences:</p>
+
+<pre><code>SELECT SESSIONPROPERTY ('ANSI_NULLS') --Specifies whether the SQL-92 compliant behavior of equals (=) and not equal to (&lt;&gt;) against null values is applied.
+                                      --1 = ON 
+                                      --0 = OFF
+
+SELECT SESSIONPROPERTY ('ANSI_PADDING') --Controls the way the column stores values shorter than the defined size of the column, and the way the column stores values that have trailing blanks in character and binary data.
+                                        --1 = ON 
+                                        --0 = OFF
+
+SELECT SESSIONPROPERTY ('ANSI_WARNINGS') --Specifies whether the SQL-92 standard behavior of raising error messages or warnings for certain conditions, including divide-by-zero and arithmetic overflow, is applied.
+                                         --1 = ON 
+                                         --0 = OFF
+
+SELECT SESSIONPROPERTY ('ARITHABORT') -- Determines whether a query is ended when an overflow or a divide-by-zero error occurs during query execution.
+                                      --1 = ON 
+                                      --0 = OFF
+
+SELECT SESSIONPROPERTY ('CONCAT_NULL_YIELDS_NULL') --Controls whether concatenation results are treated as null or empty string values.
+                                                    --1 = ON 
+                                                    --0 = OFF
+
+SELECT SESSIONPROPERTY ('NUMERIC_ROUNDABORT') --Specifies whether error messages and warnings are generated when rounding in an expression causes a loss of precision.
+                                              --1 = ON 
+                                              --0 = OFF
+
+SELECT SESSIONPROPERTY ('QUOTED_IDENTIFIER') --Specifies whether SQL-92 rules about how to use quotation marks to delimit identifiers and literal strings are to be followed.
+                                             --1 = ON 
+                                             --0 = OFF
+</code></pre>
+
+<p>make your query like (so you can see the connection settings in VB6):</p>
+
+<pre><code>SELECT
+    col1, col2
+        ,SESSIONPROPERTY ('ARITHABORT') AS ARITHABORT
+        ,SESSIONPROPERTY ('ANSI_WARNINGS') AS ANSI_WARNINGS
+    FROM ...
+</code></pre>

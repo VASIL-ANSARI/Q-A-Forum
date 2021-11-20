@@ -1,0 +1,74 @@
+<p>I wrote a blog post on this which goes into a bit more detail.
+<a href="http://ddelapaz.github.io" rel="nofollow">http://ddelapaz.github.io</a></p>
+
+<p>It appears that the <code>WUApi</code> exposes <code>IUpdate</code> which holds multiple levels of <code>bundleUpdates</code>. Before, I was simply retrieving the top level of <code>bundleUpdates</code> which by doing so, made certain updates fail due to missing content required by the update; most windows updates have more than 1 level of bundles. </p>
+
+<p><strong>For example, imagine this tree like structure for 1 Update (aka IUpdate):</strong></p>
+
+<pre><code>Update 1
+    ---&gt; Bundle 1
+       *URL 1
+       *URL 2
+         ----&gt; Bundle 1A
+               *URL 1
+               *URL 2
+               *URL 3
+
+    ---&gt; Bundle 2
+       *URL 1
+         ----&gt; Bundle 2A
+               *URL 1
+               *URL 2
+         ----&gt; Bundle 2B
+               *URL 1
+
+   ----&gt; Bundle 3
+         *URL 1
+          ----&gt; Bundle 3A
+                *URL 1
+                *URL 2
+</code></pre>
+
+<p>My Solution was to create a Recursive function to parse each update individually and keep all URIs in a dictionary of key type "<code>bundleName</code>" and <code>list of value</code>s that will hold all URIs for that particular bundle.</p>
+
+<p><strong>Like So:</strong></p>
+
+<pre><code>Dictionary&lt;string, List&lt;string&gt;&gt;
+</code></pre>
+
+<p><strong>The Recursive function is the following:</strong></p>
+
+<pre><code> private static Dictionary&lt;string, List&lt;string&gt;&gt; GetAllUpdates(IUpdate iUpdate)
+        {
+            var bundleDict = new Dictionary&lt;string, List&lt;string&gt;&gt;();
+
+            foreach (IUpdate bundle in iUpdate.BundledUpdates)
+            {
+                foreach (IUpdateDownloadContent udc in bundle.DownloadContents)
+                {
+                    var downloadContents = new List&lt;string&gt;();
+                    if (String.IsNullOrEmpty(udc.DownloadUrl))
+                        continue;
+
+                    var url = udc.DownloadUrl;
+                    downloadContents.Add(url);
+
+                    if (!bundleDict.ContainsKey(bundle.Title))   
+                        bundleDict.Add(bundle.Title, downloadContents);
+                }
+
+                if (bundle.BundledUpdates.Count &gt; 0)
+                {
+                    var valuesReturned = GetAllUpdates(bundle);
+                    foreach (var data in valuesReturned)
+                    {
+                      if(!bundleDict.ContainsKey(data.Key))     
+                         bundleDict.Add(data.Key, data.Value);
+                    }
+
+                }
+            }
+
+            return bundleDict;
+        }
+</code></pre>

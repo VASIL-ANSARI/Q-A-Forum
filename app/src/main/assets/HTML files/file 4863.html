@@ -1,0 +1,74 @@
+<p>The two lines:</p>
+
+<pre><code>outf.write( reinterpret_cast&lt;char *&gt;( &amp;temp ), sizeof( Item ) );
+</code></pre>
+
+<p>and</p>
+
+<pre><code>inf.read( reinterpret_cast&lt;char *&gt;( &amp;temp ), sizeof( Item ) );
+</code></pre>
+
+<p>are wrong. You are writing the binary layout of the object, including <code>std::string</code> instances.  This means you are writing the value of pointers to a file and reading them back.</p>
+
+<p>You cannot simply read pointers from a file and assume they point to valid memory, especially if it was held by a temporary <code>std::string</code> instance, which should have freed the memory in it's destructor when it went out of scope. I'm surprised you got this to run "correctly" with any compiler.</p>
+
+<p>Your program should write the content and read it back using your <code>operator&lt;&lt;</code> and <code>operator&gt;&gt;</code> methods. It should look like the following:</p>
+
+<pre><code>void write_to_file( const string&amp; fn, const Item&amp; item )
+{
+    fstream outf( fn.c_str(), ios::binary | ios::out );
+    outf &lt;&lt; item &lt;&lt; std::endl;
+    outf.close();
+}
+
+void read_from_file( const string&amp; fn, Item&amp; item )
+{
+    fstream inf( fn.c_str(), ios::binary | ios::in );
+    if( !inf )
+    {
+        cout &lt;&lt; "What's wrong?";
+    }
+    inf &gt;&gt; item;
+    inf.close();
+}
+</code></pre>
+
+<p><strong>BONUS</strong>: There are a few quirks with your code.</p>
+
+<p>This statement is, thankfully, presently unused in your program (the method is not called). </p>
+
+<pre><code>return ( string&amp; )"";
+</code></pre>
+
+<p>It is invalid because you will  be returning a reference to a temporary string object. Remeber that a string literal <code>""</code> is not a <code>std::string</code> object and you can't get a reference to it of type <code>std::string&amp;</code>. You should probably raise an exception, but you could get away with:</p>
+
+<pre><code>string&amp; operator []( int x )
+{
+    static string unknown;
+    if ( 0 == x )
+        return itemID;
+    if ( 1 == x )
+        return itemName;
+    if ( 2 == x )
+        return itemState;
+    return unkonwn;
+}
+</code></pre>
+
+<p>This is a poor solution given that the string is returned by reference. It can be modified by the caller, so it might not always return the <code>""</code> value you thought it would. However, it will remove undefined behavior for your program.</p>
+
+<p>The <code>.close()</code> method invocations on <code>std::fstream</code> objects are not necessary, the destructor calls it automagically when the object goes out of scope. Inserting the call there is extra clutter.</p>
+
+<p>Also, what's with the redundant naming convention?</p>
+
+<pre><code>class Item
+{
+private:
+    string itemID;
+    string itemName;
+    string itemState;
+// ...
+};
+</code></pre>
+
+<p>What's wrong with calling them <code>ID</code>, <code>name</code> and <code>state</code>?</p>

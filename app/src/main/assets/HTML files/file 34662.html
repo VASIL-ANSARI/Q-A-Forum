@@ -1,0 +1,26 @@
+<p>You have <code>char choice[1];</code> but then you call <code>fgetsTrim(choice, 2)</code>. That then calls <code>fgets(choice, 2, stdin)</code> causing a buffer overflow (and thus undefined behaviour).</p>
+
+<p>To fix this, make <code>choice</code> bigger. However your code has a lot of magic numbers in it. Use <code>sizeof</code> where possible, and use <code>#define</code> constants in other places. </p>
+
+<p>BTW you probably want to make it at least <code>3</code>. If it is size <code>2</code>, then <code>fgets</code> will only extract the digit the person types, and not the newline. Then your next call to <code>fgets</code>, wherever it may be, will pick up that newline.  To be user-friendly you should probably use a fairly large buffer, there's no reason not to.</p>
+
+<p>For example: </p>
+
+<pre><code>char choice[80];
+// ...
+fgetsTrim(choice, sizeof choice);
+</code></pre>
+
+<p>For the struct names:</p>
+
+<pre><code>#define STRUCT1_SIZE 20
+char struct1[STRUCT1_SIZE] = { 0 };   // don't need to set it to zero later
+// ... in function
+fgetsTrim(struct1, STRUCT1_SIZE);
+</code></pre>
+
+<p>Another problem is <code>char password[6] = "Fedora";</code>. This is NOT a string because it is not null-terminated. But you call <code>login(password)</code> which then calls <code>strncmp</code>, a function that expects a null-terminated string. So you have a read buffer overflow. </p>
+
+<p>To fix this, write <code>char password[] = "Fedora";</code> instead, then the compiler will pick the right size for you.</p>
+
+<p><strong>Edit</strong>: The <code>createStruct</code> function has severe issues. It seems as if you think you can use the user's input as a typename... you can't. The line <code>typedef struct fileProperties struct1;</code> means that the token <code>struct1</code> <em>in your code</em> aliases that struct. Then your <code>printf("%s", struct1...</code> will not compile because <code>struct1</code> is now a type name.</p>

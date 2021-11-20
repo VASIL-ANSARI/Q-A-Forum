@@ -1,0 +1,34 @@
+<p>Your program is overflowing the stack not because the grammar is "too complex" but rather because it is left-recursive. Since your program does not check to see if it has already recursed through a non-terminal, once it tries to compute <code>first('B')</code>, it will enter an infinite recursion, which will eventually fill the call stack. (In the example grammar, not only is <code>B</code> left-recursive, it is also <em>useless</em> because it has no non-recursive production, which means that it can never derive a sentence consisting only of terminals.)</p>
+
+<p>That's not the only problem, though. The program suffers from at least two other flaws:</p>
+
+<ul>
+<li><p>It does not check if a given terminal has already been added to the <strong>FIRST</strong> set for a non-terminal before adding the terminal to the set. Consequently, there will be repeated terminals in the <strong>FIRST</strong> sets.</p></li>
+<li><p>The program only checks the first symbol in the right-hand side. However, if a non-terminal can produce &epsilon; (in other words, the non-terminal is <em>nullable</em>), the <em>following</em> symbol needs to be used as well to compute the <strong>FIRST</strong> set.</p>
+
+<p>For example,</p>
+
+<pre><code>A â B C d
+B â b | Îµ
+C â c | Îµ
+</code></pre>
+
+<p>Here, <strong>FIRST</strong>(<em>A</em>) is <code>{b, c, d}</code>. (And similarly, <strong>FOLLOW</strong>(<em>B</em>) is <code>{c, d}</code>.)</p></li>
+</ul>
+
+<p>Recursion doesn't help much with the computation of <strong>FIRST</strong> and <strong>FOLLOW</strong> sets. The simplest algorithm to describe is the this one, similar to the algorithm presented in the <a href="https://en.wikipedia.org/wiki/Compilers:_Principles,_Techniques,_and_Tools" rel="nofollow">Dragon Book</a>, which will suffice for any practical grammar:</p>
+
+<ol>
+<li><p>For each non-terminal, compute whether it is nullable.</p></li>
+<li><p>Using the above, initialize <strong>FIRST</strong>(<em>N</em>) for each non-terminal <em>N</em> to the set of <em>leading symbols</em> for each production for <em>N</em>. A symbol is a leading symbol for a production if it is either the first symbol in the right-hand side or if every symbol to its left is nullable. (These sets will contain both terminals and non-terminals; don't worry about that for now.)</p></li>
+<li><p>Do the following until no <strong>FIRST</strong> set is changed during the loop:</p>
+
+<ul>
+<li>For each non-terminal <em>N</em>, for each non-terminal <em>M</em> in <strong>FIRST</strong>(<em>N</em>), add every element in <strong>FIRST</strong>(<em>M</em>) to <strong>FIRST</strong>(<em>N</em>) (unless, of course, it is already present).</li>
+</ul></li>
+<li><p>Remove all the non-terminals from all the <strong>FIRST</strong> sets.</p></li>
+</ol>
+
+<p>The above assumes that you have an algorithm for computing nullability. You'll find that algorithm in the Dragon Book as well; it is somewhat similar. Also, you should eliminate useless productions; the algorithm to detect them is very similar to the nullability algorithm.</p>
+
+<p>There is an algorithm which is usually faster, and actually not much more complicated. Once you've completed step 1 of the above algorithm, you have computed the relation <b>leads-with</b>(<em>N</em>, <em>V</em>), which is true if and only if some production for the nonterminal <em>N</em> starts with the terminal or non-terminal <em>V</em>, possibly skipping over nullable non-terminals. FIRST(<em>N</em>) is then the transitive closure of <b>leads-with</b> with its domain restricted to terminals. That can be efficiently computed (without recursion) using the Floyd-Warshall algorithm, or using a variant of Tarjan's algorithm for computing strongly connected components of a graph. (See, for example, <a href="http://www.cs.hut.fi/~enu/tc.html" rel="nofollow">Esko Nuutila's transitive closure page.</a>)</p>

@@ -1,0 +1,15 @@
+<p>The problem is that, in development, you're only running one server process, which is busy generating the email. That process is sending another request (to itself) to generate a PDF and waiting for a response.  The request for the PDF is basically standing in line at the server so that it can get it's PDF, but the server is busy generating the email and waiting to get the PDF before it can finish.  And thus, you're waiting forever.</p>
+
+<p>What you need to do is start up a second server process...</p>
+
+<pre><code>script/rails server -p 3001
+</code></pre>
+
+<p>and then get your PDF with something like ...</p>
+
+<pre><code>args = ['127.0.0.1','/responses/1.pdf']
+args &lt;&lt; 3001 unless Rails.env == 'production'
+file = Net::HTTP.get(*args)
+</code></pre>
+
+<p>As an aside, depending on what server you're running on your production machine, you might run into issues with pointing at 127.0.0.1.  You might need to make that dynamic and point to the full domain when in production, but that should be easy.</p>

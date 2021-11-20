@@ -1,0 +1,88 @@
+<p><em>Although it's not a good practice but if it's only a minor change and rest of your partial is same in all cases then what you do is <strong>use some generic variable in your partial. In your case your polymorphic url depends on the initialized value of second variable i.e @idea(as first part challenges/12/ is same)</em></strong> so you can do something like this:</p>
+
+<pre><code>polymorphic_path([@challenge,@something_generic])
+</code></pre>
+
+<p>and now depending on your controllers action you can change <code>@something_generic</code> to make proper url for your form </p>
+
+<pre><code>class IdeasController &lt; ApplicationController
+  def new
+    @challenge = Challenge.find(params[:challenge_id])
+    @something_generic = @challenge.ideas.build
+  end
+end
+
+class RefinementsController &lt; ApplicationController
+  def new
+    @challenge = Challenge.find(params[:challenge_id])
+    @something_generic = @challenge.refinements.build
+  end
+end
+</code></pre>
+
+<p><strong>Update:</strong></p>
+
+<p>Change your code to this:</p>
+
+<pre><code>class IdeasController &lt; ApplicationController
+  before_action :authenticate_user!
+  load_and_authorize_resource :challenge
+  load_and_authorize_resource :idea, through: :challenge
+
+  def index
+  end
+
+  def show
+    @something_generic = Idea.find(params[:id])
+  end
+end
+
+class RefinementsController &lt; ApplicationController
+  before_action :authenticate_user!
+  load_and_authorize_resource :challenge, parent: true
+  load_and_authorize_resource :idea, through: :challenge, parent: false
+
+  def index
+    @something_generic = Refinement.find(params[:id])
+    render 'ideas/index'
+  end
+
+  def show
+    @something_generic = Refinement.find(params[:id])
+    render 'ideas/show'
+  end
+end
+</code></pre>
+
+<p>Since you are using cancancan and have proper filters so @idea and @challenge will be defined automatically in your actions.</p>
+
+<p><strong>For index.html i think you'll be better of using separate templates</strong> but if you still want to use a single template then you can do something like this:</p>
+
+<p>app/views/ideas/index.html.erb</p>
+
+<pre><code>&lt;div class="ideas"&gt;
+  &lt;% @ideas.each do |idea| %&gt;
+    &lt;div class="idea"&gt;
+      &lt;div class="title"&gt;
+        &lt;% if controller_name == "ideas" %&gt;
+          &lt;%= link_to idea.title, polymorphic_path([@challenge, idea]) %&gt;
+        &lt;% else %&gt;
+          &lt;%= link_to idea.title, polymorphic_path([@challenge, @something_generic]) %&gt;
+        &lt;% end %&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;% end %&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>and show.html.erb</p>
+
+<pre><code>&lt;div class="idea"&gt;
+  &lt;div class="title"&gt;
+    &lt;%= link_to @idea.title, polymorphic_path([@challenge, @something_generic]) %&gt;
+  &lt;/div&gt;
+  &lt;div class="description"&gt;
+      &lt;%= @idea.description %&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>

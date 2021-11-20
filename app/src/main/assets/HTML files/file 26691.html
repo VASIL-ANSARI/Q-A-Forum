@@ -1,0 +1,58 @@
+<p>You're talking about a software-hardware interface here. They are usually set low and high by assigning a 1-byte value to a register. A <a href="http://en.wikipedia.org/wiki/Parallel_port" rel="nofollow">parallel port</a> has 8 pins for data to travel across. In a low level language like C, C++, there would be a register, lets call it 'A', somewhere holding 8 bits corresponding to the 8 pins of data. So for example:</p>
+
+<p>Assuming resgister A is setup like pins: [7,6,5,4,3,2,1,0]</p>
+
+<p>C-like pseudocode</p>
+
+<pre><code>A=0x00 // all pins are set low
+A=0xFF // all pins are high
+A=0xF0 // Pins 0:3 are low, Pins 4:7 are high
+</code></pre>
+
+<p>This idea follows through with <a href="http://en.wikipedia.org/wiki/Parallel_port" rel="nofollow">PyParallel</a></p>
+
+<pre><code>import parallel
+p = parallel.Parallel() # open LPT1
+p.setData(0x55) #&lt;--- this is your bread and butter here  
+</code></pre>
+
+<p>p.setData is the function you're interested in. 0x55 converted to binary is </p>
+
+<p>0b01010101</p>
+
+<p>-or- </p>
+
+<p>[L H L H L H L H]</p>
+
+<p>So now you can set the data to a certain byte, but how would I sent a bunch of data... lets say 3 bytes 0x00, 0x01, 0x02? Well you need to watch the ack line for when the receiving machine has confirmed receipt of whatever was just sent.</p>
+
+<p>A naive implementation:</p>
+
+<pre><code>data=[0x00, 0x01, 0x02]
+while data:
+    onebyte=data.pop()
+    p.setDataStrobe('low') #signal that we're sending data
+    p.setData(onebyte)
+    while p.getInAcknowledge() == 'high': #wait for this line to go 'low'
+                                          # to indicate an ACK
+        pass                              #we're waiting for it to acknowledge...
+    p.setDataStrobe('high')#Ok, we're done sending that byte.
+</code></pre>
+
+<p>Ok, that doesn't directly answer your question. Lets say i ONLY want to set pin 5 high or low. Maybe I have an LED on that pin. Then you just need a bit of binary operations.</p>
+
+<pre><code>portState = 0b01100000 #Somehow the parallel port has this currently set
+newportState = portState | 0b00010000#&lt;-- this is called a bitmask
+print newportState 
+&gt;&gt;&gt; 0b011*1*0000
+</code></pre>
+
+<p>Now lets clear that bit...</p>
+
+<pre><code>newportState = 0b01110000
+clearedPin5 = newportState &amp; 11101111
+print clearedPin5
+&gt;&gt;&gt; 0b011*0*0000
+</code></pre>
+
+<p>If these binary operations are foreign, I recommend this excellent <a href="http://www.avrfreaks.net/index.php?name=PNphpBB2&amp;file=viewtopic&amp;p=40348&amp;highlight=programming%20101#40348" rel="nofollow">tutorial</a> over on avrfreaks. I would become intimate with them before progressing further. Embedded software concepts like these are full of bitmasks and bitshifting. </p>

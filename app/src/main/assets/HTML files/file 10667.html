@@ -1,0 +1,41 @@
+<blockquote>
+  <p><strong>Option  1</strong></p>
+</blockquote>
+
+<p>You need to create a trigger on the table for insert.</p>
+
+<p>Here is an example:</p>
+
+<pre><code>create trigger forinsertrig1 
+on salesdetail 
+for insert 
+as 
+if (select count(*) 
+    from titles, inserted 
+    where titles.title_id = inserted.title_id) !=
+    @@rowcount 
+/* Cancel the insert and print a message.*/
+  begin
+    rollback transaction 
+    print "No, the title_id does not exist in
+    titles." 
+  end  
+/* Otherwise, allow it. */
+else
+  print "Added! All title_idâs exist in titles."
+</code></pre>
+
+<p>But in the trigger you'll update the slot that doesn't have any value (the last inserted) to be the value of the first missing id.</p>
+
+<p>To discover the first missing id you can do the following steps:</p>
+
+<ol>
+<li>select the min(id) from the table</li>
+<li>Make a cycle incrementing the id and selecting the row from the table. The first one that doesn't have a row, it's your missing slot</li>
+</ol>
+
+<blockquote>
+  <p><strong>Option 2</strong></p>
+</blockquote>
+
+<p>Another possibility, like stated by <a href="http://stackoverflow.com/users/95353/elzo-valugi">Elzo Valugi</a> is to use the increment logic to build a function that will return you the next available slot and make the entry directly on the insert.</p>

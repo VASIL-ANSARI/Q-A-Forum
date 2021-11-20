@@ -1,0 +1,39 @@
+<p>Generally it's a better idea to have a URL-safe "slug" field in your models for situations like this. For example:</p>
+
+<pre><code>class User &lt; ActiveRecord::Base
+  before_validation :assign_slug
+
+  def to_param
+    # Can't use alias_method on methods not already defined,
+    # ActiveRecord creates accessors after DB is connected.
+    self.slug
+  end
+
+  def unique_slug?
+    return false if (self.slug.blank?)
+
+    if (new_record?)
+      return self.class.count(:conditions =&gt; [ 'slug=?', self.slug ]) == 0
+    else
+      return self.class.count(:conditions =&gt; [ 'slug=? AND id!=?', self.slug, self.id ]) == 0
+    end
+  end
+
+  def assign_slug
+    return if (slug.present?)
+
+    base_slug = self.name.gsub(/\s+/, '-').gsub(/[^\w\-]/, '')
+    self.slug = base_slug
+    count = 1
+
+    # Hunt for a unique slug starting with slug1 .. slugNNN
+
+    while (!unique_slug?)
+      self.slug = base_slug + count.to_s
+      count += 1
+    end
+  end
+end
+</code></pre>
+
+<p>This may solve the problem of having non-URL-friendly names. Rails is particularly ornery when it comes to having dots in the output of to_param.</p>

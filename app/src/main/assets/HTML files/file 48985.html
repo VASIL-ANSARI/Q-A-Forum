@@ -1,0 +1,56 @@
+<p>Generally speaking you have the following set of equations:</p>
+
+<pre><code>inserted_coins :: independent source
+items :: independent source
+accumulated_coins :: sum(inserted_coins)
+accumulated_paid :: sum(price(items))
+change :: accumulated_coins - accumulated_paid
+coins_in_machine :: when items : 0, when inserted_coins : sum(inserted_coins) starting after last emission of item
+</code></pre>
+
+<p>The hard part is <code>coins_in_machine</code>. You need to switch the source observable based on some emissions from two sources. </p>
+
+<pre><code>function emits ( who ) {
+  return function ( x ) { console.log([who, ": "].join(" ") + x);};
+}
+
+function sum ( a, b ) {return a + b;}
+
+var inserted_coins = Rx.Observable.fromEvent(document.getElementById("insert"), 'click').map(function ( x ) {return 15;});
+var items = Rx.Observable.fromEvent(document.getElementById("item"), 'click').map(function ( x ) {return "snickers";});
+
+console.log("running");
+
+var accumulated_coins = inserted_coins.scan(sum);
+
+var coins_in_machine =
+    Rx.Observable.merge(
+        items.tap(emits("items")).map(function ( x ) {return {value : x, flag : 1};}),
+        inserted_coins.tap(emits("coins inserted ")).map(function ( x ) {return {value : x, flag : 0};}))
+        .distinctUntilChanged(function(x){return x.flag;})
+        .flatMapLatest(function ( x ) {
+                   switch (x.flag) {
+                     case 1 :
+                       return Rx.Observable.just(0);
+                     case 0 :
+                       return inserted_coins.scan(sum, x.value).startWith(x.value);
+                   }
+                 }
+    ).startWith(0);
+
+coins_in_machine.subscribe(emits("coins in machine"));
+</code></pre>
+
+<p>jsbin : <a href="http://jsbin.com/mejoneteyo/edit?html,js,console,output" rel="nofollow">http://jsbin.com/mejoneteyo/edit?html,js,console,output</a></p>
+
+<p><strong>[UPDATE]</strong></p>
+
+<p>Explanations:</p>
+
+<ul>
+<li>We merge the insert_coins stream with the items stream while attaching a flag to them to know which one of the two emitted when we receive a value in the merged stream</li>
+<li>When it is the items stream emitting, we want to put 0 in <code>coins_in_machine</code>. When it is the the <code>insert_coins</code> we want to sum the incoming values, as that sum will represent the new amount of coins in the machine. That means the definition of <code>insert_coins</code> switches from one stream to another under the logic defined before. That logic is what is implemented in the <code>switchMapLatest</code>.</li>
+<li>I use <code>switchMapLatest</code> and not not <code>switchMap</code> as otherwise the <code>coins_in_machine</code> stream would continue to receive emission from former switched streams, i.e. duplicated emission as in the end there are ever only two streams to and from which we switch. If I may, I would say this is a close and switch that we need.</li>
+<li><code>switchMapLatest</code> has to return a stream, so we jump through hoops to make a stream that emits 0 and <code>never</code> ends (and does not block the computer, as using the <code>repeat</code> operator would in that case)</li>
+<li>we jump through some extra hoops to make the <code>inserted_coins</code> emit the values we want. My first implementation was <code>inserted_coins.scan(sum,0)</code> and that never worked. The key and I found that quite tricky, is that when we get to that point in the flow, <code>inserted_coins</code> already emitted one of the values that is a part of the sum. That value is the one passed as a parameter of <code>flatMapLatest</code> but it is not in the source anymore, so calling <code>scan</code> after the fact won-t get it, so it is necessary to get that value from the <code>flatMapLatest</code> and reconstitute the correct behaviour.</li>
+</ul>

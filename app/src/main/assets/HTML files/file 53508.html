@@ -1,0 +1,50 @@
+<p>You can use <a href="http://www.cplusplus.com/reference/cstdlib/strtoul/" rel="nofollow"><code>strtoul</code></a> from <code>cstdlib</code>:</p>
+
+<pre><code>unsigned long value = strtoul (s.c_str(), NULL, 11);
+</code></pre>
+
+<p>Some differences:</p>
+
+<ol>
+<li>The second argument of <code>std::stoul</code> is a <code>size_t *</code> which will be set to  the position of the first character after the converted number, while the second argument of <code>strtoul</code> is of type <code>char **</code> and points to the first character after the converted number.</li>
+<li>If no conversion happens, <code>std::stoul</code> throw a <a href="http://www.cplusplus.com/invalid_argument" rel="nofollow"><code>invalid_argument</code></a> exception while <code>strtoul</code> does not (you must check the value of the second argument). Typically, if  you want to check for error:</li>
+</ol>
+
+
+
+<pre><code>char *ptr;
+unsigned long value = strtoul (s.c_str(), &amp;ptr, 11);
+if (s.c_str() == ptr) {
+    // error
+}
+</code></pre>
+
+<ol start="3">
+<li>If the converted value is out of range for an <code>unsigned long</code>, <code>std::stoul</code> throws a <a href="http://www.cplusplus.com/out_of_range" rel="nofollow"><code>out_of_range</code></a> exception while <code>strtoul</code> return <code>ULONG_MAX</code> and set <code>errno</code> to <code>ERANGE</code>.</li>
+</ol>
+
+<hr>
+
+<p>Here is <em>custom</em> version of <a href="http://www.cplusplus.com/reference/string/stoul/" rel="nofollow"><code>std::stoul</code></a> that should behave like the standard one and summarizes the difference between <code>std::stoul</code> and <code>strtoul</code>:</p>
+
+<pre><code>#include &lt;string&gt;
+#include &lt;stdexcept&gt;
+#include &lt;cstdlib&gt;
+#include &lt;climits&gt;
+#include &lt;cerrno&gt;
+
+unsigned long my_stoul (std::string const&amp; str, size_t *idx = 0, int base = 10) {
+    char *endp;
+    unsigned long value = strtoul(str.c_str(), &amp;endp, base);
+    if (endp == str.c_str()) {
+        throw std::invalid_argument("my_stoul");
+    }
+    if (value == ULONG_MAX &amp;&amp; errno == ERANGE) {
+        throw std::out_of_range("my_stoul");
+    }
+    if (idx) {
+        *idx = endp - str.c_str();
+    }
+    return value;
+}
+</code></pre>

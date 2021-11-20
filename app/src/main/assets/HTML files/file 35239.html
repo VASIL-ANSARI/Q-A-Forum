@@ -1,0 +1,63 @@
+<p>pthread_create is defined as </p>
+
+<pre><code>int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                          void *(*start_routine) (void *), void *arg);
+</code></pre>
+
+<p>So, it takes a function pointer, e.g.</p>
+
+<pre><code>void *myfunction(void *argument)
+</code></pre>
+
+<p>and the <code>void* argument</code> </p>
+
+<p>If you want to use it in a class, do:</p>
+
+<ol>
+<li>Define a static method with the signature: <code>static void *myMethod(void *argument)</code></li>
+<li>Call pthread_create from an object (non-static) method and pass <code>this</code> as the <code>arg</code> parameter.</li>
+<li>The implementation of the static method must cast the <code>void *argument</code> to a pointer of the class (a <em>sort-of-this</em>) that can be used to call other (non-static) methods of the object.</li>
+</ol>
+
+<p>Now, depending of what other things you need to do in the thread and passing arguments to them, you can do several things:</p>
+
+<ol>
+<li>Instead of passing the <code>this</code> in the <code>arg</code>, pass a different type that can contain the <code>this</code> and all the arguments.</li>
+<li>Or, perhaps more OO, make those arguments, required by the thread functionaly, attributes of the class that can be set in the object before calling <code>pthread_create</code> and can be got from the <em>sort-of-this</em> </li>
+</ol>
+
+<p>being more specific</p>
+
+<pre><code>class MyThread {
+public:
+
+   MyThread(int _argument): mArgument(_argument) { }
+
+   void start() {
+       pthread_create(&amp;mThreadId, 0,&amp;MyThreadClass::threadMethod, this);
+   }
+
+   void doThings(int x) {
+       // something to be done in the thread.
+   }
+
+   static void *threadMethod(void *arg) {
+       MyThread *_this=static_cast&lt;MyThread *&gt;(arg);
+       _this-&gt;doThings(_this-&gt;getArgument());
+   }
+
+   int getArgument() const {
+       return mArgument;
+   }
+
+private:
+   pthread_t mThreadId;
+   int mArgument;
+};
+</code></pre>
+
+<p>That can be called as:</p>
+
+<pre><code>MyThread thread(10);
+thread.start();
+</code></pre>

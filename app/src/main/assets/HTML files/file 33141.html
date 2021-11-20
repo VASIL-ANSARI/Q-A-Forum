@@ -1,0 +1,181 @@
+<h3>tl;dr</h3>
+
+<p>Compared to <code>static_assert</code>s, concepts are more powerful because:</p>
+
+<ul>
+<li>they give you good diagnostic that you wouldn't easily achieve with <code>static_asserts</code></li>
+<li>they let you easily overload template functions without <code>std::enable_if</code> (that is impossible only with <code>static_asserts</code>)</li>
+<li>they let you define static interfaces and reuse them without losing diagnostic (there would be the need for multiple <code>static_asserts</code> in each function)</li>
+<li>they let you express your intents better and improve readability (which is a big issue with templates)</li>
+</ul>
+
+<p>This can ease the worlds of:</p>
+
+<ul>
+<li>templates</li>
+<li>static polymorphism</li>
+<li>overloading </li>
+</ul>
+
+<p>and be the building block for interesting paradigms.</p>
+
+<hr>
+
+<h3>What are concepts?</h3>
+
+<p>Concepts express "classes" (not in the C++ term, but rather as a "group") of types that satisfy certain requirements. As an example you can see that the <a href="http://en.cppreference.com/w/cpp/concept/Swappable"><code>Swappable</code></a> concept express the set of types that:</p>
+
+<ul>
+<li>allows calls to <code>std::swap</code></li>
+</ul>
+
+<p>And you can easily see that, for example, <code>std::string</code>, <code>std::vector</code>, <code>std::deque</code>, <code>int</code> etc... satisfy this requirement and can therefore be used interchangeably in a function like:</p>
+
+<pre><code>template&lt;typename Swappable&gt;
+void func(const Swappable&amp; a, const Swappable&amp; b) {
+    std::swap(a, b);
+}
+</code></pre>
+
+<p>Concepts <a href="http://en.cppreference.com/w/cpp/concept">always existed in C++</a>, the actual feature that will be added in the (possibly near) future will just allow you to express and enforce them in the language.</p>
+
+<hr>
+
+<h3>Better diagnostic</h3>
+
+<p>As far as better diagnostic goes, we will just have to trust the committee for now. But the output they "guarantee":</p>
+
+<pre><code>error: no matching function for call to 'sort(list&lt;int&gt;&amp;)'
+sort(l); 
+      ^
+note: template constraints not satisfied because 
+note: `T' is not a/an `Sortable' type [with T = list&lt;int&gt;] since
+note: `declval&lt;T&gt;()[n]' is not valid syntax
+</code></pre>
+
+<p>is very promising. </p>
+
+<p>It's true that you can achieve a similar output using <code>static_assert</code>s but that would require different <code>static_assert</code>s per function and that could get tedious very fast. </p>
+
+<p>As an example, imagine you have to enforce the amount of requirements given by the <a href="http://en.cppreference.com/w/cpp/concept/Container"><code>Container</code></a> concept in 2 functions taking a template parameter; you would need to replicate them in both functions:</p>
+
+<pre><code>template&lt;typename C&gt;
+void func_a(...) {
+    static_assert(...);
+    static_assert(...);
+    // ...
+}
+
+template&lt;typename C&gt;
+void func_b(...) {
+    static_assert(...);
+    static_assert(...);
+    // ...
+}
+</code></pre>
+
+<p>Otherwise you would loose the ability to distinguish which requirement was not satisfied.</p>
+
+<p>With concepts instead, you can just define the concept and enforce it by simply writing:</p>
+
+<pre><code>template&lt;Container C&gt;
+void func_a(...);
+
+template&lt;Container C&gt;
+void func_b(...);
+</code></pre>
+
+<hr>
+
+<h3>Concepts overloading</h3>
+
+<p>Another great feature that is introduced is the ability to overload template functions on template constraints. Yes, this is also possible with <code>std::enable_if</code>, but we all know how ugly that can become.</p>
+
+<p>As an example you could have a function that works on <code>Container</code>s and overload it with a version that happens to work better with <code>SequenceContainer</code>s:</p>
+
+<pre><code>template&lt;Container C&gt;
+int func(C&amp; c);
+
+template&lt;SequenceContainer C&gt;
+int func(C&amp; c);
+</code></pre>
+
+<p>The alternative, without concepts, would be this:</p>
+
+<pre><code>template&lt;typename T&gt;
+std::enable_if&lt;
+    Container&lt;T&gt;::value,
+    int
+&gt; func(T&amp; c);
+
+template&lt;typename T&gt;
+std::enable_if&lt;
+    SequenceContainer&lt;T&gt;::value,
+    int
+&gt; func(T&amp; c);
+</code></pre>
+
+<p>Definitely uglier and possibly more error prone.</p>
+
+<hr>
+
+<h3>Cleaner syntax</h3>
+
+<p>As you have seen in the examples above the syntax is definitely cleaner and more intuitive with concepts. This can reduce the amount of code required to express constraints and can improve readability. </p>
+
+<p>As seen before you can actually get to an acceptable level with something like:</p>
+
+<pre><code>static_assert(Concept&lt;T&gt;::value);
+</code></pre>
+
+<p>but at that point you would loose the great diagnostic of different <code>static_assert</code>. With concepts you don't need this tradeoff.</p>
+
+<hr>
+
+<h3>Static polymorphism</h3>
+
+<p>And finally concepts have interesting similarities to other functional paradigms like type classes in Haskell. For example they can be used to define <em>static interfaces</em>.</p>
+
+<p>For example, let's consider the classical approach for an (infamous) game object interface:</p>
+
+<pre><code>struct Object {
+    // â¦
+    virtual update() = 0;
+    virtual draw() = 0;
+    virtual ~Object();
+};
+</code></pre>
+
+<p>Then, assuming you have a polymorphic <code>std::vector</code> of derived objects you can do:</p>
+
+<pre><code>for (auto&amp; o : objects) { 
+    o.update();
+    o.draw();
+}
+</code></pre>
+
+<p>Great, but unless you want to use multiple inheritance or entity-component-based systems, you are pretty much stuck with only one possible interface per class.</p>
+
+<p>But if you actually want <strong>static polymorphism</strong> (polymorphism that is not <em>that</em> dynamic after all) you could define an <code>Object</code> concept that requires <code>update</code> and <code>draw</code> member functions (and possibly others). </p>
+
+<p>At that point you can just create a free function:</p>
+
+<pre><code>template&lt;Object O&gt;
+void process(O&amp; o) {
+    o.update();
+    o.draw();
+}
+</code></pre>
+
+<p>And after that you could define another interface for your game objects with other requirements. The beauty of this approach is that you can develop as many interfaces as you want without </p>
+
+<ul>
+<li>modifying your classes</li>
+<li>require a base class</li>
+</ul>
+
+<p>And they are all checked and enforced at compile time.</p>
+
+<p>This is just a stupid example (and a very simplistic one), but concepts really open up a whole new world for templates in C++.</p>
+
+<p>If you want more informations you can <a href="http://bartoszmilewski.com/2010/11/29/understanding-c-concepts-through-haskell-type-classes/">read this nice article</a> on C++ concepts vs Haskell type classes.</p>

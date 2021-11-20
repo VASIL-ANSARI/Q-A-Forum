@@ -1,0 +1,33 @@
+<p>I managed to do it on my own. I also managed to simplify the way I define my custom extra fields, without overriding <code>get_formset</code> method:</p>
+
+<pre><code>class MyCustomInlineForm(forms.ModelForm):
+    matcher = forms.ChoiceField(choices=[(v['name'], v['name']) for v in matchers], label='Matcher')
+    param0 = forms.CharField(label='First Param', required=False)
+    param1 = forms.CharField(label='Second Param', required=False)
+
+    def __init__(self, *args, **kwargs):
+        super(MyCustomInlineForm, self).__init__(*args, **kwargs)
+        if self.instance.pk:
+            """ self.instance is the model for the current row.
+                If there is a pk property that is not None, it means it's not
+                a new, empty inline model but we are working with existing one."""
+            self.initial['param0'], self.initial['param1'] = custom_way_to_load_params(self.instance)
+
+    def save(self, commit=True):
+        model = super(MyCustomInlineForm, self).save(True)
+        param0 = self.cleaned_data['param0']
+        param1 = self.cleaned_data['param1']
+        custom_way_to_save_params(model, param0, param1)
+        return model
+
+
+
+class MyCustomInline(admin.TabularInline):
+    min_num = 1
+    extra = 0
+    fields = ['matcher', 'param0', 'param1']
+    model = MyModel
+    form = MyCustomInlineForm
+</code></pre>
+
+<p>If needed - validation of custom params could be done by overriding <code>is_valid()</code> method of <code>forms.ModelForm</code> class and adding errors via <code>self.add_error()</code>. I hope it helps someone.</p>

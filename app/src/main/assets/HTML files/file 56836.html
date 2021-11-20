@@ -1,0 +1,72 @@
+<p>Here's what I'd write if I were being extremely thorough. Imagine test-driving the validations, adding one test at a time and adding to the validations to make it pass.</p>
+
+<pre><code>describe '#provider_unique_id' do
+  %w(a z).each do |letter|
+    it "can be letter #{letter}" do
+      expect_to_be_valid letter
+    end
+  end
+
+  # after making this pass, I'd change the regex to use the i flag so I wouldn't need to test for Z
+  it "can be uppercase" do
+    expect_to_be_valid 'A'
+  end
+
+  [0, 9].each do |digit|
+    it "can be digit #{digit}" do
+      expect_to_be_valid digit
+    end
+  end
+
+  it "can be more than one character" do
+    expect_to_be_valid '00'
+  end
+
+  it "isn't nil" do
+    expect_to_be_invalid nil
+  end
+
+  it "isn't blank" do
+    expect_to_be_invalid ""
+  end
+
+  it "can be 50 characters long" do
+    expect_to_be_valid('0' * 50)
+  end
+
+  it "can't be longer than 50 characters" do
+    expect_to_be_invalid('0' * 51)
+  end
+
+  # I chose _ as a non-alphanumeric since it's the only non-alphanumeric word character.
+  # That is, it's as close to a valid character as it can be without be valid.
+  it "can't contain a non-alphanumeric character" do
+    expect_to_be_invalid '_'
+  end
+
+  # this example forces you to add \A
+  it "can't begin with a non-alphanumeric character" do
+    expect_to_be_invalid '_0'
+  end
+
+  # this example forces you to add \z
+  it "can't end with a non-alphanumeric character" do
+    expect_to_be_invalid '0_'
+  end
+
+  def expect_to_be_valid(provider_unique_id)
+    shop.provider_unique_id = provider_unique_id
+    expect(shop).to be_valid
+  end
+
+  def expect_to_be_invalid(provider_unique_id)
+    shop.provider_unique_id = provider_unique_id
+    expect(shop).to_not be_valid
+  end
+
+end
+</code></pre>
+
+<p>I wouldn't randomly generate a bad string, because it wouldn't force you to write any additional code. I think the tests with <code>_</code> are sufficient. Note that there are many more characters than ASCII 0-255, and it would be impractical to test them all.</p>
+
+<p>You could imagine boundary-checking the ranges in the regex (<code>a-z</code>, <code>A-Z</code>, <code>0-9</code>) by testing characters that come immediately before and after each range, but it's unlikely that someone would write code that would incorrectly include those characters, so I wouldn't go that far.</p>

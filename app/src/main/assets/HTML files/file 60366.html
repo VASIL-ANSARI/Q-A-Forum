@@ -1,0 +1,83 @@
+<p>I would suggest using HTML Div Elements for this, but if you must use HTML5 Canvas here are the basic ideas:</p>
+
+<ol>
+<li>Create an array of boxes as objects and add boxes to them</li>
+<li>Draw the boxes every 16.666 (60fps) milliseconds or draw them when the user moves their mouse or drags a box, etc...</li>
+<li>Determine if the user is clicking on a box when they press their mouse down (this is just math) and store the selected box.</li>
+<li>Set up the <code>onmousemove</code> and <code>onmouseup</code> functions properly so the currently selected box is moved when the mouse is moved and is let go on mouse up.</li>
+</ol>
+
+<p>For example:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var canvas = document.getElementById("canvas"),
+    ctx = canvas.getContext("2d"),
+    width = canvas.width,
+    height = canvas.height;
+
+var boxes = [];
+
+for (var i = 0; i &lt; 100; i++) { // Add boxes
+    boxes.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        s: 25,
+        c: "rgb(" + Math.floor(Math.random() * 255) + "," + Math.floor(Math.random() * 255) + "," +
+            Math.floor(Math.random() * 255) + ")"
+    });
+}
+
+window.onmousedown = function(e) {
+    var mx = e.clientX - canvas.getBoundingClientRect().left,
+        my = e.clientY - canvas.getBoundingClientRect().top;
+
+    // Since the drawing is done from lowest to highest index, we want to go backwards for selecting the box most visible (highest index)
+    for (var i = boxes.length - 1; i &gt;= 0; i--) {
+        if (mx &gt;= boxes[i].x &amp;&amp; mx &lt;= boxes[i].x + boxes[i].s &amp;&amp;
+            my &gt;= boxes[i].y &amp;&amp; my &lt;= boxes[i].y + boxes[i].s) {
+            // Store the offset of the mouse position to the boxes position so dragging offset looks natural and stays offsetted
+            boxes.soffsetx = mx - boxes[i].x;
+            boxes.soffsety = my - boxes[i].y;
+            // Store the box index as the selected box
+            boxes.sbox = i;
+            return;
+        }
+    }
+
+    boxes.sbox = -1;
+};
+
+window.onmouseup = function(e) {
+    boxes.sbox = -1;
+};
+
+window.onmousemove = function(e) {
+    if (boxes.sbox === -1 || !boxes.sbox) {
+        return;
+    }
+
+    var mx = e.clientX - canvas.getBoundingClientRect().left,
+        my = e.clientY - canvas.getBoundingClientRect().top;
+
+    // Apply the offset to the currently selected box
+    boxes[boxes.sbox].x = mx - boxes.soffsetx;
+    boxes[boxes.sbox].y = my - boxes.soffsety;
+};
+
+(function update() { // Just draws the boxes
+    ctx.clearRect(0, 0, width, height);
+
+    for (var i = 0; i &lt; boxes.length; i++) {
+        ctx.fillStyle = boxes[i].c;
+        ctx.fillRect(boxes[i].x, boxes[i].y, boxes[i].s, boxes[i].s);
+    }
+
+    setTimeout(function() {
+        requestAnimationFrame(update);
+    }, 1000 / 60);
+})();</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;canvas id="canvas" width="250" height="250"&gt;&lt;/canvas&gt;</code></pre>
+</div>
+</div>
+</p>

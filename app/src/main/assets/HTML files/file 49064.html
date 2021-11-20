@@ -1,0 +1,40 @@
+<p>You don't have to keep including the <code>connect.php</code> file over and over.
+Assuming you already included it somewhere at the top since you run <code>$AddBook-&gt;execute()</code></p>
+
+<p>See this updated code:</p>
+
+<pre><code>$AddBook = $conn-&gt;prepare("CALL makeBooking((SELECT CustID FROM customer WHERE UserName = '$UserName'), ?, ?, ?, ?, now())");
+$AddBook-&gt;bind_param('iiis',$PerfID, $NumAdults, $NumChilds, $ColTicket);
+if ($AddBook-&gt;execute())
+{
+    //----------------DEDUCT SEATS--------------//
+    $SeatDeduction = $conn-&gt;prepare("CALL deductSeats($TotalSeats,?)");
+    $SeatDeduction-&gt;bind_param('i',$PerfID);
+    $SeatDeduction-&gt;execute();
+
+    $SeatDeduction-&gt;close();
+    $conn-&gt;next_result();
+
+    // mysqli_close($conn); // remove this
+    // require ('connect.php'); // remove this
+    //-----------------GET BOOK ID--------------//
+    $getBookID = "CALL getBookByUserName('$UserName')";
+    $result2 = mysqli_query($conn, $getBookID);
+    $Output2 = mysqli_fetch_assoc($result2);
+    $BookID = $Output2['BookID'];
+    // mysqli_close($conn); remove this
+    // require ('connect.php');  remove this
+    //-------------------SET COST---------------//
+    // ...
+    //-------------------GET COST---------------//
+    // ...
+    //---------------BOOKING CONFIRM------------//
+    // ...
+}
+else
+{
+    die(mysqli_error($conn));
+}
+
+mysqli_close($conn);
+</code></pre>

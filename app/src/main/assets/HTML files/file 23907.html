@@ -1,0 +1,37 @@
+<p>The problem is you are attempting to concatenate a <code>datetime</code> to your <code>varchar</code> sql string. You need to convert it:</p>
+
+<pre><code>convert(varchar(10), @startdate, 120)
+</code></pre>
+
+<p>So the full code will be:</p>
+
+<pre><code>ALTER PROCEDURE [dbo].[customFormReport]
+(
+    @formid int,
+    @startdate DATETIME
+)
+AS
+BEGIN
+SET NOCOUNT ON
+
+DECLARE @cols AS NVARCHAR(MAX),
+    @query  AS NVARCHAR(MAX)
+
+select @cols = STUFF((SELECT distinct ',' + QUOTENAME(fieldname) from FormResponse WHERE FormID = @formid AND value IS NOT NULL FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)') 
+        ,1,1,'')
+
+set @query = 'SELECT FormID, FormSubmissionID,' + @cols + ' from 
+             (
+                SELECT FormID, FormSubmissionID, fieldname, value
+                FROM FormResponse 
+                WHERE FormID = ' + CAST(@formid AS VARCHAR(25)) + ' 
+                  AND createDate &gt; ''' + convert(varchar(10), @startdate, 120) + '''
+             ) x
+            pivot 
+            (
+                max(value)
+                for fieldname in (' + @cols + ')
+            ) p '
+
+execute(@query)
+</code></pre>

@@ -1,0 +1,31 @@
+<p>Alot of people from a desktop application background will wonder how this is done in a web application.</p>
+
+<h2>Locked record flag</h2>
+
+<p>One approach in the desktop world is to have a Boolean column on the row that indicates that it is being edited, and by whom.  You could certainly do this with a web app, but it is a very bad approach because if a user visits the Edit page, placing the record into a locked state, then leaves the page, it will forever be in a locked state.  You have no definitive way to tell that the user doesn't still have the edit page open.</p>
+
+<h2>Time sensitive lock</h2>
+
+<p>The airline reservation approach is a variation on the above, but you would also have a LockedUntilUtc which is a datetime indicating how long the record is locked for.  Let's say Bob visits a page for a record, when serving the apge from the GET action you also set the locked flag, and set LockedUntilUtc to 10 minutes in the future.  5 minutes later Sarah visits the page but gets a "currently locked" error because you checked the LockedUntilUtc and it is currently in the future.  Another 6 minutes elapses(total of 11 minutes since locked) and someone visits the page and the LockedUntil is now in the past, so you give the lock to the new user.</p>
+
+<p>This seems like a reasonable compromise, but it is rife with problems sure to frustrate users.  First, there is no easy way to queue up users who need access to edit the record.  Sarah could try 10 times, and then just as it passes 10 minutes, Jimmy visits the page and because he was the first person after the lock expired, he grabbed the next lock without Sarah getting a chance.  Sarah calls your help desk and says she waited 10 minutes for the lock to expire, and it's now been 15 minutes and she still can't get to the page.  Your helpdesk probably doubts she really waited a full 10 minutes, back and forth ensues.</p>
+
+<p>You also must implement a client side timer/display for whoever currently has the lock so they know how much time they have left before it can expire.</p>
+
+<h2>Optimistic concurrency</h2>
+
+<p>This is the right approach in most cases.  You don't actually lock the record in any way at all.  Instead, many users can visit the edit page.  When they save an edit, the form includes both the original values and the new edited values.  The server will compare the original values from the form, with the current values in the database, to see if there was an interim edit.</p>
+
+<p>The <strong>original</strong> values are from some point in the past(when Bob initially visited the edit page).  The <strong>current</strong> values are from right now.  Between the past and now, if Sarah also visited the edit page, and successfully saved changes to the database values, then Bob's <strong>original</strong> values will be different from the <strong>current</strong> values in the database.  Thus when Bob attempts to save his changes, the server will see that his <strong>original</strong> values are different than <strong>current</strong> values in the DB, and throw an error.  You will need to decide how you handle this situation.  Usually you let the user know that someone else has edited the page since they did, and refresh the page, and they lose their edits.  Entity Framework supports optimistic concurrency.</p>
+
+<h2>Ajax'ified Optimistic Concurrency</h2>
+
+<p>You can also have the client occasionally ping the server with original values so the server can check to see if your page is stale(i.e. other user changed something) and popup a message.  This improves the user's experience by giving the user earlier notice that another user has edited the page.  Thus they don't get to far along in making edits which they are going to lose anyways.  They can also take note/copy/paste their edits out of the browser so that can refresh the page and have a reference of what they changed.</p>
+
+<p>There is a Timestamp column in SQL Server which can work in tandem with Entity Framework to lower the overhead involved in checking for changes.  Such that you don't need to keep the entire record of original values in each client and pass them back in forth: <a href="http://www.remondo.net/entity-framework-concurrency-checking-with-timestamp/" rel="nofollow">http://www.remondo.net/entity-framework-concurrency-checking-with-timestamp/</a></p>
+
+<h2>Granular edits</h2> 
+
+<p>One approach we use alot is to ajax'ify every field and edits to a single field are committed immediately.  This is accomplished using a jquery library called x-editable.  The user edits a single field, confirms the edit, and that value is sent to server.  You could combine this with optimistic concurrency if you wanted to check the entire record for changes, or just the single field.  If changes are detected, then you reject the edit and refresh the page.  This can be a much friendlier experience for the user, primarily because the user gets the "Another user edited page" error instantly when editing a single field.  This prevents them from wasting alot of time editing a large number of fields, only to find their edit was rejected and they have to <strong>redo all of their edits again</strong>.  Instead, they edit a single field, get the error, page refreshes, <strong>they only have to repeat that one field edit and continue from there</strong>.</p>
+
+<p><a href="http://vitalets.github.io/x-editable/demo-bs3.html" rel="nofollow">http://vitalets.github.io/x-editable/demo-bs3.html</a></p>

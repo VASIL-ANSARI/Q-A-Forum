@@ -1,0 +1,28 @@
+<p>You should be able to do what you want using conditional aggregation.  The query would look something like this:</p>
+
+<pre><code>SELECT CAST(t.timecreated AS DATE) as date, date_format(timecreated, '%d-%b-%Y'),
+       SUM(t.enquiry_cnt) as enquiry_cnt,
+       COUNT(DISTINCT CASE WHEN source = 1 THEN lead_id END) as lead_enquiry_cnt,
+       SUM(t.suggested_cnt) suggested_cnt,
+       COUNT(DSTINCT CASE WHEN source = 6 THEN lead_id END) as lead_suggested_cnt,
+       SUM(t.tot_cnt) as tot_cnt,
+       COUNT(DISTINCT CASE WHEN source IN (1, 6) THEN lead_id END) as lead_suggested_cnt,
+       SUM(t.dropped_cnt) as droped_cnt,
+       COUNT(DISTINCT CASE WHEN source IN (1, 6) and Directory_status = 4 THEN lead_id END) as lead_droped_cnt,
+       sum(t.visit_pending_cnt) visit_pending_cnt,
+       COUNT(DISTINCT CASE WHEN Directory_status = 3 AND finl_status = 6 THEN lead_id END) as lead_visit_pending_cnt
+FROM (SELECT (source = 1) as enquiry_cnt,
+             (source = 6) as suggested_cnt,
+             (source = 1 OR source = 6) as tot_cnt,
+             (source IN (1, 6) AND directory_status = 4) as dropped_cnt,
+             (directory_status = 3 AND finl_status = 6) as visit_pending_cnt,
+            lead_id,
+            timecreated
+     FROM mg_lead_suggested_listing
+    ) AS t
+group by CAST(t.timecreated AS DATE)
+order by date desc
+limit 10;
+</code></pre>
+
+<p>Getting rid of the subquery and using a <code>where</code> clause on the date logic would probably also help.</p>

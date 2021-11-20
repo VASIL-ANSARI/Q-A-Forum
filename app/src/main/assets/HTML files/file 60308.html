@@ -1,0 +1,84 @@
+<p>As I said in a comment, to work out sample standard deviation manually, at some point you multiply an interval by an interval. PostgreSQL doesn't support that.</p>
+
+<p>To work around that issue, reduce the interval to hours or minutes or seconds (or whatever). This turns out to be a lot simpler than working out the calculation manually, and it suggests why PostgreSQL doesn't support this kind of calculation out of the box.</p>
+
+<p>First, a function from the <a href="https://www.postgresql.org/message-id/CAHsw44-mWjPm%3D1WaeuU35BAZi1ouoyDngTwQpzaKeDRA1oCwww%40mail.gmail.com" rel="nofollow">PostgreSQL general mailing list</a></p>
+
+<pre><code>CREATE OR REPLACE FUNCTION interval_to_seconds(interval)
+RETURNS double precision AS $$
+    SELECT (extract(days from $1) * 86400)
+         + (extract(hours from $1) * 3600)
+         + (extract(minutes from $1) * 60)
+         + extract(seconds from $1);
+$$ LANGUAGE SQL;
+</code></pre>
+
+<p>Now we can take the standard deviation of a simple set of intervals.</p>
+
+<pre><code>with intervals (i) as (
+  values (interval '1 hour'), (interval '2 hour'), (interval '3 hour'), 
+         (interval '4 hour'), (interval '5 hour') 
+)
+, intervals_as_seconds as (
+  select interval_to_seconds(i) as seconds
+  from intervals
+)
+select stddev(seconds), stddev(seconds)/60
+from intervals_as_seconds
+</code></pre>
+
+<pre>
+in_sec             in_min
+double precision   double precision
+--
+5692.09978830308   94.8683298050514
+</pre>
+
+<p>You can verify the results however you like.</p>
+
+<p>Now let's say you wanted hour granularity instead of seconds. Clearly, the choice of granularity is highly application dependent. You might define another function, <code>interval_to_hours(interval)</code>. You can use a very similar query to calculate the standard deviation.</p>
+
+<pre><code>with intervals (i) as (
+  values (interval '1 hour'), (interval '2 hour'), (interval '3 hour'), 
+         (interval '4 hour'), (interval '5 hour') 
+)
+, intervals_as_hours as (
+  select interval_to_hours(i) as hours
+  from intervals
+)
+select stddev(hours) as stddev_in_hrs
+from intervals_as_hours
+</code></pre>
+
+<pre>
+stddev_in_hrs
+double precision
+--
+1.58113883008419
+</pre>
+
+<p>The value for standard deviation in hours is clearly different from the value in minutes or in seconds. But they measure exactly the same thing. The point is that the "right" answer depends on the granularity (units) you want to use, and there are a lot of choices. (From microseconds to centuries, I imagine.)</p>
+
+<p>Also, consider this statement.</p>
+
+<pre><code>select interval_to_hours(interval '45 minutes')
+</code></pre>
+
+<pre>
+interval_to_hours
+double precision
+--
+0
+</pre>
+
+<p>Is that the right answer? You can't say; the right answer is application-dependent. I can imagine applications that would want 45 minutes to be considered as 1 hour. I can also imagine applications that would want 45 minutes to be considered as 1 hour for <em>some</em> calculations, and as 0 hours for <em>other</em> calculations.</p>
+
+<p>And think about this question. How many seconds are in a month? The expression <code>select interval '1' month;</code> is valid; the number of seconds depends on how many days are in the month. </p>
+
+<p>And I think <em>that's</em> why PostgreSQL doesn't support this kind of calculation out of the box. The right way to do it with interval arguments is too application-dependent.</p>
+
+<p><strong>Later . . .</strong></p>
+
+<p>I found this discussion on one of the PostgreSQL mailing lists.</p>
+
+<p><a href="https://www.postgresql.org/message-id/37ed240d0605200814y5dfbd443s9d6938dbf3bd9aa4%40mail.gmail.com" rel="nofollow">No stddev() for interval?</a></p>

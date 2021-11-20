@@ -1,0 +1,47 @@
+<p>Your problem is that you're returning your filtered result from your action handler. The action handler doesn't use a return value (for the most part). Instead, you need to place your filtered items somewhere where your template can access them. Since your filter selector is in a different component, this is what I would do (if you have questions about any part of this, just ask):</p>
+
+<ol>
+<li><p>In your component, re-send the filter action so it bubbles to the controller:</p>
+
+<pre><code>actions: {
+    filter(categoryName) {
+        this.sendAction('filterByCategory', categoryName);
+    }
+}
+</code></pre></li>
+<li><p>Make sure your controller can receive the action by subscribing to it in the template:</p>
+
+<pre><code>{{filterable-offers categories=categories filterByCategory='filterByCategory'}}
+</code></pre></li>
+<li><p>Add a handler for the <code>filterByCategory</code> action in your controller:</p>
+
+<pre><code>actions: {
+    filterByCategory(categoryName) {
+        // We'll use this in the next step
+        this.set('filterCategory', categoryName);
+    }
+}
+</code></pre></li>
+<li><p>Set up a computed property that will automatically filter your items based on the filter category. We have our <code>filterCategory</code> property on the controller, so let's use that:</p>
+
+<pre><code>filteredOffers: Ember.computed('model.offers.@each.company_industry', 'filterCategory', {
+    get() {
+        const offers = this.get('model.offers');
+        const filterCategory = this.get('filterCategory');
+
+        // If there's no category to filter by, return all of the offers
+        if (filterCategory) {
+            return offers.filterBy('company_industry', filterCategory);
+        } else {
+            return offers;
+        }
+    }
+})
+</code></pre></li>
+<li><p>Finally, instead of using <code>model.offers</code> in your template, use <code>filteredOffers</code></p>
+
+<pre><code>    {{#each filteredOffers as |offer|}} ... {{/each}}
+</code></pre></li>
+</ol>
+
+<p>That answer might be a tad more in-depth than you want, but hopefully it helps. The major sticking point you were having is that you needed some way to tell your controller to use a filtered set of offers instead of the original set. This is just one of many ways to accomplish that.</p>

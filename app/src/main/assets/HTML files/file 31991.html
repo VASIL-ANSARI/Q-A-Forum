@@ -1,0 +1,42 @@
+<p>This problem happens, because convertView is being recycled. To solve your issue, just make sure, that when you set some properties for convertView inside IF statement, you need to reset those properties inside ELSE statement, to make sure that when view is reused, and particular condition no longer applies, your properties are back to default. </p>
+
+<p>In your particular case:</p>
+
+<ul>
+<li><p>for first item on list, these conditions may be true: (latest_version != null) AND (app.getVersion().equals(latest_version)), so you set your textColor as GREEN</p></li>
+<li><p>then you scroll down, and this view is reused for another list item, since is no longer visible (this is how listView is designed for performance reasons). Now, different conditions may be true for this new list item, in particular this: (latest_version == null) -> which causes this line to be called <code>version.setText(app.getVersion());</code>, so your new list item has correct text, but you didnt set textColor for this scenario, so textColor stays the same (that was set before view was reused).</p></li>
+</ul>
+
+<p>So to solve your problem, see code below:</p>
+
+<pre><code>@Override
+public View getView(int position, View convertView, ViewGroup parent)
+{
+    if (convertView == null) {
+        convertView = LayoutInflater.from(ctx).inflate(R.layout.list_item, parent, false);
+    }
+    InstalledApp app = data.get(position);
+    String latest_version = app.getLatestVersion();
+    TextView version = (TextView) convertView.findViewById(R.id.version);
+
+    if (latest_version != null)
+    {
+        if (app.getVersion().equals(latest_version))
+        {
+            version.setText(app.getVersion());
+            version.setTextColor(Color.GREEN);
+        }
+        else
+        {
+            version.setText(app.getVersion() + " (Current: " + latest_version + ")");
+            version.setTextColor(Color.RED);
+        }
+    }
+    else {
+        version.setText(app.getVersion());
+        version.setTextColor(Color.GREEN); // YOU NEED TO ALSO SET CORRECT COLOR HERE
+    }
+
+    return convertView;
+}
+</code></pre>

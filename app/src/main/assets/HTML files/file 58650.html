@@ -1,0 +1,39 @@
+<p>Something like this?</p>
+
+<pre><code>DECLARE @YourTime VARCHAR(100)='69:00:00.0000';
+
+WITH Splitted AS
+(
+    SELECT @YourTime AS t
+          ,CHARINDEX(':',@YourTime)-1 AS HourLength
+          ,LEFT(@YourTime,CHARINDEX(':',@YourTime)-1) AS HourPart
+)
+SELECT HourPart/24 + CAST(CAST(CAST(STUFF(@YourTime,1,HourLength,HourPart-(HourPart/24)*24) AS TIME) AS DATETIME) AS FLOAT)
+FROM Splitted
+</code></pre>
+
+<h2>UPDATE the same as function</h2>
+
+<pre><code>CREATE FUNCTION dbo.ConvertExceedingTimeToFloat(@TimeString VARCHAR(100))
+RETURNS FLOAT
+AS
+BEGIN
+    DECLARE @RetVal FLOAT;
+    WITH Splitted AS
+    (
+        SELECT @TimeString AS t
+              ,CHARINDEX(':',@TimeString)-1 AS HourLength
+              ,LEFT(@TimeString,CHARINDEX(':',@TimeString)-1) AS HourPart
+    )
+    SELECT @RetVal = HourPart/24 + CAST(CAST(CAST(STUFF(@TimeString,1,HourLength,HourPart-(HourPart/24)*24) AS TIME) AS DATETIME) AS FLOAT)
+    FROM Splitted;
+
+    RETURN @RetVal;
+END
+GO
+
+SELECT dbo.ConvertExceedingTimeToFloat('69:00:00.0000')
+GO
+
+DROP FUNCTION dbo.ConvertExceedingTimeToFloat;
+</code></pre>

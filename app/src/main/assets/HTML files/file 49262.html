@@ -1,0 +1,143 @@
+<h1>Trying to solve the problem</h1>
+
+<h3>Testing the get_function() return value</h3>
+
+<p>Maybe it is not about the smartpointer, but the return value of the <strong>get_function()</strong>. We should test it:</p>
+
+<pre><code>int main()
+{
+    To_do_base* a = new Special_to_do();
+    std :: function&lt;void()&gt; to_do = a -&gt; get_function();
+    to_do();
+    delete a;
+    return 0;
+}
+</code></pre>
+
+<p>This program outputs:</p>
+
+<pre><code>I have a special thing for you to do!
+~Special_to_do()...
+~To_do_base()...
+</code></pre>
+
+<p>Which is the correct behaviour.</p>
+
+<h3>Trying to force of passing the unique_ptr by moving it</h3>
+
+<p>Maybe we should somehow try and force the factory to return the original object. Maybe returning an rvalue by performing an <strong>std::move()</strong> on the return value can help:</p>
+
+<pre><code>class To_do_factory
+{
+    public:
+        static std :: unique_ptr&lt;To_do_base&gt;&amp;&amp; get_to_do( const std :: string&amp; keyword_p )
+        {
+            if( keyword_p == "special" )
+            {
+                return std :: move( std :: unique_ptr&lt;To_do_base&gt;( new Special_to_do() ) );
+            }
+            std :: cerr &lt;&lt; "Error: Argument_factory::get_argument()..." &lt;&lt; std :: endl;
+            exit( -1 );
+            return std :: move( std :: unique_ptr&lt;To_do_base&gt;( nullptr ) );
+        };
+};
+</code></pre>
+
+<p>The code compiles and the output is:</p>
+
+<pre><code>~Special_to_do()...
+~To_do_base()...
+[1]    329 segmentation fault  ./main
+</code></pre>
+
+<p>Well, this is a bit embarassing... What if we save the rvalue first and then invoke it? After checking: it just fine without passing rvalue references, but it still creates segmentation fault with rvalues. </p>
+
+<h3>Saving the unique_ptr in the main()</h3>
+
+<p>So let's revert to lvalues. This code with the first approach to the factory:</p>
+
+<pre><code>int main()
+{
+    std :: unique_ptr&lt;To_do_base&gt; saved_return_value( To_do_factory :: get_to_do( "special" ) );
+    std :: cout &lt;&lt; "Return value saved." &lt;&lt; std :: endl;
+    //std :: function&lt;void()&gt; to_do = To_do_factory :: get_to_do( "special" ) -&gt; get_function(); // WRONG: assigns by copying OR frees dinamically allocated memory after assigning
+    std :: function&lt;void()&gt; to_do = saved_return_value -&gt; get_function();
+    to_do();
+    return 0;
+}
+</code></pre>
+
+<p>generates a good output:</p>
+
+<pre><code>Return value saved.
+I have a special thing for you to do!
+~Special_to_do()...
+~To_do_base()...
+</code></pre>
+
+<p>Well, it works just fine... But it kind of loses the point of having a function-factory. Here we are able to generate factory elements but only when we are saving them...</p>
+
+<h3>Saving the pointers in the factory</h3>
+
+<p>Maybe there is a way to save the pointers in the factory. We should try creating a static member variable in the factory to handle the saving. An std :: vector should be fine.</p>
+
+<pre><code>class To_do_factory
+{
+    public:
+        static std :: vector&lt;std :: unique_ptr&lt;To_do_base&gt;&gt; to_do_list;
+        static std :: unique_ptr&lt;To_do_base&gt;&amp; get_to_do( const std :: string&amp; keyword_p )
+        {
+            if( keyword_p == "special" )
+            {
+                to_do_list.push_back( std :: unique_ptr&lt;To_do_base&gt;( new Special_to_do ) );
+                return to_do_list.back();
+                //return std :: unique_ptr&lt;To_do_base&gt;( new Special_to_do() );
+            }
+            std :: cerr &lt;&lt; "Error: Argument_factory::get_argument()..." &lt;&lt; std :: endl;
+            exit( -1 );
+            return to_do_list.back();
+        };
+};
+
+std :: vector&lt;std :: unique_ptr&lt;To_do_base&gt;&gt; To_do_factory :: to_do_list; 
+// global scope I have no idea, where else could I define this...
+</code></pre>
+
+<p>And the input is:</p>
+
+<pre><code>I have a special thing for you to do!
+~Special_to_do()...
+~To_do_base()...
+</code></pre>
+
+<p>Finally, a good output! :) </p>
+
+<h1>Testing</h1>
+
+<p>Let's not get ahead of ourselves, we should test if the lambda returned really is what we want. We can try giving it a value to capture:</p>
+
+<pre><code>class Special_to_do : public To_do_base
+{
+    private:
+        int x = 2;
+    public:
+        Special_to_do()
+        { 
+            this -&gt; what_to_do = [&amp;]()
+            {
+                std :: cout &lt;&lt; "I have " &lt;&lt; this -&gt; x &lt;&lt; " special thing for you to do!" &lt;&lt; std :: endl;
+            };
+        };
+        ~Special_to_do() { std :: cout &lt;&lt; "~Special_to_do()..." &lt;&lt; std :: endl; };
+};
+</code></pre>
+
+<p>Outputs:</p>
+
+<pre><code>I have 2 special thing for you to do!
+~Special_to_do()...
+~To_do_base()...
+</code></pre>
+
+<p>Which is the expected output. Still I am really confused about this behaviour... Can anyone show me a "more correct" way to implement this?
+Thank you :)</p>

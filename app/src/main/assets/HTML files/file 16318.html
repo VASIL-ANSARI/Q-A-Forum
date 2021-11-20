@@ -1,0 +1,13 @@
+<ol>
+<li><p>First of all, you appear to be creating a tab-delimited text file and then returning it to the browser with the MIME-type <code>application/octet-stream</code> and the file extension <code>.xls</code>.  Excel might work out that's tab-delimited (but it sounds from your error as though it doesn't), but in any case you really should use the <code>text/tab-separated-values</code> MIME type and <code>.txt</code> file extension so that everything knows exactly what the data is.</p></li>
+<li><p>Secondly, to create tab-delimited files, you'd be very wise to export the data directly from MySQL (using <a href="http://dev.mysql.com/doc/en/select-into.html" rel="nofollow"><code>SELECT ... INTO OUTFILE</code></a>), as all manner of pain can arise with escaping delimiters and such when you try to cook it yourself.  For example:</p>
+
+<pre><code>SELECT * FROM users INTO OUFILE '/tmp/users.txt' FIELDS TERMINATED BY '\t'
+</code></pre>
+
+<p>Then you would merely need to read the contents of that file to the browser using <a href="http://php.net/manual/en/function.readfile.php" rel="nofollow"><code>readfile()</code></a>.</p>
+
+<p>If you absolutely <em>must</em> create the delimited file from within PHP, consider using its <a href="http://uk3.php.net/manual/en/function.fputcsv.php" rel="nofollow"><code>fputscsv()</code></a> function (you can still specify that you wish to use a tab-delimiter).</p></li>
+<li><p>Always use the <code>.txt</code> file extension rather than <code>.csv</code> <em>even if your file is comma-separated</em> as some versions of Excel assume that <em>all</em> files with the <code>.csv</code> extension are encoded using <code>Windows-1252</code>.</p></li>
+<li><p>As far as character encodings go, you will need to inspect the contents of your database to determine whether data is stored correctly or not: the best way to do this is to <code>SELECT HEX(column) ...</code> in order that you can inspect the underlying bytes.  Once that has been determined, you can <code>UPDATE</code> the records if conversions are required.</p></li>
+</ol>

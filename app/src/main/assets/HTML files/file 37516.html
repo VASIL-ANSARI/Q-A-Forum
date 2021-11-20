@@ -1,0 +1,21 @@
+<p>It turns out the answer to this was as simple as taking a closer look at <a href="http://dev.mysql.com/doc/refman/5.6/en/partitions-table.html" rel="nofollow">the columns in the  <code>INFORMATION_SCHEMA.PARTITIONS</code> table</a>:</p>
+
+<blockquote>
+  <p><code>TABLE_ROWS</code>: The number of table rows in the partition.</p>
+  
+  <p>For partitioned <code>InnoDB</code> tables, the row count given in the
+  <code>TABLE_ROWS</code> column is only an estimated value used in SQL
+  optimization, and may not always be exact.</p>
+</blockquote>
+
+<p>So, for <em>the MyISAM engine in particular</em>, we can find the <code>MAX(year)</code> without a table scan or any additional indexing by using the following query:</p>
+
+<pre><code>SELECT MAX(PARTITION_DESCRIPTION) AS maxyear
+FROM
+    INFORMATION_SCHEMA.PARTITIONS
+WHERE
+    TABLE_NAME = 'fact_registration'
+        AND TABLE_ROWS &gt; 0;
+</code></pre>
+
+<p><strong>Note that this only works in certain situations</strong> - if you have more than one value in a partition, the fact that there are rows in the partition doesn't necessarily mean that one or the other value is present; and since <code>PARTITION_DESCRIPTION</code> is a <code>longtext</code> column, the integer values you supply will be stored as a comma-separated string.</p>

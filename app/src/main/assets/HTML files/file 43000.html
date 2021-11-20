@@ -1,0 +1,65 @@
+<blockquote>
+  <p>The c-extension is compiled to cutil.so, I do not know how to see the dump.</p>
+</blockquote>
+
+<p>To solve this, I'm going to cite <a href="http://gnuradio.org/redmine/projects/gnuradio/wiki/TutorialsGDB" rel="nofollow">GNU Radio's GDB/Python debugging mini-tutorial</a>:</p>
+
+<blockquote>
+  <p>Luckily, there's a feature called core dumping that allows the state of your program to be stored in a file, allowing later analysis. Usually, that feature is disabled; you can enable it by:</p>
+
+<pre><code>ulimit -c unlimited
+</code></pre>
+  
+  <p>Note that this only works for processes spawned from the shell that you used ulimit in. What happens here is that the maximum size of a core dump is set to unlimited (the original value is 0 in most cases).</p>
+  
+  <p>Now, the core dump file lays in the current execution directory of the program that crashed. In our case, that's build/python/, but since all core dumps should have a name like core., we can use a little find magic:</p>
+
+<pre><code>marcus&gt; find -type f -cmin 5 -name 'core.[0-9]*'
+</code></pre>
+  
+  <p>./build/python/core.22608</p>
+  
+  <p>because that will find all _f_iles, changed/created within the last _5 min_utes, having a name that matches.</p>
+  
+  <h2>Using GDB with a core dump</h2>
+  
+  <p>having found build/python/core.22608,
+  we can now launch GDB:</p>
+
+<pre><code>gdb programname coredump
+</code></pre>
+  
+  <p>i.e.</p>
+
+<pre><code>gdb /usr/bin/python2 build/python/core.22608
+</code></pre>
+  
+  <p>A lot of information might scroll by.</p>
+  
+  <p>At the end, you're greeted by the GDB prompt:</p>
+
+<pre><code>(gdb) 
+</code></pre>
+  
+  <h2>Getting a backtrace</h2>
+  
+  <p>Typically, you'd just get a backtrace (or shorter, bt). A backtrace is simply the hierarchy of functions that were called.</p>
+
+<pre><code> (gdb)bt
+</code></pre>
+</blockquote>
+
+<p>[...] skipped,</p>
+
+<blockquote>
+  <p>Frame #2 and following definitely look like they're part of the Python implementation -- that sounds bad, because GDB doesn't itself know how to debug python, but luckily, there's an extension to do that. So we can try to use py-bt:</p>
+
+<pre><code>(gdb) py-bt
+</code></pre>
+  
+  <p>If we get a undefined command error, we must stop here and make sure that the python development package is installed (python-devel on Redhatoids, python2.7-dev on Debianoids); for some systems, you should append the content of /usr/share/doc/{python-devel,python2.7-dev}/gdbinit[.gz] to your ~/.gdbinit, and re-start gdb.</p>
+  
+  <p>The output of py-bt now states clearly which python lines correspond to which stack frame (skipping those stack frames that are hidden to python, because they are in external libraries or python-implementation routines)</p>
+  
+  <p>...</p>
+</blockquote>

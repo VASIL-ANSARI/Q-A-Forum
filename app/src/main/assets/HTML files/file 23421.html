@@ -1,0 +1,44 @@
+<p>The result of evaluating your expression is <em>unspecified</em>, since the evaluations of <code>x</code> and <code>fun(&amp;x, &amp;y)</code> are indeterminately sequenced. </p>
+
+<p>Notice, that an expression evaluation being allowed to yield an unspecified result does <em>not</em> mean that your program has undefined behavior; rather, it means that you cannot tell <em>which</em> of a finite set of possible results will be produced by the evaluation of that expression.</p>
+
+<p>Interpreting the Standard can be quite tricky here (and in fact, in the original answer I interpreted it the wrong way - thanks to <a href="http://stackoverflow.com/users/179910/jerry-coffin">Jerry Coffin</a> for noticing). </p>
+
+<p>To see why this can be tricky, let's consider the first part of paragraph 1.9/15 of the C++11 Standard:</p>
+
+<blockquote>
+  <p>Except where noted, <strong>evaluations of operands of individual operators and of subexpressions of individual
+  expressions are unsequenced</strong>. [...] The value computations of the operands of an
+  operator are sequenced before the value computation of the result of the operator. <strong>If a side effect on a scalar
+  object is unsequenced relative to</strong> either another side effect on the same scalar object or <strong>a value computation
+  using the value of the same scalar object, the behavior is undefined</strong>.</p>
+</blockquote>
+
+<p>For example, given an expression which consists in computing the sum of two sub-expressions, such as (considering <code>operator +</code> is not overloaded here):</p>
+
+<pre><code>e1 + e2
+</code></pre>
+
+<p>Where the evaluation of <code>e1</code> uses the value of a certain scalar <code>s</code>, and the evaluation of <code>e2</code> has side-effects on that value, the behavior is undefined. For instance, the evaluation of:</p>
+
+<pre><code>(i + i++)
+</code></pre>
+
+<p>Gives undefined behavior because of the sentence quoted above.</p>
+
+<p>However, your situation is different. The same paragraph later on specifies:</p>
+
+<blockquote>
+  <p>When calling a function (whether or not the function is inline), [...] Every evaluation in the calling function (including other function calls) that is not otherwise specifically
+  sequenced before or after the execution of the body of the called function is <strong>indeterminately sequenced</strong> with
+  respect to the execution of the called function.</p>
+</blockquote>
+
+<p>This means that if the expression to be evaluated looks like this:</p>
+
+<pre><code>i + f(i)
+</code></pre>
+
+<p>And <code>f(i)</code> increments <code>i</code>, the behavior is no more undefined, but only <em>unspecified</em>. In other words, your compiler is allowed to evaluate <code>i</code> and <code>f(i)</code> in any order, but the possible outcome is just the result of one of these possible evaluations. </p>
+
+<p>If the behavior were undefined, on the other hand, the possible outcome would have been <em>anything</em> (ranging from crashing, to behaving as you expected, to printing weird messages on the console, <a href="http://stackoverflow.com/a/16428253/1932150">and so on and so on</a>).</p>

@@ -1,0 +1,91 @@
+<p>Assuming that the live site allows the sending of emails</p>
+
+<pre><code>&lt;?php
+    /*
+        Why not use POST to send the data via ajax?
+        Then you could use 
+        if( $_SERVER['REQUEST_METHOD']=='POST' ){
+
+        }
+    */
+    /* Comment out the lines below if you get a response in the console and receive an email */
+    $res=mail('me@example.com','test','this is a test');
+    echo $res;
+    print_r( $_GET );
+    exit();
+    /* comment out above lines */
+
+    if( !isset($_GET['action']) ) {
+        die("You must not access this page directly!");
+    }
+
+    $to = "name@domain.com";
+    $subject = 'Contactform';
+    /*
+        There is no filtering of the request - you could use
+        filter_input( INPUT_GET, 'email1', FILTER_SANITIZE_ENCODED, array( 'flags' =&gt; FILTER_FLAG_STRIP_HIGH | FILTER_FLAG_ENCODE_HIGH ) );
+        to provide some basic filtering of supplied data
+    */
+    $name = trim($_GET['name']);
+    $email1 = trim($_GET['email1']);
+
+    /*
+        Initially you had $message.= but there was no message at that stage
+    */
+    $message = "===================================="."\n";
+    $message .= "Kontaktanfrage"."\n";
+    $message .= "===================================="."\n\n";
+    $message .= "Name: ".$name."\n";
+    $message .= "email: ".trim($_GET['email1'])."\n";
+    $message .= "Telefon: ".trim($_GET['phone1'])."\n";
+    $message .= "Strasse: ".trim($_GET['street'])."\n";
+    $message .= "Stadt: ".trim($_GET['city'])."\n";
+    $message .= "------------------------------------"."\n\n";
+    $message .= "Nachricht: "."\n".trim($_GET['msg'])."\n\n";
+    $message .= "===================================="."\n";
+
+    if ( empty($name) or empty($_GET['phone1']) or empty($_GET['msg']) ) {
+        echo 'errorarea|Bitte f&amp;uuml;llen Sie folgende Felder aus: Name, Telefon und Nachricht!';
+    } else {
+        /* Test for return value of mail call and use to decide which message to send */
+        $response=mail( $to, $subject, $message, "From: ".$email1 );
+        if( $response==true ) echo 'contactarea|Vielen Dank '.$name.', Ihre eMail wurde verschickt.';
+        else echo 'contactarea|Failed';
+    }
+
+?&gt;
+
+
+&lt;script type='text/javascript' charset='utf-8'&gt;
+    function sendemail() {
+      var http = navigator.appName=="Microsoft Internet Explorer" ? new ActiveXObject("Microsoft.XMLHTTP") : new XMLHttpRequest();
+      var msg = document.contactform.msg.value;
+      var name = document.contactform.name.value;
+      var email1 = document.contactform.email1.value;
+      var phone1 = document.contactform.phone1.value;
+      var street = document.contactform.street.value;
+      var city = document.contactform.city.value;
+
+      document.contactform.send.disabled=true; 
+      document.contactform.send.value='Absenden';
+
+        /* Why use GET as the method here?? */
+      http.open('GET', '/js/message.php?msg='+msg+'&amp;name='+name+'&amp;email1='+email1+'&amp;phone1='+phone1+'&amp;street='+street+'&amp;city='+city+'&amp;action=send');
+      http.onreadystatechange = function(){
+        if( http.status==200 &amp;&amp; http.readyState==4 ){
+
+            console.log(http.responseText);
+
+            var response = http.responseText;
+            if( response.indexOf('|') != -1 ) {
+                update = response.split('|');
+                document.getElementById(update[0]).innerHTML = update[1];
+                document.contactform.send.disabled=false;
+                document.contactform.send.value='Absenden';
+            }
+        }
+      };
+      http.send(null);  
+    }
+&lt;/script&gt;
+</code></pre>

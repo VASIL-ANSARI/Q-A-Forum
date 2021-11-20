@@ -1,0 +1,48 @@
+<p>A classic solution here would be to use Rails <a href="http://edgeapi.rubyonrails.org/classes/ActiveRecord/Enum.html" rel="nofollow">enum</a>. </p>
+
+<p>Add this to your order model:</p>
+
+<pre><code>class Order
+  enum status: [ :pending_approval, :confirmed, etc.. ]
+  ...
+end
+</code></pre>
+
+<p>The status can be changed by doing the following:</p>
+
+<pre><code># order.update! status: 0
+order.pending_approval!
+order.pending_approval? # =&gt; true
+order.status  # =&gt; "pending_approval"
+</code></pre>
+
+<p>No need for the <code>order_events</code> model.</p>
+
+<p>To query all the orders that are pending approval:</p>
+
+<pre><code>Order.where(status: :pending_approval)
+</code></pre>
+
+<p>Edit:
+Alternate solution when <code>order_event</code> has necessary columns.</p>
+
+<p>Add a column to the <code>order_event</code> called <code>archived</code> which can either be set to 1 or 0. Set the default scope in the <code>order_event</code> model to this:</p>
+
+<pre><code>default_cope where(:archived =&gt; 0)
+</code></pre>
+
+<p>Assuming 0 is not archived. </p>
+
+<p>Now, when you create a new order event set the old event to 1.</p>
+
+<pre><code>old_event = OrderEvent.find(params[:order_id])
+old_event.update(archived: 1)
+new_event = OrderEvent.create(...archived: 0)
+</code></pre>
+
+<p>Whenever you query for pending review like so:</p>
+
+<pre><code>OrderEvent.where(:status =&gt; pending_approval)
+</code></pre>
+
+<p>Only events that are not archived will be shown. </p>

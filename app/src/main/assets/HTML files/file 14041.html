@@ -1,0 +1,110 @@
+<p>Check out the bottom of this Scott Hanselman article.  He basically demonstrates how to send information about the status of the file upload back to the user.  In particular he creates a ViewModel to hold fileUpload results, creates a list of results based on the upload status of each file, and sends the information back to user by passing it into a View to be rendered.</p>
+
+<p><a href="http://www.hanselman.com/blog/ABackToBasicsCaseStudyImplementingHTTPFileUploadWithASPNETMVCIncludingTestsAndMocks.aspx" rel="nofollow">http://www.hanselman.com/blog/ABackToBasicsCaseStudyImplementingHTTPFileUploadWithASPNETMVCIncludingTestsAndMocks.aspx</a></p>
+
+<p><strong>Edit:</strong></p>
+
+<p>If you're looking to prompt the user for a confirmation when uploading (in case the file already exists), you can:</p>
+
+<p>(a) use a javascript ajax call to check if file exists and prompt the user before posting -or-</p>
+
+<p>(b) allow the user to submit, save the files to a temp location, prompt the user for confirmation in another view, process files if user confirms.</p>
+
+<p>EXAMPLE (a):</p>
+
+<p>[Controller]</p>
+
+<pre><code>public ActionResult AddFileForm() {
+   return View();
+}
+
+[HttpPost]
+public ActionResult AddFileX(IEnumerable&lt;HttpPostedFileBase&gt; files) {
+   // do what you need to save your files and/or update your db
+   foreach (var file in files) {
+      if (file.ContentLength &gt; 0) {
+         var fileName = Path.GetFileName(file.FileName);
+         var path = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName);
+         file.SaveAs(path);
+      }
+   }
+
+   // collect the updated file ids and send to View to render (should prob use Strongly typed class(es))
+   string[] results = {"123", "456", "789"};
+
+   return View(results);
+}
+
+[HttpPost]
+public JsonResult FileExists(List&lt;string&gt; filelist) {
+   //check if file(s) exist given filename 
+
+   // return ids for files that already exist on your system
+   string[] results = {"123", "", "789"};
+   return Json(results);
+}
+</code></pre>
+
+<p>[View] for AddFileForm</p>
+
+<pre><code>@using (Html.BeginForm("AddFileX", "File", FormMethod.Post, new { enctype = "multipart/form-data" }))
+{
+   &lt;input id="f1" type="file" name="files" multiple="true" /&gt;
+   &lt;input id="f2" type="file" name="files" multiple="true" /&gt;
+   &lt;input id="overwrite" type="hidden" value="false" /&gt;
+   &lt;input id="submit" type="submit" value="Upload" /&gt;
+}
+
+&lt;script&gt;
+   $(document).ready(function () {
+      $('#submit').click(function (e) {
+         if ($('#overwrite').val() == 'true')
+            return; //proceed w/ submit
+
+         e.preventDefault();
+
+         // collect filenames of proposed file updates
+         var files = [];
+         $('input[type=file]').each(function () {
+            var filename = $(this).val();
+            files.push(filename);
+         });
+
+         // send request to check if files exist
+         $.ajax({
+            type: "POST",
+            url: "/File/FileExists",
+            data: { filelist: files },
+            success: function (data) {
+               confirmUpload(data);
+            },
+            traditional: true
+         });
+      });
+   });
+
+   function confirmUpload(results) {
+      var existing = false;
+      $(results).each(function () {
+         var fid = $(this)[0];
+         if (fid.length &gt; 0) {
+            existing = true; //file exists on Server, fid returned.
+
+            //do stuff..highlight table row..etc
+         }
+      });
+
+      if (existing) {
+         //do whatever to request confirmation, show a message div, etc
+         var answer = confirm("Overwrite files?");
+         if (answer) {
+            // if confirmed, set flag submit form
+            $('#overwrite').val('true');
+            $('#submit').click();   //$('form').submit() - unreliable
+         }
+      }
+   }
+&lt;/script&gt;
+</code></pre>
+
+<p>Hope this gives you some ideas.</p>

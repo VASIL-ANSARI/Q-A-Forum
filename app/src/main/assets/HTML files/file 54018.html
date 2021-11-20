@@ -1,0 +1,66 @@
+<p>Here's one approach that is significantly faster than <code>V2</code>: take <code>img1-img2</code>, and multiply by 1 or -1 depending on <code>img1&gt;img2</code>. Here's how it is implemented:</p>
+
+<pre><code>def differenceImageV6(img1, img2):
+  a = img1-img2
+  b = np.uint8(img1&lt;img2) * 254 + 1
+  return a * b
+</code></pre>
+
+<p>A test harness for testing performance:</p>
+
+<pre><code>import numpy as np
+
+img1=np.uint8(np.random.randint(0, 255, (480, 640)))
+img2=np.uint8(np.random.randint(0, 255, (480, 640)))
+
+def differenceImageV1(img1, img2):
+  diff=np.empty_like(img1)
+  h, w=img1.shape
+  for y in range(h):
+    for x in range(w):
+      if img1[y, x]&lt;img2[y, x]: diff[y, x]=img2[y, x]-img1[y, x]
+      else:                     diff[y, x]=img1[y, x]-img2[y, x]
+  return(diff)
+
+def differenceImageV2(img1, img2):
+  return(np.uint8(np.abs(np.int16(img1)-img2)))
+
+def differenceImageV3(img1, img2):  # fast - but wrong result
+  return(img1-img2)
+
+def differenceImageV4(img1, img2):
+  return np.where(img1&gt;img2, img1-img2, img2-img1)
+
+def differenceImageV5(img1, img2):
+  a = img1-img2
+  b = img2-img1
+  c = img1&gt;img2
+  return a*c + b*(~c)
+
+def differenceImageV6(img1, img2):
+  a = img1-img2
+  b = np.uint8(img1&lt;img2) * 254 + 1
+  return a * b
+
+import timeit
+def testit():
+  for fn in [differenceImageV2, differenceImageV3, differenceImageV4, differenceImageV5, differenceImageV6]:
+    print fn.__name__, np.sum(fn(img1, img2).astype('int64')),
+    print timeit.timeit("%s(img1, img2)" % fn.__name__, "from test import img1, img2, %s" % fn.__name__, number=1000)
+
+if __name__ == '__main__':
+    testit()
+</code></pre>
+
+<p>and resulting performance numbers:</p>
+
+<pre><code>differenceImageV2 26071358 0.982538938522
+differenceImageV3 39207702 0.0261280536652
+differenceImageV4 26071358 1.36270809174
+differenceImageV5 26071358 0.220561981201
+differenceImageV6 26071358 0.154536962509
+</code></pre>
+
+<p><code>differenceImageV6</code> is about 6x slower than the incorrect <code>differenceImageV3</code>, but still about 6x faster than the previous best <code>differenceImageV2</code>. <code>differenceImageV1</code> isn't tested because it's easily a few orders of magnitude slower than the rest.</p>
+
+<p>Note: I included an <code>np.where</code> approach for comparison; I thought it might have good performance but it turns out to be fairly poor. It seems that performing slicing by a boolean array is quite slow in NumPy.</p>

@@ -1,0 +1,87 @@
+<p>I created a new <em>Single View Application</em> project to test this out; and dropped the following code in the <code>ViewController.m</code></p>
+
+<pre><code>#import "ViewController.h"
+
+@interface ViewController () &lt;UITextFieldDelegate&gt;
+{
+    @private
+    IBOutlet UITextField* m_fieldA;
+    IBOutlet UITextField* m_fieldB;
+    IBOutlet UITextField* m_fieldC;
+}
+
+@end
+
+@implementation ViewController
+
+// connected to Editing Did Begin
+- (IBAction) onFocus:(UITextField*)_textField
+{
+    [self updateKeyboardFor:_textField];
+}
+
+// connected to Editing Changed
+- (IBAction) onChanged:(UITextField*)_textField
+{
+    [self updateKeyboardFor:_textField];
+}
+
+- (void) updateKeyboardFor:(UITextField*)_textField
+{
+    bool allTextFieldsAreFilled = [m_fieldA.text length] &amp;&amp; [m_fieldB.text length] &amp;&amp; [m_fieldC.text length];
+
+    if (allTextFieldsAreFilled)
+    {
+        if (_textField.returnKeyType != UIReturnKeyGo)
+        {
+            _textField.returnKeyType = UIReturnKeyGo;
+            //[_textField resignFirstResponder];
+            //[_textField becomeFirstResponder];
+            [_textField reloadInputViews];
+        }
+    }
+    else
+    {
+        if (_textField.returnKeyType != UIReturnKeyNext)
+        {
+            _textField.returnKeyType = UIReturnKeyNext;
+            //[_textField resignFirstResponder];
+            //[_textField becomeFirstResponder];
+            [_textField reloadInputViews];
+        }
+    }
+}
+
+// A part of UITextFieldDelegate
+- (BOOL) textFieldShouldReturn:(UITextField*)_textField
+{
+    if (_textField.returnKeyType == UIReturnKeyGo)
+    {
+        [_textField resignFirstResponder];
+
+        // go off and perform 'go'
+    }
+    else
+    {
+        if(_textField == m_fieldA) [m_fieldB becomeFirstResponder];
+        if(_textField == m_fieldB) [m_fieldC becomeFirstResponder];
+        if(_textField == m_fieldC) [m_fieldA becomeFirstResponder];
+    }
+
+    return true;
+}
+
+@end
+</code></pre>
+
+<p>Then in the XIB create three <code>UITextFields</code> and hooked them up to the <code>IBOutlets</code>, <code>IBActions</code>, and also set this view controller as the <code>delegate</code> for all the fields.</p>
+
+<p><strike>All seems to work fine regardless of secure fields.</p>
+
+<p>My guess is that your issue is somewhere in the code where you move to the 'Next' field; and not in the code that you posted. Also make sure that all your outlets and delegates are linked up properly.</strike></p>
+
+<hr>
+
+<p><strong>Update</strong>: I've edited the code above. The commented out lines were the problem, you should be using <code>reloadInputViews</code> to update the button.</p>
+
+<p>It seems that it wasn't locking the keyboard; but what it was doing was after you typed the first letter and did the resign/become calls to refresh the button then the second press would overwrite the first. This seems like a bug in iOS... it's more noticeable if after the first letter you type a space. When I noticed that I added a label that updated it's content with the contents of the password field and it was even more clear what was happening.</p>

@@ -1,0 +1,13 @@
+<p>There seems to be a basic mismatch of approaches.  You are using <code>DefaultMutableTreeNode</code>s, which cache there child nodes, but are managing the actual nodes directly via the model, this is causing confusion at multiple different levels...</p>
+
+<p>If you want to continue monitoring the disk contents directly (or proxying it), I would create a custom <code>TreeNode</code> whose sole responsibility was to monitor a single directory.</p>
+
+<p>I would then create a custom <code>TreeModel</code> (probably from the <code>DefaultTreeModel</code>), which provided a <code>makeDirectory</code> method, which you would pass the currently selected <code>TreeNode</code> and the name of the directory.</p>
+
+<p>This method would then be responsible for the physical creation of the directory and notification of the  structural changes to the <code>JTree</code> (via the <code>nodesWereInserted</code> method).  I'd probably have this node return an instance a <code>TreeNode</code> which represented the child...</p>
+
+<p>There are a lot of problems with this approach, namly with the referencing of objects.  In your current approach, you are creating a new <code>DefaultMutableTreeNode</code> whenever <code>getChild</code> is called, this could cause issues if parts of the API are relying on those references remaining constant for the given position/data, this would require you to maintain some kind of internal cache, linking the <code>File</code> with the <code>TreeNode</code>...which kind of defeats the purpose...</p>
+
+<p>A better approach might be to utilising the existing "mutable tree node" API, each node would still be responsible for a single <code>File</code>, but it would also cache the results.  The problem here is managing when a node should be populated (as you don't want to populate directory nodes that are not expanded).</p>
+
+<p>I you are planning on utilising the "Watch Service" API, then I would go for the "mutable tree node" API and cache the child files within it (as you need to), it will simply the issues...</p>

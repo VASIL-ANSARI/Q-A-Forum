@@ -1,0 +1,365 @@
+<p>You were so close, I'm not even sure what was the true cause of failure, because, for the first cut, I just applied [most of] the fixes suggested by others and got a working program.</p>
+
+<p>Although it worked, I found that the way you did the "one ahead" <code>make_structure</code> call to be less flexible when you extend the program to do other things.</p>
+
+<p>For example, you'd have a hanging "ghost" record if, instead of adding a new record, you decided to <em>not</em> add a new record, but do some statistics on or manipulation of the existing ones.</p>
+
+<p>So, I created a second version of the program that has more isolation and generality.</p>
+
+<hr>
+
+<p>Here's the minimally changed version [please pardon the gratuitous style cleanup]:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;ncurses.h&gt;
+
+struct pat {
+    char surn[16];
+    char name[16];
+    struct pat *next;
+};
+
+static FILE *h;
+static struct pat *osp;
+static struct pat *first;
+
+struct pat *make_structure(void);
+
+int
+main()
+{
+    int rlen;
+
+    initscr();
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
+
+    clear();
+
+    osp = make_structure();
+    first = osp;
+
+    h = fopen("archivio", "r");
+
+    if (h == NULL)
+        printw("Archivio inesistente\n");
+    else {
+        while (1) {
+            printw("Lungh. nome = %d\n", sizeof osp-&gt;name);
+
+            // leave early on EOF or badly formed entry
+            rlen = fread(osp-&gt;surn, sizeof osp-&gt;surn, 1, h);
+            if (rlen != 1)
+                break;
+
+            // leave early on EOF or badly formed entry
+            fread(osp-&gt;name, sizeof osp-&gt;name, 1, h);
+            if (rlen != 1)
+                break;
+
+            printw("Cognome: %s\tNome: %s\n", osp-&gt;surn, osp-&gt;name);
+
+            osp-&gt;next = make_structure();
+            osp = osp-&gt;next;
+        }
+        fclose(h);
+    }
+
+    // NOTE: this just chews the first character (debug, I suppose?)
+#if 0
+    getch();
+#endif
+
+    // add new element
+    echo();
+    printw("Surname: ");
+    scanw("%15s", osp-&gt;surn);
+    printw("Name: ");
+    scanw("%15s", osp-&gt;name);
+
+    noecho();
+
+    h = fopen("archivio", "w");
+
+    osp = first;
+    while (osp != NULL) {
+        fwrite(osp-&gt;surn, sizeof osp-&gt;surn, 1, h);
+        fwrite(osp-&gt;name, sizeof osp-&gt;name, 1, h);
+        osp = osp-&gt;next;
+    }
+
+    fclose(h);
+
+    return 0;
+}
+
+struct pat *
+make_structure(void)
+{
+    struct pat *a;
+
+    a = malloc(sizeof(struct pat));
+
+    // NOTE: do this for good measure
+    a-&gt;next = NULL;
+
+    return (a);
+}
+</code></pre>
+
+<hr>
+
+<p>Here's the more generalized version that may give you some ideas when you extend the capabilities of the program:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;ncurses.h&gt;
+
+struct pat {
+    char surn[16];
+    char name[16];
+    struct pat *next;
+};
+
+static FILE *h;
+static struct pat *osp;
+static struct pat *first;
+static struct pat *prev;
+
+void read_archive(const char *file);
+void add_new_elements(void);
+void write_archive(const char *file);
+struct pat *make_structure(void);
+void add_to_list(struct pat *pat);
+
+int
+main()
+{
+
+    initscr();
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
+
+    clear();
+
+    read_archive("archivio");
+
+    // NOTE: this just chews the first character (debug, I suppose?)
+#if 0
+    getch();
+#endif
+
+    // NOTE: instead of just automatically adding new elements, this might
+    // be replaced with a menu, such as:
+    //   Enter Operation:
+    //     (1) Add new names
+    //     (2) Calculate statistics
+    //     (3) Backup database
+    add_new_elements();
+
+    write_archive("archivio");
+
+    return 0;
+}
+
+// read_archive -- read in archive
+void
+read_archive(const char *file)
+{
+    int rlen;
+
+    h = fopen(file, "r");
+
+    if (h == NULL)
+        printw("Archivio inesistente\n");
+
+    else {
+        while (1) {
+            osp = make_structure();
+
+            // leave early on EOF or badly formed entry
+            rlen = fread(osp-&gt;surn, sizeof osp-&gt;surn, 1, h);
+            if (rlen != 1)
+                break;
+
+            // leave early on EOF or badly formed entry
+            fread(osp-&gt;name, sizeof osp-&gt;name, 1, h);
+            if (rlen != 1)
+                break;
+
+            printw("Cognome: %s\tNome: %s\n", osp-&gt;surn, osp-&gt;name);
+
+            add_to_list(osp);
+        }
+
+        // NOTE: this is _always_ for EOF or bad entry, so free it
+        free(osp);
+
+        fclose(h);
+    }
+}
+
+// add_new_elements -- prompt for new elements
+void
+add_new_elements(void)
+{
+
+    echo();
+    while (1) {
+        osp = make_structure();
+
+        printw("Surname: ");
+        osp-&gt;surn[0] = 0;
+        scanw("%15s", osp-&gt;surn);
+        if (osp-&gt;surn[0] == 0)
+            break;
+
+        printw("Name: ");
+        osp-&gt;name[0] = 0;
+        scanw("%15s", osp-&gt;name);
+        if (osp-&gt;name[0] == 0)
+            break;
+
+        add_to_list(osp);
+    }
+    noecho();
+
+    free(osp);
+}
+
+// write_archive -- write out archive
+void
+write_archive(const char *file)
+{
+
+    h = fopen(file, "w");
+
+    for (osp = first;  osp != NULL;  osp = osp-&gt;next) {
+        fwrite(osp-&gt;surn, sizeof osp-&gt;surn, 1, h);
+        fwrite(osp-&gt;name, sizeof osp-&gt;name, 1, h);
+    }
+
+    fclose(h);
+}
+
+struct pat *
+make_structure(void)
+{
+    struct pat *a;
+
+    a = malloc(sizeof(struct pat));
+
+    // NOTE: do this for good measure
+    a-&gt;next = NULL;
+
+    return (a);
+}
+
+void
+add_to_list(struct pat *pat)
+{
+
+    if (first == NULL)
+        first = pat;
+    else
+        prev-&gt;next = pat;
+
+    prev = pat;
+}
+</code></pre>
+
+<hr>
+
+<p><strong>UPDATE:</strong></p>
+
+<blockquote>
+  <p>I was still trying to figure out the reason of my failure</p>
+</blockquote>
+
+<p>I didn't debug/single-step your original code because I thought that your linked list logic would need fixing and I wanted to get to that quickly. However, after I reviewed it, the logic was fine. Based on my best guess analysis, the probable failure was the <code>feof</code> which I had already changed to length check on <code>fread</code>.</p>
+
+<blockquote>
+  <p>Of course I was going to organize better the program using functions</p>
+</blockquote>
+
+<p>I assumed that you would. The splitup in the second program was more of a teaching tool to clarify and illustrate a principle and was <em>not</em> a critique of the modularity.</p>
+
+<p>In your original code, you <em>had</em> to add a new record because <code>osp</code> was empty but already linked into the list. Loosely, a "zombie" record, if you will.</p>
+
+<p>That is, the list had an entry linked in <em>before</em> it was filled in and validated. In other words, after the read loop, but before the user is prompted for the new entry, the <em>list</em> could be considered malformed (i.e. a [small] violation of "contract programming" or "design-by-contract" principles).</p>
+
+<p>The function splitup in the second program was just to emphasize this. In particular, by moving the read loop to a separate function, it illustrated/enforced design-by-contract.</p>
+
+<p>That is, upon entry, the list is whole and well formed [albeit, empty]. Upon return, it either is empty [if the input file does <em>not</em> exist] or has only well formed/complete records in it.</p>
+
+<p>In the second program, a partial/malformed entry is <em>never</em> linked in. The <code>add_to_list</code> is always done last [for a whole/complete record only].</p>
+
+<p>So, for both <code>read_archive</code> and <code>add_new_entries</code>, when they are called, they are both given a whole/complete list with only valid, fully formed records. That is the "contract" to <em>them</em>.</p>
+
+<p>And to fulfill their part of the "contract" these functions must leave things the same way, maintaining the list integrity upon exit. That is the functions' "contract" to the outside world</p>
+
+<hr>
+
+<p><strong>UPDATE #2:</strong></p>
+
+<blockquote>
+  <p>excuse me for the OT, but could you suggest to me a good IDE for C - C++ that works well with Debian/GNU Linux ?</p>
+</blockquote>
+
+<p>I may not be the best person to advise you on this as I don't use one. I was writing C long before they existed, so I have developed my own tools suite which is far more powerful than any IDE I've seen. Also, when I've looked at them, I could never find a way to mesh the two.</p>
+
+<blockquote>
+  <p>I'm at home with Code::Blocks, but unfortunately the so called nightly build is buggy and crashes very often</p>
+</blockquote>
+
+<p>If you're at home with codeblocks, but the nightly build is buggy, perhaps the simple solution is to switch your update to the "stable" tree, if that's possible. That may be the best "short answer".</p>
+
+<blockquote>
+  <p>(the code completion utility is very useful but I must not type str..., otherwise it freezes), and that's very frustrating!</p>
+</blockquote>
+
+<p>Maybe you could check the bug database and see if the problems you are experiencing are have known bug reports. If not, you could/should file one.</p>
+
+<hr>
+
+<p>I installed <code>codeblocks</code>. It looks clean and simple enough. I also installed <code>eclipse</code> and took a look at <code>kdevelop</code>. From several web pages, eclipse gets high marks, with <code>netbeans</code> a close second</p>
+
+<p>I tried to use them on source file I had lying around that was built with a Makefile. codeblocks was intuitive enough that I could get it going quickly. I had more trouble with the others. eclipse was originally designed by IBM for internal use and then released as a public service. It is well supported and mature.</p>
+
+<p>I had been running eclipse <em>without</em> CDT, but once I added that, <code>eclipse</code> gets my vote, because it appears to have enough features to control all of what I'm going to gripe about below ;-)</p>
+
+<p>An IDE is a somewhat personal choice [unless your company mandates one], so you should use what you like. In other words, try some and see what features they have and how they work. Here is a page that lists some: <a href="https://en.wikipedia.org/wiki/Comparison_of_integrated_development_environments" rel="nofollow">https://en.wikipedia.org/wiki/Comparison_of_integrated_development_environments</a></p>
+
+<p>When selecting an IDE, you have to look at the "most used" features. The most frequent thing you do is scroll around in the source file. So, an editor should support the <code>hjkl</code> aliases to the arrow keys, like <code>vi</code> does. Having to move your right hand over to the arrow keys and back slows things down so much that it's a non-starter.</p>
+
+<p>eclipse uses <code>gvim</code> [graphical <code>vim</code>], so that's a plus.</p>
+
+<p>I'm <em>not</em> a fan of editing with some simple WYSIWYG editor pane that has only crude search/replace features. Likewise, <code>vim</code> allows regex search simply by typing <code>/</code>, so again, the most common operations are "at your fingertips"</p>
+
+<p>I don't use [nor <em>want</em>] autocompletion features. When I've tried them, they frequently get things wrong and it takes longer to backspace over what they've done. I am a very fast typist.</p>
+
+<p>I also turn off syntax highlighting and colorization of source. When entering source code, the colors change just about with every character entered because of what the editor <em>thinks</em> I'm typing (e.g. I'm typing a comment, but it thinks it's code, etc.) I've found that to be distracting.</p>
+
+<p>Also, when looking at the final result, I find that the colorized result to be "too busy" (i.e. more information I have to filter) rather than something that helps me see what I need to see.</p>
+
+<p>I am fairly insistent about indenting, breaking up long code blocks with blank lines to improve readibility. And, of course, good comments. To me, these are far more important than the coloring. I have a custom tool for the indent [As you may recall, when I posted the code above, it was reindented because I ran it through my tool before posting.</p>
+
+<p>Another feature is the graphical debugger. Is it full featured? For example, <code>ddd</code> is a graphical wrapper around [the very powerful] <code>gdb</code>. <code>ddd</code> provides a graphical wrapper and windows for common things, but still allows a direct text window for the <code>gdb</code> prompt, so you can manually type in the more advanced commands (e.g. <code>watch symbol</code>).</p>
+
+<p>Is the IDE extensible? Can you add plugins? Can you easily add/create your own?</p>
+
+<p>What source code control system does the IDE use? I've used <em>many</em> over the years and, now, am completely sold on <code>git</code>. So, if the IDE doesn't support <code>git</code>, it's a non-starter.</p>
+
+<p>It should be noted that <code>git</code> has <em>so</em> many features than they can <em>not</em> be contained in a GUI. So, the really powerful stuff uses a command line tool in a terminal window.</p>
+
+<p>My IDE? Several <code>xterm</code> windows, <code>vi</code>, <code>git</code>, and my tools suite [which is currently 250,000 lines of <code>perl</code> scripts ;-)]
+Does the IDE force you to do things its way? How easy is it to import/export configuration, etc. to other external tools and IDEs?</p>
+
+<p>I have a very powerful build script of my own design. So, I'd want the IDE to, when I click on the "build" button to <em>not</em> do whatever it would normally do, but turn over control to <em>my</em> build script. Likewise for <em>any</em> other operation the IDE has to offer.</p>
+
+<p>Is the IDE portable and available on all major platforms: linux, OSX, and windows? In the past, that was another reason I shied away from IDEs. They would be available on only one platform. Or, since I was doing consulting work, I'd go into an environment that would not allow the IDE to be installed/used because of [sysadmin] policy.</p>

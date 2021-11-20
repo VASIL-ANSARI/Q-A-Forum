@@ -1,0 +1,42 @@
+<p><em>this isn't an answer, per se. It is mainly to give you an idea of the flexibility of the API.</em></p>
+
+<hr>
+
+<p>The schema, from what I can tell, is correct. <code>Event</code> has <code>month</code> and <code>category</code> (or <code>category_id</code>) and <code>user_id</code>. You can create all manner of helper methods to operate on that model.</p>
+
+<p>For example, with a few scopes:</p>
+
+<pre><code>class Event
+  scope :for_month,    -&gt;(m) { where(month: m) }
+  scope :for_category, -&gt;(c) { where(category: c) }
+  scope :for_user,     -&gt;(u) { where(user: u) }
+end
+
+# usage
+
+Event.for_month("august").for_category("baseball").for_user(current_user)
+
+# below, month "august" will be set on instance
+current_user.events.for_month("august").new("foo") 
+</code></pre>
+
+<p>But all of this is pointless. With those relationships in place, you can access the <code>Event</code> from <code>User</code> or <code>Category</code> and fill in the details yourself:</p>
+
+<pre><code>Event.where(month: "august", category: "baseball", user: current_user)
+current_user.events.where(month: "august", category: "baseball")
+
+current_user.events.new(month: "august", category: "baseball")
+</code></pre>
+
+<p>There are a tonne of ways to access and manipulate this data. I'm not sure you can reduce it much further than the above. You could go crazy and add a scope with multiple arguments:</p>
+
+<pre><code>class Event
+  scope :for_mcu, -&gt;(m, c, u) {
+    for_month(m).for_category(c).for_user(u)
+  }
+end
+
+# usage
+
+Event.for_mcu("august", "baseball", current_user)
+</code></pre>

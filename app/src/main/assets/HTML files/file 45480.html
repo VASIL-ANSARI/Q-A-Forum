@@ -1,0 +1,62 @@
+<p>There is no such <code>public</code> method that will allow you to control the mutex that the synchronized collection will use. So if itâs not the list which allows you to specify the mutex, your higher level operations have to be implemented with that flexibility, e.g.:</p>
+
+<pre><code>public static &lt;T&gt; boolean addIfNew(List&lt;T&gt; target, T value, Object mutex) {
+    synchronized (mutex) {
+        return !target.contains(value) &amp;&amp; target.add(value);
+    }
+}
+</code></pre>
+
+<p>which can then be used as</p>
+
+<pre><code>List&lt;String&gt; synchedList=Collections.synchronizedList(new ArrayList&lt;String&gt;());
+addIfNew(synchedList, "foo", synchedList);
+</code></pre>
+
+<p>This works because the list returned by <code>synchronizedList</code> will use itself as mutex. Compare with <a href="http://docs.oracle.com/javase/8/docs/api/java/util/Collections.html#synchronizedList-java.util.List-" rel="nofollow">its documentation</a>:</p>
+
+<p><sub>emphasis mine</sub></p>
+
+<blockquote>
+  <p>It is imperative that the user manually <strong>synchronize on the returned list</strong> when iterating over it:</p>
+
+<pre><code> List list = Collections.synchronizedList(new ArrayList());
+     ...
+ synchronized (list) {
+     Iterator i = list.iterator(); // Must be in synchronized block
+     while (i.hasNext())
+         foo(i.next());
+ }
+</code></pre>
+</blockquote>
+
+<p>The reason why the implementation allows using different mutex objects internally is that you can create <a href="http://docs.oracle.com/javase/8/docs/api/java/util/List.html#subList-int-int-" rel="nofollow"><em>sub lists</em></a> and the sub list of a synchronized list will synchronize on the backing list instance rather than itself (same applies to <code>Vector.subList</code>). So when you pass a sub list to your high-level method, itâs crucial to pass the original synchronized list as mutex.</p>
+
+<p>Similar things apply to the <code>Collection</code> view to maps:</p>
+
+<p><a href="http://docs.oracle.com/javase/8/docs/api/java/util/Collections.html#synchronizedMap-java.util.Map-" rel="nofollow"><code>Collections.synchronizedMap</code></a>:</p>
+
+<blockquote>
+  <p>It is imperative that the user manually synchronize on the returned map when iterating over any of its collection views:</p>
+
+<pre><code>Map m = Collections.synchronizedMap(new HashMap());
+    ...
+Set s = m.keySet();  // Needn't be in synchronized block
+    ...
+synchronized (m) {  // Synchronizing on m, not s!
+    Iterator i = s.iterator(); // Must be in synchronized block
+    while (i.hasNext())
+        foo(i.next());
+}
+</code></pre>
+</blockquote>
+
+<hr>
+
+<p>There is a simplification to this. If you ensure that all access to a collection takes place in your methods, these methods may agree on an arbitrary mutex and be thread-safe if synchronizing on that mutex consistently. Of course, there is no need for the collection itself to do an additional synchronization itself then, but thatâs what it is all about:</p>
+
+<p>In practice, you will hardly find any useful scenario for these synchronized collections. Any non-trival operation requires more than one access to a collection thus requiring manual or higher-level synchronization which renders the low-level synchronization obsolete.</p>
+
+<p>Itâs tempting to think about passing a synchronized collection to an arbitrary method working with a collection and gain thread safety automatically without additional synchronization but since this works only if said method consist of one single access to the collection, you wonât find any useful real life method for which that works.</p>
+
+<p>So the bottom line is you will always have to make <em>your</em> code thread safe and controlling access to collections and thus never have a real need for a synchronized collection.</p>

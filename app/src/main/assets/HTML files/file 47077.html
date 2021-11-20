@@ -1,0 +1,89 @@
+<p>To answer your questions:</p>
+
+<ol>
+<li><p>You probably shouldn't reinvent the wheel with custom string solutions. Regardless, if you want an (insanely) high-level of control over your (de-)serialization, you could implement IXmlSerializable and do the exact same thing yourself.</p>
+
+<pre><code>[XmlRoot("string-wrapper")]
+public class CustomString : IXmlSerializable
+{
+    public string Value { get; set; }
+
+    public XmlSchema GetSchema()
+    {
+        return null; // GetSchema should not be used.
+    }
+
+    public void ReadXml(XmlReader reader)
+    {
+        reader.MoveToContent();
+        bool isEmpty = reader.IsEmptyElement;
+
+        reader.ReadStartElement();
+        if (!isEmpty)
+        {
+            Value = reader.ReadString();
+            reader.ReadEndElement();
+        }
+    }
+    public void WriteXml(XmlWriter writer)
+    {
+        writer.WriteString(Value);
+    }
+}
+</code></pre></li>
+</ol>
+
+<p>Serialization of a CustomString now yields <code>&lt;string-wrapper&gt;Testing&lt;/string-wrapper&gt;</code>. I'll post some test code at the end of this post.</p>
+
+<ol start="2">
+<li>Your deserialization is likely broken because the XmlSerializer doesn't know that the IEnumerable you marked serializable should actually be treated like a string.</li>
+</ol>
+
+<p>And now... Forget what I just told you. Unless you have very specific formatting requirements you should <em>not</em> implement your own version of a string. The built-in formatter knows a lot more formatting tricks (<a href="http://www.w3.org/TR/xmlschema-2/#built-in-datatypes" rel="nofollow">http://www.w3.org/TR/xmlschema-2/#built-in-datatypes</a>), so you should probably let it do it's job.</p>
+
+<p>Serializing classes is where the attributes come in, though I recommend you switch to the WFC data contracts, which may sound scary at first but actually provides a whole lot more for a lot less code. Again, I'm not sure what you're trying to accomplish, but trust me you don't want to get into the habit of hand writing XML. </p>
+
+<p>If you're up for it you might like dynamic objects and the ExpandoObject (<a href="http://www.codeproject.com/Tips/227139/Converting-XML-to-an-dynamic-object-using-ExpandoO" rel="nofollow">http://www.codeproject.com/Tips/227139/Converting-XML-to-an-dynamic-object-using-ExpandoO</a>). These eliminate types all together and allow you to create dictionaries, arrays, named properties, whatever, all on the fly!</p>
+
+<p>Finally, easy on the generics! Deserializing generic classes is not a trivial task. Besides, you probably don't need to. If you want your own collections, try the System.Collections.ObjectModel namespace. You don't have to worry about maintaining lists and implementing interfaces, just what you're actually storing:</p>
+
+<pre><code>class DictionaryOfStringsAndObjects : KeyedCollection&lt;string, object {...}
+class CollectionOfStrings : Collection&lt;string&gt; {...}
+</code></pre>
+
+<p>Also, try to avoid partial classes unless an ORM or a large legacy class forces it on you. You shouldn't actually use them unless you're made to.</p>
+
+<p>All the best, and to a future devoid of XML!</p>
+
+<pre><code>public class CustomSerializer
+{
+    public static void Test()
+    {
+        var obj = new CustomString {Value = "Random string!"};
+        var serializer = new CustomSerializer();
+        var xml = serializer.Serialize(obj);
+        Console.WriteLine(xml);
+
+        var obj2 = serializer.Deserialize&lt;CustomString&gt;(xml);
+    }
+
+    public string Serialize(object obj)
+    {
+        var serializer = new XmlSerializer(obj.GetType());
+        using (var io = new StringWriter())
+        {
+            serializer.Serialize(io, obj);
+            return io.ToString();
+        }
+    }
+
+    public T Deserialize&lt;T&gt;(string xml)
+    {
+        var serializer = new XmlSerializer(typeof (T));
+        using (var io = new StringReader(xml))
+        {
+            return (T)serializer.Deserialize(io);
+        }
+    }
+}
+</code></pre>

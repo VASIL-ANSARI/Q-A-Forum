@@ -1,0 +1,46 @@
+<p>Ok, well after several hours of research, I've concluded that it is near impossible to bind to a <code>Uri</code>, and the alternative is to bind a <code>BitmapImage</code>. I couldn't find the exact reason, but it has something to do with the fact that using a <code>Uri</code> leaves the <code>BitmapImage</code> open and binding quickly breaks this paradigm. The solution is to bind the <code>BitmapImage</code> and set the <code>BitmapImage</code> to a stream, which seems to support binding quite well. </p>
+
+<p>I liked the idea of the <code>Uri</code> since its easily seriliazable, while the <code>BitmapImage</code> is more difficult and takes up significantly more space (since you are serializing the picture data as opposed to a link). The solution that I decided on and that works is to serialize the <code>Uri</code>, and use the <code>OnDeserialized</code> attribute to create the <code>BitmapImage</code> on startup. I then needed a method/event to reset the <code>BitmapImage</code> whenever the <code>Uri</code> changed.</p>
+
+<p>Here's the final code to recap:</p>
+
+<pre><code>private async Task CameraCapture()
+{
+    CameraCaptureUI camUI = new CameraCaptureUI();
+
+    camUI.PhotoSettings.AllowCropping = true;
+    camUI.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.MediumXga;
+    camUI.PhotoSettings.CroppedAspectRatio = new Size(4, 3);
+
+    Windows.Storage.StorageFile imageFile = await camUI.CaptureFileAsync(CameraCaptureUIMode.Photo);
+
+    if (imageFile != null)
+    {
+        // Use unique id for image name since name could change
+
+        string filename = student.StudentID + "Photo.jpg";
+
+        // Move photo to Local Storate and overwrite existing file
+
+        await imageFile.MoveAsync(ApplicationData.Current.LocalFolder, filename, NameCollisionOption.ReplaceExisting);
+
+        // Open file stream of photo
+
+        IRandomAccessStream stream = await imageFile.OpenAsync(FileAccessMode.Read);
+        BitmapImage bitmapCamera = new BitmapImage();
+        bitmapCamera.SetSource(stream);
+
+        student.BitmapPhoto = bitmapCamera // BitmapImage
+
+        // Save Uri to photo since we can serialize this and re-create BitmapPhoto on startup/deserialization
+
+        student.UriPhoto = new Uri(string.Format("ms-appdata:///local/{0}", filename), UriKind.Absolute);
+
+    }
+}
+</code></pre>
+
+<p>And the new XAML binding to the student BitmapImage</p>
+
+<pre><code>&lt;Image x:Name="imgStudent" Source="{Binding BitmapPhoto}" Grid.Row="0" Width="400" Height="300" Margin="15" Grid.ColumnSpan="2"/&gt;
+</code></pre>

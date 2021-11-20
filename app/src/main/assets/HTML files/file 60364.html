@@ -1,0 +1,74 @@
+<p>Your specification is not very clear. XML itself does not have the concept of a "list". Any element can contain any number of child elements, and XML doesn't care what the name of the elements are. Using the word "list" in an element doesn't actually make it a list.</p>
+
+<p>In addition, in your example XML you show two different kinds of "child" nodes, the outer being named <code>child</code> and the inner being named <code>child2</code>. But in your desired output, you only have the name <code>child</code>. The <code>child2</code> nodes appear to have been replaced by <code>child</code> nodes.</p>
+
+<p>Unfortunately, the XML you show isn't even valid XML. So it's pretty obvious you have not provided us with <em>real</em> XML examples, making it even more difficult to understand what you're trying to do.</p>
+
+<p>So, with all that in mind, I'll point out that the basic approach you want, given that you want to apply the same algorithm to a series of nested objects, is one based on recursion. I.e. you want to recursively select the nodes you'll be keeping, and apply the same removal logic to them.</p>
+
+<p>Here is a <a href="http://stackoverflow.com/help/mcve">Complete, Minimal, and Verifiable code example</a> (i.e. similar to what should have been included in the question in the first place) that illustrates this basic idea:</p>
+
+<pre><code>class Program
+{
+    const string _kxmlInput =
+        @"&lt;parent1&gt;
+      &lt;listchild&gt;
+           &lt;child&gt;
+               &lt;listchild2&gt;
+                    &lt;child/&gt;
+                    &lt;child/&gt;
+                    &lt;child/&gt;
+               &lt;/listchild2&gt;
+           &lt;/child&gt;
+           &lt;child&gt;
+                &lt;listchild2&gt;
+                     &lt;child/&gt;
+                     &lt;child/&gt;
+                     &lt;child/&gt;
+                &lt;/listchild2&gt;
+           &lt;/child&gt;
+      &lt;/listchild&gt;
+&lt;/parent1&gt;";
+
+    static void Main(string[] args)
+    {
+        Console.WriteLine(removeParentNode(_kxmlInput));
+    }
+
+    static string removeParentNode(string xml)
+    {
+        StringReader reader = new StringReader(xml);
+
+        XDocument xdoc = XDocument.Load(reader);
+
+        //remove parent1 
+        XDocument xdoc1 = new XDocument(KeepDescendants(xdoc.Root, "child"));
+
+        StringBuilder sb = new StringBuilder();
+        XmlWriterSettings settings = new XmlWriterSettings { Indent = true };
+
+        using (XmlWriter xmlWriter = XmlWriter.Create(sb, settings))
+            xdoc1.WriteTo(xmlWriter);
+
+        return sb.ToString();
+    }
+
+    private static XElement KeepDescendants(XElement node, string descendantName)
+    {
+        var child = node.Descendants(descendantName).Select(c =&gt; KeepDescendants(c, descendantName));
+
+        if (!child.Any())
+        {
+            return node;
+        }
+
+        XElement newParent = new XElement(node.Name);
+
+        newParent.Add(child);
+
+        return newParent;
+    }
+}
+</code></pre>
+
+<p>If you have some other kind of behavior in mind, you should be able to adapt the basic technique shown above to accomplish whatever it is you actually want to do.</p>

@@ -1,0 +1,44 @@
+<p>If a class implements an interface, a bean of that class can only be autowired using the interface type and not the concrete class type. Since <code>UserDao</code> implements the <code>GenericDAO&lt;User, Long&gt;</code> interface, it is being autowired correctly when you autowire using the interface. Spring is not able to find the dependency when you try to autowire using the concrete class, then it looks for a no-arg constructor for <code>UserService</code> and fails giving the particular error on not finding any.</p>
+
+<p>In general, it not a good idea to inject dependencies using concrete classes because it tightly couples your modules. Right way to do this is to have an interface for each of your DAO classes and have their implementation extending the <code>GenericDAOHibernate4</code>.</p>
+
+<pre><code>public interface GenericDAO&lt;E, PK extends Serializable&gt; {
+    PK save(E newInstance);
+    void update(E transientObject);
+    //typical dao methods
+}
+
+public interface UserDAO extends GenericDAO&lt;User, Long&gt; {
+    List&lt;User&gt; findUsersByFirstname(String firstName);
+}
+
+@Component
+@Transactional
+@Repository
+@Qualifier("userDAO")
+public class UserDAOImpl extends GenericDAOHibernate4&lt;User, Long&gt; 
+        implements UserDAO {
+
+    @Autowired
+    public UserDAO(SessionFactory factory) {
+        super(factory);
+    }
+
+    @Override
+    protected Class&lt;User&gt; getEntityClass() {
+        return User.class;
+    }
+
+    List&lt;User&gt; findUsersByFirstname(String firstName) {
+        //provide implementation here
+    }
+
+}
+
+public class UserService extends GenericService&lt;User&gt; {
+    @Autowired
+    public UserService(@Qualifier("userDAO") UserDAO dao) {
+        super(dao);
+    }
+}
+</code></pre>

@@ -1,0 +1,49 @@
+<p>When I want events to propagate from a cell to the containing controller, I usually define a custom delegate, like this:</p>
+
+<pre><code>protocol SettingCellDelegate : class {
+    func didChangeSwitchState(# sender: SettingCell, isOn: Bool)
+}
+</code></pre>
+
+<p>use it in the cell:</p>
+
+<pre><code>class SettingCell: UITableViewCell {
+    @IBOutlet weak var settingsLabel: UILabel!
+    @IBOutlet weak var settingsSwitch: UISwitch!
+
+    weak var cellDelegate: SettingCellDelegate?
+
+    @IBAction func handledSwitchChange(sender: UISwitch) {
+        self.cellDelegate?.didChangeSwitchState(sender: self, isOn:settingsSwitch.on)
+        ^^^^
+    }
+}
+</code></pre>
+
+<p>implement the protocol in the view controller and set the delegate in the cell:</p>
+
+<pre><code>class ViewController : UITableViewController, SettingCellDelegate {
+                                              ^^^^
+    override func tableView(_tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -&gt; UITableViewCell {
+        let cell = tableView.dequeueReusableCellWithIdentifier("CustomSettingCell") as! SettingCell
+
+        let settingItem = settings[indexPath.row]
+        cell.settingsLabel.text = settingItem.settingName
+        cell.settingsSwitch.enabled = settingItem.switchState!
+
+        cell.cellDelegate = self
+        ^^^^
+
+        return cell
+    }
+
+#pragma mark - SettingCellDelegate
+
+    func didChangeSwitchState(#sender: SettingCell, isOn: Bool) {
+        let indexPath = self.tableView.indexPathForCell(sender)
+        ...
+    }
+}
+</code></pre>
+
+<p>When the switch is tapped, the event is propagated to the view controller, with the new status and the cell itself passed as arguments. From the cell you can obtain the index path, and then do whatever you need to, such as selecting the row etc.</p>

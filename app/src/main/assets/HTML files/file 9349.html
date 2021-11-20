@@ -1,0 +1,28 @@
+<p>Unless the variables that go into your queries are sanitized somewhere we don't get to see, it can be subverted in minutes by any kid with an <a href="http://en.wikipedia.org/wiki/SQL_injection" rel="nofollow">SQL injection</a> <a href="http://sqlmap.sourceforge.net/" rel="nofollow">tool</a>.</p>
+
+<p><strong>Always</strong> escape variables before putting them into queries. Since you are using some database wrapper (a custom one?), I can't tell you the exact way to do this. Generally (e.g. if using PDO) it involves parameterized prepared statements.</p>
+
+<p>Also, this code is kind of wasteful. What about this:</p>
+
+<pre><code>// WARNING -- WARNING -- HERE PROBABLY BE SQL INJECTIONS
+$rs=$DBobject-&gt;execute_query(
+    "select * from users where `email`='".$email."' and password`='".passwordMD5($password)."'");
+
+// Is there such a user?
+if($DBobject-&gt;my_num_rows($rs) == 0) {
+    return "Invalid email/password";
+}
+
+// Now fetch the record from $rs -- I don't know how your code does this,
+// but let's assume:
+$row = $rs-&gt;getRow();
+
+// Now check if the user is cancelled
+if ($row['status'] == 'cancelled') {
+    return "Your account has been cancelled";
+} 
+
+// Login the user, since the account exists and is not cancelled
+</code></pre>
+
+<p>This way you only have to hit the db once for a successful login.</p>

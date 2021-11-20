@@ -1,0 +1,100 @@
+<p>I don't think there is an easy or particularly elegant solution, because ServiceStack resolves it's services based on concrete classes rather than by interfaces, and this is something beyond the capability of Funq. However it's not impossible.</p>
+
+<p>You will need to have a default implementation of each interface that you want to use as a DTO, because ServiceStack resolves using the concrete class.</p>
+
+<p>So essentially here we have a <code>DefaultCalculator</code> which will provide us the route into our action method.</p>
+
+<pre class="lang-cs prettyprint-override"><code>[Route("/Calculate","GET")]
+public class DefaultCalculator : ILoanCalculator
+{
+    public decimal Amount { get; set; }
+    public decimal TermYears { get; set; }
+    public int TermMonths { get; set; }
+    public decimal IntrestRatePerYear { get; set; }
+    public DateTime StartDate { get; set; }
+    public decimal MonthlyPayments { get; set; }
+    public void Calculate()
+    {
+        throw new NotImplementedException();
+    }
+}
+</code></pre>
+
+<p>Then our action method is used almost as normal, except we call a method <code>GetInstance&lt;T&gt;</code> which we implement in our <code>MyServiceBase</code> from which this service extends, rather than <code>Service</code>, because it makes it easier to share this method across services.</p>
+
+<pre class="lang-cs prettyprint-override"><code>public class TestService : MyServiceBase
+{
+    public decimal Get(DefaultCalculator request)
+    {
+        // Get the instance of the calculator for the current customer
+        var calculator = GetInstance&lt;ILoanCalculator&gt;(MyTypes.LoanCalculator, request);
+
+        // Perform the action
+        calculator.Calculate();
+
+        // Return the result
+        return calculator.MonthlyPayments;
+    }
+}
+</code></pre>
+
+<p>In <code>MyServiceBase</code> we implement the method <code>GetInstance&lt;T&gt;</code> which is responsible for resolving the correct instance, based on the customer name, of <code>T</code>, in this case is the <code>ILoanCalculator</code>.</p>
+
+<p>The method works by:</p>
+
+<ol>
+<li><p>Determine the customer name from the <code>Request.GetItem("customer")</code>. Your current method will need to set the customer identifier on the <code>Request</code> <code>Items</code> collections using <code>Request.SetItem</code> method at the point where you identify your customer. <em>Or perhaps move the identification mechanism into this method.</em></p></li>
+<li><p>With the customer name known the full type name can be built, based on the passed in type name template. i.e. <code>MyCompany.Services.Business.Foo.LoanCalculator</code> where <code>Foo</code> is the customer. This should resolve the type if the containing assembly has been loaded at startup.</p></li>
+<li><p>Then an instance of the type is created as <code>T</code> i.e. the interface, <code>ILoanCalculator</code></p></li>
+<li><p>Then a safety check to make sure everything worked okay.</p></li>
+<li><p>Then populate the values from the request that are in <code>DefaultCalculator</code> which is also of type <code>ILoanCalculator</code>.</p></li>
+<li><p>Return the instance.</p></li>
+</ol>
+
+<pre class="lang-cs prettyprint-override"><code>public class MyServiceBase : Service
+{
+    public T GetInstance&lt;T&gt;(string typeName, object value)
+    {
+        // Get the customer name from the request items
+        var customer = Request.GetItem("customer") as string;
+        if(customer == null) throw new Exception("Customer has not been set");
+
+        // Create the typeof the object from the customer name and the type format
+        var type = Type.GetType(string.Format(typeName, customer));
+
+        // Create an instance of the type
+        var instance = Activator.CreateInstance(type) as T;
+
+        // Check the instance is valid
+        if(instance == default(T)) throw new Exception("Unable to create instance");
+
+        // Populate it with the values from the request
+        instance.PopulateWith(value);
+
+        // Return the instance
+        return instance;
+    }
+}
+</code></pre>
+
+<p>You can optionally add a cache of instances to prevent having to use <code>Activator.CreateInstance</code> for each request.</p>
+
+<p>If you are going to have many different types being created dynamically then you may wish to organise their type strings into a static class:</p>
+
+<pre class="lang-cs prettyprint-override"><code>public static class MyTypes
+{
+    public static string LoanCalculator = "MyCompany.Services.Business.{0}.LoanCalculator";
+    public static string AnotherType = "MyCompany.Services.Business.{0}.AnotherType";
+    //...//
+}
+</code></pre>
+
+<p>Then all that's left to do is ensure that you add the assemblies with your different customer implementations are loaded into your application, which you could do from your <code>AppHost</code> <code>Configure</code> method.</p>
+
+<pre class="lang-cs prettyprint-override"><code>foreach(var pluginFileName in Directory.GetFiles("Plugins", "*.dll"))
+    Assembly.Load(File.ReadAllBytes(pluginFileName));
+</code></pre>
+
+<p>Obviously this method relies on the full type name being of a specific format to match it to customers. There are other approaches but I believe this to be straightforward.</p>
+
+<p>I hope that helps.</p>

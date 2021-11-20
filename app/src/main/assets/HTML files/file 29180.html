@@ -1,0 +1,175 @@
+<p>Thank you. I have implemented my timer class with help of link <a href="http://stackoverflow.com/questions/18110369/c-timer-implemetation-assigning-a-member-function-to-signal-callback-functio?rq=1">c++ timer implemetation - Assigning a member function to signal callback function pointer</a></p>
+
+<p>Here is the code </p>
+
+<p><em>timer.hpp</em></p>
+
+<pre><code>#ifndef TIMERHELPER_H_
+#define TIMERHELPER_H_
+
+#include &lt;signal.h&gt;
+#include &lt;time.h&gt;
+#include &lt;pthread.h&gt;
+#include &lt;iostream&gt;
+
+using namespace std;
+
+#define CLOCKID CLOCK_REALTIME
+#define SIG SIGUSR1
+
+typedef void (*TimerHandler)(sigval_t signum);
+
+class TimerTimeoutHandler
+{
+    public:
+        virtual void handlerFunction( void ) = 0;
+};
+
+class Timer
+{
+    public:
+        Timer( TimerTimeoutHandler * timeHandler );
+        ~Timer();
+
+        void setDuration(long int seconds);
+        void start();
+        void restart();
+        void timeout();
+        void stop();
+        void callbackWrapper( void );
+        static void timeOutHandler( sigval_t This  );
+
+    private:
+        void createTimer(timer_t *timerid, TimerHandler handler_cb);
+        void startTimer(timer_t timerid, int startTimeout, int cyclicTimeout);
+        void stopTimer(timer_t timerid);
+
+    long int m_Duration;
+        TimerTimeoutHandler * timeOutHandlerImp;
+        timer_t timerid;
+};
+
+class TimeTimeoutHandlerImp : public TimerTimeoutHandler
+{
+    public:
+        TimeTimeoutHandlerImp(){}
+        ~TimeTimeoutHandlerImp(){}
+
+        void handlerFunction( void );
+};
+
+#endif /* TIMERHELPER_H_ */
+</code></pre>
+
+<p><em>timer.cpp</em></p>
+
+<pre><code>#include "timer.hpp"
+#include &lt;unistd.h&gt;
+
+Timer::Timer( TimerTimeoutHandler * timeHandler )
+{
+    timeOutHandlerImp = timeHandler;
+    m_Duration = 0;
+
+    TimerHandler handler_cb = &amp;timeOutHandler;
+    createTimer( &amp;timerid, handler_cb );
+    //createTimer( &amp;timerid, timeOutHandler );
+}
+
+Timer::~Timer()
+{
+    stopTimer( timerid );
+}
+
+void Timer::setDuration(long int seconds)
+{
+    m_Duration = seconds;
+}
+
+void Timer::start()
+{
+    startTimer(timerid, m_Duration, 3);
+}
+
+void Timer::restart()
+{
+    stopTimer(timerid);
+    startTimer(timerid, m_Duration, 0);
+}
+
+void Timer::stop()
+{
+    stopTimer(timerid);
+}
+
+void Timer::createTimer(timer_t *timerid, TimerHandler handler_cb)
+{
+    sigevent sev;
+    pthread_attr_t attr;
+    pthread_attr_init( &amp;attr );
+    sched_param parm;
+
+    parm.sched_priority = 255;
+    pthread_attr_setschedparam(&amp;attr, &amp;parm);
+
+    sev.sigev_notify_attributes = &amp;attr;
+    sev.sigev_notify = SIGEV_THREAD;
+    sev.sigev_notify_function = handler_cb;
+    sev.sigev_signo = SIG;
+    sev.sigev_value.sival_ptr = this;
+
+    timer_create(CLOCKID, &amp;sev, timerid);
+}
+
+void Timer::startTimer(timer_t timerid, int startTimeout, int cyclicTimeout)
+{
+    itimerspec its;
+
+    /* Start the timer */
+    its.it_value.tv_sec = startTimeout;
+    its.it_value.tv_nsec = 0;
+
+        /* for cyclic timer */
+    its.it_interval.tv_sec = cyclicTimeout;
+    its.it_interval.tv_nsec = 0;
+
+    timer_settime(timerid, 0, &amp;its, NULL);
+}
+
+void Timer::stopTimer(timer_t timerid)
+{
+    itimerspec its;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = 0;
+    its.it_interval.tv_sec = 0;
+    its.it_interval.tv_nsec = 0;
+    timer_settime(timerid, 0, &amp;its, NULL);
+}
+
+void Timer::timeOutHandler( sigval_t This )
+{
+    Timer * timer = (Timer*) This.sival_ptr;
+    timer-&gt;callbackWrapper();
+}
+
+void Timer::callbackWrapper( void )
+{
+    timeOutHandlerImp-&gt;handlerFunction();
+    stopTimer( timerid );
+}
+
+void TimeTimeoutHandlerImp::handlerFunction( void )
+{
+    cout &lt;&lt; "time handler invoked" &lt;&lt; endl;
+}
+
+int main()
+{
+    TimeTimeoutHandlerImp * timerImp = new TimeTimeoutHandlerImp;
+    Timer * timer = new Timer( timerImp );
+
+    timer-&gt;setDuration( 5 );
+    timer-&gt;start();
+    sleep( 10 );
+}
+</code></pre>

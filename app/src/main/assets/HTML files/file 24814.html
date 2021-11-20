@@ -1,0 +1,25 @@
+<p>The standard does not specify a specialization of <code>std::atomic&lt;std::string&gt;</code>, so the generic <code>template &lt;typename T&gt; std::atomic&lt;T&gt;</code> applies. 29.5 [atomics.types.generic] p1 states:</p>
+
+<blockquote>
+  <p>There is a generic class template atomic. The type of the template argument T shall be trivially copyable (3.9).</p>
+</blockquote>
+
+<p>There is no statement that the implementation must diagnose violations of this requirement. So either (a) your use of <code>std::atomic&lt;std::string&gt;</code> invokes undefined behavior, or (b) your implementation provides <code>std::atomic&lt;std::string&gt;</code> as a conforming extension.</p>
+
+<p>Looking at the MSDN page for <code>std::atomic&lt;T&gt;</code> (<a href="http://msdn.microsoft.com/en-us/library/vstudio/hh874651.aspx">http://msdn.microsoft.com/en-us/library/vstudio/hh874651.aspx</a>), it does explicitly mention the requirement that <code>T</code> be trivially copyable, and it does NOT say anything specific about <code>std::atomic&lt;std::string&gt;</code>. If it is an extension, it's undocumented. My money is on undefined behavior.</p>
+
+<p>Specifically, 17.6.4.8/1 applies (<a href="https://groups.google.com/a/isocpp.org/d/msg/std-discussion/YEB0sIgGoHA/PL4NYEq5yykJ">with thanks to Daniel KrÃ¼gler for setting me straight</a>):</p>
+
+<blockquote>
+  <p>In certain cases (replacement functions, handler functions, operations on types used to instantiate standard library template components), the C++ standard library depends on components supplied by a C++ program. If these components do not meet their requirements, the Standard places no requirements on the implementation.</p>
+</blockquote>
+
+<p><code>std::string</code> certainly does not meet the <code>std::atomic&lt;T&gt;</code> requirement that the template parameter <code>T</code> be trivially copyable, so the standard places no requirements on the implementation. As a quality of implementation issue, note that <code>static_assert(std::is_trivially_copyable&lt;T&gt;::value, "std::atomic&lt;T&gt; requires T to be trivially copyable");</code> is an easy diagnostic to catch this violation.</p>
+
+<hr>
+
+<p>2016-04-19 Update: I don't know when the change happened, but VS2015 Update 2 does now diagnose <code>std::atomic&lt;std::string&gt;</code>:</p>
+
+<blockquote>
+<pre>error C2338: atomic requires T to be trivially copyable.</pre>
+</blockquote>

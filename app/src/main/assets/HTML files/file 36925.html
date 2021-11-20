@@ -1,0 +1,60 @@
+<p>The problem is that the <a href="http://msdn.microsoft.com/en-us/library/system.windows.threading.dispatcher.invoke(VS.100).aspx" rel="nofollow">Dispatcher.Invoke</a> blocks the UI thread, so any <code>Invoke</code> should be as small as possible.</p>
+
+<p>Put your time-consuming code outside the invoke to solve the issue.</p>
+
+<p>And as it has been pointed by @RohitVals you can't access the UI control from background thread, so you will have to use 2 invokes - one to get text values, one to set <code>ItemsSource</code> :</p>
+
+<pre><code>Thread test = new Thread(() =&gt;
+{
+    String text, password, ipText, domainText;
+
+    // !!!!!!This one should be simple Invoke because otherwise variables may not get their         
+    // values before calls. Thanks @ScottChamberlain.!!!!!!
+    datagrid_Disks.Dispatcher.Invoke(
+      new Action(() =&gt;
+      {
+          text = textbox_Username.Text;
+          password = textbox_password.Password;
+          ipText = textbox_IP.Text,
+          domainText = textbox_Domain.Text
+      }));
+
+
+     var result = Server.GetDisksInfo(text, 
+         password, 
+         ipText,
+         domainText);
+
+     datagrid_Disks.Dispatcher.BeginInvoke(
+      new Action(() =&gt;
+      {
+        datagrid_Disks.ItemsSource = result;
+      }));
+ });
+
+ test.Start();
+</code></pre>
+
+<p><strong>OR (thanks to @RohitVals)</strong></p>
+
+<p>You can get these values before running the thread to avoid the double dispatch:</p>
+
+<pre><code>text = textbox_Username.Text;
+// ...
+
+Thread test = ...
+</code></pre>
+
+<p><strong>OR</strong></p>
+
+<p>You may want to try the MVVM pattern - <a href="http://msdn.microsoft.com/en-us/magazine/dd419663.aspx" rel="nofollow">http://msdn.microsoft.com/en-us/magazine/dd419663.aspx</a>. It may look intimidating and far too complex for no or little advantages at the beginning, but you will see its merits with time.</p>
+
+<p>This particular article deals with MVVM and Dispathcer - <a href="http://msdn.microsoft.com/en-us/magazine/dn630646.aspx" rel="nofollow">http://msdn.microsoft.com/en-us/magazine/dn630646.aspx</a></p>
+
+<p><strong>P.S.:</strong> If your <code>GetDisksInfo</code> method uses deferred execution (like LINQ) then you should enumerate the result before using it:</p>
+
+<pre><code> var result = Server.GetDisksInfo(text, 
+         password, 
+         ipText,
+         domainText).ToArray();
+</code></pre>

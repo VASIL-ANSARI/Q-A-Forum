@@ -1,0 +1,70 @@
+<p>There is no such guarantee.</p>
+
+<p>For example, in <a href="https://en.wikipedia.org/wiki/IEEE_floating_point" rel="nofollow">IEEE floating point format</a>, there exists the concept of negative 0.  It compares equal to positive 0 but has a different representation.</p>
+
+<p>Here's an example of that:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+
+int main()
+{
+    unsigned long long *px, *py;
+    double x = 0.0, y = -0.0;
+    px = (unsigned long long *)&amp;x;
+    py = (unsigned long long *)&amp;y;
+
+    printf("sizeof(double)=%zu\n",sizeof(double));
+    printf("sizeof(unsigned long long)=%zu\n",sizeof(unsigned long long));
+
+    printf("x=%f,y=%f,equal=%d\n",x,y,(x==y));
+    printf("x=%016llx,y=%016llx\n",*px,*py);
+
+    return 0;
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre class="lang-none prettyprint-override"><code>sizeof(double)=8
+sizeof(unsigned long long)=8
+x=0.000000,y=-0.000000,equal=1
+x=0000000000000000,y=8000000000000000
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>Here's a revised example that doesn't rely on type punning:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+
+void print_bytes(char *name, void *p, size_t size)
+{
+    size_t i;
+    unsigned char *pdata = p;
+    printf("%s =", name);
+    for (i=0; i&lt;size; i++) {
+        printf(" %02x", pdata[i]);
+    }
+    printf("\n");
+}
+
+int main()
+{
+    double x = 0.0, y = -0.0;
+
+    printf("x=%f,y=%f,equal=%d\n",x,y,(x==y));
+    print_bytes("x", &amp;x, sizeof(x));
+    print_bytes("y", &amp;y, sizeof(y));
+
+    return 0;
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre class="lang-none prettyprint-override"><code>x=0.000000,y=-0.000000,equal=1
+x = 00 00 00 00 00 00 00 00
+y = 00 00 00 00 00 00 00 80
+</code></pre>
+
+<p>You can see here the difference in representation between the two.  One has the sign bit set while the other doesn't.</p>

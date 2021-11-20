@@ -1,0 +1,53 @@
+<p>Horrible hack - start up a webserver in <code>server.py</code>:</p>
+
+<pre class="lang-py prettyprint-override"><code>import bottle
+from threading import Thread
+
+on_data = lambda alpha, beta, gamma: None
+
+@bottle.route('/')
+def handler():
+    return bottle.static_file('index.html', '.')
+
+@bottle.post('/data')
+def handler():
+    on_data(**bottle.request.json)
+
+def data_handler(f):
+    global on_data
+    on_data = f
+    return f
+
+def go():
+    t = Thread(target=lambda: bottle.run(quiet=True))
+    t.start()
+</code></pre>
+
+<p>With this <code>index.html</code>:</p>
+
+<pre class="lang-html prettyprint-override"><code>&lt;script&gt;
+  window.addEventListener('deviceorientation', function(eventData) {
+    var d = {};
+    ['alpha', 'beta', 'gamma'].forEach(function(prop) {
+      d[prop] = eventData[prop];
+    })
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "http://localhost:8080/data");
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.send(JSON.stringify(d));
+  }, false);
+&lt;/script&gt;
+</code></pre>
+
+<p>And use it as:</p>
+
+<pre><code>import server
+
+@server.data_hander
+def on_acc_data(alpha, beta, gamma):
+    print alpha, beta, gamma
+
+server.go()
+</code></pre>
+
+<p>After having opened <code>localhost:8080/</code> in the browser</p>

@@ -1,0 +1,40 @@
+<p>Touch can be used only in two case.</p>
+
+<p><strong>On a record</strong></p>
+
+<pre><code>category = Category.first
+category.touch
+</code></pre>
+
+<p><strong>On a belongs_to relation</strong></p>
+
+<pre><code>belongs_to :category, :touch =&gt; true
+</code></pre>
+
+<p>So if you want to use it on a HABTM relation, I'm afraid that you'll have to do it manually. It could be something like:</p>
+
+<pre><code>class Category
+  before_save :touch_videos
+
+  def touch_videos
+    videos.touch
+  end
+end
+
+class Video
+  def self.touch
+    update_attributes(:updated_at =&gt; Time.now)
+    # or
+    each { |video| video.touch } # Make a proper touch
+  end
+end
+</code></pre>
+
+<p>Be aware that if you want to allow Video to touch categories as well, you'll have to find a way to avoid "circular" updates.</p>
+
+<p><strong>each &amp; find_each</strong></p>
+
+<p>If you prefer each over update_attributes, use find_each to load records by batch. This will avoid loading all records at the same time in memory and potentially crash the application. If you don't have 10k records, you probably won't see any difference, but as your table grows, it will get slower or even break if you use each.</p>
+
+<pre><code>find_each(batch_size: 2000) { |video| video.touch }
+</code></pre>

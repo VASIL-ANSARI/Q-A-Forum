@@ -1,0 +1,46 @@
+<p>I've got exactly the same errors when building VTK 5.8.0 in Win 8.1 + VS2013x64.</p>
+
+<p>Here's my solution:</p>
+
+<ol>
+<li><p>After substituting the macros, the error goes to the definition of <code>operator&lt;&lt;</code>. The compiler need to find an declaration that matches</p>
+
+<pre><code>this-&gt;ostr &lt;&lt; a;
+</code></pre>
+
+<p>where the type of <code>this-&gt;ostr</code> and <code>a</code> are both <code>std::ostream &amp;</code>. So I wrote a simple test code to check the VS compiler.</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+
+void test(std::ostream &amp;a, std::ostream &amp;b) {
+    a &lt;&lt; b;
+}
+
+int main(int argc, char *argv[])
+{
+    std::ostringstream a,b;
+    test(a,b);
+    std::cout &lt;&lt; a &lt;&lt; std::endl;
+    return 0;
+}
+</code></pre>
+
+<p>It turns out to be correct on GCC4.7. And seems that <code>ostream</code> is auto-casted to some kind of a pointer (not its own address, but it doesn't matter, just output an address). However, VS2013 gives me the same error as building VTK! So, let's make rewrite the definition of <code>vtkOStreamWrapper::operator&lt;&lt; (ostream &amp;a)</code>:</p>
+
+<pre><code>//VTKOSTREAM_OPERATOR(ostream&amp;);
+vtkOStreamWrapper&amp; vtkOStreamWrapper::operator &lt;&lt; (ostream&amp; a) {
+    this-&gt;ostr &lt;&lt; (void *)&amp;a;
+    return *this;
+}
+</code></pre></li>
+<li><p>Since the code</p>
+
+<pre><code>if ( this-&gt;IFile-&gt;read(result, 80) == 0)
+</code></pre>
+
+<p>actually is a C++11 way to determine whether <code>ifstream-&gt;read()</code> suceeds or not (a <code>ostream</code> can be auto-casted to a <code>bool</code>), which is not supported by VS2013. I change all of them into standard form:</p>
+
+<pre><code>if ( this-&gt;IFile-&gt;read(result, 80).fail())
+</code></pre></li>
+</ol>

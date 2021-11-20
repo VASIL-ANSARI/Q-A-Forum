@@ -1,0 +1,127 @@
+<p>Your custom ListView class.    </p>
+
+<pre><code>import android.content.Context;
+import android.util.AttributeSet;
+import android.util.Log;
+import android.widget.AbsListView;
+
+/**
+ * Created by ozgur on 11/3/15 at 4:48 PM.
+ */
+public class ListView extends android.widget.ListView implements AbsListView.OnScrollListener {
+
+    private boolean inEndOfList = false;
+    private ListViewListener listViewListener;
+
+    public ListView(Context context) {
+        super(context);
+        init(context);
+    }
+
+    public ListView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init(context);
+    }
+
+    public ListView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init(context);
+    }
+
+    @Override
+    public void onScrollStateChanged(AbsListView absListView, int scrollState) {
+        //Log("onScrollStateChanged(..), scrollState =" + scrollState);
+    }
+
+    @Override
+    public void onScroll(AbsListView absListView, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+
+        int tot = firstVisibleItem + visibleItemCount;
+        if(tot &gt;= totalItemCount) {
+
+           if(!inEndOfList) {
+               Log("onScroll, end of list");
+               inEndOfList = true;
+
+               if(listViewListener != null)
+                   listViewListener.onEndOfList();
+           }
+        } else
+            inEndOfList = false;
+    }
+
+
+    private void init(Context context) {
+        this.setOnScrollListener(this);
+    }
+
+    private void Log(String str) {
+        Log.d("ListView", str);
+    }
+
+    public void setListViewListener(ListViewListener listViewListener) {
+        this.listViewListener = listViewListener;
+    }
+
+    public static interface ListViewListener {
+        public void onEndOfList() ;
+    }
+
+}
+</code></pre>
+
+<p>In your activity, implement ListView.ListViewListener</p>
+
+<pre><code>private ArrayList&lt;Object&gt; listObjects = new ArrayList&lt;&gt;();
+int limit = 20;
+int offset = 0;
+private ListView customListView;
+
+
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_your);
+
+    initYourViews();
+    customListView.setListViewListener(this);
+
+}
+
+@Override
+public void onEndOfList() {
+    this.offset += 10 + limit;
+    this.initData();
+}
+
+private void initData() {
+
+    new AsyncTask&lt;Void, Void, ArrayList&lt;Object&gt; /* or whatever */&gt;() {
+        @Override
+        protected ArrayList&lt;Object&gt; doInBackground(Void... voids) {
+
+             ArrayList&lt;Object&gt; temp = YourSqLiteController.getData(limit, offset);
+             if(temp.size == 0 /* assume db data consumed, get from REST API*/) {
+                 temp = YourApi.getData();                  
+             }
+
+        }
+
+        @Override
+        protected void onPostExecute(ArrayList&lt;Object&gt; temp){
+
+            if(temp != null &amp;&amp; temp.size() &gt; 0)
+                listObjects.addAll(temp);                
+
+            update();
+
+        }
+
+    }.execute();
+
+}
+
+private void update(){
+    this.listAdapter.notifyDataSetChanged(); /* your adapter */
+}
+</code></pre>

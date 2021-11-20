@@ -1,0 +1,27 @@
+<p>So after playing around with correlated queries and FROM-subqueries, which still did NOT give me what I wanted, I think I have found a workaround. Even though it leaves the original problem on its own, I think it even provides a better alternative than I was originally aiming at.</p>
+
+<p>Note there is no union - I just selected another column which is to signify whether the data on all the ingredients is in place. Here it goes:</p>
+
+<pre><code>select hw_marketable.name as nm, hw_productcategory.name as pc, hw_marketable.price as p,
+           round(sum(hw_inputopcrf.price*hw_prodcrf.spendquantity)::numeric, 2)::text as primecost,
+           (case round(hw_marketable.price::numeric, 2) when 0.00 then '--' else
+                 round((sum(hw_inputopcrf.price*hw_prodcrf.spendquantity)*100./hw_marketable.price::real)::numeric, 2)::text
+           end) as primecost_percentage,
+           case ((select count(productid) from hw_prodcrf where marketableid=hw_marketable.id)
+                        -(select count(stapleid) from hw_inputopcrf, hw_prodcrf where productid=stapleid and marketableid=hw_marketable.id))
+                   when 0 then 'OK'
+                   else 'Insufficient data'
+                   end,
+
+                   (case hw_marketable.enabled when 0 then 'Inactive' else 'Active' end)
+from hw_marketable inner join hw_prodcrf on marketableid=hw_marketable.id
+     inner join hw_product on hw_product.id=productid
+     inner join hw_inputopcrf on hw_inputopcrf.stapleid=hw_product.id
+     inner join hw_inputop on hw_inputop.id=hw_inputopcrf.inputopid and
+                hw_inputop.id=(
+                  select id from hw_inputop, hw_inputopcrf
+                  where hw_inputop.id=hw_inputopcrf.inputopid and hw_inputopcrf.stapleid=hw_prodcrf.productid
+                        and hw_product.id=hw_prodcrf.productid order by dateclosed desc limit 1)
+     inner join hw_productcategory on hw_productcategory.id=hw_marketable.productcategoryid
+group by hw_marketable.id, nm, pc, p order by hw_marketable.name asc
+</code></pre>

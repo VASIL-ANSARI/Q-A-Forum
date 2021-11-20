@@ -1,0 +1,48 @@
+<p>You have to remember that Tornado runs in one thread. The code is split into task that are called sequentially in main loop. If one of these task takes long to finish (because of blocking functions like <code>time.sleep()</code> or some heavy computation like factorial) it will block entire loop as a result.</p>
+
+<p>So what you can do...? One solution is to create loop using <code>IOLoop.add_callback()</code>:</p>
+
+<pre><code>from tornado import web, gen
+import tornado, time
+
+class CoroutineFactorialHandler(web.RequestHandler):
+    def factorial(self, limit=1):
+        count = 1
+        fact = 1
+        while count &lt;= limit:
+            yield fact
+            count = count + 1
+            fact = fact * count 
+
+    def loop(self):
+        try:
+            self.fact = self.generator.next()
+            tornado.ioloop.IOLoop.instance().add_callback(self.loop)
+        except StopIteration:
+            self.write("took : %f sec" %(time.time() - self.t))
+            self.write("\n")
+            self.write("f(%d) = %d" % (self.n, self.fact))
+            self.finish()
+
+    @web.asynchronous
+    def get(self, n, *args, **kwargs):
+        self.n = int(n)
+        self.generator = self.factorial(self.n)
+        self.t = time.time()
+        self.set_header("Content-Type", "text/plain")
+        tornado.ioloop.IOLoop.instance().add_callback(self.loop)
+
+application = tornado.web.Application([
+    (r"^/coroutine/factorial/(?P&lt;n&gt;\d+)", CoroutineFactorialHandler),
+    #http://localhost:8888/coroutine/factorial/&lt;int:n&gt;
+])
+
+if __name__ == "__main__":
+    application.listen(8888)
+    ioloop = tornado.ioloop.IOLoop.instance()
+    ioloop.start()
+</code></pre>
+
+<p>Every multiplication is a separate task here, which  allows mixing <code>factorial</code> generator calls from different requests. This is a good approach if every call to generator took same amount of time. However if you will be computing 100000! then at some point in time tasks in sequence will be looking like 90000!*90001, 90001!*90002 and so on. It takes some time to have this computed even if its only one multiplication instead of whole loop so the other request will be delayed. For such big input integer you have to make computations in another thread to have fair share of processor time for a request. Here is example how to do this: <a href="http://lbolla.info/blog/2013/01/22/blocking-tornado">http://lbolla.info/blog/2013/01/22/blocking-tornado</a></p>
+
+<p>As a side note, in factorial you have a lot of redundancy so you should keep list of solutions for some n at memory to turn them back instantly without wasting processor time for same computation over and over again. </p>

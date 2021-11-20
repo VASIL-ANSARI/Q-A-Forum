@@ -1,0 +1,61 @@
+<p>It works, but sometimes you just have to be careful and try to understand what is happening behind the scene.</p>
+
+<p>As I said in my comment. When you first ran the migration without creating the related column, Laravel migration services created your table and then, when you tried to migrate again it will always give you an error saying that the table already exists. </p>
+
+<p>So you just have to <code>drop table areas</code> and run <code>php artisan migrate</code> again to fix it all.</p>
+
+<p>EDIT:</p>
+
+<p>I just created your migration (below) here and it worked.</p>
+
+<p>As you can see I'm not using MySQL, so it must be a MySQL problem. Check MySQL foreign key documentation to see if your metadata fits in InnoDB requirements: <a href="http://dev.mysql.com/doc/refman/5.6/en/innodb-foreign-key-constraints.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.6/en/innodb-foreign-key-constraints.html</a>.</p>
+
+<pre><code>&lt;?php
+
+use Illuminate\Database\Migrations\Migration;
+
+class CreateAreasTable extends Migration {
+
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('regions', function($table)
+         {
+             // $table-&gt;engine = 'InnoDB';
+             $table-&gt;increments('id');
+             $table-&gt;string('name', 160)-&gt;unique();
+             $table-&gt;timestamps();
+        });
+
+        Schema::create('areas', function($table)
+        {
+            // $table-&gt;engine ='InnoDB';
+            $table-&gt;increments('id');
+
+            $table-&gt;integer('region_id');
+            $table-&gt;foreign('region_id')-&gt;references('id')-&gt;on('regions');
+
+            $table-&gt;string('name', 160);
+            $table-&gt;timestamps();
+        });     
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+    Schema::drop('areas');
+    Schema::drop('regions');
+    }
+
+}
+</code></pre>
+
+<p><img src="http://i.stack.imgur.com/BjUUd.png" alt="enter image description here"></p>

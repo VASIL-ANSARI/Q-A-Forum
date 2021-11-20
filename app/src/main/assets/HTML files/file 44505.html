@@ -1,0 +1,44 @@
+<p>Welcome to virtual functions! Whenever you mark a function in a class as <code>virtual</code> you're telling the compiler, "Hey, I might override this function later. If I do, then make sure to use the new overridden version!". It has nothing to do with restricting access to functions within a class. That's what the <code>public</code> keyword does.</p>
+
+<p>In your specific example, you can access all four functions from both <code>basevector</code> and <code>myvector</code>. However, what those functions represent is dependent on the type of the value that you're using (not the type of the pointer!) When you create a <code>new myvector</code>, you're also creating a table that points to the functions that it should use:</p>
+
+<pre><code>push    --&gt; myvector::push
+pop     --&gt; myvector::pop
+getSize --&gt; myvector::getSize
+indexTo --&gt; basevector::indexTo
+</code></pre>
+
+<p>That last one happens automatically because you're inheriting from <code>basevector</code> when you declare <code>myvector</code>. In your definition of <code>myvector</code> though, you've overridden the other three.</p>
+
+<p>OK. So what?</p>
+
+<p>Well, when you define a new function that takes a generic <code>basevector</code>, like <code>do_something</code>, the compiler knows that <code>basevector</code> has virtual functions. Whenever it invokes one of these functions, it has to go look in the table that was generated when the <code>basevector</code> was created. In your example, that table is the table from a <code>myvector</code>. Hence, <code>do_something</code> will call <code>basevector</code>'s <code>indexTo</code> regardless of whether or not you pass in a <code>basevector</code> or <code>myvector</code>.</p>
+
+<p>You can actually <strong>force</strong> <code>myvector</code> to implement its own version of <code>indexTo</code>:</p>
+
+<pre><code>class basevector {
+  public:
+    virtual int indexTo(int arg) = 0;
+    /* ... */
+};
+</code></pre>
+
+<p>Now if you try and create a <code>new myvector</code>, the compiler will complain saying that it can't find something to point to for its <code>indexTo</code> entry in it's virtual function table (commonly called a "V-table").</p>
+
+<p>However, when it comes to private inheritance, you should treat it as the following:</p>
+
+<pre><code>class A : private B { ... 
+</code></pre>
+
+<p>this means "Everything that an A has access to in B will be private to people outside of A". So later, you can do things like:</p>
+
+<pre><code>myvector *p1 = new myvector;
+basevector *p2;
+// p2 = p1;    // &lt;-- Compiler will complain here because we don't know that
+               // basevector is a base class of myvector!
+p2 = reinterpret_cast&lt;basevector *&gt;(p1);
+p2-&gt;pop();  // Super hacky but identical to calling p1-&gt;pop();
+</code></pre>
+
+<p>However, as mentioned in <a href="http://stackoverflow.com/questions/9661936/inheritance-a-is-an-inaccessible-base-of-b#answer-9661959">this question</a>, using private inheritance hides that <code>basevector</code> is the base class of <code>myvector</code> too! Since we know it is, we can cast the pointer
+to a <code>basevector</code> and elicit the same behavior because we know how virtual functions work.</p>

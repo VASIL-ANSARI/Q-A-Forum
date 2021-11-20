@@ -1,0 +1,59 @@
+<p>I read the code of leaflet and was able to fix the problem: </p>
+
+<p>each map object has a propriety _layers which is an array indexing all the layers added to the map. So the addTo function should not add the features of the object on the map but pass the layer to the map with map.addLayer, which will be added to the _layers array. The map will then call the onAdd function.</p>
+
+<p>If the addTo isn't coded that way, the layer wont be added to map._layers, and it will become impossible to remove it with the map functions.</p>
+
+<pre><code>    L.CustomClusterGroup = L.FeatureGroup.extend({
+    options: {
+        singleMarkerMode: true,
+
+
+        //Options to pass to the L.Polygon constructor
+        polygonOptions: {
+            color: 'red',
+            fillColor: 'red',
+            weight: 2,
+            opacity: 1,
+            dashArray: '3',
+            fillOpacity: 0.4
+        }
+    },
+
+    initialize: function(marker, options) {
+
+        options = options || {};
+        L.Util.setOptions(this, options);
+
+
+        this.coreMarker = marker;
+
+
+
+        L.FeatureGroup.prototype.initialize.call(this, []);
+
+    },
+    addTo: function(map) {
+        map.addLayer(this);
+        return this;
+
+    },
+    onRemove: function(map) {
+
+        map.removeLayer(this.coreMarker);
+        L.FeatureGroup.prototype.onRemove.call(this, map);
+        this._map = null;
+
+    },
+    onAdd:function (map){
+        this._map = map;
+        map.addLayer( this.coreMarker );
+        var that = this;
+        this.coreMarker.on( "click", function ()
+        {
+            L.FeatureGroup.prototype.onAdd.call( that, map );
+
+        } );
+}
+});
+</code></pre>

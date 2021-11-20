@@ -1,0 +1,43 @@
+<p>Assuming your parent process does <strong>not terminate</strong>, you have to manually send a signal to the child. </p>
+
+<p>Here is how to set this up:</p>
+
+<pre><code>int run = 1;
+void OnSigUsr1()
+{
+    run = 0;
+}
+
+///....
+signal(SIGUSR1, OnSigUsr1);
+pid = fork();
+if(pid == 0)
+{ //we are the child
+    //loop until SIGUSR1 comes in
+    while(run == 1) p_sleep(1000);
+}
+else
+{ //we are the parent
+    //send the SIGUSR1 signal to child
+    kill(pid,SIGUSR1);
+}
+</code></pre>
+
+<p>When the process now gets the signal <code>SIGUSR1</code> the function <code>OnSigUsr1</code> is called. In this you can set some global variable to false.</p>
+
+<p>The <code>kill</code> command does not kill the child but sends a signal to it (the name may be misleading).</p>
+
+<p>When your parent is <strong>terminating</strong> by itself though you don't need to manually send a signal but can tell Linux to send you a signal when the parent dies. </p>
+
+<p>This can be done by adding</p>
+
+<pre><code>prctl(PR_SET_PDEATHSIG, SIGUSR1);
+</code></pre>
+
+<p>Now your child processes get the signal on "death" of the parent.</p>
+
+<p>If you don't need any extra handling but just the child to terminate you can "skip" the custom signal handling and send <code>SIGTERM</code> instead of <code>SIGUSR1</code>. By default this will end the process.</p>
+
+<hr>
+
+<p>You should read about signals a bit this will help with understanding the code more. </p>

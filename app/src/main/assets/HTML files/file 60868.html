@@ -1,0 +1,84 @@
+<p>After a long research,I solved my problem like this. Added a customized appender in tst and property file in src lik</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;Configuration package="log4j.test" status="WARN"&gt;
+&lt;Appenders&gt;
+    &lt;Console name="Console" target="SYSTEM_OUT"&gt;
+        &lt;PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/&gt;
+    &lt;/Console&gt;
+&lt;/Appenders&gt;
+&lt;Loggers&gt;
+    &lt;Logger name="log4j.test.Log4jTest" level="debug"&gt;
+        &lt;AppenderRef ref="Console"/&gt;
+    &lt;/Logger&gt;
+    &lt;Root level="debug"&gt;
+        &lt;AppenderRef ref="Console"/&gt;
+    &lt;/Root&gt;
+&lt;/Loggers&gt;
+&lt;/Configuration&gt;
+</code></pre>
+
+<p>Here I set my log level to Debug and wrote a custom appender that actually has creating an appender and set and get log messages</p>
+
+<pre><code>@Plugin(name = "TestAppender", category = "Core", elementType = "apender", printObject = true)
+public class TestAppender extends AbstractAppender {
+
+    private List&lt;String&gt; messages = new ArrayList&lt;String&gt;();
+
+    protected TestAppender(String name, Filter filter, Layout&lt;? extends Serializable&gt; layout) {
+        super(name, filter, layout);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+        getMessages().add(event.getMessage().toString());
+    }
+
+    public static TestAppender createAppender(@PluginAttribute("name") String name,
+            @PluginElement("Layout") Layout&lt;? extends Serializable&gt; layout, 
+            @PluginElement("Filter") final Filter filter,
+            @PluginAttribute("otherAttribute") String otherAttribute) {
+        if (name == null) {
+            LOGGER.error("No name provided for TestAppender");
+            return null;
+        }
+        if (layout == null) {
+            layout = PatternLayout.createDefaultLayout();
+        }
+        return new TestAppender(name, filter, layout);
+    }
+
+    public List&lt;String&gt; getMessages() {
+        return messages;
+    }
+
+    public void setMessages(List&lt;String&gt; messages) {
+        this.messages = messages;
+    }    
+}
+</code></pre>
+
+<p>and in my actual test, I initialized and attached an appender in setup method </p>
+
+<pre><code>   @Before
+    public void setUp() {
+        org.apache.logging.log4j.core.Logger logger = (org.apache.logging.log4j.core.Logger) LogManager.getRootLogger();
+        PatternLayout layout = PatternLayout.createLayout("%d{HH:mm:ss.SSS} [%t] %-5level %logger{1} - %msg%n%ex",
+                null, null, null, Charset.forName("GBK"), false, true, null, null);
+        testAppender = TestAppender.createAppender("TestAppender", layout, null, "true");
+        testAppender.start();
+        logger.getContext().getConfiguration().addLoggerAppender(logger, testAppender);
+    }
+</code></pre>
+
+<p>and asserted this way.</p>
+
+<pre><code>   assertEquals(Level.DEBUG, LogManager.getRootLogger().getLevel());
+    assertEquals(
+            "[Request headers: [{key: one, values: [one1, one2]}, {key: two, values: []}, {key: three, values: [three]}]]",
+            testAppender.getMessages().toString());
+</code></pre>
+
+<p>This is a long procedure. But it worked for me. After a long research I came up with this. I am looking for better and easy way to do this if there is any.</p>
+
+<p>Note: I copied this code from various blogs according to serve my purpose. </p>

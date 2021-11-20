@@ -1,0 +1,31 @@
+<p>That HTTP server is sending the content in GZIPped form (<code>Content-Encoding: gzip</code>; see <a href="http://en.wikipedia.org/wiki/HTTP_compression" rel="nofollow">http://en.wikipedia.org/wiki/HTTP_compression</a> if you don't know what that means), so you need to wrap <code>aUrl.openStream()</code> in a <code>GZIPInputStream</code> that will decompress it for you. For example:</p>
+
+<pre><code>builder.build(new GZIPInputStream(aUrl.openStream()));
+</code></pre>
+
+<hr>
+
+<p><strong>Edited to add</strong>, based on the follow-up comment: If you don't know in advance whether the URL will be GZIPped, you can write something like this:</p>
+
+<pre><code>private InputStream openStream(final URL url) throws IOException
+{
+    final URLConnection cxn = url.openConnection();
+    final String contentEncoding = cxn.getContentEncoding();
+    if(contentEncoding == null)
+        return cxn.getInputStream();
+    else if(contentEncoding.equalsIgnoreCase("gzip")
+               || contentEncoding.equalsIgnoreCase("x-gzip"))
+        return new GZIPInputStream(cxn.getInputStream());
+    else
+        throw new IOException("Unexpected content-encoding: " + contentEncoding);
+}
+</code></pre>
+
+<p>(warning: not tested) and then use:</p>
+
+<pre><code>builder.build(openStream(aUrl.openStream()));
+</code></pre>
+
+<p>. This is basically equivalent to the above &mdash; <code>aUrl.openStream()</code> is explicitly documented to be a shorthand for <code>aUrl.openConnection().getInputStream()</code> &mdash; except that it examines the <code>Content-Encoding</code> header before deciding whether to wrap the stream in a <code>GZIPInputStream</code>.</p>
+
+<p>See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/URLConnection.html" rel="nofollow">the documentation for <code>java.net.URLConnection</code></a>.</p>

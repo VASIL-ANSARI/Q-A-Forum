@@ -1,0 +1,233 @@
+<p>I've tested on real device (API10) and it works.
+(Rewritten many parts.. Use diff with your source to check them.)</p>
+
+<p>Need more information to find out the problem..</p>
+
+<hr>
+
+<pre><code>// part of manifest
+&lt;uses-sdk android:minSdkVersion="10" /&gt;
+</code></pre>
+
+<hr>
+
+<pre><code>//MainActivity.java    
+// Changed imports.
+// MUST check v4 library class or not. (for each UI parts class etc.)
+import android.os.Bundle;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.view.ViewPager;
+import android.view.View;
+import android.view.View.OnClickListener; // for selectButton_* click events.
+import android.widget.SeekBar;
+
+// Changed Activity -&gt; FragmentActivity to use getSupportFragmentManager()
+public class MainActivity extends FragmentActivity
+{
+    private ViewPager pager;
+    private SeekBar seekbarMin;
+    private SeekBar seekbarMax;
+    private int sliderMaxTemp;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState)
+    {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        Init();
+    }
+
+    private void Init()
+    {
+        MyPagerAdapter pageAdapter = new MyPagerAdapter(getSupportFragmentManager());
+        pager = (ViewPager) findViewById(R.id.myViewPager);
+        pager.setAdapter(pageAdapter);
+        seekbarMin = (SeekBar) findViewById(R.id.seekBarMin);
+        seekbarMax = (SeekBar) findViewById(R.id.seekBarMax);
+        sliderMaxTemp = seekbarMax.getProgress();
+
+        // Events to choose page.
+        // You may want to use onTouch or gesture..
+        final int idx_CheckBox = 0;
+        final int idx_RadioButton = 1;
+        final int idx_Slider = 2;
+        findViewById(R.id.selectButton_CheckBox).setOnClickListener(new OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                // Select page
+                pager.setCurrentItem(idx_CheckBox);
+            }
+        });
+        findViewById(R.id.selectButton_RadioButton).setOnClickListener(new OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                pager.setCurrentItem(idx_RadioButton);
+            }
+        });
+        findViewById(R.id.selectButton_Slider).setOnClickListener(new OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                pager.setCurrentItem(idx_Slider);
+            }
+        });
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>// FilterSlider.java
+import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.RelativeLayout;
+
+// Changed to "v4" Fragment
+public class FilterSlider extends Fragment
+{
+    private static final String TAG = FilterSlider.class.getSimpleName();
+    RelativeLayout relativeLayout;
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
+    {
+        View view = inflater.inflate(R.layout.filter_slider, container, false);
+        return view;
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>// MyPagerAdapter.java
+import java.util.ArrayList;
+import java.util.List;
+
+// Changed to "v4" classes
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentStatePagerAdapter;
+
+// Changed PagerAdapter -&gt; FragmentStatePagerAdapter
+public class MyPagerAdapter extends FragmentStatePagerAdapter
+{
+    private List&lt;Fragment&gt; fragments;
+
+    MyPagerAdapter(FragmentManager fm)
+    {
+        super(fm);
+        this.fragments = new ArrayList&lt;Fragment&gt;();
+        fragments.add(new FilterCheckBox());
+        fragments.add(new FilterRadioButton());
+        fragments.add(new FilterSlider());
+    }
+
+    @Override
+    public int getCount()
+    {
+        return fragments.size();
+    }
+
+    @Override
+    public Fragment getItem(int position)
+    {
+        // returns fragment you want to show
+        try
+        {
+            return fragments.get(position);
+        }
+        catch (IndexOutOfBoundsException e)
+        {
+            // TODO: handle exception
+            return null;
+        }
+    }
+}
+</code></pre>
+
+<hr>
+
+<p>activity_main.xml</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" &gt;
+
+    &lt;SeekBar
+        android:id="@+id/seekBarMin"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="20dp"
+        android:max="100" /&gt;
+
+    &lt;SeekBar
+        android:id="@+id/seekBarMax"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="50dp"
+        android:max="100" /&gt;
+
+    &lt;LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" &gt;
+
+        &lt;Button
+            android:id="@+id/selectButton_CheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CheckBox" /&gt;
+
+        &lt;Button
+            android:id="@+id/selectButton_RadioButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="RadioButton" /&gt;
+
+        &lt;Button
+            android:id="@+id/selectButton_Slider"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Slider" /&gt;
+
+    &lt;/LinearLayout&gt;
+
+    &lt;android.support.v4.view.ViewPager
+        android:id="@+id/myViewPager"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content" /&gt;
+
+&lt;/LinearLayout&gt;
+</code></pre>
+
+<hr>
+
+<p>filter_slider.xml</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" &gt;
+
+    &lt;TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Filter Slider"
+        android:textAppearance="?android:attr/textAppearanceMedium" /&gt;
+
+&lt;/LinearLayout&gt;
+</code></pre>

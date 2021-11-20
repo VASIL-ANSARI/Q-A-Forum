@@ -1,0 +1,229 @@
+<p>I have some implementation that has the same requeriment, also remember that the device might lose connection when it's been located, so you might think in implementing saving the positions in sqlite. it looks like this: </p>
+
+<p>WakefulAlarmListener.java</p>
+
+<pre><code>import java.util.Calendar;
+
+import android.annotation.TargetApi;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.os.StrictMode;
+import android.util.Log;
+
+import com.commonsware.cwac.wakeful.WakefulIntentService;
+import com.commonsware.cwac.wakeful.WakefulIntentService.AlarmListener;
+
+/*
+ * 
+ * 
+ * @see &lt;a&gt; href="https://github.com/commonsguy/cwac-wakeful"&gt;https://github.com/commonsguy/cwac-wakeful&lt;/a&gt;
+ * @see {@link AutoSendingWakefulIntentService}
+ * 
+ */
+public class WakefulAlarmListener implements AlarmListener {
+
+
+    @Override
+    public void scheduleAlarms(AlarmManager alarmManager,PendingIntent pendingIntent, Context context) 
+    {
+        IOController ioController = new IOController(context);
+        int autoSendingFrequency = Integer.parseInt(context.getString(R.string.default_autosending_frequency));
+        // Este mÃ©todo permite que se puedan realizar operaciones de
+        // red en el hilo de la interfaz grÃ¡fica (El alarmlistener se ejecuta en este hilo).
+        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.GINGERBREAD) 
+        {
+            Log.d("WakefulAlarmListener =&gt; scheduleAlarms()", "Build version: "
+                    + Build.VERSION.SDK_INT + " &gt;= "
+                    + Build.VERSION_CODES.GINGERBREAD
+                    + " =&gt; setting thread policy...");
+            setThreadPolicy();
+        }       
+
+        alarmManager.cancel(pendingIntent);
+        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, Calendar
+                .getInstance().getTimeInMillis(), autoSendingFrequency * 1000, pendingIntent);
+    }
+
+
+    @Override
+    public void sendWakefulWork(Context context) {
+
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.FROYO) 
+        {
+            context.startService(new Intent(context,LocationListenerDummyService.class));
+        }                   
+        IOController ioController = new IOController(context);
+        int autoSendingFrequency = ioController.loadAutoSendingFrequency();
+        int lastAutoSendingFrequency = ioController.loadLastAutoSendingFrequency();     
+        if (autoSendingFrequency != -1)         
+        {
+            Log.d("sendWakefulWork()", "autoSendingFrequency=" + autoSendingFrequency);
+            Log.d("sendWakefulWork()","lastAutoSendingFrequency=" + lastAutoSendingFrequency);
+            if (autoSendingFrequency != lastAutoSendingFrequency) 
+            {               
+                WakefulIntentService.cancelAlarms(context);
+                WakefulIntentService.scheduleAlarms(this, context);
+            }
+            else 
+            {
+                Log.d("sendWakefulWork()","autoSendingFrequency == lastAutoSendingFrequency");              
+                WakefulIntentService.sendWakefulWork(context,AutoSendingWakefulIntentService.class);
+            }
+        } 
+        else 
+        {
+            WakefulIntentService.cancelAlarms(context);
+            WakefulIntentService.scheduleAlarms(this, context);
+            Log.d("sendWakefulWork()","autoSendingFrequency == -1");
+        }
+    }
+
+    /**
+     * Si detecta que la alarma no se lanzÃ³ en el nÃºmero de milisegundos
+     * devuelto, entonces asume que el usuario cerrÃ³ la aplicaciÃ³n de forma
+     * forzada y vuelve a programar la alarma.
+     * 
+     * Consultar la documentaciÃ³n de la biblioteca para mÃ¡s informaciÃ³n.
+     * 
+     * @return Tiempo en milisegundos. En este caso es de 0 milisegundos.
+     * 
+     */
+    @Override
+    public long getMaxAge() {
+        return 0;
+    }
+
+    @TargetApi(Build.VERSION_CODES.GINGERBREAD)
+    private void setThreadPolicy() {
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+    }
+
+}
+</code></pre>
+
+<p>AutosendeindWakefulIntenService.java</p>
+
+<pre><code>public class AutoSendingWakefulIntentService extends WakefulIntentService {
+
+
+MDRCController myMDRC;
+
+public AutoSendingWakefulIntentService() {
+    super("AutoSendingWakefulIntentService");
+}
+
+
+@Override
+protected void doWakefulWork(Intent intent) {               
+
+    int timeout = Integer.parseInt((getString(R.string.autosending_timeout)));
+    int sampleSize = Integer.parseInt((getString(R.string.autosending_samplesize)));
+    boolean useNetworkLocation = Boolean.parseBoolean((getString(R.string.use_network_location_provider)));             
+    int autoSendingTries = Integer.parseInt(getString(R.string.autosending_connection_tries));
+    final WifiManager wifi = (WifiManager) getSystemService(WIFI_SERVICE);
+    IOController myIO =new IOController(getApplicationContext());
+    MyLocation myLocation = new MyLocation(getApplicationContext(),timeout, sampleSize, useNetworkLocation);
+
+    Location location = null;                                                   
+    location = myLocation.getLocation();
+
+    sendLocationToServer(location, autoSendingTries);               
+    sendPendingGeoEventToServerAndUpdateCollection();                       
+    verifyBatteryLevel();
+}
+
+private void sendLocationToServer(Location location, int autoSendingTries) {
+
+    IOController myIo= new IOController(getApplicationContext());
+    ServerResponseParser serverResponseParser = new ServerResponseParser(getApplicationContext());      
+    SQLDataSource mySqlDataSource = new SQLDataSource(getApplicationContext());     
+    String type;
+    int actioncode=0;
+
+    Log.d("AutoSendingWakefulIntentService =&gt; sendLocationToServer()","Auto Sending Tries: " + autoSendingTries);
+        if (location != null) 
+        {               
+            if (autoSendingTries &gt; 0)                   
+            {   
+                myIo.saveLastLocationData(location);                    
+                Log.d("AutoSendingWakefulIntentService =&gt; sendLocationToServer()",
+                                   "Latitude: " + location.getLatitude()
+                                + "; Longitude: " + location.getLongitude()
+                                + "; Accuracy: " + location.getAccuracy());                            
+                 if(location.getProvider().equals(LocationManager.GPS_PROVIDER)) 
+                 {
+                   Log.d("AutoSending","GPS");
+                   actioncode = Integer.parseInt(getApplicationContext().getResources().getString(R.string.actioncode_automatic_gps), 16);                                             
+                   GeoEvent myGeoEvent = new GeoEvent(location, actioncode, new  DeviceInformation(getApplicationContext()).getBatteryLevel());         
+                        //FIXME  sendGeoEventToServer() ;                                      
+                 }
+                 else
+                {
+                    if(location.getProvider().equals(LocationManager.NETWORK_PROVIDER))
+
+                   {
+                       try {
+                             type =location.getExtras().getString("networkLocationType");
+                            }catch(NullPointerException ex){                         
+                             type ="network";
+                            }
+                       if(type.equalsIgnoreCase("wifi") &amp;&amp; !myIo.loadWifiForLocation())
+                           {
+                            Log.d("AutoSending","wifi");
+                             actioncode = Integer.parseInt(getApplicationContext().getResources().getString(R.string.actioncode_automatic_passive),16);    
+                           }
+                       else
+                           {
+                            Log.d("AutoSending","network");
+                            actioncode = Integer.parseInt(getApplicationContext().getResources().getString(R.string.actioncode_automatic_network),16);
+                           }
+
+                       GeoEvent myGeoEvent = new GeoEvent(location, actioncode, new  DeviceInformation(getApplicationContext()).getBatteryLevel());
+                        mySqlDataSource.InsertGeoEvent(myGeoEvent);
+                       //FIXME  sendGeoEventToServer()  ;                                      
+                   } 
+                 else if(location.getProvider().equals(LocationManager.PASSIVE_PROVIDER))
+                   {
+                       actioncode = Integer.parseInt(getApplicationContext().getResources().getString(R.string.actioncode_automatic_passive),16);
+                       //FIXME  sendGeoEventToServer()  ;                                      
+                   }
+
+                }                                                   
+
+            } 
+            else
+            {
+                Log.e("ASWIS=&gt;sLTS()","Auto sending tries==0, Automatic location sending failed! Adding location to list...");                  
+                GeoEvent myGeoEvent = new GeoEvent(location, actioncode, new  DeviceInformation(getApplicationContext()).getBatteryLevel());
+                mySqlDataSource.InsertGeoEvent(myGeoEvent);
+
+            }
+        } 
+        else 
+        {
+
+        }                   
+}   
+</code></pre>
+
+<p>}</p>
+
+<p>and the alarm in the manifest: </p>
+
+<pre><code>&lt;receiver
+            android:name="com.commonsware.cwac.wakeful.AlarmReceiver"
+            android:exported="true" &gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.BOOT_COMPLETED" /&gt;
+                &lt;action android:name="android.intent.action.BATTERY_OKAY" /&gt;
+                &lt;action android:name="android.intent.action.ACTION_POWER_CONNECTED" /&gt;
+            &lt;/intent-filter&gt;
+            &lt;meta-data
+                android:name="com.commonsware.cwac.wakeful"
+                android:resource="@xml/wakeful" /&gt;
+        &lt;/receiver&gt;
+</code></pre>

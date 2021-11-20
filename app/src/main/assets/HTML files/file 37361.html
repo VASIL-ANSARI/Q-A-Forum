@@ -1,0 +1,57 @@
+<p>It seems that you have raised an interesting point. I have figured out something, but since I can't actually test my intuition right now, I can't be 100% sure. Anyway here is what I would do : </p>
+
+<p>If I parse your code (with a little extension to declare a kudamono variable), here is what I can say from this:</p>
+
+<pre><code>struct _poire {
+    int g;
+    char rouge; // tomate is probably one of your classes so I just changed the type of the field.
+};
+typedef struct _poire kudamono;
+
+int maFonction(){
+    kudamono une_poire;
+    return 0;
+}
+</code></pre>
+
+<p>When the typedef is parsed, here is what is yielded : </p>
+
+<p><code>-TypedefDecl 0x23b4620 &lt;line:5:1, col:23&gt; kudamono 'struct _poire':'struct _poire'</code></p>
+
+<p>When I declare a variable of type <code>kudamono</code>, here is below its AST-dump :</p>
+
+<p><code>-VarDecl 0x2048040 &lt;col:2, col:11&gt; une_poire 'kudamono':'struct _poire'</code></p>
+
+<p>NB : You can get the AST Dump of your code with this command line, it can be really handy to understand how your code will be parsed : </p>
+
+<p><strong>clang -Xclang -ast-dump -std=c++11 -fsyntax-only test.cpp</strong>  (just remove -std=c++11 if you want to compile a <em>file_name.c</em> file) </p>
+
+<p>Now, from what I understand, I will make a comparaison between the <code>VarDecl</code> and the <code>TypedefDecl</code> : </p>
+
+<p>1Â°) This <code>VarDecl</code> is named <em>une_poire</em> and has the type <em>kudamono</em> which is <strong>a typedef</strong> from the type <em>struct _poire</em>. </p>
+
+<p>2Â°) This <code>TypedefDecl</code> is named <em>kudamono</em> and has the type <em>struct _poire</em> which is <strong>a typedef</strong> from the type <em>struct _poire</em> </p>
+
+<p>So, the weird part is right here. <em>struct _poire</em> is considered as typedef from <em>struct _poire</em>. </p>
+
+<p>You'll note that I tried to make a typedef with a usual type : </p>
+
+<p><code>typedef int numbers;</code> </p>
+
+<p>And this time, AST-dump yields : </p>
+
+<p><code>TypedefDecl 0x25d9680 &lt;line:7:1, col:13&gt; numbers 'int'</code>, so I guess the parser may have some troubles with handmade types (typically structs). </p>
+
+<p>I can see one dirty way to know if your type is canonical or not (without getting false positives or false negatives) : </p>
+
+<p><strong>Check that the QualType and the canonical QualType are not the same</strong> </p>
+
+<p>I don't know if a simple '=' between <code>Qualtype</code> will make false positives or false negatives (as I can't test), but you can still compare the names of the types with <a href="http://www.cplusplus.com/reference/cstring/strcmp/" rel="nofollow" title="strcmp">strcmp</a></p>
+
+<p>So, to sum up a little bit : </p>
+
+<ul>
+<li>Your understanding of a canonical type is fine. </li>
+<li>Clang seems to have some trouble with handmade types, but it should be fine with Typedef from usual types (such as <code>typedef int int32_t</code>). </li>
+<li>When you want to know if a type is canonical or not, you can compare the name of the type and the name of the canonical type, but it's quite dirty. On usual type, isCanonical() works well.</li>
+</ul>

@@ -1,0 +1,60 @@
+<p>Here is an example with three tables that can probably get you started. </p>
+
+<p>DB schema</p>
+
+<pre><code>CREATE TABLE users
+    (user_id int auto_increment PRIMARY KEY, 
+     user_name varchar(32));
+CREATE TABLE agenda
+    (agenda_id int auto_increment PRIMARY KEY, 
+     `user_id` int, `agenda_name` varchar(7));
+CREATE TABLE events
+    (event_id int auto_increment PRIMARY KEY, 
+     `agenda_id` int, 
+     `event_name` varchar(8));
+</code></pre>
+
+<p>An SP to clone a user with his agenda and events records</p>
+
+<pre><code>DELIMITER $$
+CREATE PROCEDURE clone_user(IN uid INT)
+BEGIN
+    DECLARE last_user_id INT DEFAULT 0;
+
+    INSERT INTO users (user_name)
+    SELECT user_name
+      FROM users
+     WHERE user_id = uid;
+
+    SET last_user_id = LAST_INSERT_ID();
+
+    INSERT INTO agenda (user_id, agenda_name)
+    SELECT last_user_id, agenda_name
+      FROM agenda
+     WHERE user_id = uid;
+
+    INSERT INTO events (agenda_id, event_name)
+    SELECT a3.agenda_id_new, e.event_name
+      FROM events e JOIN
+    (SELECT a1.agenda_id agenda_id_old, 
+           a2.agenda_id agenda_id_new
+      FROM
+    (SELECT agenda_id, @n := @n + 1 n 
+       FROM agenda, (SELECT @n := 0) n 
+      WHERE user_id = uid 
+      ORDER BY agenda_id) a1 JOIN
+    (SELECT agenda_id, @m := @m + 1 m 
+       FROM agenda, (SELECT @m := 0) m 
+      WHERE user_id = last_user_id 
+      ORDER BY agenda_id) a2 ON a1.n = a2.m) a3 
+         ON e.agenda_id = a3.agenda_id_old;
+END$$
+DELIMITER ;
+</code></pre>
+
+<p>To clone a user</p>
+
+<pre><code>CALL clone_user(3);
+</code></pre>
+
+<p>Here is <strong><a href="http://sqlfiddle.com/#!2/8841c/2" rel="nofollow">SQLFiddle</a></strong> demo.</p>

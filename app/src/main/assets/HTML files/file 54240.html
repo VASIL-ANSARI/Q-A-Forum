@@ -1,0 +1,29 @@
+<p>You can get rid of a lot of the joins and correlated sub-queries (which will speed things up by reducing the number of table scans) by doing something like:</p>
+
+<pre><code>SELECT a.system_serial_number,
+       s.system_status,
+       a.SN_cmat_customer_id,
+       a.EC_cmat_customer_id,
+       a.SN_customer_name,
+       a.EC_customer_name
+FROM   (
+  SELECT l.system_serial_number,
+         MAX( CASE l.role_id WHEN 19 THEN l.cmat_customer_id END ) AS SN_cmat_customer_id,
+         MAX( CASE l.role_id WHEN  1 THEN l.cmat_customer_id END ) AS EC_cmat_customer_id
+         MAX( CASE l.role_id WHEN 19 THEN p.customer_name END ) AS SN_customer_name,
+         MAX( CASE l.role_id WHEN  1 THEN p.customer_name END ) AS EC_customer_name
+  FROM   EIM.eim_pr_ib_latest l
+         INNER JOIN
+         EIM.eim_aprty p
+         ON ( p.CMAT_Customer_ID= l.cmat_customer_id )
+  WHERE  l.role_id IN ( 1, 19 )
+  GROUP BY system_serial_number
+  HAVING    NVL( MAX( CASE l.role_id WHEN 19 THEN l.cmat_customer_id END ), 0 )
+         &lt;&gt; NVL( MAX( CASE l.role_id WHEN  1 THEN l.cmat_customer_id END ), 0 )
+) a
+LEFT OUTER JOIN
+eim_pr_system s
+ON ( s.system_serial_number=a.system_serial_number )
+</code></pre>
+
+<p>Since your original query is not throwing a <code>TOO_MANY_ROWS</code> exception on the correlated sub-queries, I am assuming that your data is such that there is only a single row being returned for each correlated query and the above query will reflect your output (although without some sample data it is difficult to test).</p>

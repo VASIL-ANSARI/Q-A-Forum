@@ -1,0 +1,81 @@
+<p>You can encapsulate the logic in a helper class deriving from <a href="https://msdn.microsoft.com/en-us/library/system.windows.forms.nativewindow(v=vs.110).aspx" rel="nofollow"><code>NativeWindow</code></a> class. This way you can do the job without creating a derived class for each control which you want to move/resize.</p>
+
+<p>You can pass the control which you want to extend to the constructor of helper class and assign your control handle to the native window. Then overriding <code>WndProc</code> of native window will handle messages of the control. </p>
+
+<p>Also other stuffs like handling event of the control is simply possible by keeping a reference to the control which you passed in constructor and assigning event handlers.</p>
+
+<p>After creating such native window helper class the usage would be:</p>
+
+<pre><code>var h1 = new LiveControlHelper(this.pictureBox1);
+var h2 = new LiveControlHelper(this.button1);
+</code></pre>
+
+<p>Or you can use the helper for all controls of a container in a loop.</p>
+
+<p><strong>Example</strong></p>
+
+<p>In below example, I refactored the code which you posted. This way you can use the code for all controls without need to inheritance.</p>
+
+<pre><code>using System;
+using System.Drawing;
+using System.Windows.Forms;
+</code></pre>
+
+
+
+<pre><code>public class LiveControlHelper : NativeWindow
+{
+    private Control control;
+    private Point cur = new Point(0, 0);
+    private const int grab = 16;
+    public LiveControlHelper(Control c)
+    {
+        control = c;
+        this.AssignHandle(c.Handle);
+        control.MouseDown += (s, e) =&gt; { cur = new Point(e.X, e.Y); };
+        control.MouseMove += (s, e) =&gt; {
+            if (e.Button == MouseButtons.Left) {
+                Control x = (Control)s;
+                x.SuspendLayout();
+                x.Location = new Point(x.Left + e.X - cur.X, x.Top + e.Y - cur.Y);
+                x.ResumeLayout();
+            }
+        };
+        control.Paint += (s, e) =&gt; {
+            var rc = new Rectangle(control.ClientSize.Width - grab, 
+                control.ClientSize.Height - grab, grab, grab);
+            ControlPaint.DrawSizeGrip(e.Graphics, control.BackColor, rc);
+        };
+        control.Resize += (s, e) =&gt; { control.Invalidate(); };
+    }
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        if (m.Msg == 0x84) {
+            var pos = control.PointToClient(new Point(m.LParam.ToInt32() &amp; 0xffff,
+                m.LParam.ToInt32() &gt;&gt; 16));
+            if (pos.X &gt;= control.ClientSize.Width - grab &amp;&amp;
+                pos.Y &gt;= control.ClientSize.Height - grab)
+                m.Result = new IntPtr(17);
+        }
+    }
+}
+</code></pre>
+
+<p><strong>Note</strong></p>
+
+<p><strong>1-</strong> To be able to revert the control to its normal state (non-resizable non-movable) it's better to assign event handlers using methods and not using lambda. You need to revome event handlers to revert the control to its normal state. Also to do so, you need to call <code>DestroyHanlde</code> method of helper class.</p>
+
+<p><strong>2-</strong> I just refactored the posted code to make it reusable for controls without need to implement a derived version of all controls. But you can enhance the code by:</p>
+
+<ul>
+<li><p>Enable moving the control and resizing it using surface, edges and corners of control by setting <code>m.Result</code> to suitable values.</p></li>
+<li><p>Draw grab borders/handlers on control.</p></li>
+</ul>
+
+<p><strong>3-</strong> If you need to call <code>SetStyle</code> on control, you can simply use an extension method from <a href="http://stackoverflow.com/a/36773585/3110834">this post</a> and call it this way:</p>
+
+<pre><code>control.SetStyle(ControlStyles.OptimizedDoubleBuffer |
+    ControlStyles.AllPaintingInWmPaint |
+    ControlStyles.ResizeRedraw, true);
+</code></pre>

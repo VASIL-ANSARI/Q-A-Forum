@@ -1,0 +1,20 @@
+<p>Since this is basically shell script based already, consider using xargs:</p>
+
+<p>First of all, make sure multiple instances of <code>./program</code> don't overwrite each other's fileA.ppm if you run it in parallel. I'll assume you'll start writing them out as fileA.ppm.0.004 in this example.</p>
+
+<p>Then make a script you can invoke with the spot number:</p>
+
+<pre><code>#!/bin/sh
+spot=$1
+th=$(echo "$spot" | awk '{print 0.004 + 0.005*$1 }')
+./program "$th" 19 /home/path0 418
+mv "fileA.ppm.$th" "$(printf '/home/path1/a.%04d.ppm' "$spot")"
+mv "fileB.ppm.$th" "$(printf '/home/path2/b.%04d.ppm' "$spot")"
+</code></pre>
+
+<p><code>chmod a+x yourscript</code>, and you can now run and test each instance using <code>./yourscript 0</code>, <code>./yourscript 1</code>, etc. </p>
+
+<p>When it works, run them 8 (or more) in parallel using:</p>
+
+<pre><code>printf "%s\n" {0..199} | xargs -P 8 -n 1 ./yourscript
+</code></pre>

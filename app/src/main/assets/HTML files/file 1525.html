@@ -1,0 +1,73 @@
+<p>You probably need the full type, i.e. 
+@property (nonatomic) BOOL boolArray <strong>[100]</strong>;</p>
+
+<p>The [100] is significant type information, not just an indication of how much space to allocate.</p>
+
+<p>Also, I think the property will be treated like a <code>const BOOL *</code> that can't be assigned, so it would probably have to be <code>readonly</code>. The correct thing to do is probably make this readonly, which means that thins will fetch the array pointer then subscript it to assign to members of the array.</p>
+
+<p>Alternately you can use an <code>NSArray</code> for this, but that will require that you use <code>NSNumber</code>s with boolVaules which is more of a biotch to deal with.</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Actually the stupid compiler doesn't like the [] for some reason. Try this:</p>
+
+<pre><code>@interface TestClass : NSObject {
+
+    const BOOL *boolArray;
+}
+
+@property (nonatomic, readonly) const BOOL *boolArray;
+
+@end
+
+
+@implementation TestClass;
+
+- (const BOOL *)boolArray {
+    if (!boolArray)
+        boolArray = malloc(sizeof(BOOL) * 100);
+    return boolArray;
+}
+
+- (void)dealloc {
+    [super dealloc];
+    free((void *)boolArray);
+}
+
+@end
+</code></pre>
+
+<p><strong>ANOTHER UPDATE</strong></p>
+
+<p>This compiles:</p>
+
+<pre><code>@interface TestClass : NSObject {
+
+    BOOL boolArray[100];
+}
+
+@property (nonatomic, readonly) const BOOL *boolArray;
+
+@end
+
+
+@implementation TestClass;
+
+- (const BOOL *)boolArray {
+    return boolArray;
+}
+
+@end
+</code></pre>
+
+<p>This is a bizarre issue. I wish the compiler would explain exactly what it's unhappy about like "Can't declare property with array type" or something.</p>
+
+<p><strong>YET ANOTHER UPDATE</strong></p>
+
+<p>See this question: <a href="http://stackoverflow.com/questions/476843/create-an-array-of-integers-property-in-objective-c">http://stackoverflow.com/questions/476843/create-an-array-of-integers-property-in-objective-c</a></p>
+
+<p>Apparently according to the C spec, an array is not a "Plain Old Data" type and the Objective-C spec only lets you declare properties for POD types. Supposedly this is the definiition of PODs:</p>
+
+<p><a href="http://www.fnal.gov/docs/working-groups/fpcltf/Pkg/ISOcxx/doc/POD.html" rel="nofollow">http://www.fnal.gov/docs/working-groups/fpcltf/Pkg/ISOcxx/doc/POD.html</a></p>
+
+<p>But reading that it seems like an array of PODs is a POD.  So I don't get it. </p>

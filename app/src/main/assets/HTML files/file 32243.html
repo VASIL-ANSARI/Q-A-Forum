@@ -1,0 +1,26 @@
+<p>I'm not sure I understand your case, because the description doesn't match the outputâ¦Â but I think I know what your problem is.</p>
+
+<p>As <a href="http://docs.python.org/2/library/logging.html#logging.Logger.propagate">the docs</a> explain:</p>
+
+<blockquote>
+  <p><strong>Note:</strong> If you attach a handler to a logger and one or more of its ancestors, it may emit the same record multiple times. In general, you should not need to attach a handler to more than one logger - if you just attach it to the appropriate logger which is highest in the logger hierarchy, then it will see all events logged by all descendant loggers, provided that their propagate setting is left set to True. A common scenario is to attach handlers only to the root logger, and to let propagation take care of the rest.</p>
+</blockquote>
+
+<p>And that "common scenario" usually works great, but I assume you need to attach a custom handler to "test", without affecting the root logger.</p>
+
+<p>So, if you want a custom handler on "test", and you don't want its messages also going to the root handler, the answer is simple: turn off its <code>propagate</code> flag:</p>
+
+<pre><code>logger.propagate = False
+</code></pre>
+
+<hr>
+
+<p>The reason this only happens if you call <code>test_b</code> is that otherwise, the root logger never gets initialized. The first time you log to any logger that hasn't been configured, it effectively does a <code>basicConfig()</code> on that logger. So, calling <code>logging.getLogger().info(msg)</code> or <code>logging.info(msg)</code> will configure the root logger. But propagating from a child logger will not.</p>
+
+<p>I believe this is explained somewhere in the logging HOWTO or cookbook, both under <a href="http://docs.python.org/2/howto/">HOWTOs</a>, but in the actual module docs, it's buried in the middle of a note about threading under <a href="http://docs.python.org/2/library/logging.html#logging.log"><code>logging.log</code></a>:</p>
+
+<blockquote>
+  <p><strong>Note:</strong> The above module-level functions which delegate to the root logger should not be used in threads, in versions of Python earlier than 2.7.1 and 3.2, unless at least one handler has been added to the root logger before the threads are started. <strong>These convenience functions call basicConfig() to ensure that at least one handler is available;</strong> ; in earlier versions of Python, this can (under rare circumstances) lead to handlers being added multiple times to the root logger, which can in turn lead to multiple messages for the same event.</p>
+</blockquote>
+
+<p>It's pretty easy to see how you could have missed that!</p>

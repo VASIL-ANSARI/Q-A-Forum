@@ -1,0 +1,29 @@
+<p>Looking into the signature (using an ASN.1 dump) reveals that:</p>
+
+<ol>
+<li>It includes in its <strong>certificates</strong> <em>CertificateSet</em> the certificates issued for
+<ul>
+<li>C = GE,O = Ministry of Justice of Georgia,OU = Civil Registry Agency,CN = GEO Root CA</li>
+<li>C = GE,O = Ministry of Justice of Georgia,OU = Civil Registry Agency,CN = GEO Signing CA</li>
+<li>C = GE,O = Ministry of Justice of Georgia,OU = Civil Registry Agency,CN = GEO Authentication CA</li>
+</ul></li>
+<li>It claims in its <em>SignerInfo</em>'s <strong>sid</strong> <em>SignerIdentifier</em> to have used the private key associated with the "GEO Root CA" certificate to sign</li>
+</ol>
+
+<p>Looking at your code, issue 1 indicates that your key store contents are different from what you think. On the one hand "GEO Authentication CA" is present in it at least once with an alias not equal to "T", and on the other hand your signer certificate does not seem to be included (or has alias "T" and is ignored due to that). Your private key is included, though, as "C".</p>
+
+<p>Issue 2 is due to the fact that iText expects the first entry of the certificates array to be the signer certificate. As "GEO Root CA" seems to be the first certificate found in your key store, it is the first certificate in your <code>chainList,</code> so also in your <code>chain,</code> and therefore assumed by iText to be the signer certificate.</p>
+
+<p>To resolve your issue you have to </p>
+
+<ol>
+<li>inspect your key store and make sure it also contains your signer certificate, not merely the associated private key, and</li>
+<li>make sure your signer certificate is first in your <code>chain</code> certificate array.</li>
+</ol>
+
+<p>BTW, have you yet tried using</p>
+
+<pre><code>Certificate[] chain = ks.getCertificateChain("C");
+</code></pre>
+
+<p>to retrieve the certificate chain? This is generally used in <a href="http://itextpdf.com/book/digitalsignatures" rel="nofollow">Digital Signatures for PDF documents</a>...</p>

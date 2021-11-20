@@ -1,0 +1,62 @@
+<p>Let's create a table. (Get in the habit of including CREATE TABLE and INSERT statements in all your SQL questions.)</p>
+
+<pre><code>create table runs (
+  entry_id integer not null,
+  run_num integer not null
+    check (run_num between 1 and 3),
+  run_time interval not null
+);
+
+insert into runs values
+(1, 1, '00:59.33'),
+(2, 1, '00:59.93'),
+(3, 1, '01:03.27'),
+(1, 2, '00:59.88'),
+(2, 2, '00:59.27');
+</code></pre>
+
+<p>This SQL statement will give you the totals in the order you want, but without ranking them.</p>
+
+<pre><code>with num_runs as (
+  select entry_id, count(*) as num_runs
+  from runs
+  group by entry_id
+)
+select r.entry_id, n.num_runs, sum(r.run_time) as total_time
+from runs r
+inner join num_runs n on n.entry_id = r.entry_id
+group by r.entry_id, n.num_runs
+order by num_runs desc, total_time asc
+</code></pre>
+
+<pre>
+entry_id  num_runs  total_time
+--
+2         2         00:01:59.2
+1         2         00:01:59.21
+3         1         00:01:03.27
+</pre>
+
+<p>This statement adds a column for rank.</p>
+
+<pre><code>with num_runs as (
+  select entry_id, count(*) as num_runs
+  from runs
+  group by entry_id
+)
+select 
+  rank() over (order by num_runs desc, sum(r.run_time) asc), 
+  r.entry_id, n.num_runs, sum(r.run_time) as total_time
+from runs r
+inner join num_runs n on n.entry_id = r.entry_id
+group by r.entry_id, n.num_runs
+order by rank asc
+</code></pre>
+
+<pre>
+rank  entry_id  num_runs  total_time
+--
+1     2         2         00:01:59.2
+2     1         2         00:01:59.21
+3     3         1         00:01:03.27
+</pre>

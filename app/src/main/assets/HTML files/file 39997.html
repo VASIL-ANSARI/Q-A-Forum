@@ -1,0 +1,55 @@
+<blockquote>
+  <p>So who is right here?</p>
+</blockquote>
+
+<p>Clang is correct in rejecting the code. [expr.const]/2:</p>
+
+<blockquote>
+  <p>A <em>conditional-expression</em> <code>e</code> is a core constant expression unless
+  the evaluation of <code>e</code>, following the rules of the abstract machine
+  (1.9), would evaluate one of the following expressions:</p>
+  
+  <ul>
+  <li>an invocation of a function other than a <code>constexpr</code> constructor for a literal class, a <code>constexpr</code> function, or an implicit invocation
+  of a trivial destructor (12.4)</li>
+  </ul>
+</blockquote>
+
+<p>Clearly your move constructor isn't a <code>constexpr</code> constructor - [dcl.constexpr]/2</p>
+
+<blockquote>
+  <p>Similarly, a <code>constexpr</code> specifier used in a constructor declaration
+  declares that constructor to be a <code>constexpr</code> constructor.</p>
+</blockquote>
+
+<p>And the requirements for an initializer of a <code>constexpr</code> object are in [dcl.constexpr]/9:</p>
+
+<blockquote>
+  <p>[â¦] every full-expression that appears in its initializer shall be a
+  constant expression. [ <em>Note</em>: <strong>Each implicit conversion u</strong>sed in
+  converting the initializer expressions and each constructor call used
+  for the initialization is part of such a full-expression. â <em>end note</em>
+  ]</p>
+</blockquote>
+
+<p>Finally the move constructor is invoked by  the copy-initialization of the array elements with the corresponding initializer-clauses - [dcl.init]:</p>
+
+<blockquote>
+  <p>Otherwise (i.e., for the remaining copy-initialization cases),
+  user-defined conversion sequences that can convert from the source
+  type to the destination type or (when a conversion function is used)
+  to a derived class thereof are enumerated as described in 13.3.1.4,
+  and the best one is chosen through overload resolution (13.3). If the
+  conversion cannot be done or is ambiguous, the initialization is
+  ill-formed. The function selected is called with the initializer
+  expression as its argument; <strong>if the function is a constructor, the
+  call initializes a temporary of the cv-unqualified version of the
+  destination type. The temporary is a prvalue. The result of the call
+  (which is the temporary for the constructor case) is then used to
+  direct-initialize, according to the rules above, the object that is
+  the destination of the copy-initialization.</strong></p>
+</blockquote>
+
+<p>In the second example, <em>copy-list-initialization</em> applies - <a href="http://stackoverflow.com/q/26964221/3647361">and no temporary is introduced</a>.</p>
+
+<p>By the way: <a href="http://coliru.stacked-crooked.com/a/a5e581d4d6448d5e" rel="nofollow"><strong>GCC 4.9 does not compile the above</strong></a>, even without any warning flags provided.</p>

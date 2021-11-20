@@ -1,0 +1,31 @@
+<p>Here are my instructions on how I compile wxwidgets/wxlua on Windows/OSX/Linux for my cross-platform project, but I use gcc/mingw-tdm and not Code::Blocks, so you may need to adapt them to your environment.</p>
+
+<p>Here is how you can build wxwidgets on Windows:</p>
+
+<pre><code>  ./configure --prefix="$INSTALL_DIR" --disable-shared --enable-unicode \
+    --enable-compat28 \
+    --with-libjpeg=builtin --with-libpng=builtin --with-libtiff=no --with-expat=no \
+    --with-zlib=builtin --disable-richtext \
+    CFLAGS="-Os -fno-keep-inline-dllexport" CXXFLAGS="-Os -fno-keep-inline-dllexport"
+  make
+  make install
+</code></pre>
+
+<p>This is how you can build wxlua on Windows:</p>
+
+<pre><code>  cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_SHARED_LIBS=FALSE \
+    -DwxWidgets_CONFIG_EXECUTABLE="$INSTALL_DIR/bin/wx-config" \
+    -DwxWidgets_COMPONENTS="stc;html;aui;adv;core;net;base" \
+    -DwxLuaBind_COMPONENTS="stc;html;aui;adv;core;net;base" -DwxLua_LUA_LIBRARY_USE_BUILTIN=FALSE \
+    -DwxLua_LUA_INCLUDE_DIR="$INSTALL_DIR/include" -DwxLua_LUA_LIBRARY="$INSTALL_DIR/lib/lua51.dll" .
+  (cd modules/luamodule; make)
+  (cd modules/luamodule; make install/strip)
+</code></pre>
+
+<p>You'll need to update wxlua build instructions to use Lua5.2 instead of Lua5.1 I'm using.</p>
+
+<p>I have working build scripts for <a href="https://github.com/pkulchenko/ZeroBraneStudio/blob/master/build/build-win32.sh" rel="nofollow">Windows</a>, <a href="https://github.com/pkulchenko/ZeroBraneStudio/blob/master/build/build-macosx.sh" rel="nofollow">OSX</a>, and <a href="https://github.com/pkulchenko/ZeroBraneStudio/blob/master/build/build-linux.sh" rel="nofollow">Linux</a> in <a href="https://github.com/pkulchenko/ZeroBraneStudio" rel="nofollow">this repository</a>. The scripts have been tested on the latest wxwidgets and wxlua versions (use trunks of both repositories). They generate one wxlua library linked against Lua dll (on Windows), so it's not quite a static configuration you may be looking for, but having static build may prevent you from loading other Lua libraries (unless you export proper symbols and provide a proxy DLL as <a href="http://lua-users.org/lists/lua-l/2013-11/msg00831.html" rel="nofollow">described here</a>), so I don't recommend that configuration.</p>
+
+<p>Also, I'm still using Lua5.1 with wxlua and wxwidgets as this allows me to use LuaJIT as a drop-in replacement to get better performance in some cases. You won't have this option if you compile wxlua with Lua 5.2 as their ABI is different.</p>
+
+<p>In terms of integration with your own C++-based toolkit, the best option is probably expose it as a Lua library and load from wxlua application as you'd load any other library as it allows you to keep your components independent of each other.</p>

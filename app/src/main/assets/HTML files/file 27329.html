@@ -1,0 +1,21 @@
+<p>I can only see two viable solutions. First is actually the same as @mariodev suggested in the comment which is to use Genetic foreign key. That will look something like:</p>
+
+<pre><code># make sure to change the app name
+ALLOWED_RELATIONSHIPS = models.Q(app_label = 'app_name', model = 'team') | models.Q(app_label = 'app_name', model = 'teammember')
+class TeamFormNote(models.Model):
+    content_type = models.ForeignKey(ContentType, limit_choices_to=ALLOWED_RELATIONSHIPS)
+    relation_id = models.PositiveIntegerField()
+    relation = generic.GenericForeignKey('content_type', 'relation_id')
+</code></pre>
+
+<p>What that does is it sets up a generic foreign key which will allow you to link to any other model within your project. Since it can link to any other model, to restrict it to only the models you need, I use the <code>limit_choices_to</code> parameter of the <code>ForeignKey</code>. This will solve your problem since there is only one generic foreign key hence there is no way multiple relationships will be created. The disadvantage is that you cannot easily apply joins to generic foreign keys so you will not be able to do things like:</p>
+
+<pre><code>Team.objects.filter(teamformnote_set__notes__contains='foo')
+</code></pre>
+
+<p>The second approach is to leave the model as it and manually go into the database backend and add a db constaint. For example in postgres:</p>
+
+<pre><code>ALTER TABLE foo ADD CONSTRAINT bar CHECK ...;
+</code></pre>
+
+<p>This will work however it will not be transparent to your code.</p>

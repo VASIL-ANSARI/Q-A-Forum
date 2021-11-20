@@ -1,0 +1,50 @@
+<p>I think it's better to post it as an answer. I'd delete the <code>var ajaxurl</code> from the functions.php and use it inside the page. Then I don't see where you pass the location to the <code>ajax</code>. It should look like this:</p>
+
+<pre><code>&lt;script type="text/javascript"&gt;
+  jQuery(document).ready(function($) {
+    $('#state').on('change', function() {
+
+      var location = this.value;
+      alert(location);
+
+      $.ajax({
+        type: "POST",
+        url:'&lt;?php echo admin_url('admin-ajax.php'); ?&gt;',
+        data: ({'action' : 'getcity', 'location' : location }),
+        success: function(results) {
+          $("#district").removeAttr("disabled");
+          $("#district").append(results);
+        }
+      });
+    });
+  });
+&lt;/script&gt;
+</code></pre>
+
+<p>then the Dropdown should look like this</p>
+
+<pre><code>&lt;select id="state"&gt;
+  &lt;option value="state1"&gt;state1&lt;/option&gt;
+  &lt;option value="state2"&gt;state2&lt;/option&gt;
+  ...
+&lt;/select&gt;
+</code></pre>
+
+<p>And for the <code>getcity</code> you have to get the right <code>$_POST</code>:</p>
+
+<pre><code>function getcity(){
+global $wpdb;
+  if($_POST['location']){
+    $id=$_POST['location'];
+    $result=$wpdb-&gt;get_results("SELECT * FROM tblcitylist WHERE state='$id'");
+    $html = '';
+    foreach($result as $row) {
+      $city_name = $row-&gt;city_name;
+      $city_id   = $row-&gt;city_id;
+      $html .= '&lt;option value="'.$city_id.'"&gt;'.$city_name.'&lt;/option&gt;';
+    }
+  }
+}
+add_action("wp_ajax_nopriv_getcity", "getcity");
+add_action("wp_ajax_getcity", "getcity");
+</code></pre>

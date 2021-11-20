@@ -1,0 +1,37 @@
+<p>If I understand correctly, you need to make sure that _moveDirection is always parallel to XZ plane.
+One way to do it is instead of using <code>_camera.TransformDirection</code>, to calculate the projection of camera forward vector on XZ plane, then use <code>LookRotation</code> in that direction, like this:</p>
+
+<pre><code>var forward = _camera.transform.forward; // Get camera forward vector
+forward.y = 0; // Project it on XZ plane
+_moveDirection =  Quaternion.LookRotation(forward) * _moveDirection; // Rotate
+</code></pre>
+
+<p>Note that simply rotating the object by camera X angle as it was suggested won't always help here, since camera Z angle can cause the same effect.</p>
+
+<p>So final code would be:</p>
+
+<pre><code>void VerySimpleMove()
+{
+    if (_controllerBody.isGrounded)
+    {
+        _moveDirection.x = _mj.GetAxis("Horizontal");
+        _moveDirection.y = 0;
+        _moveDirection.z = _mj.GetAxis("Vertical");                  
+
+        var forward = _camera.transform.forward; // Get camera forward vector
+        forward.y = 0; // Project it on XZ plane
+        _moveDirection =  Quaternion.LookRotation(forward) * _moveDirection; // Rotate
+        if (Mathf.Abs(_moveDirection.x) &gt; 0 || Mathf.Abs(_moveDirection.y) &gt; 0)
+        {
+            _body.rotation = Quaternion.LookRotation(_moveDirection);
+        }
+        if (_jumpButton)
+        {
+            _jumpButton = false;
+            _moveDirection.y = _jumpHeight;
+        }
+    }
+    _moveDirection.y -= _gravity * Time.deltaTime;
+    _controllerBody.Move(_moveDirection * Time.deltaTime);
+}
+</code></pre>

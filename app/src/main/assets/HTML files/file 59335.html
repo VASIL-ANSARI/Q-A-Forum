@@ -1,0 +1,132 @@
+<blockquote>
+  <p>I mean to achieve immutability in JS app you should just to keep simple patterns like <code>Object.prototype.assign</code>, <code>Array.prototype.concat</code>, i.e. donât mutate data directly, but returning a new copy not touching the source.</p>
+</blockquote>
+
+<p>If it was only that simple. </p>
+
+<h2>Arrays containing arrays being concatenated</h2>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var a = [ [1] ];
+var b = [ [2] ];
+
+var c = a.concat(b);
+
+c[0].push(42);
+
+console.log("Array c contains", c);
+console.log("Array a contains", a);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>div.as-console-wrapper { max-height: inherit; }</code></pre>
+</div>
+</div>
+</p>
+
+<h2>Arrays containing objects being concatenated</h2>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var a = [ { name: "Alice" } ];
+var b = [ { name: "Bob" } ];
+
+var c = a.concat(b);
+
+c[0].age = 42;
+
+console.log("Array c is", c);
+console.log("Array a is", a);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>div.as-console-wrapper { max-height: inherit; }</code></pre>
+</div>
+</div>
+</p>
+
+<h2>Objects containing arrays and other objects being composed together</h2>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var a = { 
+  name: "Alice"
+}
+
+var foods = { 
+  favouriteFoods: [
+    "noodles",
+    "pancakes"
+  ]
+};
+
+var seasons = {
+  thoughtsOnSeasons: {
+    spring: "Beautiful",
+    summer: "Too hot",
+    autumn: "Pretty",
+    winter: "Festive"
+  }
+};
+
+//this object is now entirely new
+var alice = Object.assign({}, a, foods, seasons);
+
+//let's manipulate one of the old objects
+foods.favouriteFoods.length = 0;
+foods.favouriteFoods.push("carrots");
+
+//let's manipulate one of the properties of the new object
+alice.thoughtsOnSeasons.spring = "boring";
+alice.thoughtsOnSeasons.summer = "boring";
+alice.thoughtsOnSeasons.autumn = "boring";
+alice.thoughtsOnSeasons.winter = "boring";
+
+//manipulated through the composed object
+console.log(seasons);
+
+//manipulated through the previous object 
+console.log(alice);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>div.as-console-wrapper { max-height: inherit; }</code></pre>
+</div>
+</div>
+</p>
+
+<p>So, this was actually an incredibly simple example that should tell you that your initial assumption is wrong - it's <em>not</em> a simple pattern. If your thought is "OK, I will just have to write my own functions that perform a deep clone of arrays and objects", then let's have a look at one more thing</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var bobby = { name: "Bobby Tables" };
+var map = new Map();
+
+map.set("student", bobby);
+bobby.name = "Robert'); DROP TABLE Students; --";
+
+console.log(map.get("student"));</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>div.as-console-wrapper { max-height: inherit; }</code></pre>
+</div>
+</div>
+</p>
+
+<p>If you are still thinking "It's fine, I'll have my own Map clone utility", then you have just realised you need something that clones properties for you.</p>
+
+<p>If your thought is then "I'll use a library that does that" then you've already made a point for Immutable.js.</p>
+
+<p>But that hasn't even touched immutability yet, which is the main thing Immutable.js offers, not just a fancy cloning utilty. Fact is, that often you don't want or don't expect consuming code to manipulate your returns. You could be returning arrays containing arrays or objects containing objects and that's fine, but as you've seen, any change to <em>them</em> could result in a change to referenced data. Changes to results could also be undesirable otherwise, and it's as simple as a typo for that to happen. If you explicitly do not want results to be manipulated, then you can return an immutable view of it. In many ways, this is similar to just you making sure to make a deep clone when you receive data, but it just enforces that behaviour, making you aware if you haven't.</p>
+
+<p>So, let me try to answer your questions in reverse order</p>
+
+<blockquote>
+  <p>Is it an advanced tool to avoid errors and reducing the complexity of app state?</p>
+</blockquote>
+
+<p>Yes, you can use it to avoid problems and complexity. That is the main problem you are facing with shared mutable data, really - errors that stem from something unexpectedly modifying the data and complexity from having to account for it.</p>
+
+<blockquote>
+  <p>Is this a kind of overhead to achieve more productivity (in terms of speed and hardware resources)?</p>
+</blockquote>
+
+<p>In terms of speed and hardware resources - hardly. There may be <em>some</em>, but I don't actually have any data on the performance of Immutable.js, however, I do know that immutable data structures can be more memory efficient in some ways, due to structural sharing. An immutable list can be appended to and you get a "new" list back, however, internally, the beginning of the list is shared between the instances, so you avoid some GC overhead. On the other hand, some other operations may take more CPU time with immutable data structures, for example, changing data on specific index. However, overall, I would not be too worried about performance.</p>
+
+<p>What you gain most benefit in, is in terms of developer time and maintainability. </p>
+
+<blockquote>
+  <p>Is this a question of self-constrains? If so, should I forget about native data structures in my app and use only Immutable.js alternative?</p>
+</blockquote>
+
+<p><em>Should</em> you? That's a whole different question altogether. You don't have to and you may not even need to. It depends on what project you are working on and how. It's entirely possible to work with Immutable.js in a small project and reap many benefits. It's entirely possible to work on a large project without Immutable.js and not suffer for it. In some ways, it's a personal choice. I'd say it's definitely useful to use immutability, so you get first hand experience with it. Whether you need to use it everywhere or not, cannot really be answered easily, but you will gain the means to assess that yourself.</p>

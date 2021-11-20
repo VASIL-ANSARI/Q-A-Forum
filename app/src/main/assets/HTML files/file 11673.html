@@ -1,0 +1,89 @@
+<p>Below are the relevant sections of code for the <a href="http://opencv.itseez.com/modules/core/doc/operations_on_arrays.html?highlight=minmaxloc#void%20minMaxLoc%28InputArray%20src,%20double%2a%20minVal,%20double%2a%20maxVal,%20Point%2a%20minLoc,%20Point%2a%20maxLoc,%20InputArray%20mask%29" rel="nofollow">minMaxLoc</a> function:</p>
+
+<pre><code>static void ofs2idx(const Mat&amp; a, size_t ofs, int* idx)
+{
+    int i, d = a.dims;
+    if( ofs &gt; 0 )
+    {
+        ofs--;
+        for( i = d-1; i &gt;= 0; i-- )
+        {
+            int sz = a.size[i];
+            idx[i] = (int)(ofs % sz);
+            ofs /= sz;
+        }
+    }
+    else
+    {
+        for( i = d-1; i &gt;= 0; i-- )
+            idx[i] = -1;
+    }
+}
+
+}
+
+void cv::minMaxIdx(InputArray _src, double* minVal,
+                   double* maxVal, int* minIdx, int* maxIdx,
+                   InputArray _mask)
+{
+    Mat src = _src.getMat(), mask = _mask.getMat();
+    int depth = src.depth(), cn = src.channels();
+
+    CV_Assert( (cn == 1 &amp;&amp; (mask.empty() || mask.type() == CV_8U)) ||
+               (cn &gt;= 1 &amp;&amp; mask.empty() &amp;&amp; !minIdx &amp;&amp; !maxIdx) );
+    MinMaxIdxFunc func = minmaxTab[depth];
+    CV_Assert( func != 0 );
+
+    const Mat* arrays[] = {&amp;src, &amp;mask, 0};
+    uchar* ptrs[2];
+    NAryMatIterator it(arrays, ptrs);
+
+    size_t minidx = 0, maxidx = 0;
+    int iminval = INT_MAX, imaxval = INT_MIN;
+    float fminval = FLT_MAX, fmaxval = -FLT_MAX;
+    double dminval = DBL_MAX, dmaxval = -DBL_MAX;
+    size_t startidx = 1;
+    int *minval = &amp;iminval, *maxval = &amp;imaxval;
+    int planeSize = (int)it.size*cn;
+
+    if( depth == CV_32F )
+        minval = (int*)&amp;fminval, maxval = (int*)&amp;fmaxval;
+    else if( depth == CV_64F )
+        minval = (int*)&amp;dminval, maxval = (int*)&amp;dmaxval;
+
+    for( size_t i = 0; i &lt; it.nplanes; i++, ++it, startidx += planeSize )
+        func( ptrs[0], ptrs[1], minval, maxval, &amp;minidx, &amp;maxidx, planeSize, startidx );
+
+    if( minidx == 0 )
+        dminval = dmaxval = 0;
+    else if( depth == CV_32F )
+        dminval = fminval, dmaxval = fmaxval;
+    else if( depth &lt;= CV_32S )
+        dminval = iminval, dmaxval = imaxval;
+
+    if( minVal )
+        *minVal = dminval;
+    if( maxVal )
+        *maxVal = dmaxval;
+
+    if( minIdx )
+        ofs2idx(src, minidx, minIdx);
+    if( maxIdx )
+        ofs2idx(src, maxidx, maxIdx);
+}    
+
+void cv::minMaxLoc( InputArray _img, double* minVal, double* maxVal,
+                Point* minLoc, Point* maxLoc, InputArray mask )
+{
+    Mat img = _img.getMat();
+    CV_Assert(img.dims &lt;= 2);
+
+    minMaxIdx(_img, minVal, maxVal, (int*)minLoc, (int*)maxLoc, mask);
+    if( minLoc )
+        std::swap(minLoc-&gt;x, minLoc-&gt;y);
+    if( maxLoc )
+        std::swap(maxLoc-&gt;x, maxLoc-&gt;y);
+}
+</code></pre>
+
+<p>Judging from the code flow it appears you have the case of <code>minidx</code> equal to zero, which then sets <code>dminval = dmaxval = 0</code>. Also, within the <code>ofs2idx</code> function, when <code>minidx</code> (i.e.,  <code>ofs</code> parameter in <code>ofs2idx</code>) is equal to zero the logic sets the min and max points to (-1, -1) (i.e., <code>idx[i] = -1;</code>). This might happen if your matrix has no elements. What is the size of the matrix you are trying to use?</p>

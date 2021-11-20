@@ -1,0 +1,29 @@
+<p>There are some things you need to correct:</p>
+
+<ol>
+<li>You're using single backslashes, which are parsed by the .net interpreter before they're passed to regex. Use a <a href="https://msdn.microsoft.com/en-us/library/aa691090(v=vs.71).aspx" rel="nofollow">verbatim string</a> instead, ie: <code>@"pattern"</code></li>
+<li>You have unescaped quotes in your string. To escape them in a verbatim string, use <a href="http://stackoverflow.com/a/1100273/5290909">2 double quotes</a>: <code>@"the ""pattern"" with quotes"</code>.</li>
+<li><a href="/questions/tagged/.net" class="post-tag" title="show questions tagged &#39;.net&#39;" rel="tag">.net</a> does not support <a href="http://www.regular-expressions.info/possessive.html" rel="nofollow">possessive quantifiers</a>. Use an <a href="http://www.regular-expressions.info/atomic.html" rel="nofollow">atomic group</a> instead. i.e: change <code>[^\\"_#?&amp;]++</code> to <code>(?&gt;[^\\"_#?&amp;]+)</code>.</li>
+<li>You can use the same multiline syntax, ignoring whitespace, using <a href="https://msdn.microsoft.com/en-us/library/system.text.regularexpressions.regexoptions(v=vs.110).aspx" rel="nofollow"><code>RegexOptions.IgnorePatternWhitespace</code></a>.</li>
+</ol>
+
+<hr>
+
+<pre><code>string pattern = @"
+    &lt;
+      (?&lt;Tag_Name&gt;(a)|img)\b
+      [^&gt;]*?
+      \b(?&lt;URL_Type&gt;(?(2)href|src))
+      \s*=\s*
+      (?:""(?&lt;URL&gt;(?&gt;\\.|[^\\""_#?&amp;]+)*(?:_|(?&lt;Query&gt;[#?&amp;]))(?&gt;\\.|[^""\\]+)*)""
+      |  '(?&lt;URL&gt;(?&gt;\\.|[^\\'_#?&amp;]+)*(?:_|(?&lt;Query&gt;[#?&amp;]))(?&gt;\\.|[^'\\]+)*)')
+    ";
+
+Regex re = new Regex( pattern, 
+                      RegexOptions.IgnoreCase | RegexOptions.Multiline
+                      | RegexOptions.IgnorePatternWhitespace);
+
+MatchCollection underscoreLinks = re.Matches(text);
+</code></pre>
+
+<p><kbd><a href="http://ideone.com/slLCcT" rel="nofollow">ideone demo</a></kbd></p>

@@ -1,0 +1,18 @@
+<p>What you are trying to do is not supported, currently, by the CUDA compiler and runtime (as of CUDA 5.0). Section D.2.6.3 of the CUDA C Programming Guide v5.0 reads:</p>
+
+<blockquote>
+  <h2>D.2.6.3 Virtual Functions</h2>
+  
+  <p>When a function in a derived class overrides a virtual function in a base class, the execution space qualifiers (i.e., <code>__host__</code>, <code>__device__</code>) on the overridden and overriding functions must match.</p>
+  
+  <p>It is not allowed to pass as an argument to a <code>__global__</code> function an object of a class
+  with virtual functions.</p>
+  
+  <p>The virtual function table is placed in global or constant memory by the compiler.</p>
+</blockquote>
+
+<p>What I recommend is that you encapsulate the data of your class separately from the functionality of the class. For example, store the data in a struct. If you plan to operate on arrays of these objects, store the data in a structure of arrays (for performance -- outside the scope of this question).  Allocate the data structures on the host using <code>cudaMalloc</code>, and then pass the data to the kernel as arguments, rather than passing the class with virtual methods. </p>
+
+<p>Then construct your objects with virtual methods on the device. The constructor of your class with virtual methods would take the device pointer kernel parameters as arguments. The virtual <strong>device</strong> methods could then operate on the device data.</p>
+
+<p>The same approach would work to enable allocating the data in one kernel on the device, and accessing it in another kernel on the device (since again, classes with virtual functions can't be parameters to the kernels).</p>

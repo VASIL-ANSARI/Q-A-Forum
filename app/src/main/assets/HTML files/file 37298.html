@@ -1,0 +1,32 @@
+<p>Yes, there is.  Use <a href="http://docs.python-requests.org/en/latest/user/advanced/#session-objects"><code>requests.Session</code></a> and <a href="http://docs.python-requests.org/en/latest/user/advanced/#keep-alive">it will do keep-alive by default</a>.</p>
+
+<p>I guess I should include a quick example:</p>
+
+<pre><code>import logging
+import requests
+
+logging.basicConfig(level=logging.DEBUG)
+s = requests.Session()
+s.get('http://httpbin.org/cookies/set/sessioncookie/123456789')
+s.get('http://httpbin.org/cookies/set/anothercookie/123456789')
+r = s.get("http://httpbin.org/cookies")
+print(r.text)
+</code></pre>
+
+<p>You will note that these log message occur</p>
+
+<pre><code>INFO:requests.packages.urllib3.connectionpool:Starting new HTTP connection (1): httpbin.org
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies/set/sessioncookie/123456789 HTTP/1.1" 302 223
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies HTTP/1.1" 200 55
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies/set/anothercookie/123456789 HTTP/1.1" 302 223
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies HTTP/1.1" 200 90
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies HTTP/1.1" 200 90
+</code></pre>
+
+<p>If you wait a little while, and repeat the last <code>get</code> call</p>
+
+<pre><code>INFO:requests.packages.urllib3.connectionpool:Resetting dropped connection: httpbin.org
+DEBUG:requests.packages.urllib3.connectionpool:"GET /cookies HTTP/1.1" 200 90
+</code></pre>
+
+<p>Note that it resets the dropped connection, i.e. reestablishing the connection to the server to make the new request.</p>

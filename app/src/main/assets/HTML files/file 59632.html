@@ -1,0 +1,72 @@
+<p>You need to create boolean value parameter for each of the columns that user selects for display in RDLC report. Pass all these parameters to RDLC report. Set the Visibility > Hidden property of each columns with respective parameter.</p>
+
+<p>For example, 'Age' column is to be excluded and say @AgeVisible is the boolean parameter with value <em>false</em>. Then, select the 'Age' column (<em>not the textbox but the column</em>) and set the property Visibility > Hidden to expression <code>=Iif(@AgeVisible, False, True)</code></p>
+
+<p>Following picture might help you what I am saying.<a href="http://i.stack.imgur.com/zksfW.png" rel="nofollow"><img src="http://i.stack.imgur.com/zksfW.png" alt="See the Picture for help"></a></p>
+
+<p><strong>To make visible columns expand and fill the space of excluded (hidden) columns so that report width is maintained, more work needs to be done.</strong></p>
+
+<p>The rdlc file is an xml document. It defines column widths as following xml (<em>This is specific to  RDLC file created using Visual Studio 2005, it may differ for other version</em>). Below xml suggests that there are 6 columns in the table.</p>
+
+<pre><code>    &lt;TableColumns&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;0.5in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;1.125in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;1in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;1in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;0.5in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+      &lt;TableColumn&gt;
+        &lt;Width&gt;1.375in&lt;/Width&gt;
+      &lt;/TableColumn&gt;
+    &lt;/TableColumns&gt;
+</code></pre>
+
+<p>Basically logic is simple, just increase the width of visible columns. But its implementation requires few lines of code.</p>
+
+<ol>
+<li><p>Calculate the sum of width of hidden columns and then re-calculate width of visible columns</p>
+
+<pre><code>    float[] resizedwidth;
+    // code for recalculation goes here
+</code></pre></li>
+<li><p>Read entire report xml into string variable 'rptxml'</p>
+
+<pre><code>    String rptxml = System.IO.File.ReadAllText(@"D:\SO\WinFormQ\WinFormQ\Report1.rdlc");
+</code></pre></li>
+<li><p>Replace above xml segment with modified xml segment</p>
+
+<pre><code>    int start = rptxml.IndexOf("&lt;TableColumns&gt;");
+    int end = rptxml.IndexOf("&lt;/TableColumns&gt;") + "&lt;/TableColumns&gt;".Length;
+    String resizedcolumns = String.format(
+        "&lt;TableColumns&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{0}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{1}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{2}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{3}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{4}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;TableColumn&gt;&lt;Width&gt;{5}in&lt;/Width&gt;&lt;/TableColumn&gt;"
+        + "&lt;/TableColumns&gt;"
+        , resizedwidth[0], resizedwidth[1], resizedwidth[2], resizedwidth[3], resizedwidth[4], resizedwidth[5]
+        );
+    rptxml = rptxml.Substring(0, start) + resizedcolumns + rptxml.Substring(end);
+</code></pre></li>
+<li><p>Create TextReader from string variable 'rptxml' </p>
+
+<pre><code>    TextReader tr = new StringReader(rptxml);            
+</code></pre></li>
+<li><p>Use LoadReportDefinition() method to load the modified report definition</p>
+
+<pre><code>    reportViewer1.LocalReport.LoadReportDefinition(tr);
+</code></pre></li>
+</ol>
+
+<p>Continue with specifying DataSources and ReportParameters etc. and finally display the report. <em>NOTE:</em> Don't forget to close TextReader <code>tr.Close()</code>.</p>

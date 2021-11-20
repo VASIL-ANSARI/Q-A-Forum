@@ -1,0 +1,41 @@
+<p>It takes 12 seconds from start to end (see your timers in zz.txt), max execution time is set to 10 seconds. So there's a problem.</p>
+
+<p>Usually I set the time limit cut-off at (max-execution-time - 5 seconds), but as you only have 10 seconds, and a 2 second overlay, you should set your shutdown to 7 seconds.</p>
+
+<hr>
+
+<p>If you launch this from a browser, it may be preferential to actual do the "call itself" from a META Refresh instruction. This way you can issue a small HTML page with status and meta refresh back to itself. (Also my preferred route for this!) Ignore if you're running a cron or other back-end process not from a browser.</p>
+
+<hr>
+
+<p>Edit (to save typing too many comments) in response to "it's now stopped, but then comes back after a few minutes".</p>
+
+<p>What I'm guessing is, if you still have the PHP script calling itself, it's probably burning more and more memory and never allowing iteslf to garbage collect. Each PHP script in Apache takes about 10MB Apache overhead, plus another 2-3MB of PHP script - so the more you call itself the more this will add up and eventually slow down.</p>
+
+<p>So you need to go back to one of the suggestions:</p>
+
+<p>a) If calling from a browser, as oposed to PHP calling itself, issue a </p>
+
+<pre><code>&lt;html&gt;
+   &lt;head&gt;
+      &lt;meta http-equiv="refresh" content="1; url=http://127.0.0.1/t.php"&gt;
+   &lt;/head&gt;
+   &lt;body&gt;
+     Echo going to &lt;a href="http://127.0.0.1/t.php"&gt;http://127.0.0.1/t.php&lt;/a&gt;
+   &lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>This means that there is calling itself in the PHP script; PHP also gets to breathe and can garbage collect, although the break is not necessary with just one simple script runing - stopping the looping should sort it out.</p>
+
+<p>Problems: if your connection should fail, or the internet should fail then the response won't happen and the script will break, so:</p>
+
+<p>b) A variation of this is to create a bit of javascript that calls the server once every 10 seconds. Don't do anything after time-out as Javascript will just start the process again.</p>
+
+<p>c) The best approach though, if you want this to run "forever", run the PHP script as a command line (php -q /var/www/html/Myphp.php > /dev/nul) from a cron job. Set the cron job to run every minute. Add a counter to the script that increments each time it calls itself and then stops after the 6th call (i.e. 1 minute). This way you're looping a max of 5 times before the script dies and allows itself to be cleaned up. </p>
+
+<p>d) Alternatively, if you can write a quick shell script, just create shell script that calls the PHP comand line then waits 10 seconds and calls it again, 6 times. Trigger that script from a cron running each minute. This way you don't have the Apache overhead (saves sockets, saves memory) as well as avoiding the lopping issue.</p>
+
+<p>e) There are other variations - depending on what permissions you've got on the server...</p>
+
+<p>Not promising they will fix your problems, but a function calling itself endlessly is programming no-no, so I'd give at least the first one a stab to see if it works, then research the more complex ones. </p>

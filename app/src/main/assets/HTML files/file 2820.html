@@ -1,0 +1,121 @@
+<p>Apparently the process you spawn cannot handle the fact that the working directory is not it's own.</p>
+
+<p>You could open the file using CreateProcess(). I have a small example with waiting for (but you can clip that out):</p>
+
+<pre><code>procedure ExecuteAndWaitFor(CommandLine, CurrentDirectory: string; Environment: TStrings);
+var
+  List: TList;
+  ActiveWin: HWnd;
+  i: Integer;
+  Ret: Longword;
+  SI: TStartupInfo;
+  PI: TProcessInformation;
+  MadeForeground: Boolean;
+  AssociatedCommandLine: string;
+begin
+  // find the association ot use
+  AssociatedCommandLine := GetAssociatedCommandLine(CommandLine);
+  // first we create a list of windows which we need to block...
+  List := TList.Create;
+  try
+    ActiveWin := Windows.GetForegroundWindow;
+    // get the list of all visible and active top windows...
+    if not Windows.EnumThreadWindows(GetCurrentThreadId,@InternallyThreadWindowCallback,Integer(List)) then RaiseLastOSError;
+    // disable all those windows...
+    for i := 0 to List.Count - 1 do Windows.EnableWindow(HWnd(List[i]),False);
+    try
+      // create the process
+      System.FillChar(SI,sizeof(SI),0);
+      SI.cb := sizeof(SI.cb);
+      // todo: environment
+      if not Windows.CreateProcess(nil,PChar(AssociatedCommandLine),nil,nil,False,NORMAL_PRIORITY_CLASS,nil,PChar(CurrentDirectory),SI,PI) then RaiseLastOSError;
+      // wait until the process is finished...
+      MadeForeGround := False;
+      repeat
+        // process any pending messages in the thread's message queue
+        Application.ProcessMessages;
+        if not MadeForeground then begin
+          Windows.EnumThreadWindows(PI.dwThreadId,@InternallyTopWindowToForeMost,Integer(@MadeForeGround));
+        end;
+        // wait for a message or the process to be finished
+        Ret := Windows.MsgWaitForMultipleObjects(1, PI.hProcess, False, INFINITE, QS_ALLINPUT);
+        if Ret = $FFFFFFFF then RaiseLastOSError;
+      until Ret = 0;
+      // free the process handle
+      Windows.CloseHandle(PI.hProcess);
+      WIndows.CloseHandle(PI.hThread);
+    finally
+      // enable all those windows
+      for i := 0 to List.Count - 1 do Windows.EnableWindow(HWnd(List[i]), True);
+    end;
+    Windows.SetForegroundWindow(ActiveWin);
+  finally
+    List.Free;
+  end;
+end;
+</code></pre>
+
+<p>Added some missing utility functions:</p>
+
+<pre><code>uses
+  SysUtils, Registry;
+
+function GetAssociatedFile(const Extension: string; const RemoveParameters: Boolean = False): string;
+var
+  FileClass: string;
+  Reg: TRegistry;
+  Position: Integer;
+begin
+  // initialize
+  Result := '';
+  // create registry entry
+  Reg := TRegistry.Create(KEY_EXECUTE);
+  try
+    // find the given extension
+    Reg.RootKey := HKEY_CLASSES_ROOT;
+    FileClass := '';
+    if Reg.OpenKeyReadOnly(ExtractFileExt(Extension)) then begin
+      FileClass := Reg.ReadString('');
+      Reg.CloseKey;
+    end;
+    if FileClass &lt;&gt; '' then begin
+      if Reg.OpenKeyReadOnly(FileClass + '\Shell\Open\Command') then begin
+        Result := Reg.ReadString('');
+        Reg.CloseKey;
+      end;
+    end;
+  finally
+    Reg.Free;
+  end;
+  // remove the additional parameters
+  Position := Pos('"%1"', Result);
+  if RemoveParameters and (Position &gt; 0) then
+    Result := Trim(Copy(Result, 1, Position - 1))
+  else
+    Result := Trim(Result);
+end;
+
+function GetAssociatedCommandLine(const CommandLine: string): string;
+begin
+  // build the command line with the associated file in front of it
+  Result := Trim(GetAssociatedFile(CommandLine, True) + ' ') + '"' + CommandLine + '"';
+end;
+
+function InternallyThreadWindowCallback(Window: HWnd; Data: Longint): Bool; stdcall;
+var
+  List: TList;
+begin
+  Result := True;
+  if (not IsWindowVisible(Window)) or (not IsWindowEnabled(Window)) then Exit;
+  List := TList(Data);
+  List.Add(Pointer(Window));
+end;
+
+function InternallyTopWindowToForeMost(Window: HWnd; Data: LongInt): Bool; stdcall;
+begin
+  Result := True;
+  if (not IsWindowVisible(Window)) or (not IsWindowEnabled(Window)) then Exit;
+  SetForegroundWindow(Window);
+  PBoolean(Data)^ := True;
+end;
+</code></pre>

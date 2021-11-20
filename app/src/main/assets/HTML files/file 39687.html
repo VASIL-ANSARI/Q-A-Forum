@@ -1,0 +1,16 @@
+<p>It is not possible to reopen <code>System.in</code>, <code>System.out</code> or <code>System.err</code>.  The underlying native streams are file descriptors that are connected to other processes, or to files whose identity your application cannot discern.  Once the underlying native file descriptors are closed, it is not possible to reopen them.</p>
+
+<p>The best I can suggest is that you create a wrapper <code>InputStream</code> class for the <code>System.in</code> object, and code the wrapper to treat <code>close()</code> as a no-op.  Or maybe set the wrapper into a "closed" state without actually closing the wrapped stream.</p>
+
+<p>In your specific use-case, that won't work, because you "need" to unblock the thread that is blocked while reading from <code>System.in</code>.  So in your case, you will need to do non-blocking input from <code>System.in</code>.  For example, use the <code>available()</code> method to test if there are any characters to read from the console.  (It is typically safe to assume that if <code>available()</code> returns a number greater than zero you will be able to read an entire line.)  </p>
+
+<p>(It might also be able to implement non-blocking reads using a <code>Selector</code>, but I don't think that it is possible to obtain a "selectable channel" for the <code>System.in</code> object.)</p>
+
+<hr>
+
+<p>Note that <code>Thread.interrupt()</code> won't work.  According to the javadocs, it will only work if you are reading from an interruptible channel.</p>
+
+<ul>
+<li><p>System.in is not an interruptible channel, and </p></li>
+<li><p>if it was, then the documented behaviour for <code>interrupt()</code> is that the channel gets closed by the interrupt.</p></li>
+</ul>

@@ -1,0 +1,26 @@
+<p>Eventually I stepped into the Qt sources to see how the SQLITE plugin is loaded (for the desktop build at least).</p>
+
+<p>The relevant function was <a href="https://github.com/Vitallium/qt5/blob/master/qtbase/src/corelib/plugin/qfactoryloader.cpp" rel="nofollow">QFactoryLoader::update()</a>. In it I noticed that it iterates all the directories in <code>QCoreApplication::libraryPaths()</code>:</p>
+
+<pre><code>QStringList paths = QCoreApplication::libraryPaths();
+for (int i = 0; i &lt; paths.count(); ++i) {
+</code></pre>
+
+<p>If any of them has a sub-directory named "sqldrivers", it goes inside it and tries to load all the dynamic libraries in that sub-directory.</p>
+
+<p>I then printed out the library paths in a test project I ran directly from Qt Creator - <code>qDebug() &lt;&lt; a.libraryPaths();</code>, and I saw this path -  <code>/data/data/org.qtproject.example.untitled/qt-reserved-files/plugins</code>. In this directory on my android phone there was a subdirectory named <code>sqldrivers</code>, that contained a single file - <code>libqsqlite.so</code>.</p>
+
+<p>I then checked the .java files, and indeed <code>QtActivity::startApp()</code> adds the library path:</p>
+
+<pre><code>boolean bundlingQtLibs = false;
+if (m_activityInfo.metaData.containsKey("android.app.bundle_local_qt_libs")
+    &amp;&amp; m_activityInfo.metaData.getInt("android.app.bundle_local_qt_libs") == 1) {
+    localPrefix = getApplicationInfo().dataDir + "/";
+    pluginsPrefix = localPrefix + "qt-reserved-files/";
+    cleanOldCacheIfNecessary(localPrefix, pluginsPrefix);
+    extractBundledPluginsAndImports(pluginsPrefix);
+    bundlingQtLibs = true;
+}
+</code></pre>
+
+<p>The solution then would be to ensure that there is a <code>sqldrivers/libqsqlite.so</code> somewhere on the phone, and then add the parent folder of <code>sqldrivers</code> to the library path using <code>QCoreApplication::addLibraryPath()</code>.</p>

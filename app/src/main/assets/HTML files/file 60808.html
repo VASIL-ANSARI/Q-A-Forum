@@ -1,0 +1,91 @@
+<p>There is no default action for this. </p>
+
+<p>In your custom receiver, get the port and use this.</p>
+
+<ul>
+<li>I use <a href="https://github.com/mik3y/usb-serial-for-android" rel="nofollow">mik3y</a> and/ or <a href="https://github.com/felHR85/UsbSerial" rel="nofollow">felHR85</a> solution for serial port</li>
+</ul>
+
+<p>This is how it likes;</p>
+
+<pre><code>public class CustomBroadcastReceiver extends BroadcastReceiver {
+public static final String BROADCAST = "arda.kaplan.android.action.broadcast";
+
+@Override
+public void onReceive(final Context context, Intent intent) {
+
+        findDevices(context);
+}
+
+
+
+
+private void findDevices(final Context context) {
+
+    UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
+
+    final List&lt;UsbSerialDriver&gt; drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
+
+    final List&lt;UsbSerialPort&gt; result = new ArrayList&lt;&gt;();
+
+    for (final UsbSerialDriver driver : drivers) {
+
+        final List&lt;UsbSerialPort&gt; ports = driver.getPorts();
+        result.addAll(ports);
+    }
+
+    if (result.size() &gt; 0) {
+
+        UsbSerialPort usbSerialPort = result.get(0);
+
+        UsbSerialDriver driver = usbSerialPort.getDriver();
+        UsbDevice device = driver.getDevice();
+
+        UsbDeviceConnection usbConnection = usbManager.openDevice(usbSerialPort.getDriver().getDevice());
+
+        final UsbSerialDevice usbSerialDevice = UsbSerialDevice.createUsbSerialDevice(device, usbConnection);
+
+        usbSerialDevice.open();
+        usbSerialDevice.setBaudRate(9600);
+        usbSerialDevice.setDataBits(UsbSerialInterface.DATA_BITS_8);
+        usbSerialDevice.setStopBits(UsbSerialInterface.STOP_BITS_1);
+        usbSerialDevice.setParity(UsbSerialInterface.PARITY_NONE);
+        usbSerialDevice.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
+
+
+        usbSerialDevice.read(new UsbSerialInterface.UsbReadCallback() {
+
+            @Override
+            public void onReceivedData(final byte[] data) {
+
+                Intent startAppIntent = new Intent(context, ComingFromBroadcastReceiverActivity.class);
+
+                startAppIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                startAppIntent.putExtra(ComingFromBroadcastReceiverActivity.KEY, new String(data));
+
+                context.startActivity(startAppIntent);
+            }
+        });
+
+    } 
+}
+</code></pre>
+
+<p>}</p>
+
+<p>And this code for registering custom receiver</p>
+
+<pre><code>Intent intent = new Intent(CustomBroadcastReceiver.BROADCAST);
+Bundle extras = new Bundle();
+sendBroadcast(intent);
+</code></pre>
+
+<p>And this is manifest part</p>
+
+<pre><code>&lt;receiver android:name=".receivers.CustomBroadcastReceiver"&gt;
+        &lt;intent-filter&gt;
+            &lt;action android:name="arda.kaplan.android.action.broadcast" /&gt;
+        &lt;/intent-filter&gt;
+    &lt;/receiver&gt;
+</code></pre>

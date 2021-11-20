@@ -1,0 +1,32 @@
+<p>I don't know about MySQL, but here's how I would try to do it in SQL Server, and bringing perhaps some adjustments depending on the results which make sense.</p>
+
+<pre><code>select Category
+        , Film
+        , MAX(Votes) as Votes
+    from (
+        select TOP 3 c.category_name as Category
+                , vd.video_id as Film
+                , COUNT(vt.votes) as Votes
+            from Category c
+                inner join Video vd on vd.category_id = c.category_id
+                inner join Votes vt on vt.video_id = vd.video_id
+            where c.category_id = 10 -- HipHop
+            group by c.category_name
+                , vd.video_id
+        union
+        select TOP 3 c.category_name
+                , vd.video_id
+                , COUNT(vt.votes) as Votes
+            from Category c
+                inner join Video vd on vd.category_id = c.category_id
+                inner join Votes vt on vt.video_id = vd.video_id
+            where c.category_id = 11 -- Rap
+            group by c.category_name
+                , vd.video_id
+        -- You need as much UNION as there are categories.
+    ) Top3VotesPerCategory
+    group by Category
+        , Film
+</code></pre>
+
+<p>Depending whether you accepte downvotes on a film, one could register a negative vote a film, and this wouldn't mean that he recommends this video. If you do support such functional feature, then you might want to consider a conditional <code>SUM()</code>, instead of a <code>COUNT()</code>, for the number of votes, so that negative votes would be considered and would decrease its overall points in regards of votes.</p>

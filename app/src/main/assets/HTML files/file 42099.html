@@ -1,0 +1,35 @@
+<p>There are no markers in the <code>ILog</code> interface of log4net, but you can use <a href="https://logging.apache.org/log4net/release/sdk/log4net.Filter.PropertyFilter.html" rel="nofollow">property filters</a> to route your events to the correct logger: just create a single logger in your code and send all events to this logger. In your root configuration set the two appenders you want</p>
+
+<pre><code>root
+    event log appender
+    file appender
+</code></pre>
+
+<p>and then in each appender filter out messages that either have or not the correct property value, e.g.</p>
+
+<pre><code>&lt;!-- filter in the event log appender --&gt;
+&lt;filter type="log4net.Filter.Property"&gt;
+    &lt;key value="ToEventLog" /&gt;
+    &lt;stringToMatch value="true" /&gt;
+&lt;/filter&gt;
+&lt;filter type="log4net.Filter.DenyAllFilter" /&gt;
+</code></pre>
+
+<p>Albeit it is magic strings ported to properties instead of the message, and you need to wrap your logging in some code setting the property: using a IDisposable to wrap the setup and teardown of the property could be a good idea, something like:</p>
+
+<pre><code>log.Info("To wherever!!");
+using (var SendToEventLogSwitch = new EventLogSwitch)
+{
+    log.Info("To EventLog!!");
+}
+</code></pre>
+
+<p>You could also use an extension method on the ILog to add the marker and use the property mechanism behind the scenes.</p>
+
+<pre><code>public static void EventLog(this ILog log, string message)
+{
+    log4net.ThreadContext.Properties["ToEventLog"] = "true";
+    log.Info(message);
+    log4net.ThreadContext.Properties["ToEventLog"] = "false";
+}
+</code></pre>

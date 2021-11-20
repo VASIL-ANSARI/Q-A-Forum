@@ -1,0 +1,19 @@
+<pre><code>#define LOG_TYPE(X) std::clog &lt;&lt; typeid(X).name() &lt;&lt; std::endl;
+</code></pre>
+
+<p><code>typeid</code> is the wrong tool for inspecting this.</p>
+
+<p>In the first function, <code>array_type</code> is not an array type because it is a reference type. The first element of <code>tuple&lt;int(&amp;)[3]&gt;</code> is <code>int(&amp;)[3]</code>, not <code>int[3]</code>. <code>typeid</code> doesn't care for top-level references, so it doesn't reflect that in that program's output.</p>
+
+<p>I tend to use a construct like the following when I'm debugging template meta-programming code in order to convince the compiler to print out an exact type. Sadly it can only do so as an error message.</p>
+
+<pre><code>struct{}_ = foo; // where foo is a value of the type I want in the message
+</code></pre>
+
+<p>This yields something like "no conversion from  to anonymous structure". Sometimes I don't have a value readily available for this, so I use <code>std::declval</code> or a simple <code>template &lt;typename T&gt; struct show{};</code>.</p>
+
+<p>So your fix is:</p>
+
+<pre><code>typedef typename std::remove_reference&lt;
+    typename std::tuple_element&lt;0, decltype(tuple)&gt;::type&gt;::type array_type;
+</code></pre>

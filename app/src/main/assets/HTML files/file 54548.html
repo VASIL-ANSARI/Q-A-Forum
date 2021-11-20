@@ -1,0 +1,39 @@
+<p>I doubt the author actually said that (exactly).</p>
+
+<p>But the point is that </p>
+
+<pre><code>while (!stopRequested)
+    i++;
+</code></pre>
+
+<p><em>could</em> behave like </p>
+
+<pre><code>if (!stopRequested)
+     while(true)
+         i++;
+</code></pre>
+
+<p>since the Java spec allows the initial value of <code>stopRequested</code> to be cached in a register, or fetched from a (potentially stale) copy in the memory cache.  One thread is not guaranteed to read the results of memory writes made by another thread <em>unless</em> there is a formal "happens before" relationship between the write and the subsequent read.  In this case, there is no such relationship.  That means that it is not specified whether the child thread will see the result of the parent thread's assignment to <code>stopRequested</code>.</p>
+
+<p>As the author of that book would have explained, the solutions include:</p>
+
+<ul>
+<li>declaring <code>stopRequested</code> as <code>volatile</code>,</li>
+<li>making sure that the code that reads and writes <code>stopRequested</code> does so within a <code>synchronized</code> blocks or methods that synchronizes on the same object, </li>
+<li>uses <code>Lock</code> objects rather than <code>synchronized</code>, or</li>
+<li>some other concurrency mechanism that satisfies the "happens before" requirement.</li>
+</ul>
+
+<hr>
+
+<p>Then you ask why your test seemed to work.</p>
+
+<p>That's is explained by the fact that while the child is not guaranteed to see the effect of the parent's assignment, it is also not guaranteed to NOT see it ... either.</p>
+
+<p>Or to put it another way.  The Java spec does not say which of the two possibilities will happen.</p>
+
+<p>Now for a specific program, compiled by a specific compiler, run by a specific version of the JVM on specific hardware, you <em>could</em> find that the program behaved one way (or the other way) consistently.  Maybe 99.9% of the time.  Maybe even 100% of the time.  But the same program compiled and run in a different context <em>could</em> behave differently.  The JLS says so.</p>
+
+<hr>
+
+<p>Another explanation for why the two almost identical versions of the program behave differently is that the <code>System.out</code> <code>PrintWriter</code> object is doing some internal synchronization when <code>println</code> is called.  That could be giving you a serendipitous "happens before".</p>

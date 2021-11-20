@@ -1,0 +1,25 @@
+<p>The subquery does indeed return more than one value when the where clause expects one single value. One solution is to change the query to use a join instead.</p>
+
+<pre><code>SELECT u.email, l.latitude, l.longitude
+FROM user u 
+JOIN locationhistory l ON u.userid = l.userId
+JOIN (
+   SELECT userId, MAX(locationDate) max_locationdate
+   FROM locationHistory 
+   GROUP BY userId
+) x ON u.userId = x.userid AND l.locationdate = x.max_locationdate
+</code></pre>
+
+<p>Edit: I think I made a mistake and filtered out users without locations by accident... if you want all users to show up even if they don't have any records in the locationhistory table then the query you want is most likely this:</p>
+
+<pre><code>SELECT u.email, l2.latitude, l2.longitude
+FROM user u 
+LEFT JOIN (
+  SELECT l1.* FROM locationhistory l1
+  JOIN (
+    SELECT userId, MAX(locationDate) max_locationdate
+    FROM locationHistory 
+    GROUP BY userId
+  ) x ON l1.locationdate = x.max_locationdate AND l1.userId = x.userid
+) l2 ON u.userid = l2.userId
+</code></pre>

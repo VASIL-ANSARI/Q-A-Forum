@@ -1,0 +1,26 @@
+<p>The MongoDB fluent API currently does not support the <code>SelectMany</code> extension method. However, you can workaround this.</p>
+
+<pre><code>var groupResult =
+    await collection
+        .Aggregate()
+        .Group(
+            x =&gt; x.PartnerId,
+            g =&gt; new
+            {
+                PartnerId = g.Key,
+                Description = g.First(x =&gt; x.Description != null).Description,
+                Discounts = g.Select(x =&gt; x.Discounts)
+            })
+        .ToListAsync();
+
+var result =
+    groupResult
+        .Select(x =&gt;
+            new GroupProjection
+            {
+                PartnerId = x.PartnerId,
+                Description = x.Description,
+                Discounts = x.Discounts.SelectMany(d =&gt; d)
+            })
+        .ToList();
+</code></pre>

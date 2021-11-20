@@ -1,0 +1,32 @@
+<blockquote>
+  <p>I am not able to understand the purpose of writing the sequence of operations inside a infinite for loop. </p>
+</blockquote>
+
+<p>The purpose of this code is to ensure that the <code>volatile</code> field gets updated appropriately <em>without</em> the overhead of a <code>synchronized</code> lock.  Unless there are a large number of threads all competing to update this same field, this will most likely spin a very few times to accomplish this.</p>
+
+<p>The <code>volatile</code> keyword provides visibility and memory synchronization guarantees but does not in itself ensure atomic operations with multiple operations (test and set).  If you are testing and then setting a <code>volatile</code> field there are race-conditions if multiple threads are trying to perform the same operation at the same time.  In this case, if multiple threads are trying to increment the <code>AtomicInteger</code> at the same time, you might miss one of the increments.  The concurrent code here uses the spin loop and the <code>compareAndSet</code> underlying methods to make sure that the <code>volatile int</code> is only updated to 4 (for example) if it still is equal to 3.</p>
+
+<ol>
+<li>t1 gets the atomic-int and it is 0.</li>
+<li>t2 gets the atomic-int and it is 0.</li>
+<li>t1 adds 1 to it</li>
+<li>t1 <em>atomically</em> tests to make sure it is 0, it is, and stores 1.</li>
+<li>t2 adds 1 to it</li>
+<li>t2 <em>atomically</em> tests to make sure it is 0, it is <em>not</em>, so it has to spin and try again.</li>
+<li>t2 gets the atomic-int and it is 1.</li>
+<li>t2 adds 1 to it </li>
+<li>t2 <em>atomically</em> tests to make sure it is 1, it <em>is</em>, and stores 2.</li>
+</ol>
+
+<blockquote>
+  <p>Does it serve any special purpose in Java Memory Model (JMM).</p>
+</blockquote>
+
+<p>No, it serves the purpose of the class and method definitions and <em>uses</em> the JMM and the language definitions around <code>volatile</code> to achieve its purpose.  The JMM defines what the language does with the <code>synchronized</code>, <code>volatile</code>, and other keywords and how multiple threads interact with cached and central memory.  This is mostly about native code interactions with operating system and hardware and is rarely, if ever, about Java code.</p>
+
+<p>It is the <code>compareAndSet(...)</code> method which gets closer to the JMM by calling into the <code>Unsafe</code> class which is mostly native methods with some wrappers:</p>
+
+<pre><code>public final boolean compareAndSet(int expect, int update) {
+    return unsafe.compareAndSwapInt(this, valueOffset, expect, update);
+}
+</code></pre>

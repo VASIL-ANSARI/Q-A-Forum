@@ -1,0 +1,28 @@
+<p>You need a conditional SET clause:</p>
+
+<pre><code>update tmp_gelbe_seten 
+  set haus_nr_von = case 
+                       when hausnummer like '%-%' then substring(hausnummer,'([0-9]*)') 
+                       when hausnummer like '%/%' then substring(hausnummer,'([0-9]*)')
+                    end,
+      haus_nr_bis = case
+                       when hausnummer like '%-%' then substring(hausnummer,'-([0-9]*)')
+                       when hausnummer like '%/%' then substring(hausnummer,'/([0-9]*)')
+                    end
+where hausnummer like '%-%' 
+   or hausnummer like '%/%';
+</code></pre>
+
+<p>Note that the <code>where</code> clause is important to only select those rows that you actually want to change. Performance is one reason and correctness the other. If you leave that out, the <code>CASE</code> statements will return NULL if the <code>hausnummer</code> doesn't match any condition. If you <em>do</em> leave the <code>where</code> clause out, you <strong>have</strong> to add an <code>ELSE</code> part returning the column to be updated so that the current value is not changed <code>else haus_nr_von</code> and <code>else haus_nr_bis</code></p>
+
+<p>As the expression for <code>haus_nr_von</code> is the same in both cases, the above statement can be simplified to:</p>
+
+<pre><code>update tmp_gelbe_seten 
+  set haus_nr_von = substring(hausnummer,'([0-9]*)'),
+      haus_nr_bis = case
+                       when hausnummer like '%-%' then substring(hausnummer,'-([0-9]*)')
+                       when hausnummer like '%/%' then substring(hausnummer,'/([0-9]*)')
+                    end
+where hausnummer like '%-%' 
+   or hausnummer like '%/%';
+</code></pre>

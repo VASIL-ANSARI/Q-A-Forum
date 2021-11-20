@@ -1,0 +1,10 @@
+<p>In a nutshell - the way you use <code>DISTINCT</code> is logically wrong from SQL perspective. </p>
+
+<p>Your <code>DISTINCT</code> is in an <code>IN</code> subquery in the <code>WHERE</code> clause - and at that point of code it has absolutely no effect (except from the performance penalty). Think on it - if the outer query returns non-unique values of <code>dbo.ISW_LPTrans.lp_num</code> (which obvioulsy happens) those values can still be within the distinct values of the <code>IN</code> subquery - the <code>IN</code> does not enforce a 1-to-1 match, it only enforces the fact that the outer query values are within the inner values, but they can match multiple times. So it is definitely not <code>DISTINCT</code>'s fault.</p>
+
+<p>I would go through the following check steps:</p>
+
+<ul>
+<li><strong>See if there is insufficient <code>JOIN ON</code> condition(s)</strong> in the outer <code>FROM</code> section that leads to data multiplication (e.g. if a table has primary-to-foreign key relation on several columns, but you join on one of them only etc.).</li>
+<li><strong>Check which of the sources contains non-distinct records</strong> in the outer <code>FROM</code> section - then either cleanse your source, or adjust the JOIN condition and / or the WHERE clause so that you only pick distinct &amp; correct records. In fact you might need to <code>SELECT DISTINCT</code> in the <code>FROM</code> sections - there it would make much more sense.</li>
+</ul>

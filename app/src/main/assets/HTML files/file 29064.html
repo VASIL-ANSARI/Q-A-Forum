@@ -1,0 +1,165 @@
+<p>Lets take your questions in order:</p>
+
+<ol>
+<li><a href="http://www.androidhive.info/2012/07/android-gps-location-manager-tutorial/" rel="nofollow">http://www.androidhive.info/2012/07/android-gps-location-manager-tutorial/</a></li>
+<li>onLocationChanged(Location location)</li>
+<li>no, goto 1</li>
+<li>Yes, again, goto 1</li>
+</ol>
+
+<p><strong>Edit:</strong> Reporting back to MainActivity</p>
+
+<p>In you MainActivity add an interface like this:</p>
+
+<pre><code>public class MainActivity implements NewLocationsListener {
+
+    public interface NewLocationsListener {
+
+        public void onNewLocation(Location location);
+    }
+
+    private GPSTracker gps;
+
+    ...
+
+    // when your button is clicked or where ever you want to start gps
+    gps = new GPSTracker(this, this);
+
+    ...
+
+    // and get Locations in onNewLocation
+    public void onNewLocation(Location location) {
+        // location reported back from gps 
+    }
+
+    // if you want gps to stop after exiting your app
+    @Override
+    protected void onPause() {
+        if (gps != null) {
+            gps.stopUsingGPS();
+        }
+        super.onPause();
+    }
+
+}
+</code></pre>
+
+<p>And add to the GPSTracker: </p>
+
+<pre><code>private NewLocationsListener mListener;
+
+public GPSTracker(Context context, NewLocationsListener listener) {
+    this.mContext = context;
+    this.mListener = listener;
+    getLocation();
+}
+
+
+@Override
+public void onLocationChanged(Location location) {
+    // report back to MainActivity
+    mListener.onNewLocation(location);
+    canGetLocation = true;
+}
+</code></pre>
+
+<p><strong>Edit2:</strong> An example of how to handle exit re-enter and orientation changes:</p>
+
+<p>Since you, as you say, are new to Android, I thought I might as well add this.</p>
+
+<pre><code>public class StrategyActivity extends Activity {
+
+    public static final String TAG = "StrategyActivity";
+
+    protected GPSTracker gps;
+
+    private Button startButton;
+    private boolean isStarted = false;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        startButton = (Button) findViewById(R.id.start_button);
+
+        if (savedInstanceState != null) {
+            isStarted = savedInstanceState.getBoolean("isStarted");
+        }
+    }
+
+
+    @Override
+    protected void onResume() {
+        if (isStarted) {
+            startStrategy();
+        }
+        updateOnOffButton();
+        super.onResume();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean("isStarted", isStarted);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isStarted) {
+            stopStrategy();
+        }
+        super.onBackPressed();
+    }
+
+    @Override
+    protected void onPause() {
+        if (isStarted) {
+            killStrategy();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        killStrategy();
+        super.onDestroy();
+    }
+
+    public void startStopClicked(View view) {
+        if (isStarted) {
+            stopStrategy();
+        } else {
+            startStrategy();
+        }
+    }
+
+    private void updateOnOffButton() {
+        if (isStarted) {
+            startButton.setText("Stop");
+        } else {
+            startButton.setText("Start");
+        }
+    }
+
+
+    protected void killStrategy() {
+        if (gps != null) {
+            gps.stopUsingGPS();
+        }
+    }
+
+    protected void startStrategy() {
+        isStarted = true;
+        gps = new GPSTracker(this);
+        updateOnOffButton();
+        Toast.makeText(this, "Started", Toast.LENGTH_LONG).show();
+    }
+
+    protected void stopStrategy() {
+        isStarted = false;
+        killStrategy();
+        updateOnOffButton();
+        Toast.makeText(this, "Stopped", Toast.LENGTH_LONG).show();
+    }
+}
+</code></pre>

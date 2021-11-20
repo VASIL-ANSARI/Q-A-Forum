@@ -1,0 +1,21 @@
+<p>Your parent process <code>wait</code>s for the sort process to finish before creating the ls process.</p>
+
+<p>The sort process needs to read its input before it can finish. And its input is coming from the ls that won't be started until after the <code>wait</code>. Deadlock.</p>
+
+<p>You need to create both processes, then <code>wait</code> for both of them.</p>
+
+<p>Also, your file descriptor manipulations aren't quite right. In this pair of calls:</p>
+
+<pre><code>close(0);
+dup2(fd[0], 0);
+</code></pre>
+
+<p>the close is redundant, since dup2 will automatically close the existing fd 0 if there is one. You should do a <code>close(fd[0])</code> after ther dup2, so you only have one file descriptor tied to that end of the pipe. And if you want to be really robust, you should test wither <code>fd[0]==0</code> already, and in that case skip the dup2 and close.</p>
+
+<p>Apply all of that to the other dup2 also.</p>
+
+<p>Then there's the issue of the parent process holding the pipe open. I'd say you should close both ends of the pipe in the parent after you've passed them on to the children, but you have that weird <code>read</code> from <code>fd[0]</code> after the last <code>wait</code>... I'm not sure why that's there. If the <code>ls|sort</code> pipeline has run correctly, the pipe will be empty afterward, so there will be nothing to read. In any case, you definitely need to close <code>fd[1]</code> in the parent, otherwise the sort process won't finish because the pipe won't indicate EOF until all writers are closed.</p>
+
+<p>After the weird <code>read</code> is a <code>printf</code> that will probably crash, since the read buffer won't be <code>'\0'</code>-terminated.</p>
+
+<p>And the point of using <code>execlp</code> is that it does the <code>$PATH</code> lookup for you so you don't have to specify <code>/bin/</code>. My first test run failed because my sort is in <code>/usr/bin/</code>. Why hardcode paths when you don't have to?</p>

@@ -1,0 +1,33 @@
+<p>Marshal the struct from the function call as an <code>IntPtr</code>. You will need to use <code>Marshal.AllocHGlobal</code> or another similar technique to get a block of unmanaged memory, since the Marshal isn't going to do it for you. You can then load the size member manually, or using <code>Marshal.StructureToPtr</code>.</p>
+
+<p>From there use <code>Marshal.OffsetOf</code> to get the offset to the <code>Union</code> member. Once that's done use <code>Marshal.Read</code> and <code>Marshal.PtrToStringUni</code> to get at the data. For example with the Parent Location information:</p>
+
+<pre><code>IntPtr raw = Marshal.AllocHGlobal(1024);
+
+// This is the GetVirtualDiskInfo from your provided code.
+GetVirtualDiskInfo info = new GetVirtualDiskInfo();
+info.Version = GetVirtualDiskInfoVersion.ParentLocation;
+Marshal.StructureToPtr(info, raw, true);
+
+Class1.Test(raw); // Replace this with your call to the function,
+                  // This is a call to a C++/CLI method I wrote to stuff data
+                  // into the structure.
+
+IntPtr offsetToUnion = Marshal.OffsetOf(typeof(GetVirtualDiskInfo), "Union");
+IntPtr data = raw + offsetToUnion.ToInt32();
+
+bool parentResolved = Marshal.ReadInt32(data) != 0;
+string parentLocationBuffer = Marshal.PtrToStringUni(data + 4);
+
+Marshal.FreeHGlobal(raw); // Don't forget this!
+</code></pre>
+
+<p>Here's the method in the C++/CLI that loads the data for testing:</p>
+
+<pre><code>static void Test(IntPtr ptr)
+{
+    GET_VIRTUAL_DISK_INFO* info = (GET_VIRTUAL_DISK_INFO*)ptr.ToPointer();
+    info-&gt;ParentLocation.ParentResolved = TRUE;
+    memcpy(info-&gt;ParentLocation.ParentLocationBuffer, L"123456789", 20);
+}
+</code></pre>

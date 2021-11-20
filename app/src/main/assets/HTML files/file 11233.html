@@ -1,0 +1,58 @@
+<p>Here is the source code for <code>cv.LoadImage</code> and <code>cv.LoadImageM</code>:</p>
+
+<pre><code>static PyObject *pycvLoadImage(PyObject *self, PyObject *args, PyObject *kw)
+{
+  const char *keywords[] = { "filename", "iscolor", NULL };
+  char *filename;
+  int iscolor = CV_LOAD_IMAGE_COLOR;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kw, "s|i", (char**)keywords, &amp;filename, &amp;iscolor))
+    return NULL;
+
+  // Inside ALLOW_THREADS, must not reference 'filename' because it might move.
+  // So make a local copy 'filename_copy'.
+  char filename_copy[2048];
+  strncpy(filename_copy, filename, sizeof(filename_copy));
+
+  IplImage *r;
+  Py_BEGIN_ALLOW_THREADS
+  r = cvLoadImage(filename_copy, iscolor);
+  Py_END_ALLOW_THREADS
+
+  if (r == NULL) {
+    PyErr_SetFromErrnoWithFilename(PyExc_IOError, filename);
+    return NULL;
+  } else {
+    return FROM_IplImagePTR(r);
+  }
+}
+
+static PyObject *pycvLoadImageM(PyObject *self, PyObject *args, PyObject *kw)
+{
+  const char *keywords[] = { "filename", "iscolor", NULL };
+  char *filename;
+  int iscolor = CV_LOAD_IMAGE_COLOR;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kw, "s|i", (char**)keywords, &amp;filename, &amp;iscolor))
+    return NULL;
+
+  // Inside ALLOW_THREADS, must not reference 'filename' because it might move.
+  // So make a local copy 'filename_copy'.
+  char filename_copy[2048];
+  strncpy(filename_copy, filename, sizeof(filename_copy));
+
+  CvMat *r;
+  Py_BEGIN_ALLOW_THREADS
+  r = cvLoadImageM(filename_copy, iscolor);
+  Py_END_ALLOW_THREADS
+
+  if (r == NULL) {
+    PyErr_SetFromErrnoWithFilename(PyExc_IOError, filename);
+    return NULL;
+  } else {
+    return FROM_CvMatPTR(r);
+  }
+}
+</code></pre>
+
+<p>It looks like the main difference is <code>return FROM_IplImagePTR(r)</code> vs. <code>return FROM_CvMatPTR(r)</code> maybe <code>step</code> is one-based indexing in <code>IplImage</code> but zero-based indexing in <code>CvMat</code>?</p>

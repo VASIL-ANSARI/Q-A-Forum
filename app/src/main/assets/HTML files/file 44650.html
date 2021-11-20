@@ -1,0 +1,38 @@
+<p>You are effectively trying to create a pivot table. You can accomplish this by chaining together quite a few joins, here's one that works for your sample data:</p>
+
+<pre><code>select q1.aspect, q1.value 'period 1', q2.value 'period 2', q3.value 'period 3'
+  from 
+    (select aspect, value 
+       from the_table 
+         where month = 1
+    ) q1
+    inner join
+    (select aspect, value
+       from the_table
+         where month = 2
+    ) q2
+    on q1.aspect = q2.aspect
+    inner join
+    (select aspect, value
+       from the_table
+         where month = 3
+    ) q3
+    on q1.aspect = q3.aspect;
+</code></pre>
+
+<p>The general form there is tedious, but simple to expand.</p>
+
+<p>Here's a demo fiddle: <a href="http://sqlfiddle.com/#!9/6eb5d/9" rel="nofollow">http://sqlfiddle.com/#!9/6eb5d/9</a></p>
+
+<p>And here's a slightly more specific version that uses a little bit of voodoo math to work:</p>
+
+<pre><code>select aspect, 
+  sum(value * (1 - abs(sign(month - 1)))) as 'period 1', 
+  sum(value * (1 - abs(sign(month - 2)))) as 'period 2', 
+  sum(value * (1 - abs(sign(month - 3)))) as 'period 3'
+from the_table
+group by aspect
+</code></pre>
+
+<p>Which can be seen compared to the first query here:
+<a href="http://sqlfiddle.com/#!9/6eb5d/13" rel="nofollow">http://sqlfiddle.com/#!9/6eb5d/13</a></p>

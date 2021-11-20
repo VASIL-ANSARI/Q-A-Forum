@@ -1,0 +1,30 @@
+<p>You can sort of do this - it only works well if the API is expecting a unique_ptr to a fully abstract class. Basically, you can just create a derived class that forwards to your instance... i.e. given</p>
+
+<pre><code>struct Abstract {
+    virtual void someFun() = 0;
+};
+</code></pre>
+
+<p>and</p>
+
+<p><code>T apiFun(unique_ptr&lt;Abstract&gt; ptr);</code></p>
+
+<p>and your class</p>
+
+<pre><code>struct MyImpl : public Abstract {
+   virtual void someFun() { cout &lt;&lt; "Hello world!" &lt;&lt; std::endl; }
+};
+</code></pre>
+
+<p>then you could have</p>
+
+<pre><code>struct AbstractProxy : public Abstract {
+    Abstract* other;
+    AbstractProxy(Abstract* other): other(other) {}
+    virtual void someFun() { other-&gt;someFun(); }
+};
+</code></pre>
+
+<p>-- of course this won't actually delete your class in the end. But since you can't actually prevent your class getting created on the stack (in which case, deleting it will cause <code>bad things</code> (TM) to happen), you probably don't want to do this anyway. If you want to make sure your created instances always get deleted you should probably not expose a constructor and instead provide a free function that always creates instances of your class on the heap. Or however your unique_ptr is expecting to be able to delete your class.</p>
+
+<p>In this case, it seems the API is broken. <code>unique_ptr</code>s should only be held by owners of the respective instance, and it doesn't seem like that function is trying to claim ownership of your instance.</p>

@@ -1,0 +1,24 @@
+<p>With 20-40k products per category at 20 categories with an unknown row size, you have some real architectural decisions to make on your data caching (if you do use a cache). Currently, each category id parameter will be a unique cache of that query with a time to live of five minutes consuming some amount of heap space. In addition, it has to be copied out of cache during a request and will consume memory until it can be collected. Also note that permgen is not related to heap size. </p>
+
+<p>I would recommend not caching to see how the DB server handles it by only asking for the records for that page. Built in query cache is very situational and this is not one of those situations. 30k records might not seem like much until you realize you have product descriptions and other large text blocks that are half a meg each. I would highly recommend going with at least a gig or two of heap if you can for any typical commerce site with a robust catalog. (You say "I am running on CF9 on a server with 6GB RAM." Hopefully some of that is free to allocate to the JVM). In this situation, more memory is only going to put off the problem until a later date, if at all. </p>
+
+<p>Also, pull permgen back to 256. 512 permgen is pretty high, even for a big enterprise app. </p>
+
+<p>Here is how your app is currently functioning when a request comes in. </p>
+
+<ol>
+<li>The query tag is hit and results are returned
+
+<ol>
+<li>Cache hit - results are copied out of the cache taking some wasteful amount of megabytes</li>
+<li>Cache miss - results are streamed in from the database taking some wasteful amount of megabytes and are additionally copied into the cache region (but you avoid the database load time as well as transfer time, I suspect most of your time is spent during transfer rather than querying) </li>
+</ol></li>
+<li>You utilize a fraction of the query</li>
+<li>The query is garbage collected</li>
+</ol>
+
+<p>Under light load, your server is probably barely keeping up. Who knows how often your cache region is able to avoid churn. </p>
+
+<p><strong>Additional follow-up:</strong></p>
+
+<p>It sounds like you are doing all this simply for the rowcounts for pagination. You can actually put your total row counts into the query that is returning records for just one page as a subquery. If you want to split into two queries -- one for the row counts and one for the records for this row, that former is a good contender for caching. It is data that won't change often, and if it does, it really doesn't matter if you are slightly behind. In addition, it is super small and actually makes sense to cache over asking the DB all the time.</p>

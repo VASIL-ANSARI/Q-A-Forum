@@ -1,0 +1,109 @@
+<p>You can use <code>itertools.groupby</code> to quickly find the count of repetitions of some character, and <code>izip_longest(*matrix)</code> to transpose the matrix (swap its rows and columns).</p>
+
+<pre><code>from itertools import groupby, izip_longest
+
+matrix_string = """
+afaaf
+rbaca
+rlaff
+"""
+
+def longest_repetition(row): 
+    return max((sum(1 for item in group), letter) 
+               for letter, group in groupby(row) 
+               if letter is not None)
+
+def main():
+    matrix = [[letter for letter in row.strip()] 
+              for row in matrix_string.strip().split('\n')]
+
+    count, letter = max(
+        max(longest_repetition(row) for row in matrix),
+        max(longest_repetition(col) for col in izip_longest(*matrix))
+    )
+
+    print letter, count
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+
+<p>Since you've updated the requirement here is a recursive version of the code with some explanations. If it were not an assignment and this task came up in some real life problem, you should really have used the first version.</p>
+
+<pre><code>matrix_string = """
+afaaf
+rbaca
+rlaff
+"""
+
+
+def find_longest_repetition(matrix):
+    rows = len(matrix)
+    cols = len(matrix[0])
+
+    # row, col - row and column of the current character.
+    # direction - 'h' if we are searching for repetitions in horizontal direction (i.e., in a row).
+    #             'v' if we are searching in vertical direction.
+    # result - (count, letter) of the longest repetition we have seen by now.
+    #          This order allows to compare results directly and use `max` to get the better one
+    # current - (count, letter) of the repetition we have seen just before the current character.
+    def recurse(row, col, direction, result, current=(0, None)):
+        # Check if we need to start a new row, new column, 
+        #   new direction, or finish the recursion.
+        if direction == 'h':    # If we are moving horizontally
+            if row &gt;= rows:     # ...  and finished all rows
+                return recurse( # restart from the (0, 0) position in vertical direction.
+                    0, 0,
+                    'v',
+                    result
+                )
+            if col &gt;= cols:     # ... and finished all columns in the current row
+                return recurse( # start the next row.
+                    row + 1, 0,
+                    direction,
+                    result
+                )
+        else:                   # If we are moving vertically
+            if col &gt;= cols:     # ... and finished all columns
+                return result   # then we have analysed all possible repetitions. 
+            if row &gt;= rows:     # ... and finished all rows in the current column
+                return recurse( # start the next column.
+                    0, col + 1,
+                    direction,
+                    result
+                )
+
+        # Figure out where to go next in the current direction
+        d_row, d_col = (0, 1) if direction == 'h' else (1, 0)
+
+        # Try to add current character to the current repetition
+        count, letter = current
+        if matrix[row][col] == letter:
+            updated_current = count + 1, letter
+        else:
+            updated_current = 1, matrix[row][col]
+
+        # Go on with the next character in the current direction
+        return recurse( 
+            row + d_row, 
+            col + d_col,
+            direction,
+            max(updated_current, result), # Update the result, if necessary
+            updated_current
+        )
+
+    return recurse(0, 0, 'h', (0, None))
+
+
+def main():
+    matrix = [[letter for letter in row.strip()] 
+              for row in matrix_string.strip().split('\n')]
+
+    count, letter = find_longest_repetition(matrix)
+
+    print letter, count
+
+
+if __name__ == '__main__':
+    main()
+</code></pre>

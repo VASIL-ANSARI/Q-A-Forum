@@ -1,0 +1,62 @@
+<p>Turns out the issue was with Content-Type: multipart/mixed at the top in the header.  This was apparently telling the email client to expect more than just email content...and thus it was making up some filler for the missing attachment.  As soon as I changed that from </p>
+
+<blockquote>
+  <p>Content-Type: multipart/mixed</p>
+</blockquote>
+
+<p>to </p>
+
+<blockquote>
+  <p>Content-Type: text/html</p>
+</blockquote>
+
+<p>everything started working.  Of course, I also did a bunch more tweaking along the way, including the ability to add a PDF attachment if I ever need to (just as part of the troubleshooting) - so here is what I ended up with after all was tweaked. Hopefully this helps someone someday. </p>
+
+<pre><code>if( $Attachment )
+{
+    $filename = $AttachmentName;
+    $file = $_SERVER['DOCUMENT_ROOT'].$AttachmentSrc;
+    $file_size = filesize($file);
+    if($file_size &gt; 0)
+    {
+        $handle = fopen($file, "r");
+        $filecontent = fread($handle, $file_size);
+        fclose($handle);
+        $attachment = chunk_split(base64_encode($filecontent));
+        $IncludeAttachment = 'yes';
+    }
+}
+
+$uid = md5(uniqid(time()));
+
+$header = "From: ".$MessageFromName." &lt;".$MessageFromEmail."&gt;".$eol;
+$header .= "Reply-To: ".$MessageFromEmail.$eol;
+if($CcMessageTo!=''){ $header .= "Cc: $CcMessageTo".$eol; }
+if($BccMessageTo!=''){ $header .= "Bcc: $BccMessageTo".$eol; }
+if($RequestReadReceipt=='yes'){ $header .= "Disposition-Notification-To: ".$MessageFromEmail.$eol; }
+$header .= "MIME-Version: 1.0".$eol;
+if($IncludeAttachment == 'yes')
+{
+    $header .= "Content-Type: multipart/mixed; boundary=\"".$uid."\"";
+    $message = "--".$uid.$eol;
+    $message .= "Content-Type: text/html; charset=UTF-8".$eol;
+    $message .= "Content-Transfer-Encoding: quoted-printable".$eol.$eol;
+    $message .= quoted_printable_encode($MessageBody).$eol;
+    $message .= "--".$uid.$eol;
+    $message .= "Content-Type: application/pdf; name=\"".$filename."\"".$eol;
+    $message .= "Content-Transfer-Encoding: base64".$eol;
+    $message .= "Content-Disposition: attachment; filename=\"".$filename."\"".$eol.$eol;
+    $message .= $attachment.$eol;
+    $message .= "--".$uid."--";
+}
+else
+{
+    $header .= "Content-Type: text/html; charset=UTF-8".$eol;
+    $header .= "Content-Transfer-Encoding: quoted-printable".$eol.$eol;
+    $message .= quoted_printable_encode($MessageBody).$eol;
+}
+
+$AdditionalParameters = "-f$MessageFromEmail";
+
+mail($MessageTo, $MessageSubject, $message, $header, $AdditionalParameters);
+</code></pre>

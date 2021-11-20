@@ -1,0 +1,31 @@
+<p>This part of the producer seems wrong.</p>
+
+<pre><code>    // Send our message
+    std::ofstream buftosend;
+    myMessage.SerializeToOstream(&amp;buftosend);
+    mq.send(&amp;buftosend, sizeof(buftosend), 1);
+</code></pre>
+
+<p>The <code>ofstream</code> has not been opened and so does not have a file to store anything, so the first call will fail (not crash). The send call is sending the raw <code>ofstream</code> class structure across the line. This will not be in a transmittable format.</p>
+
+<p>I think what you want is to serialize to an ostringstream, then transmit the contents of the ostringstream (not the whole object).</p>
+
+<p>Something like:</p>
+
+<pre><code>    // Send our message
+    std::ostringstream buftosend;
+    myMessage.SerializeToOstream(&amp;buftosend);
+    std::string str = buftosend.str();
+    mq.send(str.data(), str.size(), 1); 
+</code></pre>
+
+<p>Or better yet:</p>
+
+<pre><code>    // Send our message
+    std::string str = myMessage.SerializeAsString();
+    mq.send(str.data(), str.size(), 1); 
+</code></pre>
+
+<p>You can also add a debug line to show what is the contents of <code>str</code>, though note it will be binary so not legible.</p>
+
+<p>You may have a similar issue with your consumer (ifstream needs to be opened on a file).</p>

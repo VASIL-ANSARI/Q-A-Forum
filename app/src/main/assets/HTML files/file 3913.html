@@ -1,0 +1,206 @@
+<p>If I understood the question correctly you should be able to achieve the same effect by creating  part of a sphere and using the image as a texture. Instead of moving the picture you rotate the sphere.</p>
+
+<p>Code and XAML of the main window: </p>
+
+<pre><code>namespace WpfBalls
+{
+   public partial class Window1 : Window
+    {
+        public Window1()
+        {
+            InitializeComponent();
+
+            Ball ball = new Ball();
+            ball.ImageSource = "YourPictureHere.jpg"; //path to the picture
+            visualModel.Children.Add(ball);
+        }
+    }
+}
+
+&lt;Window x:Class="WpfBalls.Window1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:WpfBalls"
+    Title="3D WpfBalls" Height="400" Width="600"&gt;
+    &lt;Grid&gt;
+        &lt;Grid.Background&gt;
+            &lt;LinearGradientBrush StartPoint="0,0" EndPoint="0,1"&gt;
+                &lt;LinearGradientBrush.GradientStops&gt;
+                    &lt;GradientStop Color="White" Offset="0"/&gt;
+                    &lt;GradientStop Color="White" Offset="1"/&gt;
+                &lt;/LinearGradientBrush.GradientStops&gt;
+            &lt;/LinearGradientBrush&gt;
+        &lt;/Grid.Background&gt;
+        &lt;Viewport3D x:Name="viewPort" Grid.Column="0" Grid.Row="0" ClipToBounds="False"&gt;
+            &lt;Viewport3D.Camera&gt;
+                &lt;PerspectiveCamera x:Name="camera" Position="0,0,-8" 
+                                   UpDirection="0,1,0" LookDirection="0,0,1" 
+                                   FieldOfView="25" NearPlaneDistance="0.125"/&gt;
+            &lt;/Viewport3D.Camera&gt;
+            &lt;Viewport3D.Children&gt;
+                &lt;ModelVisual3D&gt;
+                    &lt;ModelVisual3D.Content&gt;
+                        &lt;AmbientLight Color="White"  /&gt;
+                    &lt;/ModelVisual3D.Content&gt;
+                &lt;/ModelVisual3D&gt;
+                &lt;ModelVisual3D x:Name="visualModel"&gt;
+
+                        &lt;ModelVisual3D.Transform&gt;
+                        &lt;Transform3DGroup&gt;
+                            &lt;RotateTransform3D&gt;
+                                &lt;RotateTransform3D.Rotation&gt;
+                                    &lt;AxisAngleRotation3D  x:Name="rotationY" 
+                                                          Angle="{Binding ElementName=sliderY,Path=Value}" Axis="0,1,0" /&gt;
+                                &lt;/RotateTransform3D.Rotation&gt;
+                            &lt;/RotateTransform3D&gt;
+                            &lt;RotateTransform3D&gt;
+                                &lt;RotateTransform3D.Rotation&gt;
+                                    &lt;AxisAngleRotation3D  x:Name="rotationX" 
+                                                          Angle="{Binding ElementName=sliderX,Path=Value}" Axis="1,0,0" /&gt;
+                                &lt;/RotateTransform3D.Rotation&gt;
+                            &lt;/RotateTransform3D&gt;
+                        &lt;/Transform3DGroup&gt;
+                    &lt;/ModelVisual3D.Transform&gt;
+
+                &lt;/ModelVisual3D&gt;
+            &lt;/Viewport3D.Children&gt;
+        &lt;/Viewport3D&gt;
+        &lt;Slider Height="23" HorizontalAlignment="Left" Margin="25,23,0,0" Name="sliderX" Minimum="-70" Maximum="70" Value="0"  VerticalAlignment="Top" Width="100" /&gt;
+        &lt;Slider Height="86" HorizontalAlignment="Left" Margin="25,52,0,0" Name="sliderY" Minimum="110" Maximum="250" Value="180" VerticalAlignment="Top" Width="27" Orientation="Vertical" /&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+
+<p>Code of the Ball class:</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Windows.Media.Media3D;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace WpfBalls
+{
+    public class Ball : ModelVisual3D
+    {
+        public Ball()
+        {
+            this.Content = new GeometryModel3D();
+            (this.Content as GeometryModel3D).Geometry = Tessellate();
+
+        }
+
+        static double DegToRad(double degrees)
+        {
+            return (degrees / 180.0) * Math.PI;
+        }
+
+        internal Point3D GetPosition(double t, double y)
+        {
+            double r = Math.Sqrt(1 - y * y);
+            double x = r * Math.Cos(t);
+            double z = r * Math.Sin(t);
+
+            return new Point3D(x, y, z);
+        }
+
+        private Vector3D GetNormal(double t, double y)
+        {
+            return (Vector3D)GetPosition(t, y);
+        }
+
+        private Point GetTextureCoordinate(double t, double y)
+        {
+            Matrix TYtoUV = new Matrix();
+            TYtoUV.Scale(1 / (2 * Math.PI), -0.5);
+
+            Point p = new Point(t, y);
+            p = p * TYtoUV;
+
+            return p;
+        }
+
+        public string ImageSource
+        {
+            set {
+
+                DiffuseMaterial dm = new DiffuseMaterial();
+                ImageSource imSrc = new 
+                    BitmapImage( new Uri( value, UriKind.RelativeOrAbsolute ) );
+                dm.Brush = new ImageBrush( imSrc );
+
+
+                (this.Content as GeometryModel3D).Material = dm; 
+            }
+        }
+
+        public Point3D Offset
+        {
+            set {
+                this.Transform = new 
+                    TranslateTransform3D(value.X, value.Y, value.Z);
+            }
+        }
+
+        internal Geometry3D Tessellate()
+        {
+            int tDiv =750;
+            int yDiv = 750;
+            double maxTheta = DegToRad(360);
+            double minY = -1.0;
+            double maxY = 1.0;
+
+            double dt = maxTheta / tDiv;
+            double dy = (maxY - minY) / yDiv;
+
+            MeshGeometry3D mesh = new MeshGeometry3D();
+
+            for (int yi = 0; yi &lt;= yDiv; yi++)
+            {
+                double y = minY + yi * dy;
+
+                for (int ti = 0; ti &lt;= tDiv; ti++)
+                {
+                    double t = ti * dt;
+                    var p = GetPosition(t, y);
+                    if (p.Z &gt; 0 &amp;&amp; p.X &gt; -.5 &amp;&amp; p.X &lt; .5 &amp;&amp; p.Y &gt; -.5 &amp;&amp; p.Y &lt; .5)
+                    {
+                    mesh.Positions.Add(p);
+                    mesh.Normals.Add(GetNormal(t, y));
+                    mesh.TextureCoordinates.Add(GetTextureCoordinate(t, y));
+                    }
+
+                }
+            }
+
+            for (int yi = 0; yi &lt; yDiv; yi++)
+            {
+                for (int ti = 0; ti &lt; tDiv; ti++)
+                {
+                    int x0 = ti;
+                    int x1 = (ti + 1);
+                    int y0 = yi * (tDiv + 1);
+                    int y1 = (yi + 1) * (tDiv + 1);
+
+                    mesh.TriangleIndices.Add(x0 + y0);
+                    mesh.TriangleIndices.Add(x0 + y1);
+                    mesh.TriangleIndices.Add(x1 + y0);
+
+                    mesh.TriangleIndices.Add(x1 + y0);
+                    mesh.TriangleIndices.Add(x0 + y1);
+                    mesh.TriangleIndices.Add(x1 + y1);
+                }
+            }
+
+            mesh.Freeze();
+            return mesh;
+        }
+    }
+}
+</code></pre>
+
+<p>The code is based on this example:
+<a href="http://www.codegod.de/WebAppCodeGod/wpf-3d-animations-and-textures-AID439.aspx" rel="nofollow">http://www.codegod.de/WebAppCodeGod/wpf-3d-animations-and-textures-AID439.aspx</a></p>

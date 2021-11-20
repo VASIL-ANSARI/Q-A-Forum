@@ -1,0 +1,43 @@
+<p>I had the same problem. I had to shange jeditable code to resolve it.</p>
+
+<p>First, I retorned the list from server as a List of SelectListItem (that have this properties: Value, Text, Selected):</p>
+
+<pre><code>listOfEentities.Select(c =&gt; new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
+</code></pre>
+
+<p>Then, change jeditable code (in the part that defines the type select, change the element content, to look like this):</p>
+
+<pre><code>select: {
+           element : function(settings, original) {
+                var select = $('&lt;select /&gt;');
+                $(this).append(select);
+                return(select);
+            },
+            content : function(data, settings, original) {
+                /* If it is string assume it is json. */
+                if (String == data.constructor) {      
+                    eval ('var json = ' + data);
+                } else {
+                /* Otherwise assume it is a hash already. */
+                    var json = data;
+                }
+                var selected = '';
+                for (var i in json) {
+                    var item = json[i];
+                    if (item.Selected)
+                        selected = item.Value;
+                    var option = $('&lt;option /&gt;').val(item.Value).append(item.Text);
+                    $('select', this).append(option);    
+                }                    
+                /* Loop option again to set selected. IE needed this... */ 
+                if (selected != "") {
+                    $('select', this).children().each(function () {
+                        if ($(this).val() == selected ||
+                            $(this).text() == $.trim(original.revert)) {
+                            $(this).attr('selected', 'selected');
+                        }
+                    });
+                }
+            }
+        }
+</code></pre>

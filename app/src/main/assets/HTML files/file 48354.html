@@ -1,0 +1,57 @@
+<p><code>LinearSVC</code> does not support probability estimates because it is based on <code>liblinear</code> but <code>liblinear</code> supports probability estimates for logistic regression only.</p>
+
+<p>If you just need confidence scores, but these do not have to be probabilities, you can use <code>decision_function</code> instead.</p>
+
+<p>If it it not required to choose penalties and loss functions of linear SVM, you can also use <code>SVC</code> by setting kernel to be <code>'linear'</code>, then you can have <code>predict_proba</code>.</p>
+
+<h3>Update #1:</h3>
+
+<p>You can use <code>SVC</code> with <code>OneVsRestClassifier</code> to support one-vs-rest scheme, for example</p>
+
+<pre><code>from sklearn import datasets
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.svm import SVC
+iris = datasets.load_iris()
+X, y = iris.data, iris.target
+clf = OneVsRestClassifier(SVC(kernel='linear', probability=True, class_weight='auto'))
+clf.fit(X, y)
+proba = clf.predict_proba(X)
+</code></pre>
+
+<h3>Update #2:</h3>
+
+<p>There is another way to estimate probabilities with <code>LinearSVC</code> as classifier.</p>
+
+<pre><code>from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.datasets import load_iris
+
+iris = load_iris()
+X = iris.data
+Y = iris.target
+svc = LinearSVC()
+clf = CalibratedClassifierCV(svc, cv=10)
+clf.fit(X, Y)
+proba = clf.predict_proba(X)
+</code></pre>
+
+<p>However for the other question (<a href="http://stackoverflow.com/questions/31681373/making-svm-run-faster-in-python">Making SVM run faster in python</a>), this solution is not likely to enhance performance either as it involves additional cross-validation and does not support parallelization.</p>
+
+<h3>Update #3:</h3>
+
+<p>For the second solution, because <code>LinearSVC</code> does not support multilabel classification, so you have to wrap it in <code>OneVsRestClassifier</code>, here is an example:</p>
+
+<pre><code>from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.datasets import make_multilabel_classification
+
+X, Y = make_multilabel_classification(n_classes=2, n_labels=1,
+                                      allow_unlabeled=True,
+                                      return_indicator=True,
+                                      random_state=1)
+clf0 = CalibratedClassifierCV(LinearSVC(), cv=10)
+clf = OneVsRestClassifier(clf0)
+clf.fit(X, Y)
+proba = clf.predict_proba(X)
+</code></pre>

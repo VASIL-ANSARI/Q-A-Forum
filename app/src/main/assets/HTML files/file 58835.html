@@ -1,0 +1,11 @@
+<p>It is an impossibly broad topic, at breakneck speed.  No, you are never going to observe an UnhandledException event when your code is called from VB6.  Passing exceptions across an interop boundary is strictly <em>verboten</em>.</p>
+
+<p>The CLR complies, it uses a catch-em-all exception handler in the CCW to catch the exception.  And translates it to an COM-compliant HRESULT error code.  Every .NET exception has a distinct <a href="https://msdn.microsoft.com/en-us/library/system.exception.hresult(v=vs.110).aspx" rel="nofollow">Exception.HResult</a> property value.</p>
+
+<p>The VB6 runtime in turn converts them to a VB6 error.  You need to use the <code>On Error</code> statement to catch them.  The CLR implements IErrorInfo to provide <em>some</em> information, the VB6 <code>Err.Number</code> property has the Exception.HResult value and the <code>Err.Description</code> gives you the Exception.Message property value.  You will however <em>not</em> get the Holy Stacktrace and will be seriously inconvenienced if you need the InnerException property to diagnose the mishap.  Consider using the AppDomain.FirstChanceException event to log the details.</p>
+
+<p>Debugging such an exception is easy enough.  Use the Project > Properties > Debugging > Start external program radio button.  Select your compiled VB6 program or the VB6 IDE.  Force the debugger to stop on the first-chance exception, in VS2015 use Debug > Windows > Exception Settings and tick "Common Language Runtime exceptions".</p>
+
+<p>Do beware that this mechanism is not in effect for any code you run on your own worker threads.  Dealing with those in an interop scenario is, well, tricky.  Presumably that's what is getting you confused about the "sometimes it works" scenario.</p>
+
+<p>Do be very careful with SetUnhandledExceptionFilter(), very easy to break .NET code with that.  The CLR calls that function as well to install its own handler and uses it to raise <em>some</em> exceptions.  Notably NullReferenceException and DivideByZeroException, the kind of exceptions that C# code <em>might</em> want to catch itself.  Also the really bad stuff, like AccessViolationException, you never want to catch that.  It could also interfere with VB6 errors btw, the runtime also uses SEH to raise exceptions.</p>

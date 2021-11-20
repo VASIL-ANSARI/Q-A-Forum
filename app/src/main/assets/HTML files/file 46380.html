@@ -1,0 +1,41 @@
+<p>The problem is that when the new tab is created, the popup dies before the callback can be executed. The popup closes automatically when another tab becomes active, and when it closes its execution stops. Simplest way to solve this is by not making the new tab active:</p>
+
+<pre><code>chrome.tabs.create({url: "http://www.google.com/", active: false}, function(tab){
+    chrome.tabs.sendMessage(tab.id, message, function(response) {});
+});
+</code></pre>
+
+<p>Although you could also move this functionality to the background page, if a non-active tab would be weird for the user. Instead of creating the tab in popup.js, message the background page with chrome.runtime.sendMessage (passing any relevant data) and put a listener in the background page that does the tab creation. (Mostly the same code you already have, just moved around.)</p>
+
+<p>Edit: Okay, I figured out the <em>other</em> problem. The popup is sending the message before the message listener in the content script is attached, so it doesn't receive it. Simplest way to fix that is by adding a timer to the message-sending: </p>
+
+<pre><code>setTimeout(function(){
+    chrome.tabs.sendMessage(tab.id, message, function(response) {});
+} , 600);  //600 works on my computer
+</code></pre>
+
+<p>This isn't a good solution; just a demonstration that the issue is time. To fix this more reliably, I think you'd have to have a more complicated thing where contentscript.js messages popup.js when it's done loading, and popup.js uses tab.ids or something to associate loaded pages with elements in the data array, and sends the appropriate data as a response to contentscript.js</p>
+
+<p>Second edit: The other other problem is with the for loop. Because it's asynchronous, by the time the callback for chrome.tabs.create is called, the loop ended a long time ago, and i=data.length (as it does when the loop ends). So you can't pass data[i] as a message because data[data.length] is undefined. You can replace it with a recursive call like this:</p>
+
+<p>background.js:</p>
+
+<pre><code>var data = ["x", "y"]; //just test data. make sure "data" has global scope
+
+chrome.runtime.onMessage.addListener( 
+    function(message, sender, sendResponse) { //from popup.js
+        createTab(0);
+    }
+);
+
+function createTab(i){
+    if (i == data.length){return;}  //this ends the loop
+     chrome.tabs.create({url: "https://www.google.com/", 
+                            active: false}, function(tab) {
+        setTimeout(function(){
+            chrome.tabs.sendMessage(tab.id,data[i], function(response) {}); //to script
+            createTab(i+1); //this calls the next iteration of the loop
+        }, 1000);
+    });
+}
+</code></pre>

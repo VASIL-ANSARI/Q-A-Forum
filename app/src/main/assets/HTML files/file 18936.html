@@ -1,0 +1,9 @@
+<p>When you declare a function or function template as e.g. <code>ret foo(A, B, C);</code> or indifferently as <code>auto foo(A, B, C) -&gt; ret;</code>, then the <code>foo</code> that refers to the entity just declared is not in scope until after the so-called declarator. In your particular case, the return type (be it a late return type or not) is always part of the declarator.</p>
+
+<p>This means that in your last declaration the name <code>qget</code> in the return type may refer to the previous declaration (the case for <code>I==0</code>) but may never refer to the current declaration. This is why <code>qget&lt;0&gt;</code> and <code>qget&lt;1&gt;</code> are found, but <code>qget&lt;2&gt;</code> is not: when attempting to form the return type of the latter, <code>qget&lt;1&gt;</code> is not found because the first declaration is SFINAE'd out, as intended and the second declaration is the current declaration and not in scope. The error results in SFINAE.</p>
+
+<p>My usual solution when this happens (which I have to say is not that often) is to use a <code>struct</code> (as an implementation detail) because <em>all</em> member functions (and member function templates) are declared inside the definition of a class, from the opening brace on.</p>
+
+<p>That being said, you'll still hit a snag because even though you are using <code>lazy_enable_if_c</code> you're still eagerly computing the type of <code>qget&lt;I - 1&gt;()</code> (as a parameter to <code>lazy_enable_if_c</code>) even when <code>I</code> is <code>0</code>. Lazily evaluating the identity of said type won't save you.</p>
+
+<p>Unfortunately I can't seem to get an example running using GCC 4.7.2, which insists in not terminating the recursion even when fixing the condition to <code>I &gt; 0</code> and using a lazy result (although normally I'd use 4.8), so I can't promise you my solution can be made to work.</p>

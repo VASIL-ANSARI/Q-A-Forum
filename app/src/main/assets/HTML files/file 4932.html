@@ -1,0 +1,36 @@
+<p>disclaimer: THIS ANSWER IS A GUESS :)</p>
+
+<p>You're doing quite a lot of work while the buffer is locked; is this holding up the thread that is capturing the image from the camera?</p>
+
+<p>You could you copy the data out of the buffer while you work on it so you can unlock it asap i.e. something like </p>
+
+<pre><code>if (CVPixelBufferLockBaseAddress(imageBuffer, 0) == kCVReturnSuccess) {
+    // Get the base address and size of the buffer
+    UInt8 *buffer_base = (UInt8 *)CVPixelBufferGetBaseAddress(imageBuffer); //image buffer start address
+    size_t width  = CVPixelBufferGetWidth(imageBuffer); 
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+
+    // Copy it's contents out
+    Uint8 *base = malloc(width * height * 4);
+    memcpy(base, buffer_base, size);
+
+    // Unlock the buffer
+    CVPixelBufferUnlockBaseAddress(imageBuffer,0);
+
+    // base now points to a copy of the buffers' data - do what you want to it . . .
+    ...
+
+    // remember to free base once you're done ;)
+    free(base);
+</code></pre>
+
+<p>If it's the lock that's holding up the capture then this should help.</p>
+
+<p>NB You could speed this up if you know all the buffers will be the same size you can just call malloc once to get the memory and then just reuse it each time and only free it when you have finished processing all the buffers.</p>
+
+<hr>
+
+<p>Or if that's not the problem you could try lowering the priority of this thread</p>
+
+<pre><code>[NSThread setThreadPriority:0.25];
+</code></pre>

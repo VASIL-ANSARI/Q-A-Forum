@@ -1,0 +1,73 @@
+<p>I'm still not a 100% about the why, but I would suggest looking at this <a href="http://stackoverflow.com/a/17923496/1698987">answer</a> for something similar.</p>
+
+<p>I'm working with web services, and I can't remember needing to use base64 in a long time. Last time I did it was for a php one that talked to different applications ... You sure you need to do this?</p>
+
+<hr>
+
+<p>Example (using Andrej code). <strong>THIS CASE WORKS , BUT : Read the warning after the code for more</strong>.</p>
+
+<pre><code>// Input
+var my_string = "Hello world!";
+// Get as binary
+System.Text.ASCIIEncoding  encoding = new System.Text.ASCIIEncoding();
+var input_as_binary = encoding.GetBytes(my_string);
+    /*
+        72 
+        101 
+        108 
+        108 
+        111 
+        32 
+        119 
+        111 
+        114 
+        108 
+        100 
+        33 
+    */
+// If the following is not an exact divisor, It won't work.
+int chunkSize = 6;
+// Create a stream and reader
+Stream stream = new MemoryStream(as_binary);
+BinaryReader rdr = new BinaryReader(stream);
+int streamLength = (int)rdr.BaseStream.Length;
+// A stub to hold the bits of Base64. This will happen on your receiving end
+var sb = new StringBuilder();
+
+// from Andrej answer, I'm just using the "streamLength" Var he defined 
+while (rdr.BaseStream.Position &lt; streamLength) 
+{
+    byte[] b = new byte[chunkSize];
+
+    long remaining = streamLength - rdr.BaseStream.Position;
+    if(remaining &gt;= chunkSize)
+    {
+        rdr.Read(b, 0, chunkSize);
+    }
+    else
+    {
+        rdr.Read(b, 0, (int)remaining);
+    }
+    string chunkString = Convert.ToBase64String(b).Dump("as base 64");
+
+    // Lets assume we send it and it's received on the other side
+    sb.Append(chunkString);
+}
+
+// This should happen on your receiving side as well
+var other_side = sb.ToString(); // value =&gt; SGVsbG8gd29ybGQh
+// Back into byte array
+var byte_from_64 = Convert.FromBase64String(other_side);
+// Back into string. Will hold "Hello World!"
+var string_from_byte = encoding.GetString(byte_from_64);
+</code></pre>
+
+<p>The above works. But if you change the chunk size to something that doesn't give you precise Base64 bits (5 for example, instead of 6), you'll get a string like <code>SGVsbG8=IHdvcmw=ZCEAAAA=</code> and then an exception: </p>
+
+<pre><code>FormatException
+
+The input is not a valid Base-64 string as it contains a non-base 64 character 
+, more than two padding characters, or an illegal character among the pa... 
+</code></pre>
+
+<p>Hence why I suggested playing around with your input :)</p>

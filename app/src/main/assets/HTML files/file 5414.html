@@ -1,0 +1,49 @@
+<p>If they are changing type you're probably not retaining them.</p>
+
+<p>For a string, your property should look like (in the .h file)</p>
+
+<pre><code>@property (nonatomic, copy) NSString *mString;
+</code></pre>
+
+<p>and you set it like</p>
+
+<pre><code>self.mString = [NSString stringWithFormat:@"hello %@", name];
+</code></pre>
+
+<p>which uses the property to retain (or in this case copy) the string.</p>
+
+<p>However, if you do </p>
+
+<pre><code>mString = [NSString stringWithFormat:@"hello %@", name];
+</code></pre>
+
+<p>you have set the variable without using the property so the string is not retained - it will be autoreleased at some point in the future and you will have a pointer that's not pointing to a string anymore :)</p>
+
+<hr>
+
+<p><strong>Why use copy instead of retain for NSStrings?</strong></p>
+
+<p><em>Actually it's copy for anything that is immutable but has a mutable subclass (like NSDictionary, NSArray, NSSet etc).</em></p>
+
+<p>Think of it as self defence.</p>
+
+<p>What happens if you have a property like this :</p>
+
+<pre><code>@property (nonatomic, retain) NSArray *things;
+</code></pre>
+
+<p>and in your code you use the number of things in a loop i.e.</p>
+
+<pre><code>uint max = [things count];
+for (uint n = 0; n &lt; max; ++n) { ... }
+</code></pre>
+
+<p>OK, that should be fine. Until someone passes in an NSMutableArray instead of an NSArray. Your code assumes that because you have an NSArray, the count of things inside it will not change.</p>
+
+<p>If someone removed an item from your NSArray (because it's really an NSMutableArray but you don't know that) while you were in that loop your code will die horribly (an out of bounds exception).</p>
+
+<p>What copy does is instead of calling retain, it calls copy - making 100% sure that inside your object you have an unmutable array instead of the mutable object someone else passed in. The mutable array can be changed as much as they want - you have your own copy so you code is safer.</p>
+
+<p>However, this comes at the cost of memory use - there are now two arrays in memory. It's usually worth taking the memory hit over a possible crash imho :)</p>
+
+<p>NB Actually, if someone did just pass in a normal NSArray, because it's immutable the implementation of <code>[NSArray copy]</code> is just a retain so 99/100 times you lose nothing by specifying copy for your property :) - this is also true for all the immutable NSxxx classes.</p>

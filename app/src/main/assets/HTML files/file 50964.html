@@ -1,0 +1,63 @@
+<p>You use translate to set the origin. Where on the canvas, or off, the coordinates X = 0, y = 0 are.</p>
+
+<p>Your character is wandering about a game world which is many times bigger than the canvas. You also have many other items and players each with their own coordinates in the game world..</p>
+
+<p>One way to render this is... For each item in the game, find the distance you are from the origin and subtract that from each item as you draw them. Then draw your own character at the center of the screen. But that is slow, and requires all that extra math for each item/player.</p>
+
+<p>So let the hardware do it with the transform. The transform holds the scales (x,y) the rotation (ang), and the translation (origin offset). Every time an object is drawn on the canvas the transformation  matrices is applied to it, you can't avoid it, it has to happen. So if you dont use it to your advantage its just wasted.</p>
+
+<p><strong>How to use it.</strong>
+Your playfield is top left -10,000,-10,000 pixels to bottom right 10,000, 10,000 pixels. Every one has a location on the map between those numbers, including your player, which may be at 5,000, 6,000 pixels. If you <code>ctx.drawImage(playerImage,5000,6000)</code> the image will not appear, its way of the bottom right of the canvas, but you want him in the center of the screen.</p>
+
+<p>To do this move the origin (currently at the upper left corner of the canvas (0,0)) so you at 5000,6000 appear in the center.  </p>
+
+<pre><code>var playerX = 5000;  // your position
+var playerY = 6000;
+var screenWidth = 1920;  // size of the screen
+var screenHeight = 1080;
+var originX = 0;   // where the origin is
+ver originY = 0
+</code></pre>
+
+<p>To center yourself move the origin so that it subtracts you position.</p>
+
+<pre><code>originX -= playerX;
+originY -= playerY;
+</code></pre>
+
+<p>now you are at the top left corner of the canvas, but you want the center. So move it back a bit by half the screen size.</p>
+
+<pre><code>originX += screenWidth/2;
+originY += screenHeight/2;
+</code></pre>
+
+<p>Combine it all into one. Assume the origin is alway 0,0 and you get</p>
+
+<pre><code>originX = -(playerX-screenWidth/2);
+originY = -(playerY-screenHeight/2);
+</code></pre>
+
+<p>Now you have the numbers that you can put into the translate.</p>
+
+<p>But its much better if you put it straight into the transformation matrix, and you don't really need the origin variables.</p>
+
+<p>Thus in one step.</p>
+
+<pre><code>ctx.setTransform(1,0,0,1,-(playerX-screenWidth/2),-(playerY-screenHeight/2));
+</code></pre>
+
+<p>Now when you draw your player at</p>
+
+<pre><code>ctx.drawImage(payerImage,5000,6000);
+</code></pre>
+
+<p>You appear at the center of the canvas. The bad guy at 5500,6200 draw with</p>
+
+<pre><code>ctx.drawImage(enemyImage,5500,6200);
+</code></pre>
+
+<p>will appear on the canvas as well 500 pixels right and 200 down from you.</p>
+
+<p>Now you don't have to mess around with anyones coordinates and just render them where they are, you have moved everything in the game with only one line of code. It has not slowed your game down at all, because the transform is always applied, you just made sure its doing what you want.</p>
+
+<p>Set the transform near the start of every frame, after you have updated your position and everything will follow your character.</p>

@@ -1,0 +1,61 @@
+<p>Instead of <code>DATEADD(d, -1, GETDATE())</code> you should use an expression that returns the beginning of the previous day. You could use your <code>dbo.ufn_StartOfDay()</code> function for that, but there's simpler way to do the same:</p>
+
+<pre><code>Select @DayStart = DateAdd( d, DateDiff( d, 0, @inDate ), 0 )
+</code></pre>
+
+<p>which means: <em>increase the nil timestamp by the whole number of days between the nil timestamp and the given one</em>.</p>
+
+<p>I would also suggest using that expression instead of the already present call to the function as well, so your query would be:</p>
+
+<pre><code>Select [JobNumber]
+From [NCLGS].[dbo].[JobClosedDate]
+Where LastInvoiceDate Between DateAdd( d, DateDiff( d, 0, GetDate() ) - 1, 0 )
+                          And DateAdd( d, DateDiff( d, 0, GetDate() ),     0 )
+Order By JobNumber Desc
+</code></pre>
+
+<hr>
+
+<p><strong>Addition</strong></p>
+
+<p>You need to be clearer about where exactly the problem is. Here is a sample query I created which tests every date from Thursday, June 9 through Saturday June 18. On which date did you expect to get values but did not or visa versa:</p>
+
+<pre><code>With SampleData As
+    (
+    Select 112117 As JobNumber, '2011-06-13 00:00:00.000' As LastInvoiceDate, 'Monday' As DayOfWeek
+    Union All Select 112089, '2011-06-10 00:00:00.000', 'Friday'
+    Union All Select 112090, '2011-06-10 00:00:00.000', 'Friday'
+    Union All Select 112068, '2011-06-10 00:00:00.000', 'Friday'
+    Union All Select 112082, '2011-06-10 00:00:00.000', 'Friday'
+    )
+    , TestDates As
+    (
+    Select Cast('20110609' As datetime) As Date
+    Union All
+    Select DateAdd(d,1,Date)
+    From TestDates
+    Where Date &lt;= '20110617'
+    )
+Select TD.Date, DateName(dw,TD.Date), Count(SD.JobNumber)
+From TestDates As TD
+    Left Join SampleData As SD
+        On SD.LastInvoiceDate Between DateAdd( d, DateDiff( d, 0, TD.Date ) - 1, 0 )
+                          And DateAdd( d, DateDiff( d, 0, TD.Date ),     0 )
+
+Group By TD.Date
+</code></pre>
+
+<hr>
+
+<p><strong>Update</strong></p>
+
+<p>In looking at your comments and the code, I think the problem is in your use of <code>Between</code>. <code>Col Between DateA And DateB</code> translates to <code>Col &gt;= DateA And Col &lt;= DateB</code>. I.e., it is inclusive of both end points. Instead, you need to exclude the final end point:</p>
+
+<pre><code>Select [JobNumber]
+From [NCLGS].[dbo].[JobClosedDate]
+Where LastInvoiceDate &gt;= DateAdd( d, DateDiff( d, 0, GetDate() ) - 1, 0 )
+    And LastInvoiceDate &lt; DateAdd( d, DateDiff( d, 0, GetDate() ), 0 )
+Order By JobNumber Desc
+</code></pre>
+
+<p>This will give you all job numbers that on the previous date. I.e, if today is Friday, June 10, 2011, it will give you all LastInvoiceDate values from <code>2011-06-09 midnight</code> through <code>2011-06-09 23:59:59</code>.</p>

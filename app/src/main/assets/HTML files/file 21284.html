@@ -1,0 +1,27 @@
+<p>Vector stores elements by copying them. So, when you do <code>vector.push_back(Customer())</code> you actually do the following:</p>
+
+<ol>
+<li>Create new Customer object.</li>
+<li><strong>Copy</strong> it into the vector. Since you don't override assignment operator all members are copied by values, including D3D pointers.</li>
+<li>Destroy original Customer object. Destructor releases all the resources.</li>
+</ol>
+
+<p>Step #3 is the problem because of now vector has a copy of an invalid object: all its resources were released. I'd bet this is the problem but your code doesn't define destructor of Customer (or you didn't paste it) so, I'm not that sure. But anyway, the design is very far from perfect.</p>
+
+<p>What I may suggest is storing <strong>pointers</strong> to Customer. If my theory is correct this will help to run this particular code sample.</p>
+
+<pre><code>std::vector&lt;Customer*&gt; customers;
+customers.push_back(new Customer());
+</code></pre>
+
+<p>Of course, you'll have to deal with releasing of the allocatied memory.</p>
+
+<p>And by the way, start checking D3D calls result. Without this any debugging will be a nightmare (and it is already). My guess is that <code>d3dSprite-&gt;Draw</code> fails because of missed texture, you may start checking from there.</p>
+
+<p>Another problem is in <code>loadGraphics</code> method. This code:</p>
+
+<pre><code>D3DXVECTOR3 position(100.0f, 100.0f, 0.0f);
+D3DXVECTOR3 center(0.0f, 0.0f, 0.0f);
+</code></pre>
+
+<p>Is probably supposed to set initial values to the object fields but in fact here you construct new local objects that get destroyed on exit. Fields <code>Customer::position</code>/<code>Customer::center</code> in fact left uninitialized. Then, in <code>Draw</code> method you use these uninitialized fields. Try fixing this and hope this will help.</p>

@@ -1,0 +1,40 @@
+<p>As noted in the comments, <code>Action</code> here is a delegate type. Which, given it's placement in the variable declaration, probably could have been inferred by many readers from the context. :)</p>
+
+<p>The code in the <code>File.Create()</code> method simply generates a new file name based on the <code>splitI</code> index.</p>
+
+<p>Ironically, in this particular case, the use of <code>Action</code> is superfluous. The code really should not have been written this way, as the delegate just makes it harder to read. A better version looks like this:</p>
+
+<pre><code>using (var reader = new Mp3FileReader(mp3Path))
+{
+    FileStream writer = null;      
+
+    try
+    {
+        Mp3Frame frame;
+        while ((frame = reader.ReadNextFrame()) != null)
+        {           
+            if (writer != null &amp;&amp;
+                (int)reader.CurrentTime.TotalSeconds - secsOffset &gt;= splitLength)
+            {   
+                writer.Dispose();
+                writer = null;
+                secsOffset = (int)reader.CurrentTime.TotalSeconds;              
+            }
+
+            if (writer == null)
+                writer = File.Create(Path.Combine(splitDir,
+                    Path.ChangeExtension(mp3File,(++splitI).ToString("D4") + ".mp3")));
+
+            writer.Write(frame.RawData, 0, frame.RawData.Length);
+        }
+    }
+    finally
+    {
+        if(writer != null) writer.Dispose();
+    }
+}
+</code></pre>
+
+<p>That way, the work to create a new <code>FileStream</code> instance is only ever needed in one place.</p>
+
+<p>Even if it were really required to call it from two different places, IMHO this particular scenario would call for named method instead. The code would have been more readable that way, than using the delegate instance.</p>

@@ -1,0 +1,83 @@
+<p>This error:</p>
+
+<pre><code>ORA-06531: Reference to uninitialized collection
+</code></pre>
+
+<p>means that you have a collection that is not initialized before you use it, for example:</p>
+
+<pre><code>SQL&gt; select banner from v$version;
+
+BANNER
+--------------------------------------------------------------------------------
+Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production
+
+SQL&gt; ed
+Wrote file afiedt.buf
+
+  1  CREATE OR REPLACE TYPE t_employee AS OBJECT(
+  2    id  number,
+  3    name VARCHAR2(300),
+  4    CONSTRUCTOR FUNCTION t_employee RETURN SELF AS RESULT
+  5* )
+SQL&gt; /
+
+Type created.
+
+SQL&gt; ed
+Wrote file afiedt.buf
+
+  1* CREATE OR REPLACE TYPE t_employees AS TABLE OF t_employee
+SQL&gt; /
+
+Type created.
+
+SQL&gt; ed
+Wrote file afiedt.buf
+
+  1  DECLARE
+  2    l_emp t_employee;
+  3    l_emps t_employees;
+  4  BEGIN
+  5    for i in (SELECT employee_id, first_name
+  6                FROM employees)
+  7    loop
+  8      l_emp := t_employee(i.employee_id, i.first_name);
+  9      l_emps.extend();
+ 10      l_emps(l_emps.COUNT) := l_emp;
+ 11    end loop;
+ 12    DBMS_OUTPUT.put_line(l_emps(4).name);
+ 13* END;
+SQL&gt; /
+DECLARE
+*
+ERROR at line 1:
+ORA-06531: Reference to uninitialized collection
+ORA-06512: at line 9
+</code></pre>
+
+<p>As you can see, I have the <code>ORA-06531</code> error, that's because I haven't initialized the <code>l_emps</code> variable, I have to add <code>l_emps := t_employees();</code>:</p>
+
+<pre><code>SQL&gt; ed
+Wrote file afiedt.buf
+
+  1  DECLARE
+  2    l_emp t_employee;
+  3    l_emps t_employees;
+  4  BEGIN
+  5    l_emps := t_employees();
+  6    for i in (SELECT employee_id, first_name
+  7                FROM employees)
+  8    loop
+  9      l_emp := t_employee(i.employee_id, i.first_name);
+ 10      l_emps.extend();
+ 11      l_emps(l_emps.COUNT) := l_emp;
+ 12    end loop;
+ 13    DBMS_OUTPUT.put_line(l_emps(4).name);
+ 14* END;
+SQL&gt; /
+David
+
+PL/SQL procedure successfully completed.
+</code></pre>
+
+<p>So take a look at the sources of all these PL/SQL procedures, the problem is in them.</p>

@@ -1,0 +1,39 @@
+<pre><code>sf::RectangleShape* operator()()
+{
+    return &amp;player;
+
+} // RectangleShape Getter
+</code></pre>
+
+<blockquote>
+  <p>Do I need to free memory after this getter?</p>
+</blockquote>
+
+<p>All you do is return a pointer to <code>player</code>. Assuming that is a member variable of the struct/class the above member function is a part of, then its lifetime is bound to the lifetime of the object you call that function with.</p>
+
+<p>In particular that means that this is a bad idea:</p>
+
+<pre><code>struct Foo {
+  sf::RectangleShape player;
+  // ...
+  // insert your operator here
+};
+
+sf::RectangleShape * some_function(void) {
+  Foo f;
+  return f(); // UB, returning pointer to object with automatic memory whose lifetime has ended
+}
+</code></pre>
+
+<blockquote>
+  <p>[..] how would one do this with unique_ptr?</p>
+</blockquote>
+
+<p>Assuming <code>sf::RectangleShape</code> has a copy constructor, then you could make a copy of <code>player</code>:</p>
+
+<pre><code>std::unique_ptr&lt;sf::RectangleShape&gt; operator()() {
+  return make_unique&lt;sf::RectangleShape&gt;(player);
+}
+</code></pre>
+
+<p>The copy you get that way is "yours", i.e. you can manage is lifetime as you want.</p>

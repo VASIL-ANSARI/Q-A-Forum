@@ -1,0 +1,66 @@
+<p>1) You should register the callback in onCreate, otherwise when your activity gets recycled due to an orientation or size change, your callback won't be added back in the new activity.
+2) You have to pass the result back into callbackManager in onActivityResult.
+3) If you keep a static reference to your main activity, you may have an old instance of it, if the main activity gets recycled. You should new up a callback manager in onCreate as well, and make it a class variable of the activity.</p>
+
+<p>Something like this:</p>
+
+<pre><code>public class MainActivity extends ActionBarActivity implements OnClickListener {
+
+    private CallbackManager callbackManager;
+
+
+    private final FacebookCallback&lt;LoginResult&gt; facebookCallback =
+            new FacebookCallback&lt;LoginResult&gt;() {
+
+                @Override
+                public void onSuccess(LoginResult loginResult) {
+                    Intent intent = new Intent(this, SecondActivity.class);
+                    startActivity(intent);
+                }
+
+                @Override
+                public void onCancel() {
+
+                }
+
+                @Override
+                public void onError(FacebookException e) {
+
+                }
+            };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        FacebookSdk.sdkInitialize(getApplicationContext());
+        callbackManager = CallbackManager.Factory.create();
+        setContentView(R.layout.activity_main);
+
+        Button facebookLoginButton = (Button) findViewById(R.id.btn_facebook_login);
+        facebookLoginButton.setOnClickListener(this);
+        loginManager.getInstance().registerCallback(callbackManager,
+                        facebookCallback);
+    }
+
+
+    @Override
+    public void onClick(View view) {
+
+        switch (view.getId()) {
+            case R.id.btn_facebook_login:
+                LoginManager.getInstance().logInWithReadPermissions(this,
+                        Arrays.asList(AppResources.sFacebookPermissions));
+
+            break;
+        }
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data)   {
+        super.onActivityResult(requestCode, resultCode, data);
+        callbackManager.onActivityResult(requestCode, resultCode, data);
+    }
+
+}
+</code></pre>

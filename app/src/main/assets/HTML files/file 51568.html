@@ -1,0 +1,98 @@
+<p>Yes your <code>canvas.width = canvas.width;</code> will clear the canvas and you'll end up with only the <code>rect</code> after moving. Either do all the rendering code in your move function as well, or have a backup canvas for the map that so that you can efficiently render it at the top of your move function without stepping through the <code>mapArray</code> each time. Here they use a backup canvas: <a href="http://stackoverflow.com/questions/7242006/html5-copy-a-canvas-to-image-and-back">html5: copy a canvas to image and back</a></p>
+
+<hr>
+
+<p>Code based on the backup canvas idea:</p>
+
+<pre><code>var canvas = &lt;HTMLCanvasElement&gt;document.getElementById('myCanvas');
+var context = canvas.getContext("2d");
+var img = new Image();
+img.onload = function () {
+    context.drawImage(img, 0, 0);
+}
+img.src = "";
+
+
+
+var mapArray =
+       ["############################",
+        "#      #    #      o      ##",
+        "#                          #",
+        "#   ####   #####    ##     #",
+        "##         #   #    ##     #",
+        "###           ##     #     #",
+        "#           ###      #     #",
+        "#   ####          ###      #",
+        "#   ##    #  o             #",
+        "# o  #    #    o ###   ### #",
+        "#    #    #                #",
+        "############################"];
+
+//need to add wall.scource =  and grass.source =
+var wall = new Image();
+var grass = new Image();
+grass.src = "http://vignette2.wikia.nocookie.net/tibia/images/6/60/Grass_(Tile).gif/revision/latest?cb=20080817072800&amp;path-prefix=en";
+wall.src = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJyofLT0tMSw3QTo6LC87RD84Nzc5OjcBCgoKBQUFDgUFDisZExkrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrK//AABEIACAAIAMBIgACEQEDEQH/xAAYAAADAQEAAAAAAAAAAAAAAAACAwQFAP/EACkQAAEDAwIDCQEAAAAAAAAAAAECAxEABCESEyMxURQyM0Fhc4GT0QX/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8Au/oXDzT2ltZSJxAHKp27242yC5nPxQ3Qm5dVqzOMelI7vNMdYoKm718Jw4c85ApN5cXIbWvdUTtk48qBKkGcgEdaFRT2e4AIPCVQaF+1tvuawAVEQKlVBM8ulHfPoXeunfaKQqJ1ilrW0UnjNfYP2gVoCoURIpdwhoMuhKTG2ZNODiJI3miPcFddvMm1cSHGvDIEKBJoP//Z";
+
+
+var posX = 0;
+var posY = 0;
+
+
+
+
+//for loops set images at given coordinates according to position on mapArray
+for (var y = 0; y &lt; mapArray.length; y++) {
+    for (var x = 0; x &lt; mapArray[0].length; x++) {
+
+        if (mapArray[y][x] == "") {
+            context.drawImage(grass, (32 * x), (32 * y), 32, 32)//last two are size of image )
+        }
+        if (mapArray[y][x] == "#") {
+            context.drawImage(wall, (32 * x), (32 * y), 32, 32)//last two are size of image )
+        }
+ }
+}
+
+// Here you've rendered the static content and you want to save the state of the canvas in a backup at this point:
+
+// create backing canvas
+var backCanvas = document.createElement('canvas');
+backCanvas.width = canvas.width;
+backCanvas.height = canvas.height;
+var backCtx = backCanvas.getContext('2d');
+
+// save main canvas contents
+backCtx.drawImage(canvas, 0,0);
+
+context.rect(posX, posY, 32, 32)
+context.stroke();//traces path, might not need this
+
+
+//moves character
+function move(e) {
+
+    canvas.width = canvas.width;//clears the board after each move (not really necessary since we'll draw the backCanvas over it...)
+
+    // Render the backup canvas here
+    context.drawImage(backCanvas, 0,0);
+
+    //alert(e.keyCode);//gives feedback to what each keyCode is
+    if (e.keyCode == 39) {
+        posX += 5;
+    }
+    if (e.keyCode == 37) {
+        posX -= 5;
+    }
+    if (e.keyCode == 40) {
+        posY += 5;
+    }
+    if (e.keyCode == 38) {
+        posY -= 5;
+
+    }
+    context.rect(posX, posY, 32, 32)
+    context.stroke();
+}    
+document.onkeydown = move;
+</code></pre>

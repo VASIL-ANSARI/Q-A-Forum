@@ -1,0 +1,57 @@
+<p>Just add an appropriate <a href="http://www.newtonsoft.com/json/help/html/T_Newtonsoft_Json_JsonConverterAttribute.htm" rel="nofollow"><code>JsonConverterAttribute</code></a> to your <code>Version</code> property, and <a href="http://www.newtonsoft.com/json/help/html/M_Newtonsoft_Json_JsonConvert_PopulateObject.htm" rel="nofollow"><code>PopulateObject</code></a> will use it:</p>
+
+<pre><code>public class Tablet
+{
+    public string MacAddress { get; set; }
+    [JsonConverter(typeof(VersionConverter))]
+    public Version SoftwareVersion { get; set; }
+    public DateTime LastUpdated { get; set; }
+    public bool Charging { get; set; }
+}
+</code></pre>
+
+<p>And here is the actual converter:</p>
+
+<pre><code>public class VersionConverter : JsonConverter 
+{
+    private static Version ParseVersion(object versionObj)
+    {
+        var pattern = new Regex(@"^[\d.]+");
+        var versionString = versionObj.ToString();
+        if (!pattern.IsMatch(versionString)) 
+            return null;
+
+        var match = pattern.Match(versionString);
+        versionString = match.Groups[0].ToString();
+
+        Version version;
+        Version.TryParse(versionString, out version);
+        return version;
+    }
+
+    public override bool CanConvert(Type objectType)
+    {
+        return  objectType == typeof(System.Version);
+    }
+
+    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+    {
+        var token = JToken.Load(reader);
+        return ParseVersion((string)token);
+    }
+
+    public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+    {
+        var version = (Version)value;
+        if (version != null)
+            writer.WriteValue(value.ToString());
+    }
+}
+</code></pre>
+
+<p>You should now be all set.  </p>
+
+<p>Alternatively, if you have a <code>Version</code> property appearing in many different container classes in a complex object graph, and you don't want to set the <code>JsonConverterAttribute</code> everywhere, you can add your converter to <a href="http://www.newtonsoft.com/json/help/html/P_Newtonsoft_Json_JsonSerializerSettings_Converters.htm" rel="nofollow"><code>JsonSerializerSettings.Converters</code></a>, then pass that to <a href="http://www.newtonsoft.com/json/help/html/M_Newtonsoft_Json_JsonConvert_PopulateObject_1.htm" rel="nofollow"><code>PopulateObject</code></a>:</p>
+
+<pre><code>JsonConvert.PopulateObject(json, model, new JsonSerializerSettings { Converters = new JsonConverter [] { new VersionConverter() } } );
+</code></pre>

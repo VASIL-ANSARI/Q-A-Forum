@@ -1,0 +1,49 @@
+<blockquote>
+  <p>Don't worry if this answer is too general or you can't understand
+  something - this is academic stuff and needs some basic preparations.
+  Feel free to contact me with questions, if you want (ask for my mail
+  in comment or smth, we'll figure something out).</p>
+</blockquote>
+
+<p>I think that this question is more suited for <a href="http://stats.stackexchange.com/">CrossValidated</a>.</p>
+
+<p>Anyway, first thing that you need to do is to create some training set. You need to find as many documents with reasons as you can and annotate them, marking phrases specifying reason. The more documents the better. 
+If you're gonna work with user reports - use example reports, so that training data and real data will come from the same source.
+This is how you'll build some kind of corpus for your processing.</p>
+
+<p>Then you have to specify what features you'll need. This may be POS tag, n-gram feature, lemma/stem, etc. This needs experimentation and some practice. Here I'd use some n-gram features (probably 2-gram or 3-gram) and maybe some knowledge basing on some Wordnet.</p>
+
+<p>Last step is building you chunker or annotator. It is a component that will take your training set, analyse it and learn what should it mark.
+You'll meet something called "semantic gap" - this term describes situation when your program "learned" something else than you wanted (it's a simplification). For example, you may use such a set of features, that your chunker will learn finding "I don't " phrases instead of reason phrases. It is really dependent on your training set and feature set.
+If that happens, you should try changing your feature set, and after a while - try working on training set, as it may be not representative.</p>
+
+<p>How to build such chunker? For your case I'd use HMM (Hidden Markov Model) or - even better - CRF (Conditional Random Field). These two are statistical methods commonly used for stream annotation, and you text is basically a stream of tokens. Another approach could be using any "standard" classifier (from Naive Bayes, through some decision tress, NN to SVM) and using it on every n-gram in text. </p>
+
+<p>Of course choosing feature set is highly dependent on chosen method, so read some about them and choose wisely.</p>
+
+<p>PS. This is oversimplified answer, missing many important things about training set preparation, choosing features, preprocessing your corpora, finding sources for them, etc. This is not walk-through - these are basic steps that you should explore yourself.</p>
+
+<p>PPS. Not sure, but NLTK may have some CRF or HMM implementation. If not, I can recommend <a href="http://scikit-learn.org/stable/modules/hmm.html" rel="nofollow">scikit-learn</a> for Markov and <a href="http://www.chokkan.org/software/crfsuite/api/crfsuite_hpp_api.html" rel="nofollow">CRFP++</a> for CRF. Look out - the latter is powerful, but is a b*tch to install and to use from Java or python.</p>
+
+<p><strong>==EDIT==</strong></p>
+
+<p>Shortly about features:</p>
+
+<p>First, what kinds of features can we imagine?</p>
+
+<ul>
+<li>lemma/stem - you find stems or lemmas for each word in your corpus, choose the most important (usually those will have the highest frequency, or at least you'll start there) and then represent each word/n-gram as binary vector, stating whether represented word or sequence after stemming/lemmatization contains that feature lemma/stem</li>
+<li>n-grams - similiar to above, but instead of single words you choose most important sequences of length n. "n-gram" means "sequence of length n", so e.g. bigrams (2-grams) for "I sat on a bench" will be: "I sat", "sat on", "on a", "a bench".
+
+<ul>
+<li>skipgrams - similiar to n-grams, but contains "gaps" in original sentence. For example, biskipgrams with gap size 3 for "Quick brown fox jumped over something" (sorry, I can't remember this phrase right now :P ) will be: ["Quick", "over"], ["brown", "something"]. In general, n-skipgrams with gap size m are obtained by getting a word, skipping m, getting a word, etc unless you have n words.</li>
+</ul></li>
+<li>POS tags - I've always mistaken them with "positional" tags, but this is acronym for "Part Of Speech". It is useful when you need to find phrases that have common grammatical structure, not common words.</li>
+</ul>
+
+<p>Of course you can combine them - for example use skipgrams of lemmas, or POS tags of lemmas, or even *-grams (choose your favourite :P) of POS-tags of lemmas.</p>
+
+<p>What would be the sense of using POS tag of lemma? That would describe part of speech of basic form of word, so it would simplify your feature to facts like "this is a noun" instead of "this is plural female noun".</p>
+
+<p>Remember that choosing features is one of the most important parts of the whole process (the other is data preparation, but that deserves the whole semester of courses, and feature selection can be handled in 3-4 lectures, so I'm trying to put basics here). 
+You need some kind of intuition while "hunting" for chunks - for example, if I wanted to find all expressions about colors, I'd probably try using 2- or 3-grams of words, represented as binary vector described whether such n-gram contains most popular color names and modifiers (like "light", "dark", etc) and POS tag. Even if you'd miss some colors (say, "magenta") you could find them in text if your method (I'd go with CRF again, this is wonderful tool for this kind of tasks) generalized learned knowledge enough.</p>

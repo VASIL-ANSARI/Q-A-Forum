@@ -1,0 +1,39 @@
+<p>The following attempts at deletion are blocked in sheets receiving form data: </p>
+
+<ul>
+<li>deletion of columns with form data</li>
+<li>deletion of the row with form questions - that is, row 1</li>
+</ul>
+
+<p>Other rows can be deleted at will. This behavior is exactly the same for scripts as it is for user actions. </p>
+
+<p>Your script attempts to delete row 1 because it's buggy. I quote the relevant part:</p>
+
+<pre><code>  var names = sheet.getSheetValues(2, 2, sheet.getLastRow(), 1);
+  for(var i=names.length; i&gt;-1; i++){
+    for(var j=names.length; j&gt;-1; j++){
+      if(names[i]==names[j] &amp;&amp; i != j)
+        sheet.deleteRow(i);
+</code></pre>
+
+<p>What row is names[i] in? It's in row i+2, because i=0 corresponds to row 2. Yet, you attempt to delete row numbered i, two rows above the intended one. </p>
+
+<p>Besides, <code>i&gt;-1; i++</code> is absurd; you want <code>i--</code> there.</p>
+
+<hr>
+
+<p>Here is a simple script that deletes row with duplicates; it's tested with my form responses. It traverses the contents of "Form Responses 1" sheet from bottom to top; if two rows have the same value in column C, the older one gets deleted. I do take care not to attempt deletion of row 1.</p>
+
+<p>(The reason to do this in bottom-up order is to avoid dealing with rows that moved up because others were deleted.) </p>
+
+<pre><code>function deleteDupes() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Form Responses 1');
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i &gt; 1; i--) {
+    if (values[i][2] == values[i-1][2]) {
+      sheet.deleteRow(i);
+    }
+  }
+}
+</code></pre>

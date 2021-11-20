@@ -1,0 +1,114 @@
+<p>Got a satisfying result now.
+What I first did was</p>
+
+<ol>
+<li>use the RgbColorRetriever class by pkuderov as linked in the
+accepted answer to this thread: <a href="http://stackoverflow.com/questions/16189590/office-2007-and-higher-interop-retrieve-rgb-color">Office 2007 [and higher] interop: retrieve RGB-color</a></li>
+<li>Since the resulting system color was slightly darker than the Word color, I additionally applied a lightening effect as proposed by Pavel Vladov in this thread (second answer, not the accepted one): <a href="http://stackoverflow.com/questions/801406/c-create-a-lighter-darker-color-based-on-a-system-color">C#: Create a lighter/darker color based on a system color</a></li>
+</ol>
+
+<p><strong>Edit</strong> Alas, this does not seem to work for certain theme grays. However I need it to also work with these. </p>
+
+<p>Therefore: alternative solution using <a href="http://www.microsoft.com/en-us/download/details.aspx?id=5124" rel="nofollow">Open XML SDK</a>:</p>
+
+<pre><code>private void bkwParseColors_DoWork(object sender, DoWorkEventArgs e)
+{
+    var docItem = (string) e.Argument;
+    using (var docx = WordprocessingDocument.Open(docItem, false))
+    {
+        var ind = 0;
+        var maxnum = docx.MainDocumentPart.Document.Descendants&lt;Run&gt;().Count();
+        foreach (Run rText in docx.MainDocumentPart.Document.Descendants&lt;Run&gt;())
+        {
+            if (rText.RunProperties != null)
+            {
+                if (rText.RunProperties.Color != null)
+                {
+                    ind++;
+                    bkwParseColors.ReportProgress(100*ind/maxnum, rText.RunProperties.Color);
+                }
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>Progress change method for creating ListViewItem in correct color and storing Word color value as well as theme color:</p>
+
+<pre><code>private void bkwParseColors_ProgressChanged(object sender, ProgressChangedEventArgs e)
+{
+    progressBar1.Value = e.ProgressPercentage;
+
+    var color = (DocumentFormat.OpenXml.Wordprocessing.Color)e.UserState;
+    var thema = "";
+    if (color.ThemeColor!=null)
+        thema = color.ThemeColor.Value.ToString();
+
+    var farbe = color.Val.Value; //hex RGB
+    var drin = lstColors.FindItemWithText(farbe);
+    if(drin==null)
+    {
+        var li = new myListItem
+        {
+            Design = thema,
+            Farbe = farbe,
+            Text = farbe,
+            BackColor = ColorTranslator.FromHtml("#" + farbe)
+        };
+        lstColors.Items.Add(li);
+    }
+}
+</code></pre>
+
+<p>Some additional info: I needed all this because I need to hide/unhide text of a certain color, but that color is never certain, i.e. depends on the whims of the customer and/or the colors already used in the document...</p>
+
+<p>So for completions sake, here is how I hide all text in the document except for text in the selected color:</p>
+
+<pre><code>private void bkwEinblenden_DoWork(object sender, DoWorkEventArgs e)
+{
+    var args = (List&lt;object&gt;) e.Argument;
+    var pfad = (string) args[0];
+    var color = (myListItem) args[1];
+    using (var docx = WordprocessingDocument.Open(pfad, true))
+    {
+        var ind = 0;
+        var maxnum = docx.MainDocumentPart.Document.Descendants&lt;Run&gt;().Count();
+        foreach (Run rText in docx.MainDocumentPart.Document.Descendants&lt;Run&gt;())
+        {
+            bkwEinblenden.ReportProgress(100*ind/maxnum);
+            var vanish = new Vanish() { Val = OnOffValue.FromBoolean(true) };
+            if (rText.RunProperties == null)
+            {
+                var runProp = new RunProperties {Vanish = vanish};
+                rText.RunProperties = runProp;
+            }
+            else
+            {
+                if (rText.RunProperties.Vanish == null)
+                    rText.RunProperties.Vanish = vanish;
+                else
+                {
+                    rText.RunProperties.Vanish.Val = OnOffValue.FromBoolean(true);
+                }
+            }
+            if (rText.RunProperties.Color != null)
+            {
+                if (rText.RunProperties.Color.Val == color.Farbe)
+                {
+                    if (!string.IsNullOrEmpty(color.Design))
+                    {
+                        if (rText.RunProperties.Color.ThemeColor.Value.ToString() == color.Design)
+                        {
+                            rText.RunProperties.Vanish.Val = OnOffValue.FromBoolean(false);
+                        }
+                    }
+                    else
+                    {
+                        rText.RunProperties.Vanish.Val = OnOffValue.FromBoolean(false);
+                    }
+                }
+            }
+        }
+    }
+}
+</code></pre>

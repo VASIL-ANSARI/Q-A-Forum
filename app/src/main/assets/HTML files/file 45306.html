@@ -1,0 +1,46 @@
+<p>I tried this and it works using mongoid version 4.0.2:</p>
+
+<pre><code>class Like
+  include Mongoid::Document
+
+  belongs_to :likable, polymorphic: true
+  belongs_to :user, inverse_of: :user
+end
+
+class Submission
+  include Mongoid::Document
+
+  belongs_to :creator, class_name: 'User', inverse_of: :submissions
+  has_many :likes, as: :likable, dependent: :destroy
+end
+
+class User
+  include Mongoid::Document
+
+  has_many :submissions, dependent: :destroy
+
+  has_many :likes, as: :user
+  has_many :liked_submissions, as: :likable, dependent: :destroy, class_name: 'Like'
+  has_many :liked_comments, as: :likable, dependent: :destroy, class_name: 'Like'
+end
+
+class BlogPost
+  include Mongoid::Document
+
+  has_many :likes, as: :likable, dependent: :destroy
+end
+</code></pre>
+
+<p>Also <code>user.liked_submissions</code> and <code>user.liked_comments</code> are the same relation so it is equivalent to declaring an alias like this:</p>
+
+<pre><code>class User
+  include Mongoid::Document
+
+  has_many :submissions, dependent: :destroy
+
+  has_many :likes, as: :user
+  has_many :liked_submissions, as: :likable, dependent: :destroy, class_name: 'Like'
+
+  alias :liked_comments :liked_submissions
+end
+</code></pre>

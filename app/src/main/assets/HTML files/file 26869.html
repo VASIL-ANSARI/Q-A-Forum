@@ -1,0 +1,55 @@
+<h2>How is an array of structs allocated</h2>
+
+<p>In your case, the <code>MyData[2]</code> array looks like this in memory:</p>
+
+<pre><code>| count | name | average | count | name | average |
+^ -- your ptr points here 
+</code></pre>
+
+<p>This is a single, continuous space with size <code>3 * sizeof (struct MyData)</code>.</p>
+
+<p>Whenever you perform a <code>ptr++</code> operation the pointer will move to the next structure in the array, which means that it takes into account the size of a single <code>struct MyData</code>. </p>
+
+<pre><code>| count | name | average | count | name | average |
+                         ^ -- after ptr++ your ptr points here
+</code></pre>
+
+<p>After another <code>ptr++</code> your pointer will point to the memory <em>just after</em> your array.</p>
+
+<pre><code>| count | name | average | count | name | average | 
+                                                  ^ -- another ptr++ and your ptr points here
+</code></pre>
+
+<p><strong>When you dereference your <code>ptr</code> pointer you access memory which is not yet used or even allocated. This is undefined behavior and because of that your application crashes.</strong></p>
+
+<h2>How to iterate?</h2>
+
+<p>There are several ways to do it. Note that not all ways are applicable in all cases.</p>
+
+<p><strong>A simple for</strong></p>
+
+<p>Very often we simply know the size of the array. We can then just use a normal <code>for</code> loop to iterate over the contents.</p>
+
+<pre><code>int len = 2;
+struct MyData data[len] = { {3, "name1", 1.0}, {5, "name2", 2.5} };
+struct MyData* ptr = data;
+for (int i=0; i&lt;2; i++, ptr++ ) {
+   // do your thing with the ptr
+   // and note that ptr gets increased inside for
+}
+</code></pre>
+
+<p><strong>Using sizeof to determine array length</strong></p>
+
+<pre><code>struct MyData data[2] = { {3, "name1", 1.0}, {5, "name2", 2.5} };
+struct MyData* ptr = data;
+struct MyData* endPtr = data + sizeof(data)/sizeof(data[0]);
+while ( ptr &lt; endPtr ){
+   // do your thing with the ptr
+   ptr++;
+}
+</code></pre>
+
+<p>The <code>sizeof(data)/sizeof(data[0])</code> calculates the amount of elements: gets the total size of an array and divides it by the size of a single element. </p>
+
+<p>This method has its drawbacks. It can not be used when the array is declared as a pointer! For example, when we pass the array as a parameter to a function it usually gets converted to a pointer - and then we can not determine the size of the array.</p>

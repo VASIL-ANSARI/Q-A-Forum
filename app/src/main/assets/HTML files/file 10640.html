@@ -1,0 +1,47 @@
+<p>Factor of 2? </p>
+
+<p>OK, the problem likely is caused by the UTF-8 vs latin1<br>
+:- <a href="http://dev.mysql.com/doc/refman/5.0/en/storage-requirements.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.0/en/storage-requirements.html</a></p>
+
+<p>You can check the database connection, database default character set for both servers.</p>
+
+<p>here is the testing I have just done :-</p>
+
+<pre>
+mysql> create table test ( name varchar(10) ) engine
+    -> =memory;
+Query OK, 0 rows affected (0.03 sec)
+
+mysql> show create table test;
++-------+------------------------------------------------------------------------------------------------+
+| Table | Create Table                                                                                   |
++-------+------------------------------------------------------------------------------------------------+
+| test  | CREATE TABLE `test` (
+  `name` varchar(10) DEFAULT NULL
+) ENGINE=MEMORY DEFAULT CHARSET=latin1 |
++-------+------------------------------------------------------------------------------------------------+
+1 row in set (0.00 sec)
+
+mysql> insert into test values ( 1 );
+
+mysql> set names utf8;
+Query OK, 0 rows affected (0.01 sec)
+
+
+mysql> create table test2 ( name varchar(10) ) engine =memory default charset = utf8;
+Query OK, 0 rows affected (0.01 sec)
+
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> insert into test2 values ( convert(1 using utf8) );
+Query OK, 1 row affected (0.01 sec)
+
+mysql> select table_name, avg_row_length from information_schema.tables where TABLE_NAME in( 'test2', 'test');
++------------+----------------+
+| table_name | avg_row_length |
++------------+----------------+
+| test       |             12 |
+| test2      |             32 |
++------------+----------------+
+2 rows in set (0.01 sec)
+</pre>

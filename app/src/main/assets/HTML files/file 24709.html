@@ -1,0 +1,33 @@
+<p>No, you can still use a std::atomic even conditionally.</p>
+
+<p>Firstly, if you use <code>std::atomic&lt;unsigned int&gt;</code> then overflow behavoir is well defined (although possibly not what you want). If you use a signed integer overflow isn't well defined but as long as you don't hit it then this doesn't matter.</p>
+
+<p>If you absolutely must check for overflow, or otherwise act conditionally, you can use compare-exchange. This lets you read the value, decide whether you want to do work on it and then atomically update the value back if it hasn't changed. And the key part here is the system will tell you if the atomic update <em>failed</em>, in which case you can go back to the start and read the new value and make the decision again.</p>
+
+<p>As an example, if we only wanted to set the max value of an atomic integer to 4 (in some kind of refcounting, for instance), we could do:</p>
+
+<pre><code>#include &lt;atomic&gt;
+
+static std::atomic&lt;int&gt; refcount = 0;
+
+int val = refcount; // this doesn't need to be in the loop as on failure compare-exchange-strong updates it
+while(true)
+{
+   if(val == 4)
+   {
+       // there's already 4 refs here, maybe come back later?
+       break;
+   }
+
+   int toChangeTo = val + 1;
+   if(refcount.compare_exchange_strong(val, toChangeTo))
+   {
+       // we successfully took a ref!
+       break;
+   }
+
+    // if we fail here, another thread updated the value whilst we were running, just loop back and try again
+}
+</code></pre>
+
+<p>In the above code you can use <code>compare_exchange_weak</code> instead. This can sometimes spuriously fail and so you need to do it in a loop. However, we have a loop anyway (and in general you always will as you need to handle real failures) and so <code>compare_exchange_weak</code> makes a lot of sense here.</p>

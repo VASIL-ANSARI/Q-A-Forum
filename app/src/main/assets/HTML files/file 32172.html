@@ -1,0 +1,59 @@
+<p>As <a href="http://stackoverflow.com/questions/21118710/invalid-calle-while-using-mlapp-in-c-sharp#comment31776934_21118710">@wonko79</a> explained in the comments, if you want to reuse the <code>out</code> variable, you should set it to <code>null</code> first.</p>
+
+<p>Here is a tested example <a href="http://www.mathworks.com/help/matlab/matlab_external/call-matlab-function-from-a-c-client.html" rel="nofollow">calling MATLAB from C#</a>:</p>
+
+<pre><code>using System;
+
+namespace CSharp_matlab_com
+{
+class Program
+{
+    static void Main(string[] args)
+    {
+        MLApp.MLAppClass matlab = new MLApp.MLAppClass();
+
+        // create variables: a_0, a_1, ..., a_4
+        for (int k = 0; k &lt; 5; k++) {
+            matlab.Execute(string.Format("a_{0} = rand(2);", k));
+        }
+
+        // retrieve variables from MATLAB and print their contents
+        object a;
+        for (int k = 0; k &lt; 5; k++) {
+            // current variable name
+            string varname = string.Format("a_{0}", k);
+
+            // get data array
+            a = null;    // without this line, an exception is thrown!
+            matlab.GetWorkspaceData(varname, "base", out a);
+
+            // print contents
+            var arr = (double[,]) a;
+            Console.WriteLine("\nndims(a) = {0}, numel(a) = {1}", arr.Rank, arr.Length);
+            for (int i = 0; i &lt; arr.GetLength(0); i++) {
+                for (int j = 0; j &lt; arr.GetLength(1); j++) {
+                    Console.WriteLine("{0}[{1},{2}] = {3}", varname, i, j, arr[i,j]);
+                }
+            }
+        }
+    }
+}
+}
+</code></pre>
+
+<p>The output:</p>
+
+<pre><code>ndims(a) = 2, numel(a) = 4
+a_0[0,0] = 0.251806122472313
+a_0[0,1] = 0.617090884393223
+a_0[1,0] = 0.290440664276979
+a_0[1,1] = 0.265280909810029
+
+...
+
+ndims(a) = 2, numel(a) = 4
+a_4[0,0] = 0.425259320214135
+a_4[0,1] = 0.16148474431175
+a_4[1,0] = 0.312718886820616
+a_4[1,1] = 0.178766186752368
+</code></pre>

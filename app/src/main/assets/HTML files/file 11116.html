@@ -1,0 +1,132 @@
+<p><strong>Curl</strong>:<br></p>
+
+<pre><code>function curl($url)
+{
+    $ch = curl_init();
+    curl_setopt ($ch, CURLOPT_URL,$url);
+    curl_setopt ($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.6) Gecko/20070725 Firefox/2.0.0.6");
+    curl_setopt ($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt ($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_HEADER, 0);
+    curl_setopt ($ch, CURLOPT_RETURNTRANSFER, 1);
+    $result = curl_exec ($ch);
+    curl_close($ch);
+    return $result;
+}
+</code></pre>
+
+<p><strong>Sockets:</strong></p>
+
+<pre><code>function sockets($host) {
+$fp = fsockopen("www.".$host, 80, $errno, $errstr, 30);
+  $out = "GET / HTTP/1.1\r\n";
+  $out .= "Host: www.".$host."\r\n";
+  $out .= "Connection: Close\r\n\r\n";
+  fwrite($fp, $out);
+  $f='';
+  while (!feof($fp)) {
+    $f .= fgets($fp, 1024);
+  }
+return $f;
+}
+</code></pre>
+
+<p><strong>file_get_contents</strong><br></p>
+
+<pre><code> function fgc($url){
+       return file_get_contents($url);
+    }
+</code></pre>
+
+<p><strong>Multicurl</strong></p>
+
+<pre><code>function multiRequest($data,$nobody=false,$options = array(), $oneoptions = array())
+{
+    $curls = array();
+    $result = array();
+    $mh = curl_multi_init();
+    foreach ($data as $id =&gt; $d)
+    {
+        $curls[$id] = curl_init();
+        $url = (is_array($d) &amp;&amp; !empty($d['url'])) ? $d['url'] : $d;
+        curl_setopt($curls[$id], CURLOPT_URL,            $url);
+        curl_setopt($curls[$id], CURLOPT_HEADER,         0);
+        curl_setopt($curls[$id], CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curls[$id], CURLOPT_FOLLOWLOCATION,1);
+        curl_setopt($curls[$id], CURLOPT_USERAGENT,"Mozilla/5.0(Windows;U;WindowsNT5.1;ru;rv:1.9.0.4)Gecko/2008102920AdCentriaIM/1.7Firefox/3.0.4");
+        //curl_setopt($curls[$id], CURLOPT_COOKIEJAR,'cookies.txt');
+        //curl_setopt($curls[$id], CURLOPT_COOKIEFILE,'cookies.txt');
+        //curl_setopt($curls[$id], CURLOPT_NOBODY, $nobody);
+
+        if (!empty($options))
+        {
+            curl_setopt_array($curls[$id], $options);
+        }
+        if (!empty($oneoptions[$id]))
+        {
+            curl_setopt_array($curls[$id], $oneoptions[$id]);
+        }
+        if (is_array($d))
+        {
+            if (!empty($d['post']))
+            {
+
+                curl_setopt($curls[$id], CURLOPT_POST,       1);
+                curl_setopt($curls[$id], CURLOPT_POSTFIELDS, $d['post']);
+            }
+        }
+        curl_multi_add_handle($mh, $curls[$id]);
+    }
+    $running = null;
+    do
+    {
+        curl_multi_exec($mh, $running);
+    }
+    while($running &gt; 0);
+    foreach($curls as $id =&gt; $content)
+    {
+        $result[$id] = curl_multi_getcontent($content);
+        //echo curl_multi_getcontent($content);
+        curl_multi_remove_handle($mh, $content);
+    }
+    curl_multi_close($mh);
+    return $result;
+}
+</code></pre>
+
+<p><strong>Tests:</strong></p>
+
+<pre><code>$url = 'example.com';
+$start = microtime(1);
+for($i=0;$i&lt;100;$i++)
+curl($url);
+$end = microtime(1);
+echo "Curl:".($end-$start)."\n";
+
+$start = microtime(1);
+for($i=0;$i&lt;100;$i++)
+fgc("http://$url/");
+$end = microtime(1);
+echo "file_get_contents:".($end-$start)."\n";
+
+$start = microtime(1);
+for($i=0;$i&lt;100;$i++)
+sockets($url);
+$end = microtime(1);
+echo "Sockets:".($end-$start)."\n";
+
+$start = microtime(1);
+for($i=0;$i&lt;100;$i++)
+$arr[]=$url;
+multiRequest($arr);
+$end = microtime(1);
+echo "MultiCurl:".($end-$start)."\n";
+?&gt;
+</code></pre>
+
+<p><strong>Results</strong>:<br></p>
+
+<ul>
+<li>Curl: 5.39667105675<br> file_get_contents: 7.99799394608<br> Sockets:
+2.99629592896<br> MultiCurl: 0.736907958984<br></li>
+</ul>

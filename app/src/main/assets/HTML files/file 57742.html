@@ -1,0 +1,111 @@
+<p>The simple solution 1:<br>
+If you don't mind aligning the marker horizontally center:
+First set the map center to the marker's position then pan the map by the half of the map's div height minus the offset from bottom:</p>
+
+<pre><code>marker.addListener('click', function(){
+  var divHeightOfTheMap = document.getElementById('map').clientHeight;
+  var offSetFromBottom = 50;
+  map.setCenter(marker.getPosition());
+  map.panBy(0, -(divHeightOfTheMap / 2 - offSetFromBottom));
+});
+</code></pre>
+
+<p>The simple solution 2:<br>
+If you don't want to aligning the marker horizontally center:
+First set the map center to the marker's latitude and the map's center longitude then pan the map by the half of the map's div height minus the offset from bottom:</p>
+
+<pre><code>marker.addListener('click', function(){
+  var divHeightOfTheMap = document.getElementById('map').clientHeight;
+  var offSetFromBottom = 50;
+  map.setCenter(new google.maps.LatLng(marker.getPosition().lat(), map.getCenter().lng()));
+  map.panBy(0, -(divHeightOfTheMap / 2 - offSetFromBottom));
+});
+</code></pre>
+
+<p>Solution 3:</p>
+
+<p>Use an empty overlay to calculate the pixel position:</p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;meta name="viewport" content="initial-scale=1.0, user-scalable=no"&gt;
+    &lt;meta charset="utf-8"&gt;
+    &lt;title&gt;Pan to bottom&lt;/title&gt;
+    &lt;style&gt;
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 100%;
+      }
+    &lt;/style&gt;
+    &lt;script src="https://maps.googleapis.com/maps/api/js"&gt;&lt;/script&gt;
+    &lt;script&gt;
+        var marker;
+        var map;
+        var overlay;
+        divOverlay.prototype = new google.maps.OverlayView();
+        function initMap() {
+            var mLatLng = {lat: 40.758984, lng: -73.985131};
+            map = new google.maps.Map(document.getElementById('map'), {
+              zoom: 15,
+              center: mLatLng
+            });
+
+            var marker = new google.maps.Marker({
+              position: mLatLng,
+              map: map
+            });
+
+            overlay = new divOverlay(map, marker);
+            overlay.setMap(map);
+
+            marker.addListener('click', function(){
+                overlay.panMarkerToBottom(50, true); // (Offset from bottom, want horizontally center?)
+            });
+        }
+        function divOverlay(map, marker) {
+            this.bounds_ = map.getBounds();
+            this.map_ = map;
+            this.div_ = null;
+            this.marker_ = marker;
+        }
+        divOverlay.prototype.onAdd = function() {
+            this.div_ = document.createElement('div');
+            this.getPanes().overlayLayer.appendChild(this.div_);
+        };
+        divOverlay.prototype.onRemove = function() {
+            this.div_.parentNode.removeChild(this.div_);
+            this.div_ = null;
+        };      
+        divOverlay.prototype.draw = function() {
+        };
+
+        divOverlay.prototype.panMarkerToBottom = function(offSetFromBottom, isCenter) {
+            if (offSetFromBottom){
+                var overlayProjection = this.getProjection();
+                var mPos = overlayProjection.fromLatLngToContainerPixel(this.marker_.getPosition());
+                var mapDiv = this.map_.getDiv();
+                var mapWidth = mapDiv.offsetWidth;
+                var mapHeight = mapDiv.offsetHeight;
+                var panX = 0;
+                if (isCenter) {
+                    panX = -(mapWidth / 2 - mPos.x);
+                }; 
+                var panY = -(mapHeight - mPos.y - offSetFromBottom);
+                this.map_.panBy(panX , panY);
+            }
+        };      
+        google.maps.event.addDomListener(window, 'load', initMap);
+    &lt;/script&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;div id="map"&gt;&lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>I hope this helps!</p>

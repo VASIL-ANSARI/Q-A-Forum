@@ -1,0 +1,45 @@
+<p><strong>Update 2:</strong> From the ArgParse documentation,</p>
+
+<blockquote>
+  <p>One of the more common uses of nargs='?' is to allow optional input and output files:</p>
+
+<pre><code>&gt;&gt;&gt; parser = argparse.ArgumentParser()
+&gt;&gt;&gt; parser.add_argument('infile', nargs='?', type=argparse.FileType('r'),
+...                     default=sys.stdin)
+&gt;&gt;&gt; parser.add_argument('outfile', nargs='?', type=argparse.FileType('w'),
+...                     default=sys.stdout)
+&gt;&gt;&gt; parser.parse_args(['input.txt', 'output.txt'])
+Namespace(infile=&lt;open file 'input.txt', mode 'r' at 0x...&gt;,
+          outfile=&lt;open file 'output.txt', mode 'w' at 0x...&gt;)
+&gt;&gt;&gt; parser.parse_args([])
+Namespace(infile=&lt;open file '&lt;stdin&gt;', mode 'r' at 0x...&gt;,
+          outfile=&lt;open file '&lt;stdout&gt;', mode 'w' at 0x...&gt;)
+</code></pre>
+</blockquote>
+
+<p><strong>Original answer:</strong></p>
+
+<p>This is straightforward: just add a positional argument with a default value and a <code>nargs='*'</code>.  The default value will be used if there are zero arguments, otherwise the arguments on the command line will be used:</p>
+
+<pre><code>&gt;&gt;&gt; p = argparse.ArgumentParser()
+&gt;&gt;&gt; p.add_argument('filename', nargs='*', default=['-'])
+&gt;&gt;&gt; p.parse_args([])
+Namespace(filename=['-'])
+&gt;&gt;&gt; p.parse_args(['abc'])
+Namespace(filename=['abc'])
+</code></pre>
+
+<p>Typically, <code>-</code> is used to refer to standard input / standard output.</p>
+
+<p>Then you do something like this:</p>
+
+<pre><code>def get_inputs(ns):
+    """Iterate over input files."""
+    for path in ns.filename:
+        if path == '-':
+            yield sys.stdin
+        else:
+            yield open(path, 'r')
+</code></pre>
+
+<p><strong>Update:</strong> I assumed you wanted multiple filenames, since <code>cat</code> takes multiple filenames.  You can use <code>nargs='?'</code> if you want either zero or one filename.</p>

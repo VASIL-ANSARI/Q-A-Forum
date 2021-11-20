@@ -1,0 +1,24 @@
+<blockquote>
+  <p>If B exits right at program start and only A calls MPI_Barrier, is A blocked for eternity?</p>
+</blockquote>
+
+<p>Basically yes. But actually, you are not allowed to do that.</p>
+
+<p>Simply speaking, you must call <code>MPI_Finalize</code> on all processes before exiting. And <code>MPI_Finalize</code> acts like a collective (on <code>MPI_COMM_WORLD</code>), so it usually does not complete before every process calls <code>MPI_Finalize</code>. So in your example, process B didn't exit (at least not correctly).</p>
+
+<p>But I guess the MPI 3.1 standard at 8.7 explains it more clearly:</p>
+
+<blockquote>
+  <p><code>MPI_Finalize</code> [...] This routine cleans up all MPI state. If an MPI
+  program terminates normally (i.e., not due to a call to <code>MPI_ABORT</code> or
+  an unrecoverable error) then each process must call <code>MPI_FINALIZE</code>
+  before it exits. Before an MPI process invokes <code>MPI_FINALIZE</code>, the
+  process must perform all MPI calls needed to complete its involvement
+  in MPI communications: It must locally complete all MPI operations
+  that it initiated and must execute matching calls needed to complete
+  MPI communications initiated by other processes.</p>
+</blockquote>
+
+<p>Note how the last sentence also requires you to complete the barrier in your question.</p>
+
+<p>The standard says, your program is not correct. In practice it will most likely deadlock/hang.</p>

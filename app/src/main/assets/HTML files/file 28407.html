@@ -1,0 +1,30 @@
+<p>I recommend you read about the <a href="http://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem" rel="nofollow">producer-consumer problem</a>.  Your producers are the fetch threads.  Your consumer is the <code>save</code> function.  If I understand correctly, you want the consumer to save the fetched result as soon as its available.  For this to work, the producer and consumer must be able to communicate in some thread-safe way (e.g. a queue).</p>
+
+<p>Basically, you need another queue.  It would replace <code>proxy_array</code>.  Your <code>save</code> function will look something like this:</p>
+
+<pre><code>while True:
+ try:
+   data = fetch_data_from_output_queue()
+   save_to_database(data)
+ except EmptyQueue:
+   if not stop_flag.is_set():
+     # All done
+     break
+   time.sleep(1)
+   continue
+</code></pre>
+
+<p>This <code>save</code> function will need to run in its own thread.  <code>stop_flag</code> is an <a href="http://docs.python.org/2/library/threading.html#event-objects" rel="nofollow">Event</a> that gets set <em>after</em> you join your fetch threads.</p>
+
+<p>From a high level, your application will look like this:</p>
+
+<pre><code>input_queue = initialize_input_queue()
+ouput_queue = initialize_output_queue()
+
+stop_flag = Event()
+create_and_start_save_thread(output_queue) # read from output queue, save to DB
+create_and_start_fetch_threads(input_queue, output_queue) # get sites to crawl from input queue, push crawled results to output_queue
+join_fetch_threads() # this will block until the fetch threads have gone through everything in the input_queue
+stop_flag.set() # this will inform the save thread that we are done
+join_save_thread() # wait for all the saving to complete
+</code></pre>

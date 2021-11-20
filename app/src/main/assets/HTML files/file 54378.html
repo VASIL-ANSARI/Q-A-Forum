@@ -1,0 +1,29 @@
+<p>As per the documentation for the <code>SetConsoleCursorPosition</code> function:</p>
+
+<blockquote>
+  <p>To determine the current position of the cursor, use the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms683171.aspx" rel="nofollow">GetConsoleScreenBufferInfo</a> function.</p>
+</blockquote>
+
+<p>In general, if you know how to get or set something, the MSDN documentation for that function will hint at how to do the opposite. That is certainly true in this case.</p>
+
+<p>If we look up the <code>GetConsoleScreenBufferInfo</code> function, we see that we've struck paydirt. It fills in a <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms682093.aspx" rel="nofollow"><code>CONSOLE_SCREEN_BUFFER_INFO</code> structure</a> that, among other things, contains a <code>COORD</code> structure that indicates the current column and row coordinates of the cursor.</p>
+
+<p>There is even <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms685113.aspx" rel="nofollow">an example</a>. Package it up into a function if you want to make it convenient:</p>
+
+<pre><code>COORD GetConsoleCursorPosition(HANDLE hConsoleOutput)
+{
+    CONSOLE_SCREEN_BUFFER_INFO cbsi;
+    if (GetConsoleScreenBufferInfo(hConsoleOutput, &amp;cbsi))
+    {
+        return cbsi.dwCursorPosition;
+    }
+    else
+    {
+        // The function failed. Call GetLastError() for details.
+        COORD invalid = { 0, 0 };
+        return invalid;
+    }
+}
+</code></pre>
+
+<p>As Michael mentioned already in a comment, <code>GetCursorPos</code> doesn't work because it is for the <em>mouse</em> cursor (the arrow), not the cursor (insertion point) in a console window. It is returning valid values, just not the values you are looking for. Lucky that the return types are different, otherwise they'd be easy to mix up. Calling it the "cursor" for a console window is sort of misleading, it probably should be called the <em>caret</em>.</p>

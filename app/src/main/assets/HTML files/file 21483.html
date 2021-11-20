@@ -1,0 +1,49 @@
+<p>If you read the documentation for <a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlcommand.executenonquery.aspx" rel="nofollow"><code>ExecuteNonQuery</code></a> you will see the line:</p>
+
+<blockquote>
+  <p>Executes a Transact-SQL statement against the connection and returns the number of rows affected.</p>
+</blockquote>
+
+<p>You need to use <a href="http://msdn.microsoft.com/en-us/library/9kcbe65k.aspx" rel="nofollow"><code>SqlCommand.ExecuteReader</code></a> to do what you want.</p>
+
+<p>EDIT:</p>
+
+<p>Here is how your code could look based on your comment. It is a bit strange that your sproc returns 2 columns but you are only interested in 1. Also it is not clear if you expect multiple rows or not.</p>
+
+<pre><code>if (dc.SqlConnection.State != ConnectionState.Open) 
+    dc.SqlConnection.Open();
+
+using (var cmd = new SqlCommand("GetDetailsByEmail", dc.SqlConnection))
+{
+    cmd.CommandType = CommandType.StoredProcedure;
+
+    foreach (Microsoft.Office.Interop.Outlook.MailItem mail in items)
+    {
+        if (mail.UnRead)
+        {
+            e = mail.SenderEmailAddress;
+
+            //this is a little nasty
+            if (cmd.Parameters.Count &gt; 0)
+                cmd.Parameters.RemoveAt(0);
+
+            cmd.Parameters.AddWithValue("@epost", e);
+
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    uid = reader.GetInt32(0);
+
+                    DataRow row = dt.NewRow();
+                    row["id"] = sid;
+                    sid++;
+                    row["uid"] = uid;// uid
+                    row["email"] = e;
+                    dt.Rows.Add(row);
+                }
+            }
+        }
+    }
+}
+</code></pre>

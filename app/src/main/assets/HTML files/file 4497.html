@@ -1,0 +1,46 @@
+<blockquote>
+  <p>a special syntax by which we could
+  tell the compiler ok here determine
+  the best passing method yourself</p>
+</blockquote>
+
+<p>Boost provides this, as <code>boost::call_traits&lt;T&gt;::param_type</code>.</p>
+
+<blockquote>
+  <p>why it is this way that this is</p>
+</blockquote>
+
+<p>Probably because the rule of thumb works most of the time. If in doubt, you can pass by const reference and it's unlikely to be horribly inefficient.</p>
+
+<p>In fact there's more to the general tip than you say - "small" types which aren't built-in are also usually best passed by value. For example, the standard library consistently passes iterators by value.</p>
+
+<blockquote>
+  <p>Does "pass built-in types by value"
+  include built-in types that are bigger
+  in size than size of a pointer</p>
+</blockquote>
+
+<p>Yes. You can reasonably expect a C++ implementation to pass a <code>double</code> or <code>long double</code> by value with acceptable efficiency for almost all practical purposes. If you've reached the stage of optimization where this is the lowest-hanging fruit, then you're beyond general tips. You would measure both in your actual program.</p>
+
+<blockquote>
+  <p>if the referenced object is not
+  volatile the compiler can convert it
+  to pass by value if it would be more
+  efficient</p>
+</blockquote>
+
+<p>Maybe. If the call is successfully inlined, then the compiler can do pretty much anything. If the call target isn't available to the compiler, then it can't do it, because in practice a change between value vs. const reference parameter requires changes to both the caller and the callee code. Furthermore, aliasing means that unless the compiler has a lot of information about what's going on, then even with a non-volatile object it can't necessarily assume that it won't change:</p>
+
+<pre><code>int foo(const int &amp;a, int &amp;b) {
+    b = 2;
+    return a;
+}
+</code></pre>
+
+<p>Unless it's inlined, this code cannot be changed to pass <code>a</code> by value, because someone might call it like this:</p>
+
+<pre><code>int a = 1;
+std::cout &lt;&lt; foo(a,a);
+</code></pre>
+
+<p>which <em>must</em> print "2", whereas with <code>a</code> passed by value it would print "1".</p>

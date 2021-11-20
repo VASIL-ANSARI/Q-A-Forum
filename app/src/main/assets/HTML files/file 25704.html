@@ -1,0 +1,44 @@
+<p>We ended up changing our Generic Repository  to look like this:</p>
+
+<pre><code>/// The Type parameter has no funcionality within the repository, 
+/// it is only there to help us differentiate when registering 
+/// and resolving different repositories with Simple Injector.
+public class GenericRepository&lt;TDummyTypeForSimpleInjector&gt; : IRepository
+</code></pre>
+
+<p>(We added a type parameter to it).<br>
+We then created two dummy classes like this (I changed the names of the classes to match my example):</p>
+
+<pre><code>// These are just dummy classes that are used to help 
+// register and resolve GenericRepositories with Simple Injector.
+public class FirstDataSelector { }
+public class SecondDataSelector { }
+</code></pre>
+
+<p>Then I can register them like this:</p>
+
+<pre><code>container.Register&lt;FirstData&gt;(() =&gt; new FirstData());
+container.Register(() =&gt; new GenericRepository&lt;FirstDataSelector&gt;
+                   (container.GetInstance&lt;FirstData&gt;()));
+
+
+container.Register&lt;SecondEntities&gt;(() =&gt; new SecondEntities());
+container.Register(() =&gt; new GenericRepository&lt;SecondDataSelector&gt;
+                   (container.GetInstance&lt;SecondData&gt;()));
+</code></pre>
+
+<p>(Note the generic type param on the GenericRepository and that I do not register it as an IRepository.  Those two changes are essential to making this work.)</p>
+
+<p>This works fine.  And I am then able to use that registration in the constructor injection of my business logic.</p>
+
+<pre><code>container.Register&lt;IFirstBusiness&gt;(() =&gt; new FirstBusiness
+               (container.GetInstance&lt;GenericRepository&lt;FirstDataSelector&gt;&gt;()));
+container.Register&lt;ISecondBusiness&gt;(() =&gt; new SecondBusiness
+               (container.GetInstance&lt;GenericRepository&lt;SecondDataSelector&gt;&gt;()));
+</code></pre>
+
+<p>Since my Business classes take an <code>IRepository</code> it works fine and does not expose the IOC container or the implementation of my repository to the business classes. </p>
+
+<p>I am basically using the Type parameter as Key for lookup.  (A hack I know, but I have limited choices.)</p>
+
+<p><strong>It is kind of disappointing to have to add dummy classes to my design, but our team decided that the drawback was worth it rather than abandoning Simple Injector and going back to Unity.</strong></p>

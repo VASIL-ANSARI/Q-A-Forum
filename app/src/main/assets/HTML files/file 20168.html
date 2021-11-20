@@ -1,0 +1,53 @@
+<p>One way to do this is to wrap the query in a <code>SELECT</code> and then use <code>COALESCE</code> on the columns you want to replace the <code>null</code> values:</p>
+
+<pre><code>SELECT [store #], 
+       COALESCE([tender type], '') [Tender Type], 
+       total 
+FROM   
+(
+    SELECT 
+        CASE 
+            WHEN ( Grouping(s.storeid) = 1 ) 
+            THEN 'All Stores' 
+            ELSE Isnull(s.storeid, 'UNKNOWN') 
+        END         AS [Store #], 
+        CASE 
+            WHEN ( Grouping(b.currencydesc) = 1 ) 
+            THEN 'Store #' + s.storeid + ' TOTAL' 
+            ELSE Isnull(b.currencydesc, 'UNKNOWN') 
+        END         AS [Tender Type], 
+        Sum(amount) AS Total 
+    FROM   rptrs s 
+    JOIN rppay p 
+        ON s.storeid = p.storeid 
+        AND s.receiptno = p.receiptno 
+    JOIN currencies b 
+        ON b.poscurrency = LEFT(p.paytype, 1) 
+    WHERE  trsdate BETWEEN @FromDate AND @ToDate 
+    GROUP  BY s.storeid, b.currencydesc WITH rollup
+) src 
+</code></pre>
+
+<p>Or you can wrap the column in a <code>COALESCE()</code> without the subquery:</p>
+
+<pre><code>SELECT 
+    CASE 
+        WHEN ( Grouping(s.storeid) = 1 ) 
+        THEN 'All Stores' 
+        ELSE Isnull(s.storeid, 'UNKNOWN') 
+    END               AS [Store #], 
+    COALESCE(CASE 
+                WHEN ( Grouping(b.currencydesc) = 1 ) 
+                THEN 'Store #' + s.storeid + ' TOTAL' 
+                ELSE Isnull(b.currencydesc, 'UNKNOWN') 
+            END, '') AS [Tender Type], 
+    Sum(amount)       AS Total 
+FROM   rptrs s 
+JOIN rppay p 
+    ON s.storeid = p.storeid 
+    AND s.receiptno = p.receiptno 
+JOIN currencies b 
+    ON b.poscurrency = LEFT(p.paytype, 1) 
+WHERE  trsdate BETWEEN @FromDate AND @ToDate 
+GROUP  BY s.storeid, b.currencydesc WITH rollup 
+</code></pre>

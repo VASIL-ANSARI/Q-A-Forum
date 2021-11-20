@@ -1,0 +1,41 @@
+<p>The problem you're seeing is that the version of <code>fmod</code> you're using appears to follow the implementation defined at <a href="http://en.cppreference.com/w/cpp/numeric/math/fmod" rel="nofollow">cppreference</a>:</p>
+
+<pre><code>double fmod(double x, double y)
+{
+    double result = std::remainder(std::fabs(x), (y = std::fabs(y)));
+    if (std::signbit(result)) result += y;
+    return std::copysign(result, x);
+} 
+</code></pre>
+
+<p><code>std::remainder</code> computes a very very small result, nearly zero (-5.55112e-17 when using 1 and 0.1 for me, -1.11022e-16 for 2 and 0.2). However, what's important is that the result is <em>negative</em>, which means <a href="http://en.cppreference.com/w/cpp/numeric/math/signbit" rel="nofollow"><code>std::signbit</code></a> returns true, causing <code>y</code> to get added to the result, effectively making the result equal to <code>y</code>.</p>
+
+<p>Note that the documentation of <code>std::fmod</code> doesn't say anything about using <code>std::remainder</code>:</p>
+
+<blockquote>
+  <p>The floating-point remainder of the division operation x/y calculated by this function is exactly the value x - n*y, where n is x/y with its fractional part truncated.</p>
+</blockquote>
+
+<p>So if you compute the value yourself, you do end up with zero (even if you use <code>std::round</code> on the result instead of pure integer truncation)</p>
+
+<p>We see similar problems when <code>x</code> is 2 and <code>y</code> is 0.2</p>
+
+<pre><code>double x = 2;
+double y = .2;
+
+int n = static_cast&lt;int&gt;(x/y);
+double result = x - n*y;
+std::cout &lt;&lt; "Manual: " &lt;&lt; result &lt;&lt; std::endl;
+std::cout &lt;&lt; "fmod: " &lt;&lt; std::fmod(x,y) &lt;&lt; std::endl;
+</code></pre>
+
+<p>Output (<a href="http://coliru.stacked-crooked.com/a/249620f2da07a9de" rel="nofollow">gcc demo</a>) is </p>
+
+<blockquote>
+  <p>Manual: 0 <br/>
+  fmod: 0.2</p>
+</blockquote>
+
+<p>However the problem is not relegated to only gcc; I also see it in MSVC and clang. In clang there is sometimes different behavior if one uses <code>float</code> instead of <code>double</code>.</p>
+
+<p>This really small negative value from <code>std::remainder</code> comes from the fact that neither 0.1 nor 0.2 can be represented exactly in floating point math. If you change x and y to, say 2 and 0.25, then all is well.</p>

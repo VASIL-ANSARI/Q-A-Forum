@@ -1,0 +1,56 @@
+<p>You could turn <code>config</code> into a method with support for config cache invalidation (and with sensible defaults), so you can choose between dynamic (default in the following sample) and performance.</p>
+
+<p>In general I suggest you use a good Scala typesafe wrapper of TypeSafe's Config such as Ficus (e.g. Gradle-stype artifact dependency <code>net.ceedubs:ficus_2.11:1.1.1</code>)</p>
+
+<pre class="lang-scala prettyprint-override"><code>package config
+
+import scala.collection.concurrent.TrieMap
+
+import com.typesafe.config.{Config, ConfigFactory}
+import net.ceedubs.ficus.Ficus._
+
+trait Settings {
+  protected[config] def config (
+    name: String = "local",
+    invalidateCache: Boolean = false
+  ): Config = {
+    if (invalidateCache) { ConfigFactory invalidateCaches }
+    ConfigFactory load name
+  }
+  def engine: EngineSettings
+}
+
+trait EngineSettings {
+  def weight: Int
+  def offset: Int
+}
+
+class AppSettings(val name: String = "local") extends Settings {
+  val c = config()
+
+  override def engine = new EngineSettings {
+    override def weight = c.as[Int]("engine.weight")
+    override def offset = c.as[Int]("engine.offset")
+  }
+}
+
+object Settings {
+  private val namedSettings = new TrieMap[String, AppSettings]
+  def load(configName: String = "local"): Settings = {
+    // e.g.
+    val loadedUpToDate = new AppSettings
+    namedSettings +=
+      ((configName + "." + System.currentTimeMillis, loadedUpToDate))
+    new Settings {
+      override def engine = loadedUpToDate.engine
+    }
+  }
+}
+</code></pre>
+
+<p>I think this solves your issues because:</p>
+
+<ol>
+<li>Configuration retrieval is dynamic by default through reload</li>
+<li>By using a method you don't resort to mutable state</li>
+</ol>

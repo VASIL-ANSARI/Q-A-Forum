@@ -1,0 +1,45 @@
+<p>Well, if you dig a little bit deeper (disable ARC, subclass tableview, override retain/release/dealloc methods then put logs/breakpoints on them), you'll find that something bad happens in an animation completion block which possibly causes the leak.<br>
+It looks like the tableview receives too many retains from a completion block after cell inserting/deleting on iOS 7, but not on iOS 6 (on iOS 6 UITableView has not yet been use block animations - you can check it too on the stack trace).</p>
+
+<p>So I try to take over the tableview's animation completion block lifecycle from UIView in a dirty way: method swizzling. <strong>And this actually solves the problem.</strong><br>
+But it does a lot more so I still looking for a more sophisticated solution.</p>
+
+<p>So extend UIView:</p>
+
+<pre class="lang-c prettyprint-override"><code>@interface UIView (iOS7UITableViewLeak)
++ (void)fixed_animateWithDuration:(NSTimeInterval)duration delay:(NSTimeInterval)delay options:(UIViewAnimationOptions)options animations:(void (^)(void))animations completion:(void (^)(BOOL finished))completion;
++ (void)swizzleStaticSelector:(SEL)selOrig withSelector:(SEL)selNew;
+@end
+</code></pre>
+
+<pre class="lang-c prettyprint-override"><code>#import &lt;objc/runtime.h&gt;
+
+typedef void (^CompletionBlock)(BOOL finished);
+
+@implementation UIView (iOS7UITableViewLeak)
+
++ (void)fixed_animateWithDuration:(NSTimeInterval)duration delay:(NSTimeInterval)delay options:(UIViewAnimationOptions)options animations:(void (^)(void))animations completion:(void (^)(BOOL finished))completion {
+    __block CompletionBlock completionBlock = [completion copy];
+    [UIView fixed_animateWithDuration:duration delay:delay options:options animations:animations completion:^(BOOL finished) {
+        if (completionBlock) completionBlock(finished);
+        [completionBlock autorelease];
+    }];
+}
+
++ (void)swizzleStaticSelector:(SEL)selOrig withSelector:(SEL)selNew {
+    Method origMethod = class_getClassMethod([self class], selOrig);
+    Method newMethod = class_getClassMethod([self class], selNew);
+    method_exchangeImplementations(origMethod, newMethod);
+}
+
+@end
+</code></pre>
+
+<p>As you can see the original completion block is not passed directly to the <em>animateWithDuration:</em> method and it is released correctly from the wrapper block (the lack of this causes leaks in tableviews). I know it looks a little bit strange but it solves the problem.</p>
+
+<p>Now replace the original animation implementation with the new one in your App Delegate's <em>didFinishLaunchingWithOptions:</em> or wherever you want:</p>
+
+<pre class="lang-c prettyprint-override"><code>[UIView swizzleStaticSelector:@selector(animateWithDuration:delay:options:animations:completion:) withSelector:@selector(fixed_animateWithDuration:delay:options:animations:completion:)];
+</code></pre>
+
+<p>After that, all of the calls to <code>[UIView animateWithDuration:...]</code> leads to this modified implementation.</p>

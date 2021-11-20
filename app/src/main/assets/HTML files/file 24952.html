@@ -1,0 +1,31 @@
+<p>You can do that but you have to check the path to make sure it doesn't point outside your desired sandbox. <code>open</code> won't do it for you. </p>
+
+<p>Look at <a href="http://ruby-doc.org/core-2.0/File.html#method-c-realpath" rel="nofollow"><code>File.realpath</code></a>. It resolves <code>..</code> components in the path leaving you with the real path being requested. That path must exist or <code>realpath</code> will raise an exception, which is your first hint that you can't serve the file. You'll need to rescue <code>Errno::ENOENT</code>:</p>
+
+<pre><code>File.realpath('/usr/bin') # =&gt; "/usr/bin"
+File.realpath('/tmp') # =&gt; "/private/tmp"
+
+File.realpath('/foobar') 
+Errno::ENOENT: No such file or directory - /foobar
+</code></pre>
+
+<p>Then you can check using a simple regex to make sure the resulting path is anchored in the area or areas you allow. Here's an example of the code.</p>
+
+<pre><code>SHARED_PATH_REGEXP = /\A#{ Regexp.escape(File.realpath('/path/to/shared/content')) }/i
+
+def is_shared_path?(requested_path)
+  real_requested_path = File.realpath(requested_path)
+  !!real_requested_path[SHARED_PATH_REGEXP]
+rescue Errno::ENOENT
+  false
+end
+
+path_received('/etc/passwd') # =&gt; false
+path_received(SHARED_PATH_REGEXP + '/foo.html') # =&gt; true
+</code></pre>
+
+<p><code>Regexp.escape</code> is useful for preprocessing the file string so the regular expression engine does a literal check:</p>
+
+<pre><code>Regexp.escape('/usr/bin')  # =&gt; "/usr/bin"
+Regexp.escape('../../public')  # =&gt; "\\.\\./\\.\\./public"
+</code></pre>

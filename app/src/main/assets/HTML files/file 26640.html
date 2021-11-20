@@ -1,0 +1,45 @@
+<p>Python "threads" are all still sort of locked together sequentially by what's called the GIL, global interpreter lock. It basically means that threads spawned from the same python process won't run in parallel like you want them to. Instead, they all fight for time on the main python process. </p>
+
+<p>In your case, if there's an intensive process you're trying to monitor with once process, its probably hogging the GIL, and not releasing it to the thread. </p>
+
+<p>One option: Try using a readline method, so it splits up the file input work enough to insert a progress bar update line.</p>
+
+<pre><code>openfile = open(filename, 'r')
+for eachline in openfile.readlines():
+    append_line(eachline)
+    update_progressBar()
+</code></pre>
+
+<p>Another option that may be easier is to offload the csv opening to another process using python's <a href="http://docs.python.org/2/library/multiprocessing.html" rel="nofollow">multiprocessing</a> module. This emulates the threads you're probably more used to. I'd kick off a new process that reads in the csv, and appends the lines to a queue. When it's done, append a sentinel value to the queue signalling its done, so the main process knows when to stop updating the progress bar and join the spawned process. Something like:</p>
+
+<pre><code>import Tkinter as tk
+import ttk as ttk
+import pandas as pd
+import tkFileDialog as tfgiag
+from multiprocessing import Process, Queue
+
+self.pb = ttk.Progressbar(frame, orient=tk.VERTICAL, mode='indeterminate')
+mynewdata = tfgiag.askopenfilenames(parent=root,title='Choose a file',filetypes=[('CSV files', '.csv')])
+
+csvqueue=Queue(1) #A mp-enabled queue with one slot to results.
+#read in each CSV file selected by the user
+offloadedProcess=Process(target=csvread, args=(filename, outputqueue))
+offloadedProcess.start()
+procNotDone=False
+while procNotDone:
+    result = getNewResultFromQueue(outputqueue) #pesudo code
+    update_ProgressBar() #&lt;--- this should get hit more often now
+    if result.isLastValue:
+        offloadedProcess.join() #Join the process, since its now done
+    else:
+        csvresults.append(result)
+
+
+def csvreadOffload(filename, outputqueue):
+    for myfile in root.tk.splitlist(mynewdata): 
+        foo = pd.read_csv(myfile)    
+        if foo is not END:#Pesudo code here
+            outputqueue.append(foo)
+        else:
+            outputqueue.append('Empty results')#pseudo code
+</code></pre>

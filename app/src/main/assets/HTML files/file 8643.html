@@ -1,0 +1,51 @@
+<blockquote>
+  <p>I want to call LogInfo like this:</p>
+</blockquote>
+
+<pre><code>Log&lt;myObject.GetType()&gt;.LogInfo("Some String");
+</code></pre>
+
+<p>Why? Why don't you just do this:</p>
+
+<pre><code>public static class Log {
+     private static readonly Dictionary&lt;Type, ILog&gt; loggers =
+         new Dictionary&lt;Type, ILog&gt;();
+
+     public static void LogInfo(Type type, string message) {
+          var logger = Log.GetLoggerForType(type);
+          logger.Info(message);
+     }
+
+     public static void LogInfo&lt;T&gt;(string message) {
+          LogInfo(typeof(T), message);
+     }
+
+     private static ILog GetLoggerForType(Type type) {
+          ILog logger;
+          if(!loggers.TryGetValue(type, out logger)) {
+               logger = LogManager.GetLogger(type);
+               loggers.Add(type, logger);
+          }
+          return logger;
+     }
+}
+</code></pre>
+
+<p>Note that this is not, Not, NOT thread safe. I wanted to communicate the idea.</p>
+
+<p>Then:</p>
+
+<pre><code>Log&lt;myObject.GetType()&gt;.LogInfo("Some String");
+</code></pre>
+
+<p>can be replaced by</p>
+
+<pre><code>Log.LogInfo(myObject.GetType(), "Some String");
+</code></pre>
+
+<p>or you can even go one step further and add an overload that allows you to say</p>
+
+<pre><code>Log.LogInfo(myObject, "Some String");
+</code></pre>
+
+<p>(just call <code>object.GetType</code> in <code>LogInfo</code>).</p>

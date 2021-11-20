@@ -1,0 +1,14 @@
+<p>We handled JVM memory more as a tuning parameter, than as something to manage actively with the application.  We have a MemoryInfo class (which wraps several of the Runtime memory info methods). </p>
+
+<p>While application is running, we track free memory in the application as:</p>
+
+<pre><code> Runtime.getMaxMemory() - Runtime.getTotalMemory() + Runtime.getFreeMemory();
+</code></pre>
+
+<p>Max memory is the -Xmx jvm arg, total memory is what JVM has already allocated to the application heap, and free memory is how much of the allocated heap memory still available. (If your -Xms parameter is the same as your -Xmx parameter, then <code>getFreeMemory()</code> is all you need to check).</p>
+
+<p>If we get above 70% memory usage, we send alerts to our monitoring system.  At that point we make a decision whether we can limp through the rest of the day, or whether adjust the -Xmx parameter and restart.  Although this seems a bit messy, in practice, once we have tuned a system, we <em>never</em> run into memory problems after that.  (Once you get above 90% max memory used, the JVM will GC extremely frequently to try to prevent running out of memory).</p>
+
+<p>I think the approach of managing memory with every construction is draconion, but if you need absolute control, then maybe it makes sense.  Another approach is to make sure that any memory caches you use have an LRU or Expiration and reload mechanism, so you can better limit the number objects preserved in memory.</p>
+
+<p>That said, our approach is to keep as much as possible in memory, and just allocate plenty of RAM. Our big systems have 28G RAM allocated (we use betwen 40-60% of that on average).</p>

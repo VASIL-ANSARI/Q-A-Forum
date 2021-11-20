@@ -1,0 +1,43 @@
+<p>Change the 1st line of your route:</p>
+
+<pre><code>app.get('/*', function(req, res) {
+</code></pre>
+
+<p>to this:</p>
+
+<pre><code>router.get('/*', function(req, res) {
+</code></pre>
+
+<p>your code never works cos nodejs don't know what <code>app</code> is. You never defined it.</p>
+
+<p>UPDATE:</p>
+
+<p>Change your server code to send the session cookie automatically with an expiration time:</p>
+
+<pre><code>// express/mongo session storage
+app.use(express.session({
+  secret: 'MEAN',
+  store: new mongoStore({
+    url: config.db,
+    collection: 'sessions'
+  }),
+  cookie: { maxAge : 3600000 } //1 Hour &lt;-----------
+}));
+</code></pre>
+
+<p>or change the <code>passport.authenticate</code> function to send the cookie directly with expiration time.</p>
+
+<p><a href="https://github.com/DaftMonk/angular-passport/blob/master/lib/controllers/session.js" rel="nofollow">https://github.com/DaftMonk/angular-passport/blob/master/lib/controllers/session.js</a></p>
+
+<pre><code>exports.login = function (req, res, next) {
+  passport.authenticate('local', function(err, user, info) {
+    var error = err || info;
+    if (error) { return res.json(400, error); }
+    req.logIn(user, function(err) {
+      if (err) { return res.send(err); }
+      res.cookie('user', JSON.stringify(req.user.user_info), { expires: new Date(Date.now() + 1000 * 60 * hrs)} ); // &lt;--
+      return res.send(200); // &lt;--
+    });
+  })(req, res, next);
+}
+</code></pre>

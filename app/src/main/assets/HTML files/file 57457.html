@@ -1,0 +1,145 @@
+<p>one of many ways (assuming we use Toolbar) - this example should give you the idea how to implement long click on toolbar button :</p>
+
+<pre><code>class MyActivity extends Activity {    
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        /** get menu inflater */
+        MenuInflater menuInflater = getMenuInflater();
+        /** Inflate the menu
+         * this adds items to the action bar if it is present. */
+        menuInflater.inflate(R.menu.menu_home, menu);
+        /** find interesting item */
+        MenuItem item = menu.findItem(R.id.itemId);
+        /** set action view */
+        item.setActionView(new ImageButton(this)); // this is a Context.class object
+        /** set listener  on action view */
+        item.getActionView().setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                return false;
+            }
+        });
+
+        return super.onCreateOptionsMenu(menu);
+    }
+}
+</code></pre>
+
+<p>in method <strong>onCreateOptionsMenu - or any other method when you can get menu item reference (omit step 1-2)</strong>:</p>
+
+<ol>
+<li>create menu / for example by inflate </li>
+<li>get menu item </li>
+<li>create action view for example ImageButton</li>
+<li>set long click listener on action view</li>
+<li>set on menu item an action view  </li>
+</ol>
+
+<p>above i set an action view then i get it back from menu item and set listener (the order is no matter it could be also in such way):</p>
+
+<pre><code>ImageButton imageButton = new ImageButton(Context);
+imageButton.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                return false;
+            }
+        });
+item.setActionView(imageButton);
+</code></pre>
+
+<p>ps. you can also set image view in xml as attribute on menu item:</p>
+
+<pre><code> &lt;item
+    ... 
+    android:actionViewClass="android.widget.ImageButton"
+ /&gt;
+
+then you can get the action view by cast 
+
+   View menuItemActionView = menu.findItem(R.id.itemId).getActionView();
+   if(menuItemActionView != null 
+            &amp;&amp; ImageButton.class.isAssignableFrom(menuItemActionView.getCLass())) {
+        ImageButton imageButton = (ImageButton) menuItemActionView;
+   }
+</code></pre>
+
+<blockquote>
+  <p><em>But then you set the long click listener to the action view only, not the whole item. â SuperThomasLab</em></p>
+</blockquote>
+
+<p>-- <strong>no you are setting an action view on single element</strong> in this case you change a default view (to ImageButton widget) for an menu item - action view could be simple or complex view type </p>
+
+<blockquote>
+  <p><em>But what if u don't want to change the view, but keep the default view? â SuperThomasLab</em></p>
+</blockquote>
+
+<p><strong>example</strong> (this is one way of many <strong>by using a layout tree observer</strong> / by setting a layout change listener): </p>
+
+<pre><code>    private View.OnLongClickListener onLongClickListener = new View.OnLongClickListener() {
+        @Override
+        public boolean onLongClick(View v) {
+            return false;
+        }
+    };
+
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        /** get menu inflater */
+        MenuInflater menuInflater = getMenuInflater();
+        /** Inflate the menu
+         * this adds items to the action bar if it is present. */
+        menuInflater.inflate(R.menu.menu_home, menu);
+        /** geta menu item using findItem(int itemid) */
+        MenuItem item = menu.findItem(R.id.itemLogOut);
+        /** check if we have item */
+        if(item!=null) {
+            /** try get its action view */
+            View actionView = item.getActionView();
+             /** check if action view is already set? */
+            if(actionView==null) {
+                /** get item id  to comparte later in observer listener*/
+                final int itemId = item.getItemId();
+                /** if not set on top most window an layout changes listener */
+                getWindow().getDecorView()
+                           .addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                    @Override
+                    public void onLayoutChange(View v, int left, int top, int right, 
+                      int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                           /** try get view by id we have stored few line up */
+                           View viewById = v.getRootView().findViewById(itemId);
+                           /** check if we have any result */
+                           if(viewById!=null) {
+                                /** set our listener */                     
+                                viewById.setOnLongClickListener(onLongClickListener);
+                                /** remove layout observer listener */
+                                v.removeOnLayoutChangeListener(this);
+                           }
+                    }
+                });
+            } else {
+                /** if set we can add our on long click listener */
+                actionView.setOnLongClickListener(onLongClickListener);
+            }
+        }
+  } 
+</code></pre>
+
+<blockquote>
+  <p><em>I tried the OnLayoutChangeListener, but it still doesn't work  Nothing changed. â SuperThomasLab</em></p>
+</blockquote>
+
+<p><strong>YES IT DOES</strong> - but i know the reason why it't is not working in your case ??? - in my example we check if view item is laid out instead of that change if menu view is laid out and then check if menu  contain item</p>
+
+<p>here is working code for you to study:</p>
+
+<p><a href="https://github.com/c3ph3us/LongClickOnMenuItem" rel="nofollow">https://github.com/c3ph3us/LongClickOnMenuItem</a></p>
+
+<p>in reply to other comments:</p>
+
+<blockquote>
+  <p><em>@ SuperThomasLab It's not obvious for me why setOnLongClickListener(...) method is not available for you. â Hossein Seifi</em></p>
+</blockquote>
+
+<p><strong>@HosseinSeifi - look at android.view.MenuItem  interface - it doesn't provide a such method</strong> - so for good programmer this should be obvious :) why he can't reach implementing class method. </p>

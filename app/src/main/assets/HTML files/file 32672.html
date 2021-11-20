@@ -1,0 +1,41 @@
+<p>Assuming you're using RFC2898DeriveBytes to hash the password itself as well, then @CodesInChaos is correct, what you're doing wrong is:</p>
+
+<ul>
+<li>Building the salt based off the username, instead of using a cryptographic PRNG to generate a fresh salt for each user.
+<ul>
+<li>You should use something like <a href="http://msdn.microsoft.com/en-us/library/system.security.cryptography.rngcryptoserviceprovider%28v=vs.110%29.aspx" rel="nofollow">the .NET RNGCryptoServiceProvider Class</a> to generate 8 to 16 (binary) bytes of random salt
+<ul>
+<li>For instance, from <a href="http://msdn.microsoft.com/en-us/library/system.security.cryptography.rfc2898derivebytes.aspx" rel="nofollow">Rfc2898DeriveBytes Example 1</a></li>
+</ul></li>
+</ul></li>
+</ul>
+
+<hr>
+
+<pre><code>byte[] salt1 = new byte[8];
+using (RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider())
+  {
+  // Fill the array with a random value.
+  rngCsp.GetBytes(salt1);
+  }
+</code></pre>
+
+<hr>
+
+<ul>
+<li><p>The salt should then be stored in the clear in your database alongside the password hash and iteration count (so you can change it), and probably a version code too (so you can change it again, i.e. your current calculated salt method is version 1, and the random salt is version 2).</p>
+
+<ul>
+<li>Spending 20,000 iterations of PBKDF2 on the salt, rather than spending it on the actual password hash!</li>
+</ul></li>
+<li>10,000 iterations for the first 20 bytes, since RFC2898DeriveBytes is PBKDF2-HMAC-SHA-1, and SHA-1 has a native 20 byte output</li>
+<li>10,000 more iteration for the next 20 bytes, which is then truncated to only the 5 you need to get to a 25 byte output.</li>
+<li>This is a weakness, as the defender has to spend the time on the salt on every login, whether it's spent on the salt, or the password hashing.  The attacker has to spent that time once for each username, and then they are going to store the results and try <strong>_illions (where _</strong> is very large) of password guesses.<br>
+<ul>
+<li>Thus, the attacker has a greater than normal marginal advantage because they can precalculate the salt, while you have to calculate it on the fly.</li>
+</ul></li>
+</ul>
+
+<p>If you aren't using RFC2898DeriveBytes, another PBKDF2 implementation, BCrypt, or SCrypt to do the actual password hashing, then <strong>that's</strong> what you're doing wrong.</p>
+
+<p>Trimming the username some, but not all of the time is entirely incidential; just make sure not to trim passwords before they're hashed.</p>

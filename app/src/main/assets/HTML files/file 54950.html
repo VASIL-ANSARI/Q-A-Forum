@@ -1,0 +1,46 @@
+<p>Note: I will refer to your data object as a "Message" for clarity.</p>
+
+<p>You can treat the date <code>TextView</code> in one of two ways. Either approach will work, although my inclination is that #2 works a little better.</p>
+
+<p><strong>1.</strong> The date <code>TextView</code> is a standalone item and the adapter needs to account for them in addition to the collection of Messages.</p>
+
+<p><strong>2.</strong> The date <code>TextView</code> is included in the item representing a Message (e.g. it is in the row's layout XML) and you only need to determine which rows make it visible and which do not.</p>
+
+<hr>
+
+<p>The adapter side is a bit more interesting. Depending on which approach you take above, you need to either modify the number of items reported by <code>getCount()</code> (<code>ListView</code>) or <code>getItemCount()</code> (<code>RecyclerView</code>), or you need to track which items have additional display logic. Naturally you might want to pre-process the collection (in the background, if possible) to discover and store this extra information. The following possibilities are all things I have used in the past:</p>
+
+<p><strong>A.</strong> Modify your data structure to keep track of the dates and their positions in the data set; it could simply be two collections encapsulated in some wrapper class. Your data fetching logic should probably return this structure instead of the collection of Messages. This can work with either <strong>#1</strong> (<code>numItems = numMessages + numDates</code>) or <strong>#2</strong> (<code>numItems = numMessages</code>) above.</p>
+
+<p><strong>B.</strong> Don't modify your data structure, but add a mutable field (<code>boolean</code>) to the Message. Your pre-processing simply marks which Messages need to show a date. This pretty much only works with <strong>#2</strong> above.</p>
+
+<p><strong>C.</strong> If dates are the only things that really "separate" two Messages, you could make your adapter aware of "sections" of your data, and you simply show a date at the start (or the end, up to you) of a section. You don't need to modify your collection to do this, for example:</p>
+
+<pre><code>List&lt;Message&gt; items;
+List&lt;AdapterSection&gt; sections;
+
+static class AdapterSection {
+    int start; // an index of the items list, e.g. in the range [0, items.size())
+    int count; // how many items in the section
+}
+</code></pre>
+
+<p>Sectioning the adapter can work with both <strong>#1</strong> and <strong>#2</strong> above. If you are working with <strong>#1</strong>, then you can have each section report its own size (adding 1 for the date) and just sum the section sizes. The main downside of this approach is keeping the sections in sync with your data when you have data changes.</p>
+
+<p>One last option I will call <strong>D</strong> does not require any pre-processing at all. When your adapter binds the data for an item, you can peek at the next item and decide if you need to show the date. This only works with <strong>#2</strong> above. Here's some pseudocode based on a <code>RecyclerView</code> adapter:</p>
+
+<pre><code>@Override
+public void onBindViewHolder(MessageViewHolder holder, int position) {
+    Message item = getItem(position);
+    // bind stuff to views ...
+
+    if (position &lt; getItemCount() - 1) {
+        Message nextItem = getItem(position + 1);
+        if (hasDifferentDates(item, nextItem) {
+            // show TextView, bind date ...
+        } else {
+            // hide TextView
+        }
+    }
+}
+</code></pre>

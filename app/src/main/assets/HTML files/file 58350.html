@@ -1,0 +1,75 @@
+<p>When we load the page in a browser with disabled JavaScript, we note, that the table remains empty.</p>
+
+<p>Activating JavaScript and monitoring the network tab (chrome dev tools/F12) on a reload, we see a request:</p>
+
+<pre><code>http://www.smbs.biz/ExRate/StdExRate_xml.jsp?arr_value=USD_2016-09-13_2016-10-05
+</code></pre>
+
+<p>And the response contains a chart with the needed information:  </p>
+
+<pre><code>&lt;chart 
+    [...]   
+    &lt;set color='c93749' label='16.09.13' value='1110.6' /&gt;
+    &lt;set color='c93749' label='16.09.19' value='1112.3' /&gt;
+    [...]
+    &lt;set color='c93749' label='16.10.04' value='1102' /&gt;
+    &lt;set color='c93749' label='16.10.05' value='1105.1' /&gt;
+    &lt;styles&gt;
+        [...]
+    &lt;/styles&gt;
+&lt;/chart&gt;
+</code></pre>
+
+<p>Before we request the chart we need to grab the <code>JSESSION</code> cookie and add it to the request.</p>
+
+<p><strong>Example Code</strong></p>
+
+<pre><code>String userAgent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.116 Safari/537.36";
+
+try {
+    // response needed to grab the cookies: res.cookies()
+    Response res = Jsoup.connect("http://www.smbs.biz/ExRate/StdExRate.jsp")..timeout(10000)
+            .userAgent(userAgent).method(Method.GET).header("Host", "www.smbs.biz").execute();
+
+    Document doc = res.parse();
+
+    String startDate = doc.getElementById("startDate").attr("value").replace(".", "-");
+    String endDate = doc.getElementById("endDate").attr("value").replace(".", "-");
+
+    doc = Jsoup.connect("http://www.smbs.biz/ExRate/StdExRate_xml.jsp?arr_value=USD_" + startDate+"_" + endDate)
+            .userAgent(userAgent).timeout(10000).header("Host", "www.smbs.biz").cookies(res.cookies())
+            .header("Connection", "keep-alive").method(Method.GET)
+            .referrer("http://www.smbs.biz/ExRate/StdExRate.jsp").get();
+
+    Elements elements = doc.select("chart &gt; set");
+
+    for (Element element : elements) {
+        System.out.println(element.attr("label") + ": " + element.attr("value"));
+    }
+
+    Element currentRateElement = doc.select("chart &gt; set").last();
+
+    System.out.println("Current rate for " + currentRateElement.attr("label") + ": " + currentRateElement.attr("value"));
+
+} catch (IOException e) {
+    e.printStackTrace();
+}
+</code></pre>
+
+<p><strong>Output</strong></p>
+
+<pre><code>16.09.13: 1110.6
+16.09.19: 1112.3
+16.09.20: 1120
+16.09.21: 1119.5
+16.09.22: 1116.8
+16.09.23: 1103.1
+16.09.26: 1104.2
+16.09.27: 1106.9
+16.09.28: 1103.5
+16.09.29: 1095.7
+16.09.30: 1096.3
+16.10.04: 1102
+16.10.05: 1105.1
+Current rate for 16.10.05: 1105.1
+</code></pre>

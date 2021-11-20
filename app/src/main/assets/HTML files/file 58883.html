@@ -1,0 +1,79 @@
+<p>Its because you cant post an atomic value directly to your method as json. You could turn it into an object and then post it as a corresponding object or post it as form uri encoded which also works. This is a limitation of asp.net's web api. </p>
+
+<p>There are some other similar questions all with similar answers. Here is a quick example of how you could change it to work.</p>
+
+<p>c# code</p>
+
+<pre><code>[HttpPost()] 
+[Route("PostLog")]
+public void PostLog(LogContainerModel logModel)
+{
+    _LogService.PostLog(logModel.log);
+}
+
+// model
+public sealed class LogContainerModel {
+    public string log { get; set; }
+}
+</code></pre>
+
+<p>javascript code</p>
+
+<pre><code>private convertToJSON(log: ILog): string {
+    return JSON.stringify({log: log});
+}
+</code></pre>
+
+<hr>
+
+<h1>Option 2</h1>
+
+<p>Stringify it as an object according to this previous <a href="http://stackoverflow.com/a/36572213/1260204">SO answer</a>.</p>
+
+<p>c# code</p>
+
+<pre><code>[HttpPost()] 
+[Route("PostLog")]
+public void PostLog([FromBody] string jsonString)
+</code></pre>
+
+<p>javascript code</p>
+
+<pre><code>private convertToJSON(log: ILog): string {
+    return JSON.stringify({'': log}); // if that does not work try the snippet below
+    // return JSON.stringify({'': JSON.stringify(log)});
+}
+</code></pre>
+
+<hr>
+
+<h2>Option 3</h2>
+
+<p>Here are some options from <a href="http://bizcoder.com/posting-raw-json-to-web-api" rel="nofollow">bizcoder.com</a></p>
+
+<p>Use <code>HttpResponseMessage</code></p>
+
+<pre><code>[HttpPost()] 
+[Route("PostLog")]
+public async Task PostLog(HttpRequestMessage request)
+{
+    var jsonString = await request.Content.ReadAsStringAsync();
+    _LogService.PostLog(jsonString);
+}
+</code></pre>
+
+<p>Or use <code>json.net</code></p>
+
+<pre><code>[HttpPost()] 
+[Route("PostLog")]
+public void PostLog([FromBody]JToken jsonbody)
+{
+    var jsonString = jsonbody.ToString();
+    _LogService.PostLog(jsonString);
+}
+</code></pre>
+
+<ul>
+<li><a href="http://stackoverflow.com/a/13771631/1260204">SO - How to post a single string (using form encoding)</a></li>
+<li><a href="http://stackoverflow.com/a/36572213/1260204">SO - send single string parameter</a> - this might be the better option, good answer.</li>
+</ul>

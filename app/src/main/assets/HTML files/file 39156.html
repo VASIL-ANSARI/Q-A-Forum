@@ -1,0 +1,55 @@
+<p>I had similar/same problem. Only parent Tornado process got the signal, while children processes where not killed.</p>
+
+<p>I made arrangement that parent process kills children manually using os.killpg(), also, children uses some delays to (possibly) finish current requests:</p>
+
+<pre><code>#will be initialized in main()
+server = None
+loop = None
+
+def stop_loop():
+    global loop
+    loop.stop()
+
+def signal_handler_child_callback():
+    global loop
+    global server
+    server.stop()
+    # allow to finish processing current requests
+    loop.add_timeout(time.time() + LOOP_STOP_DELAY, stop_loop)
+
+def signal_handler(signum, frame):
+    global loop
+    global server
+    if loop:
+        #this is child process, will restrict incoming connections and stop ioloop after delay
+        loop.add_callback(signal_handler_child_callback)
+    else:
+        #this is master process, should restrict new incomming connections
+        #and send signal to child processes
+        server.stop()
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        os.killpg(0, signal.SIGTERM)
+
+
+def main():
+  parse_command_line()      
+  signal.signal(signal.SIGTERM, signal_handler)
+
+  # ...
+
+  tornado_app = tornado.web.Application(
+      [
+          #...
+      ])
+
+  global server 
+  server = tornado.httpserver.HTTPServer(tornado_app)
+  server.bind(options.port)  
+  server.start(0)
+  global loop
+  loop = tornado.ioloop.IOLoop.instance()
+  loop.start()
+
+if __name__ == '__main__':
+  main()
+</code></pre>

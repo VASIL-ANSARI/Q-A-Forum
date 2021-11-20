@@ -1,0 +1,40 @@
+<p>No, each instance of <code>GameObject</code> will have its own (uninitialized) instance of <code>id</code>. There needs to be a shared incrementing <code>id</code> instance available to all instances of <code>GameObject</code>. One mechanism to achieve this to use a <code>static</code> class variable. If threads are involved you need to synchronize access to the <code>static</code> variable:</p>
+
+<pre><code>class GameObject
+{
+protected:
+    static int id;
+};
+
+int GameObject::id; // defaults to zero and should be added to
+                    // exactly one .cpp file only.
+
+GameObject::GameObject() : instances(GameObject::id++) {}
+</code></pre>
+
+<p>Another alternative is to use <a href="http://www.boost.org/doc/libs/1_53_0/libs/uuid/" rel="nofollow"><code>boost::uuid</code></a>:</p>
+
+<pre><code>#include &lt;string&gt;
+using std::string;
+
+#include &lt;boost/lexical_cast.hpp&gt;
+#include &lt;boost/uuid/uuid.hpp&gt;
+#include &lt;boost/uuid/uuid_generators.hpp&gt;
+#include &lt;boost/uuid/uuid_io.hpp&gt;
+using boost::lexical_cast;
+using boost::uuids::uuid;
+using boost::uuids::random_generator;
+
+class GameObject
+{
+public:
+    string instances;
+    GameObject() : instances(make_uuid_());
+    void Display();
+private:
+    string make_uuid_()
+    {
+        return lexical_cast&lt;string&gt;((random_generator())());
+    }
+};
+</code></pre>

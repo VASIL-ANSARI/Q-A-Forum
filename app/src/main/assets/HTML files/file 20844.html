@@ -1,0 +1,31 @@
+<p>I would not have your code save to the desktop you could be having permissions issues if your code is running as a different user than the desktop you specified. Change your code to the following and see if this fixes your problem</p>
+
+<pre><code>string destFolder = @"C:\ReceivedFiles"
+if (Directory.Exists(destFolder) == false)
+    Directory.CreateDirectory(destFolder);
+BinaryWriter bWrite = new BinaryWriter(File.Open(Path.Combine(destFolder, FileName), FileMode.Append));
+</code></pre>
+
+<hr>
+
+<p>On to other problems with your code:</p>
+
+<pre><code>int receivedBytesLen = clientSock.Receive(clientData);
+</code></pre>
+
+<p>First of all, <strong>this does not guarantee that you got all of the data</strong>. If the payload is bigger than one datagram you will need to call <code>Receive</code> multiple times. The only way to know how many times you need to call is you need to somehow send the length of the entire binary before hand or close the connection after the file is done client side and loop building a buffer (or writing it out as it comes in) until Receive returns 0.</p>
+
+<p>Secondly, you should also be using <code>using</code> to make sure your classes get disposed properly in the event of a exception</p>
+
+<pre><code>using(Socket clientSock=sock.Accept())
+{
+    //This needs to be redone, see my first point
+    int receivedBytesLen = clientSock.Receive(clientData);
+    int fileNameLen = BitConverter.ToInt32(clientData, 0);
+    string fileName = Encoding.ASCII.GetString(clientData, 4, fileNameLen);
+    using(BinaryWriter bWrite = new BinaryWriter(File.Open(@"C:\Users\asd\Desktop\"+           fileName,FileMode.Append)))
+    {
+        bWrite.Write(clientData, 4 + fileNameLen, receivedBytesLen - 4 - fileNameLen);
+    }
+}
+</code></pre>

@@ -1,0 +1,22 @@
+<p>I fixed this. It appears that when the user expands the moviePlayer, the event lifecycle causes the view (MyAddDetailViewController) (that holds the subview (MyMoviePlayerController)) to execute  viewWillDisappear &amp; viewDidDisappear.</p>
+
+<p>I mentioned that the code path created an additional viewController on the navigation stack, and that VC was making a brief appearance (evidenced by a viewWillAppear message) then going back into the background with viewWillDisappear. It still is not clear why that would cause the autoreleasePool to free up MyAddDetailViewController thus deallocating MyMoviePlayerController, but it is now clear that there was no strong reference to MyAddDetailViewController.</p>
+
+<p>To fix, I created a property in the VC that pushes MyAddDetailViewController onto the navigation Stack to hold a strong reference to it.</p>
+
+<pre><code>- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+{
+// ... snip ...
+    self.myAddDetailViewControllerReference = [segue destinationViewController];
+
+}
+
+//
+
+- (void)viewDidUnload {
+    [self setMediaAddDetailViewControllerReference:nil];
+
+}
+</code></pre>
+
+<p>That takes care of the black screen/freeze.</p>

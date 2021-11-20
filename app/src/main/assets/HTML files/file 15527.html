@@ -1,0 +1,25 @@
+<p>Don't use a base controller. You can accomplish this using action filters. This will give you the point of intercept for checking whether they are logged on, whether there is an account selected, and even redirecting them to the error or account selection page. All you have to do is set <code>filterContext.Result</code> during the action filter's <code>OnActionExecuting</code> method to prevent the request from going through. You have complete access to session, temp data, cookies, and the whole HttpContext during the action, just as you would in the controller. Also you can property inject dependencies using a filter attribute filter provider, so that should give you any data access you need.</p>
+
+<p>As far as modeling the data, I am not too familiar with Linq to SQL, but I think a normal one to many should do the trick:</p>
+
+<pre><code>User (1) &lt;-------&gt; (0..*) Account
+
+public class User
+{
+    public virtual ICollection&lt;Account&gt; Accounts { get; protected internal set; }
+}
+
+public class Account
+{
+    public int UserId { get; protected internal set; }
+    public virtual User User { get; protected internal set; }
+}
+</code></pre>
+
+<p><strong>Update:</strong> Sorry, I misunderstood what you meant by "store". In MVC, there are only a few ways you can store it - Session, Cookie, and Cache (and TempData, which is just short-term session) are the most popular choices. My choice would depend. Session is probably the easiest, but if you are deployed to a server farm with a load balancer, you need to think about what would happen if the user's session jumps physical machines. Will the session remain intact?</p>
+
+<p>As Jeremy says there is also cookie. No worries about load balancing here, but the semantics are a little harder to deal with than session. For example you have to send a redirect to write the cookie before you can read it, and I've never liked the fact that you have to add an expired cookie to delete one. Since this data is part of your security, you also may want to encrypt the cookie value.</p>
+
+<p>If you use cache, the data will most likely still end up living in memory somewhere, like session (unless you are using a SQL session provider). Cache would probably be my last choice, since we use Azure and their cache doesn't support a lot of great MVC features. You also have the same problem with load balancers moving the user to a different machine in the cluster, where the data may have to be re-cached. </p>
+
+<p>Either way, you should still use action filters for this instead of a base Controller class.</p>

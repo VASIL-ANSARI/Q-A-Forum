@@ -1,0 +1,9 @@
+<p>As others have commented, it's not possible to alter Postgres grammar via an extension. There's been some discussion related to this on the hacker's mailing list, but no one sees any feasible way to make the Bison grammar extensible.</p>
+
+<p>The other problem with what you're proposing is that CHECK constraints (which it appears is what you're trying to do here) can not safely reference other tables.</p>
+
+<p>It sounds like what you really want here is extensible foreign key support. That's something the community would actually like as well, at least for arrays. The idea is to support something like int[], where each element should be treated as a foreign key reference to another table. What you're describing is similar: instead of a different data type, you want to use a different operator.</p>
+
+<p>For now though, I think the best you could do is to provide your users a function that will put an appropriate column and trigger on the table. The column would be a foreign key to the school table. The trigger would find an appropriate school and populate it's primary key in the new column. (You'd probably want a BEFORE DELETE trigger on the school table to deal with deleting a school too.)</p>
+
+<p>The reason you need the foreign key field is because foreign key triggers operate with different visibility rules than normal queries, so you can't fully simulate them in user space. If you're not quite that paranoid you could just have a single AFTER INSERT trigger that looks for a school and throws an error if it doesn't find one.</p>

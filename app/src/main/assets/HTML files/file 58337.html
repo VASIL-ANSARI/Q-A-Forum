@@ -1,0 +1,45 @@
+<p>I assume that you are trying to extimate the natural logarithm of 2 by its Taylor series expansion:</p>
+
+<pre>
+         â (-1)<sup><em>n</em> + 1</sup>
+ ln(<em>x</em>) = <strong>â</strong> ââââââââ(<em>x</em> - 1)<sup><em>n</em></sup>
+         <sup><em>n</em>=1</sup>   <em>n</em> 
+</pre>
+
+<p>One of the problems of your code is the condition choosen to stop the iterations at a specified precision:</p>
+
+<pre><code>do { ... } while((log(2)-k)&gt;=digits);
+</code></pre>
+
+<p>Besides using <code>log(2)</code> directly (aren't you supposed to find it out instead of using a library function?), at the second iteration (and for every other even iteration) <code>log(2) - k</code> gets negative (-0.3068...) ending the loop.</p>
+
+<p>A possible (but not optimal) fix could be to use <code>std::abs(log(2) - k)</code> instead, or to end the loop when the absolute value of <code>1.0 / l</code> (which is the difference between two consecutive iterations) is small enough. </p>
+
+<p>Also, using <code>pow(-1, l - 1)</code> to calculate the sequence 1, -1, 1, -1, ... Is really a waste, especially in a series with such a slow convergence rate.</p>
+
+<p>A more efficient series (see <a href="https://en.wikipedia.org/wiki/Logarithm" rel="nofollow">here</a>) is:</p>
+
+<pre>
+           â     1 
+ ln(<em>x</em>) = 2 <strong>â</strong>  âââââââ ((<em>x</em> - 1) / (<em>x</em> + 1))<sup>2<em>n</em> + 1</sup>
+           <sup><em>n</em>=0</sup> 2<em>n</em> + 1  
+</pre>
+
+<p>You can extimate it without using <code>pow</code>:</p>
+
+<pre><code>double x = 2.0;  // I want to calculate ln(2)
+
+int n = 1;
+double eps = 0.00001,
+       kpow = (x - 1.0) / (x + 1.0),
+       kpow2 = kpow * kpow,
+       dk,
+       k = 2 * kpow;
+
+do {
+    n += 2;
+    kpow *= kpow2;
+    dk = 2 * kpow / n;
+    k += dk;
+} while ( std::abs(dk) &gt;= eps );
+</code></pre>

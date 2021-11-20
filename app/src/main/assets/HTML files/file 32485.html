@@ -1,0 +1,48 @@
+<p>I did more looking and fiddling and it seems like neither of them are part of javascriptCore.  I made a function that returned something and if it returned null then there was some code error inside it.</p>
+
+<p>Anyway, I also tried to then recreate the timeout functions in objective c but the problem comes when trying to pass the function/closure into the timeout.  It appears from what I've seen you cannot pass that sort of information through.  You get a string back.  At any point if in the code local variables are being referenced it wouldn't work.</p>
+
+<p>I can imagine you could make a workaround where the timer acts as a delayed messenger where you send the timer an identifier of some sort and after the delay it sends the string back to be ran by some other class that uses the id to call the right thing.</p>
+
+<pre><code>var interval = setInterval( 1000 );
+someObj[interval] = someFnToCall;
+... 
+someObj[interval]();
+...
+</code></pre>
+
+<p>[edit]
+Did some work to replicate the setTimeout properly.  setInterval would work pretty much the same way since you could invalidate the timer by nilling out the value in callbackstore</p>
+
+<pre><code>var callbackstore = {};
+
+var setTimeout = function( fn, ms ) {
+  callbackstore[setTimeoutFn(ms)] = fn;
+}
+
+var runTimeout = function( id ) {
+  if( callbackstore[id] )
+    callbackstore[id]();
+
+   callbackstore[id] = nil;
+}
+</code></pre>
+
+<p>and the objective-c side looks like this</p>
+
+<pre><code>JSValue *timeOutCallback = self.context[ @"runTimeout" ];
+
+self.context[@"setTimeoutFn"] = ^( int ms ) {
+  NSString *str = @"xyz";
+
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, ms * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    [timeOutCallback callWithArguments: @[str]];
+  });
+
+  return str;
+};
+</code></pre>
+
+<p>xyz was just to verify, it should be some incrementing string of some sort that would be valid as a javascript object name.</p>
+
+<p>This properly maintains all the nice closure stuff javascript likes.</p>

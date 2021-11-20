@@ -1,0 +1,42 @@
+<p>You're code most likely stopped working because of an update in some part of the API's that you are using; I'm guessing it could be updating from OAuth to OAuth2, or possibly a simple patch update. The easiest fix would be to add uses permissions and metadata to your <code>AndroidManifest.xml</code>:</p>
+
+<pre><code>&lt;uses-permission android:name="android.permission.INTERNET"/&gt;
+&lt;uses-permission android:name="android.permission.GET_ACCOUNTS"/&gt;
+&lt;uses-permission android:name="android.permission.USE_CREDENTIALS"/&gt;
+
+&lt;meta-data android:name="com.google.android.gms.version"
+           android:value="@integer/google_play_services_version" /&gt;
+</code></pre>
+
+<p><strong><em>If that doesn't fix it</em></strong>, there is most likely a bigger problem at hand.</p>
+
+<p>According to <a href="http://stackoverflow.com/a/32656807/4111606" title="An answer to a question on stackoverflow">this post</a>, it is better to use <code>onCreate()</code> for doing any non-graphical initializations, since it is called before <code>onCreateView()</code>. In order to be able to login to google, as stated in <a href="http://stackoverflow.com/a/19051107/4111606">this post</a>, you first need to select an account from the device like so (put this in your <code>Main.java</code> or <code>MainActivity.java</code>):</p>
+
+<pre><code>public static AccountManager accountManager;
+accountManager = AccountManager.get(this);
+Account[] accounts = accountManager.getAccountsByType("com.google");
+</code></pre>
+
+<p>Then, you need to get the token from the selected account like so:</p>
+
+<pre><code>private void onAccountSelected(final Account account) {
+    accountManager.getAuthToken(account, AUTH_TOKEN_TYPE, null, this, new AccountManagerCallback&lt;Bundle&gt;() {
+        public void run(AccountManagerFuture&lt;Bundle&gt; future) {
+            try {
+                String token = future.getResult().getString(AccountManager.KEY_AUTHTOKEN);
+                useToken(account, token);
+            } catch (OperationCanceledException e) {
+                onAccessDenied();
+            } catch (Exception e) {
+                handleException(e);
+            }
+        }
+    }, null);
+}
+</code></pre>
+
+<p>Then, once you authenticate the Token and Account, you will be able to login to google using OAuth2 (Refer to the <a href="https://github.com/google/gmail-oauth2-tools" rel="nofollow">OAuth2 GitHub Source</a> for the authentication code).</p>
+
+<p><strong><em>If you're still having problems and/or I didn't fully answer your question</em></strong>, check out <a href="https://www.learn2crack.com/2014/01/android-google-oauth2.html" rel="nofollow">this</a> on how to use OAuth2 with <code>AccountManager</code> and API calls, or <a href="https://www.learn2crack.com/2014/01/android-oauth2-webview.html" rel="nofollow">this</a> on how to use OAuth2 with <code>WebView</code>. The latter probably pertains more to your needs. Both give entire example files on how to do what you're looking for.</p>
+
+<p><strong><em>If even after reading the two links above</em></strong> you still need help or have a question or concern, feel free to leave a comment!</p>

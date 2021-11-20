@@ -1,0 +1,61 @@
+<p>another way to do what you want (without using a <code>Queue</code>) would be by using the <a href="http://docs.python.org/dev/library/concurrent.futures.html" rel="nofollow"><code>concurrent.futures</code></a> module (from python3.2, for earlier versions <a href="http://pypi.python.org/pypi/futures" rel="nofollow">there is a backport</a>).</p>
+
+<p>using this, your example would work like this:</p>
+
+<pre><code>from concurrent import futures
+
+def GetDict():
+    return {'foo':'bar'}
+
+# imports ...
+# from Worker import GetDict
+
+def ThreadStart():
+    executor = futures.ThreadPoolExecutor(max_workers=4)
+    future = executor.submit(GetDict)
+    print(future.result()) # blocks until GetDict finished
+
+    # or doing more then one:
+    jobs = [executor.submit(GetDict) for i in range(10)]
+    for j in jobs:
+        print(j.result())
+
+if __name__ == '__main__':
+    ThreadStart()
+</code></pre>
+
+<p>edit:</p>
+
+<p>something similar woule be to use your own thread to execute the target function and save it's return value, something like this:</p>
+
+<pre><code>from threading import Thread
+
+def GetDict():
+    return {'foo':'bar'}
+
+# imports ...
+# from Worker import GetDict
+
+class WorkerThread(Thread):
+
+    def __init__(self, fnc, *args, **kwargs):
+        super(WorkerThread, self).__init__()
+        self.fnc = fnc
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self):
+        self.result = self.fnc(*self.args, **self.kwargs)
+
+
+def ThreadStart():
+    jobs = [WorkerThread(GetDict) for i in range(10)]
+    for j in jobs:
+        j.start()
+    for j in jobs:
+        j.join()
+        print(j.result)
+
+if __name__ == '__main__':
+    ThreadStart()
+</code></pre>

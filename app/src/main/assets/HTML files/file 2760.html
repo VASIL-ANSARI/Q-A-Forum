@@ -1,0 +1,49 @@
+<p>Do you actually need to save the attributes in a separate table, and then perform the update after an administrator views and approves them? If this is the scenario, you may just want to overwrite the update method to do something like this:</p>
+
+<pre><code>def update(perform_updates = false)
+  if perform_updates
+    latest_approved_update = UpdateAuditor.first(:conditions =&gt; { :updatable_id =&gt; self.id, :updatable_type =&gt; self.class.name, :approved =&gt; true })
+    self.attributes = latest_approved_update.attributes
+    self.save
+  else 
+    UpdateAuditor.create(:updatable_id =&gt; self.id, :updatable_type =&gt; self.class.name, :attributes =&gt; self.attributes)
+  end
+end
+</code></pre>
+
+<p><strong>UPDATE:</strong> The author has commented that they want to be able to apply this model to <em>all</em> updates. In order to accomplish this, you can add an attr_accessor to the model, let's say something like "perform_updates", which will of course be nil by default. </p>
+
+<p>When you want to perform the update to the database, you will first have to set the attribute to true, then run update. Otherwise, the update will just create a new UpdateAuditor record which will need to be approved by an administrator.</p>
+
+<pre><code>class Person &lt; ActiveRecord::Base
+  has_many :audits, :class_name =&gt; "UpdateAudit", :as =&gt; :auditable
+
+  attr_accessor :perform_updates
+
+  private
+
+  def create_or_update
+    raise ReadOnlyRecord if readonly?
+
+    if new_record?
+      result = create
+      result != false
+    else
+      if perform_updates
+        latest_approved_update = audits.approved.last
+
+        if latest_approved_update
+          self.attributes = latest_approved_update.attributes
+          update
+        else
+          return false
+        end
+      else
+        audits.create(:updated_attributes =&gt; self.attributes)
+      end 
+    end
+  end
+end
+</code></pre>
+
+<p>For the record, I think that overwriting the default update methods is a dangerous game, and such programming is better off in a <code>before_update</code> callback where it belongs. Once an update is approved in some interface, then an observer can then perform the update, overwriting what is currently there, until another change which was made can be approved. If there are currently updates to an object in the queue to be approved, users can be alerted that changes are pending approval, etc.</p>

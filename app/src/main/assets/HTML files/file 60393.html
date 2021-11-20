@@ -1,0 +1,51 @@
+<p>I reduced your reproduction to:</p>
+
+<pre><code>#include &lt;functional&gt;
+#include &lt;iostream&gt;
+#include &lt;queue&gt;
+
+struct foo {
+  using Task = std::function&lt;void()&gt;;
+
+  void Test() {
+    std::cout &lt;&lt; "In Test, this: " &lt;&lt; this &lt;&lt; std::endl;
+    AddTask([this] { std::cout &lt;&lt; "In task, this: " &lt;&lt; this &lt;&lt; std::endl; });
+  }
+
+  void AddTask(const Task&amp; task) {
+    tasks_.push(task);
+  }
+
+  Task GetTask() {
+    const auto&amp; task = tasks_.front();
+    tasks_.pop();
+    return task;
+  }
+
+  std::queue&lt;Task&gt; tasks_;
+};
+
+int main() {
+  foo f;
+  f.Test();
+  auto func = f.GetTask();
+  func();
+}
+</code></pre>
+
+<p>Do you see the problem now? The issue lies with:</p>
+
+<pre><code>const auto&amp; task = tasks_.front();
+tasks_.pop();
+</code></pre>
+
+<p>Here you grab a reference to an object, then you tell the queue to go ahead and delete that object. Your reference is now dangling, and chaos ensues.</p>
+
+<p>You should move it out instead:</p>
+
+<pre><code>Task GetTask() {
+  auto task = std::move(tasks_.front());
+  tasks_.pop();
+  return task;
+}
+</code></pre>

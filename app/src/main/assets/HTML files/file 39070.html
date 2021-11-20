@@ -1,0 +1,47 @@
+<p>I should preface this by pointing out that extending Visual Studio is not a particularly easy, fun or straightforward endeavor. </p>
+
+<p>I believe the MSDN article <a href="http://msdn.microsoft.com/en-us/library/ee334194.aspx" rel="nofollow">Walkthrough: Displaying Signature Help</a> should get you off to a good start.</p>
+
+<blockquote>
+  <p>The Signature Help source is based on signatures that implement <code>ISignature</code>, each of which contains parameters that implement <code>IParameter</code>.</p>
+</blockquote>
+
+<p>So first we have to create a parameter that inherits from <a href="http://msdn.microsoft.com/en-us/library/microsoft.visualstudio.language.intellisense.iparameter.aspx" rel="nofollow">IParameter</a>.</p>
+
+<p>Next we have to create a signature that inherits from <a href="http://msdn.microsoft.com/en-us/library/microsoft.visualstudio.language.intellisense.isignature.aspx" rel="nofollow">ISignature</a>. The key here is to implement a <code>CurrentParameterChanged</code> event that is fired as the user types commas, changing with parameter's definition should be shown.</p>
+
+<p>This is accomplished by creating the event and firing it as follows:</p>
+
+<pre><code>public event EventHandler&lt;CurrentParameterChangedEventArgs&gt; CurrentParameterChanged;
+
+public IParameter CurrentParameter
+{
+    get { return m_currentParameter; }
+    internal set
+    {
+        if (m_currentParameter != value)
+        {
+            IParameter prevCurrentParameter = m_currentParameter;
+            m_currentParameter = value;
+            this.RaiseCurrentParameterChanged(prevCurrentParameter, m_currentParameter);
+        }
+    }
+}
+
+private void RaiseCurrentParameterChanged(IParameter prevCurrentParameter, IParameter newCurrentParameter)
+{
+    EventHandler&lt;CurrentParameterChangedEventArgs&gt; tempHandler = this.CurrentParameterChanged;
+    if (tempHandler != null)
+    {
+        tempHandler(this, new CurrentParameterChangedEventArgs(prevCurrentParameter, newCurrentParameter));
+    }
+}
+</code></pre>
+
+<p>They computer the current parameter based on the number of commas in the string. The <code>ComputeCurrentParameter()</code> method is a little too long to post here, however. </p>
+
+<p>Next you have to implement <a href="http://msdn.microsoft.com/en-us/library/microsoft.visualstudio.language.intellisense.isignaturehelpsource.aspx" rel="nofollow"><code>ISignatureHelpSource</code></a>. This interface provides signature help information for Intellisense. </p>
+
+<p>The method <code>ISignatureHelpSource.AugmentSignatureHelpSession()</code> is where the list of parameter information is created and where you'll be adding your custom parameter information. The MSDN provided example uses pre-written strings here. In reality, you'd probably want to calculate these things on the fly, perhaps with Roslyn, depending on your goals.</p>
+
+<p>Finally, you must export an <a href="http://msdn.microsoft.com/en-us/library/microsoft.visualstudio.language.intellisense.isignaturehelpsourceprovider.aspx" rel="nofollow"><code>ISignatureHelpSourceProvider</code></a> via <a href="http://msdn.microsoft.com/en-CA/library/dd460648(v=vs.110).aspx" rel="nofollow">MEF</a>. This allows Visual Studio to consume your <code>ISignatureHelpSource</code>.</p>

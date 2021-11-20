@@ -1,0 +1,42 @@
+<p>From what I'm seeing, you're letting the fragments communicate directly with each other. 
+I'd recommend against it, since this can quickly lead to maintaining unused references, as fragments can have quite diverse lifecycles. The idea behind fragments is to have small segments of functionality which can communicate with their parent some information.</p>
+
+<p>I think a better way to approach would be to use the parent activity as a form of 'manager' between these two fragments.</p>
+
+<p>Instead of maintaining a static reference to the other fragment, store a normal reference to the activity, preferably in the form of a listener interface the activity implements. Then you'd use the findFragmentById/Tag to notify the other fragment of the change. All in all, this would look something like this:</p>
+
+<p>Fragment:</p>
+
+<pre><code>public interface ActivityListener {
+    void onText(String text);
+}
+
+private ActivityListener listener;
+
+@Override
+public void onAttach(Activity activity) {
+    super.onAttach(activity);
+
+    if(activity instanceof ActivityListener) {
+        listener = (ActivityListener) activity;
+    }
+    // else some error
+}
+
+@Override
+public void onDetach(Activity activity) {
+    // to make absolutely sure you don't maintain a reference to a killed activity
+    listener = null;
+}
+</code></pre>
+
+<p>Activity:</p>
+
+<pre><code>@Override
+public void onText(String text) {
+    Fragment frag = getSupportFragmentManager.findFragmentById(&lt;someId&gt;);
+    // notify with text information
+}
+</code></pre>
+
+<p>Something like this should work fine.</p>

@@ -1,0 +1,33 @@
+<p>Going with what may be the simplest solution: your query doesn't need any CTEs.  Generally speaking, use a CTE when </p>
+
+<ol>
+<li>You're trying to abstract away some set of joins/operations (ie, usually created as a view)</li>
+<li>You plan on referencing the result more than once</li>
+</ol>
+
+<p>(There's a related one for naming aggregate result sets, but that can be done with a joined subquery)</p>
+
+<p>For simple conditions, don't bother.  The following should run in almost every version of DB2 (and, barring <code>FETCH FIRST</code>, almost every RDBMS):</p>
+
+<pre><code>DELETE FROM Address 
+WHERE member_id &gt;= 50000000 
+      AND member_id &lt; 1000000000
+      AND status = 'T'
+      AND lastCreate &lt; CURRENT_TIMESTAMP - 42 DAYS
+      AND NOT EXISTS (SELECT '1'
+                      FROM Orders
+                      WHERE Orders.address_id = Address.address_id)
+      AND NOT EXISTS (SELECT '1'
+                      FROM OrderItems
+                      WHERE OrderItems.addressId = Address.address_id
+                            OR OrderIterms.allocAddress_id = Address.address_id)
+      AND NOT EXISTS (SELECT '1'
+                      FROM HD_Member_Subscr
+                      WHERE HD_Member_Subscr.address_id = Address.address_id)
+FETCH FIRST 800000 ROWS ONLY
+WITH UR
+</code></pre>
+
+<p>(actually, I wonder if the <code>FOR READ ONLY</code> was part of the problem.  Note that without an <code>ORDER BY</code> clause, the order of the rows will be random - although likely by <code>address_id</code> anyways).</p>
+
+<p>Note that I've swapped out <code>BETWEEN</code> for an exclusive range (I personally believe <code>BETWEEN</code> should be deprecated, and advocate explicitly defined ranges for even integer ranges, for consistency reasons).</p>

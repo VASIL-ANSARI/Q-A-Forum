@@ -1,0 +1,21 @@
+<p>The <code>[[NSURL alloc] init]</code> is not just unnecessary, it's <strong>invalid</strong>. <code>fileURLWithPath:</code> is a class method, which means you can only call it on the class object (that is, <code>NSURL</code> itself). It does not produce a compile error because <code>-(NSURL *)init</code> returns an object of type <code>id</code>, and does not result in a runtime error because <code>-(NSURL *)init</code> actually returns <code>nil</code>, and messages sent to <code>nil</code> will just cascade another <code>nil</code> as their return value.</p>
+
+<p><strike>This code should work:</p>
+
+<pre><code>NSString* pathToFile = @"/this/is/a/path";
+NSURL* url = [NSURL fileURLWithPath:pathToFile];
+</code></pre>
+
+<p></strike></p>
+
+<p><strong>I found your problem.</strong>
+<code>-[NSOpenPanel URLs]</code> returns an array of NSURL objects, which you treat as NSString objects. That's not right. You should use the following:</p>
+
+<pre><code>NSURL* url = [[oPanel URLs] objectAtIndex:0];
+</code></pre>
+
+<hr>
+
+<p>The debugger could've show you that if you looked at the <code>pathToFile</code> variable. Make sure to check it next time. :) Hovering a variable with your mouse should get you its type. </p>
+
+<p>However, remember that there are situations where you will legitimately encounter another type than the one you expected. For instance, the private NSPathStore2 class is part of the NSString cluster, and you can do everything NSString supports on NSPathStore2 objects. (If this happens and you're not too sure, check the documentation to see if the type you expect is a cluster type. That's how they're called in the documentation.)</p>

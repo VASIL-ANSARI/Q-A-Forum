@@ -1,0 +1,58 @@
+<p>I finally managed to figure it out. I added an appformid property to the applicationuser class like this:</p>
+
+<pre><code>[ForeignKey("AppForm")]
+public int AppFormId { get; set; }
+</code></pre>
+
+<p>Then created another class to load the appform object like this:</p>
+
+<pre><code>public static class AppFormManager {
+
+    public static ApplicationUser GetCurrentUser() {
+        ApplicationUser user = System.Web.HttpContext.Current.GetOwinContext().GetUserManager&lt;ApplicationUserManager&gt;().FindById(System.Web.HttpContext.Current.User.Identity.GetUserId());
+        if (user != null) {
+            AppForm form = new AppForm();
+            ApplicationDbContext db = new ApplicationDbContext();
+            AppForm ap = db.AppForms.Where(af =&gt; af.Id == user.AppFormId).Include("Answers").Include("Documents").SingleOrDefault();
+            if (ap == null) {
+                var AppForm = new AppForm { PercentComplete = 0, Reviewed = false, Status = "Incomplete", SignedOff = false, Completed = false, LastPageCompleted = 0 };
+                user.AppForm = AppForm;
+            } else {
+                user.AppForm = ap;
+            }
+            return user;
+        }
+        return null;
+    }
+
+    public static bool SaveCurrentUser() {
+        ApplicationUser user = System.Web.HttpContext.Current.GetOwinContext().GetUserManager&lt;ApplicationUserManager&gt;().FindById(System.Web.HttpContext.Current.User.Identity.GetUserId());
+        if (user == null) { return false; }
+        var uManager = new UserManager&lt;ApplicationUser&gt;(new UserStore&lt;ApplicationUser&gt;(new ApplicationDbContext()));
+        uManager.UpdateAsync(user);
+        return true;
+    }
+
+}
+</code></pre>
+
+<p>So in the controller, the code is much cleaner:</p>
+
+<pre><code>// GET: AppForm
+    public ActionResult Index() {
+
+        ApplicationUser user = AppFormManager.GetCurrentUser();
+
+        var model = new AppFormIndexViewModel();
+        if (user != null) {
+                model.PercentComplete = user.AppForm.PercentComplete;
+                model.NextPage = "Page" + user.AppForm.LastPageCompleted + 1;
+                model.Status = user.AppForm.Status;
+        }
+        return View(model);
+    }
+</code></pre>
+
+<p>and I can call the AppFormManager.SaveCurrentUser() method to save the data in the post action.</p>
+
+<p>Thanks for all those who made suggestions which helped me figure out a way to do it. Possibly not the best way to do it, but it works for me for now.</p>

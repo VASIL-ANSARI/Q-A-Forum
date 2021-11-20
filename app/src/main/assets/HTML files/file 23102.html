@@ -1,0 +1,10 @@
+<p>Stamppot, thank you for posting this problem to StackOverflow; as you know, there is not much other information about this error message to be found on the Web. My team ran into a similar problem a few months ago in a webapp that uses NHibernate and log4net. (StringTemplate might have been involved too.) We "fixed" the problen by redirecting Console.Out/Error to null streams (effectively disabling them) in the Application_Start() event handler in Global.ascx.cs:</p>
+
+<pre><code>protected void Application_Start(object sender, EventArgs e)
+{
+    Console.SetOut(new System.IO.StreamWriter(System.IO.Stream.Null));
+    Console.SetError(new System.IO.StreamWriter(System.IO.Stream.Null)); 
+}
+</code></pre>
+
+<p>Details: In our case, the "probable race condition..." error was related to load. On the production server, this exception would arise sporadically, crashing the worker process on each occasion. Eventually we found out how to reproduce it, by running a script that flooded the webapp with many requests in a short period of time. The exception stack traces, when correlated with the NHibernate/StringTemplate/log4net source code, pointed to the use of Console.Out/Error methods for logging in various situations. Seems like a strange place for such an error to arise---aren't these methods <a href="http://stackoverflow.com/questions/1079980/calling-console-writeline-from-multiple-threads">considered to be thread-safe?</a> However, after we applied the above workaround, the problem immediately disappeared and hasn't returned since. Unfortunately, other priorities kept us from digging deeper---but whatever the root cause of the problem, it hasn't manifested itself in any other way.</p>

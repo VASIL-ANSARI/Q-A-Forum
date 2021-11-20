@@ -1,0 +1,100 @@
+<p>As [class.friend]/5 says :</p>
+
+<blockquote>
+  <p>When a friend declaration refers to an overloaded name or operator, only the function specified by the parameter types becomes a friend. A member function of a class X can be a friend of a class Y.</p>
+</blockquote>
+
+<p>In your specific case :</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;vector&gt;
+
+struct Screen;
+
+class Window_mgr
+{
+  public:
+
+    Window_mgr();
+
+    using ScreenIndex = std::vector&lt;Screen&gt;::size_type;
+    void clear(ScreenIndex);
+  private:
+    std::vector&lt;Screen&gt; screens;
+};
+
+class Screen
+{
+  friend void Window_mgr::clear(ScreenIndex);
+  public:
+    using pos = std::string::size_type;
+    Screen(pos ht, pos wd, char c) : height(ht), width(wd), contents(ht * wd, c) { }
+  private:
+    pos height = 0, width = 0;
+    std::string contents;
+};
+
+
+Window_mgr::Window_mgr():
+  screens{1, Screen(24, 80, ' ') }
+{
+}
+
+void Window_mgr::clear(ScreenIndex i)
+{
+  Screen &amp;s = screens[i];
+  s.contents = std::string(s.height * s.width, ' ');
+}
+
+int main()
+{
+  Window_mgr w;
+  w.clear(0);
+}
+</code></pre>
+
+<hr>
+
+<p>Take a note that it is not possible to solve that exercise, because Window_mgr has a member variable of std::vector which argument is an incomplete type. It will work on most compilers (see <a href="http://stackoverflow.com/a/8330131/476681">here</a> why), but the standard prohibits it.</p>
+
+<p>This example demonstrates how to make a member function friend of a class :</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+struct A;
+
+struct B
+{ 
+  void bar( A&amp; a, int l);
+};
+
+struct A
+{
+  friend void B::bar(A&amp;,int);
+  A():k(0){}
+  private:
+  void foo(int m);
+  int k;
+};
+
+
+
+void A::foo(int m)
+{
+  std::cout&lt;&lt;"A::foo() changing from "&lt;&lt;k&lt;&lt;" to "&lt;&lt;m&lt;&lt;std::endl;
+  k=m;
+}
+
+void B::bar( A&amp; a, int l)
+{
+  std::cout&lt;&lt;"B::bar() changing to "&lt;&lt;l&lt;&lt;std::endl;
+  a.foo(l);
+}
+
+int main()
+{
+  A a;
+  B b;
+  b.bar(a,11);
+}
+</code></pre>

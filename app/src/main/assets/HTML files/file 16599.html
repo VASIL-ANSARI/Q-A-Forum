@@ -1,0 +1,80 @@
+<p>The issue is that your P/Invoke declaration doesn't match your call.  DeviceIoControl takes in pointers for the in/out paramters:</p>
+
+<pre><code>BOOL DeviceIoControl(
+  HANDLE hDevice, 
+  DWORD dwIoControlCode, 
+  LPVOID lpInBuffer, 
+  DWORD nInBufferSize, 
+  LPVOID lpOutBuffer, 
+  DWORD nOutBufferSize, 
+  LPDWORD lpBytesReturned, 
+  LPOVERLAPPED lpOverlapped
+);
+</code></pre>
+
+<p>So you can "adjust" your declaration in a lot of ways.  The one in the link you provide uses a <code>byte[]</code> probably for convenience where they were using it.  In your case, since you're passing simple structs (i.e. no internal pointers to other data), then the easiest "fix" is to just change you P/Invoke declaration:</p>
+
+<pre><code>[DllImport("coredll", SetLastError = true)]    
+internal static extern int DeviceIoControl(    
+    IntPtr hDevice, 
+    IOCTL.MY dwIoControlCode,    
+    ref Query lpInBuffer,
+    int nInBufferSize,    
+    ref Response lpOutBuffer, 
+    int nOutBufferSize,    
+    ref int lpBytesReturned, 
+    IntPtr lpOverlapped);    
+</code></pre>
+
+<p>And you code should work.  Note I also changed the types of the first two parameters to allow making your calling code more clear without casts.</p>
+
+<p><strong>EDIT 2</strong></p>
+
+<p>If you find you need different signatures, simply overload the P/Invoke.  For example, the <a href="http://www.opennetcf.com/Products/SmartDeviceFramework.aspx" rel="nofollow">Smart Device Framework</a> code has at least 11 overloads for DeviceIoControl.  Here are just some of them to give you a flavor:</p>
+
+<pre><code>    [DllImport("coredll.dll", EntryPoint = "DeviceIoControl", SetLastError = true)]
+    internal static extern int DeviceIoControl&lt;TInput, TOutput&gt;(
+        IntPtr hDevice,
+        uint dwIoControlCode,
+        ref TInput lpInBuffer,
+        int nInBufferSize,
+        ref TOutput lpOutBuffer,
+        int nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped)
+        where TInput : struct
+        where TOutput : struct;
+
+    [DllImport("coredll.dll", EntryPoint = "DeviceIoControl", SetLastError = true)]
+    internal unsafe static extern int DeviceIoControl(
+        IntPtr hDevice,
+        uint dwIoControlCode,
+        void* lpInBuffer,
+        int nInBufferSize,
+        void* lpOutBuffer,
+        int nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped);
+
+    [DllImport("coredll.dll", EntryPoint = "DeviceIoControl", SetLastError = true)]
+    internal static extern int DeviceIoControl(
+        IntPtr hDevice,
+        uint dwIoControlCode,
+        IntPtr lpInBuffer,
+        uint nInBufferSize,
+        IntPtr lpOutBuffer,
+        uint nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped);
+
+    [DllImport("coredll.dll", EntryPoint = "DeviceIoControl", SetLastError = true)]
+    internal static extern int DeviceIoControl(
+        IntPtr hDevice,
+        uint dwIoControlCode,
+        byte[] lpInBuffer,
+        int nInBufferSize,
+        IntPtr lpOutBuffer,
+        int nOutBufferSize,
+        out int lpBytesReturned,
+        IntPtr lpOverlapped);
+</code></pre>

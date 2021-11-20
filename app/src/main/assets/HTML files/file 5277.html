@@ -1,0 +1,81 @@
+<p>well there are a few ways to skin a cat here (assuming 5.1 and triggers)</p>
+
+<ul>
+<li><p>you can update everything from application layer</p></li>
+<li><p>you can trigger updates to <code>post_count</code> from <code>categories_posts</code> and trigger updates (cascade) to <code>under_post_count</code> from <code>categories</code></p></li>
+<li><p>finally, you can trigger all updates from <code>categories_posts</code></p></li>
+</ul>
+
+<p>Also depending on the actual number of categories, you might not need to denormalize <code>under_post_count</code> as it should be rather easy and inexpensive to fetch it with</p>
+
+<pre><code>SELECT c.id, SUM(cc.post_count) 
+FROM categories c 
+LEFT JOIN categories cc ON c.lft &lt;= cc.lft AND c.rght &gt;= cc.rght 
+GROUP BY c.id;
+</code></pre>
+
+<p>Fetching the actual counts on exact match is</p>
+
+<pre><code>SELECT c.id, COUNT(*) 
+FROM categories c 
+LEFT JOIN categories_posts cp ON c.id = cp.post_id 
+GROUP BY c.id;
+</code></pre>
+
+<p>Combining the two gives the counts including the hierarchies</p>
+
+<pre><code>SELECT c.id, COUNT(*) 
+FROM categories c 
+LEFT JOIN categories cc ON c.lft &lt;= cc.lft AND c.rght &gt;= cc.rght 
+LEFT JOIN categories_posts cp ON cc.id = cp.post_id
+GROUP BY c.id;
+</code></pre>
+
+<p><strong>EDIT</strong></p>
+
+<p>Constructing update statements from the above should not be so hard</p>
+
+<pre><code>UPDATE categories 
+SET post_count = (SELECT COUNT(*) 
+                  FROM categories_posts cp 
+                  WHERE cp.post_id = categories.id)
+</code></pre>
+
+<p>should work for the <code>post_count</code></p>
+
+<p>Situation for the <code>under_post_count</code> is different since mysql does not like to hear that target table is mentioned in the where part, therefore you have to do some monstrosity like this</p>
+
+<pre><code>UPDATE categories LEFT JOIN 
+       (SELECT c.id, COUNT(*) AS result 
+        FROM categories c 
+        LEFT JOIN categories cc ON c.lft &lt;= cc.lft AND c.rght &gt;= cc.rght 
+        INNER JOIN categories_posts cp ON cc.id = cp.post_id
+        GROUP BY c.id) AS x ON categories.id = x.id
+SET under_post_count = x.result
+</code></pre>
+
+<p><strong>EDIT2</strong><br>
+Actually there is an error in all of the above queries - whenever I joined categories and posts I should have joined on <code>cc.id = cp.category_id</code> and not <code>cp.post_id</code>, which then I didn't check. Don't feel like correcting... but only in this last query</p>
+
+<pre><code>UPDATE categories LEFT JOIN 
+       (SELECT c.id, COUNT(*) AS result 
+        FROM categories c 
+        LEFT JOIN categories cc ON c.lft &lt;= cc.lft AND c.rght &gt;= cc.rght 
+        INNER JOIN categories_posts cp ON cc.id = cp.category_id
+        INNER JOIN posts p ON cp.post_id = p.id
+        WHERE p.status = 'published'
+        GROUP BY c.id) AS x ON categories.id = x.id
+SET under_post_count = x.result,
+    post_count = (SELECT COUNT(*) 
+                  FROM categories_posts cp 
+                  WHERE cp.category_id = categories.id)
+</code></pre>
+
+<p><strong>EDIT3</strong><br>
+Just few notes:</p>
+
+<ul>
+<li>the above query will fix the <code>under_post_count</code> and <code>post_count</code> regardless of the state of the data,</li>
+<li>there are queries that are cheaper which if you data access layers are properly abstracted, secured and if you can assure the atomicity - these queries would only do <code>post_count = post_count +/- 1</code> on appropriate records in statuses (similary for <code>under_post_count</code>),</li>
+<li>in case you can not reliably emulate triggers from application level it might still be cheaper to check if you need to run the above queries (even though mysql is quite good in this respect, but if you want to be DB agnostic), or adopt some strategy that you normally just increment/decrement the counters and only periodically recalculate the number. </li>
+</ul>

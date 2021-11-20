@@ -1,0 +1,13 @@
+<p>I apologize for this late update, but I had a similar problem with PDO (Sybase), and I can confirm that re-using statement variables without unsetting or setting to null should definitely be avoided.</p>
+
+<p>In PHP, whenever we overwrite a variable value, it first creates the new variable, and only after that it replaces and destroys the old value. In most cases that's not a problem (other than spending double the memory for allocating a single variable), but with statements it's completely different, because it wouldn't close the first statement or the cursor when it creates the second one, and some database drivers don't handle well multiple statements within the same PDO connection.</p>
+
+<p>Depending on the driver you use, the <code>PDOStatement::closeCursor()</code> might not close the statement, so the problem persists (at <a href="http://www.php.net/manual/en/pdostatement.closecursor.php" rel="nofollow">http://www.php.net/manual/en/pdostatement.closecursor.php</a> we can see that it depends on the driver, otherwise it will use PDO default that does not closes statements).</p>
+
+<p>So in this case, an <code>unset()</code> between the <code>PDO::prepare()</code>  makes all the difference:</p>
+
+<pre><code>$stmt=$dbh-&gt;prepare("SELECT ....");   
+$stmt-&gt;execute();
+unset($stmt); // or $stmt = null; --&gt; statement is destroyed at PDO
+$stmt=$dbh-&gt;prepare("UPDATE ....");
+</code></pre>

@@ -1,0 +1,39 @@
+<ol>
+<li><p><code>$service-&gt;newEventQuery()</code> doesn't need a parameter here. </p></li>
+<li><p>I believe you're retrieving calendar lists from a single user. Let's say it's yourself. So </p>
+
+<p><code>$query-&gt;setUser('default');</code></p>
+
+<p>won't help you get any second calendar, instead only the primary calendar which name is your email address.</p>
+
+<p>Refer from <a href="https://developers.google.com/google-apps/calendar/v1/developers_guide_protocol#RetrievingEvents%3a" rel="nofollow">Google developer protocol guide</a></p>
+
+<p>To get a feed, you send the following HTTP request to Calendar, using the URL you found in the previous section of this document:</p>
+
+<p><code>GET https://www.google.com/calendar/feeds/userID/private-magicCookie/full</code></p>
+
+<p>So replace userID with your calendarID to get a particular calendar's event feeds.</p></li>
+</ol>
+
+<p>Try</p>
+
+<pre><code>    $index = 0;
+    foreach($listFeed as $list) {
+        $calendarID = $list-&gt;id-&gt;text;
+        $user = str_replace("http://www.google.com/calendar/feeds/default/owncalendars/full/", '', $calendarID);
+        $query = $service-&gt;newEventQuery();
+        // Set different query parameters
+        $query-&gt;setUser($user);
+        $query-&gt;setVisibility('private');
+        $query-&gt;setProjection('full');
+        $query-&gt;setOrderby('starttime');
+
+        // Get the event list
+        try {
+            $eventFeed[$index] = $service-&gt;getCalendarEventFeed($query);
+        } catch (Zend_Gdata_App_Exception $e) {
+            echo "Error: " . $e-&gt;getResponse() . "&lt;br /&gt;";
+        }
+        $index++;
+    }
+</code></pre>

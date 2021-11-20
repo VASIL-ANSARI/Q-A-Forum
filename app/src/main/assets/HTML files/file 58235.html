@@ -1,0 +1,92 @@
+<p>One cannot simply <code>std::getline</code> into an <code>int</code>. Seriously. It's harder than walking into Mordor.</p>
+
+<p>A few ways to do this.</p>
+
+<p>One is to intermix <code>std::getline</code> and use of the <code>&gt;&gt;</code> operator. But </p>
+
+<pre><code>myFile &gt;&gt; price;
+getline(myFile,isbn);
+</code></pre>
+
+<p>Won't work because <code>myFile &gt;&gt; price;</code> leaves the end of line in the stream to be gobbled up by <code>getline(myFile,isbn)</code> resulting in an empty string in <code>isbn</code>. Something simple like </p>
+
+<pre><code>char end_of_line;
+myFile &gt;&gt; price &gt;&gt; end_of_line;
+getline(myFile,isbn);
+</code></pre>
+
+<p>will do the job, assuming your file strictly adheres to the format.</p>
+
+<pre><code>myFile &gt;&gt; price;
+myFile.ignore(numeric_limits&lt;streamsize&gt;::max(), '\n');
+getline(myFile,isbn);
+</code></pre>
+
+<p>is safer. It discards everything up to and including the end of the line. </p>
+
+<p>Sadly you can't do this with <code>published</code> unless you've written an <code>operator&gt;&gt;</code> for <code>Date</code>.</p>
+
+<p>The next good option is to read in everything as a string and then convert it to  the appropriate datatype before calling the <code>Book</code> constructor. Something along the lines of </p>
+
+<pre><code>int main()
+{
+    ifstream myFile("sample.txt");
+
+    string title;
+    string author;
+    string publisher;
+    string published;
+    string price;
+    string isbn;
+    string page;
+    string copies;
+
+    while (getline(myFile, title) &amp;&amp;
+           getline(myFile, author) &amp;&amp;
+           getline(myFile, publisher) &amp;&amp;
+           getline(myFile, published) &amp;&amp;
+           getline(myFile, price) &amp;&amp;
+           getline(myFile, isbn) &amp;&amp;
+           getline(myFile, page) &amp;&amp;
+           getline(myFile, copies))
+    {
+        myList.insert_rear(new Book(title,
+                                    author,
+                                    publisher,
+                                    string_to_date(published), // function does not exist 
+                                    stof(price),
+                                    isbn,
+                                    stoi(page),
+                                    stoi(copies)));
+    }
+
+    return 0;
+}
+</code></pre>
+
+<p>Off topic: Note how all of the <code>getline</code>s are in the <code>while</code> this will not enter the body of the loop unless reading of all of the inputs succeeded. </p>
+
+<pre><code>while( myFile )
+</code></pre>
+
+<p>tests for goodness at the beginning before all of the values are read. All this tells you is the last thing you read was good. It give no guarantees about the quality of the next things you will read. Currently <code>getline(myFile,title);</code> could fail along with everything after it and you'll build the new <code>Book</code> with the results of invalid reads. Always read, test that you read good information, and only then use what you read.</p>
+
+<p>Probably the best way is to take either of the above two methods and build them into an <code>operator&gt;&gt;</code> for <code>Book</code>.</p>
+
+<p>Then you can</p>
+
+<pre><code>int main()
+{
+    ifstream myFile("sample.txt");
+
+    Book temp;
+    while (myFile &gt;&gt; temp)
+    {
+        myList.insert_rear(new Book(temp));
+    }
+
+    return 0;
+}
+</code></pre>
+
+<p>This even makes it easy to get rid of the dynmaically allocated <code>Book</code>, and that's worth it's weight in gold.</p>

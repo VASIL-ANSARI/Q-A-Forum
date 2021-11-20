@@ -1,0 +1,42 @@
+<p>Since the warning message identifies the relevant flag as <code>-Wsign-conversion</code>, you should add that to the pragmas.</p>
+
+<pre><code>#include &lt;stdint.h&gt;
+extern int32_t foo(void);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+int32_t foo(void)
+{
+    uint32_t result = 0;
+    return result;
+}
+#pragma GCC diagnostic pop
+</code></pre>
+
+<p>If you comment out the second <code>ignored</code> and compile with <code>-Wconversion</code>, you get the error:</p>
+
+<pre><code>$ gcc -O3 -g -std=c11 -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition -Werror -Wconversion -c cvt.c
+cvt.c: In function âfooâ:
+cvt.c:9:5: error: conversion to âint32_tâ from âuint32_tâ may change the sign of the result [-Werror=sign-conversion]
+     return result;
+     ^
+cc1: all warnings being treated as errors
+$
+</code></pre>
+
+<p>If you uncomment that pragma, you get no warnings or errors.</p>
+
+<p>(Tested on Mac OS X 10.9.1 Mavericks with GCC 4.8.2 â YMMV!)  I note that the Apple-supplied <code>clang</code> (version 'Apple LLVM version 5.0 (clang-500.2.79) (based on LLVM 3.3svn)') does not object with the second <code>ignored</code> pragma commented out, with <code>-Wconversion</code> or with <code>-Wsign-conversion</code>, and I tried dinking with the code passing a <code>uint32_t</code> parameter and assigning that to result before returning it, etc (so it isn't simply superior optimization recognizing that 0 is special, or that returning an uninitialized variable is undefined behavior, etc.):</p>
+
+<pre><code>#include &lt;stdint.h&gt;
+extern int32_t foo(uint32_t v);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+//#pragma GCC diagnostic ignored "-Wsign-conversion"
+int32_t foo(uint32_t v)
+{
+    uint32_t result = v;
+    return result;
+}
+#pragma GCC diagnostic pop
+</code></pre>

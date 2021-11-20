@@ -1,0 +1,78 @@
+<p>To implement JavaScript in the Classic UI you will use Listeners. For example:</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;jcr:root xmlns:cq="http://www.day.com/jcr/cq/1.0"
+          xmlns:jcr="http://www.jcp.org/jcr/1.0"
+          xmlns:nt="http://www.jcp.org/jcr/nt/1.0"
+          jcr:primaryType="cq:Dialog"
+          height="600"
+          width="600"
+          title="My Component"
+          xtype="dialog"&gt;
+    &lt;listeners
+        jcr:primaryType="nt:unstructured"
+        beforesubmit="function(dialog){ return myNamespace.myCustomFunction(dialog); }"/&gt;
+    &lt;items jcr:primaryType="cq:TabPanel"&gt;
+        &lt;items jcr:primaryType="cq:WidgetCollection"&gt;
+        &lt;/items&gt;
+    &lt;/items&gt;
+&lt;/jcr:root&gt;
+</code></pre>
+
+<p>All the listeners available to you are listed in the <a href="https://docs.adobe.com/docs/en/cq/5-6-1/widgets-api/index.html" rel="nofollow">CQ Widgets API documentation</a>. For example, if you look at the <a href="https://docs.adobe.com/docs/en/cq/5-6-1/widgets-api/index.html?class=CQ.Dialog" rel="nofollow">Dialog API</a> you will see all the Public Events.</p>
+
+<p>I can't comment on your custom widget, however this JavaScript example when used in conjunction with the dialog listener above, will validate all your multifields with custom properties of <code>maxLimit</code> and <code>minLimit</code>. </p>
+
+<p>The dialog:</p>
+
+<pre><code>&lt;quiz-data
+    jcr:primaryType="cq:Widget"
+    fieldDescription="Click the '+' to add a new data"
+    fieldLabel="Quiz"
+    name="./quizData"
+    minLimit="2"
+    maxLimit="4"
+    xtype="multifield"&gt;
+    &lt;fieldConfig
+        jcr:primaryType="cq:Widget"
+        xtype="textfield"/&gt;
+&lt;/quiz-data&gt;
+</code></pre>
+
+<p>The JavaScript:</p>
+
+<pre><code>var myNamespace = myNamespace || {};
+
+myNamespace.myCustomFunction(dialog){
+  var multifields
+      field,
+      max,
+      min,
+      length,
+      x;
+
+  multifields = dialog.findByType('multifield');
+
+  for (x = 0; x &lt; multifields.length; x++) {
+
+    field = multifields[x];
+    max = parseInt(field.maxLimit, 10);
+    min = parseInt(field.minLimit, 10);
+    length = field.getValue().length;
+
+    if (max &amp;&amp; length &gt; max) {
+      CQ.Ext.Msg.show({
+        title: 'Validation Error',
+        msg: field.fieldLabel + ' must have no more than ' + max + ' items.',
+        buttons: CQ.Ext.MessageBox.OK, icon: CQ.Ext.MessageBox.ERROR});
+      return false;
+    } else if (min &amp;&amp; length &lt; min) {
+      CQ.Ext.Msg.show({
+        title: 'Validation Error',
+        msg: field.fieldLabel + ' must have at least ' + min + ' items.',
+        buttons: CQ.Ext.MessageBox.OK, icon: CQ.Ext.MessageBox.ERROR});
+      return false;
+    }
+  }
+}
+</code></pre>

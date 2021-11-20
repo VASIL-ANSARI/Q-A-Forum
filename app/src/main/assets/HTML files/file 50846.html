@@ -1,0 +1,23 @@
+<p>After going back and forth in comments, it turns out that you're trying to call <code>setcookie</code> from within a shortcode(you should have mentioned that in your question).</p>
+
+<p>This will usually not work, because by the time that a shortcode is parsed, some output has been sent to the browser, and therefore you can't use the <code>setcookie</code> function.</p>
+
+<p>Your alternative as you've already figured it out is to use <code>setcookie</code> from within a callback function on the <code>init</code> action. However you can usually hook all the way up to <code>template_redirect</code>(I believe this is the last, or one of the last actions you can use for sending headers). Can you specify what you're trying to achieve so that I can give you appropriate suggestions?</p>
+
+<p>Without any additional details, I can give you the below example on how to set the cookie based on whether the shortcode is present on the page/post the user is currently viewing.</p>
+
+<pre><code>&lt;?php
+function set_newuser_cookie(){
+    // Check to see if we're looking at a single post, page or attachment
+    if ( is_singular() ) {
+        $_post = get_post();
+        // See if the content of the current post object has the shortcode
+        if ( has_shortcode( $_post-&gt;post_content, 'js_conditions_script' ) ) {
+            setcookie( 'sm_js_cookie', 1, time()+3600*24*100,'/');
+        }
+    }
+}
+add_action( 'template_redirect', 'set_newuser_cookie' );
+</code></pre>
+
+<p>What we do is that we hook to the <code>template_redirect</code> action(the main WordPress query has been executed so we know what page we are looking at). We check to make sure we are looking at a single post(including custom post types), page or attachment and then we check to see if it contains the shortcode <code>[js_conditions_script]</code>. If it does, we set the cookie.</p>

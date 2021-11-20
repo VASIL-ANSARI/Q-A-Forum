@@ -1,0 +1,70 @@
+<p>In the loop you have checked <code>$error[]</code>. So when the error is in first file so that array will not be blank and other images will not upload.</p>
+
+<p>Try as below :</p>
+
+<pre><code>function filesupload($files) // here files is $_FILES array
+{
+    $i = 0;
+    $errors = array();
+    $maxfilesize = 1*1024*1024; // 1 MB
+    $num = count($files['name']);
+
+    $allowed_types = array('image/jpeg', 'image/png');
+
+    foreach($files['tmp_name'] as $key=&gt;$tmp_name)
+    {
+        $tmpname = $files['tmp_name'][$key]; // file temp name
+        $fsize = $files['size'][$key];  // file size
+
+        if(!empty($files['name'][$key]))
+        {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $ftype = finfo_file($finfo, $files['tmp_name'][$key]); // file mime type
+        }
+
+        //validations for file type and size
+
+        // no file selected
+        if(empty($files['name'][$key]))
+        {
+            $errors[$key] = 'Select at least one file for uploading';
+        }
+
+        // file type not allowed
+        if(in_array($ftype, $allowed_types) === false)
+        {
+            $errors[$key] = 'One or more files have invalid file extension';
+        }
+
+        // file size validation
+        if($fsize &gt; $maxfilesize)
+        {
+            $errors[$key] = 'Size of one or more files is more than allowed';
+        }
+
+        // if no errors uploaded file(s)
+        if(!isset($errors[$key]))
+        {
+            $path = 'images/';
+            $newfilename = time().'_'.rand(100000, 999999).'_'.$files['name'][$key];
+            $move = move_uploaded_file($tmpname, $path.$newfilename);
+            if($move)
+            {
+                $i = $i + 1;
+                if($i == $num)
+                {
+                    $msg = 'Files uploaded';
+                    return $msg;
+                }
+            }
+        }
+    }
+
+    if(!empty($errors))
+    {
+        return $errors;
+    }
+}
+</code></pre>
+
+<p>I have changed error message array from <code>$errors[]</code> to <code>$errors[$key]</code> and checked the same. So if you have 4 file input and 1st and 3rd are having error then 2nd and 4th will upload and you will get error in 0th and 2nd index of array. </p>

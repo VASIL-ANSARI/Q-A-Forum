@@ -1,0 +1,69 @@
+<p>You've gone wrong in a couple of places, first of all:</p>
+
+<pre><code>Property key is reserved for all elements: id
+</code></pre>
+
+<p>Basically you can't use the property value "id" in your <code>@Property("id")</code> annotations.</p>
+
+<p>Secondly, although it doesn't fail, your <code>Vert</code> class should:</p>
+
+<ul>
+<li>implement <code>JavaHandlerContext&lt;Vertex&gt;</code></li>
+<li>be <code>abstract</code></li>
+<li>persist values using the <code>Vertex</code>'s properties (local variables <strong>are NOT</strong> stored in the graph db!)</li>
+<li><strong>only</strong> implement/override the methods annotated with <code>@JavaHandler</code></li>
+</ul>
+
+<p>Additionally, you don't need to store the <code>Vertex</code>. Because your <code>IVert</code> interface extends <code>VertexFrame</code>, you have access to the <code>Vertex</code> using the <code>asVertex()</code> method.</p>
+
+<p>You should definitely re-read the documentation, refer to the examples - <a href="https://github.com/tinkerpop/frames/wiki/Java-Handler" rel="nofollow">https://github.com/tinkerpop/frames/wiki/Java-Handler</a></p>
+
+<p>Here are the re-written/working classes. <strong>N.B.</strong> I was using Groovy - it should be exactly the same/very similar for Java.</p>
+
+<h3>IVert</h3>
+
+<pre><code>@JavaHandlerClass(Vert.class)
+public interface IVert extends VertexFrame {
+
+    @Property("xxid")
+    public int getId();
+
+    @Property("xxid")
+    public void setId(int id);
+
+    @JavaHandler
+    public void setTestVar(int testVar);
+
+    @JavaHandler
+    public int getTestVar();
+
+}
+</code></pre>
+
+<h3>Vert</h3>
+
+<pre><code>abstract class Vert implements JavaHandlerContext&lt;Vertex&gt;, IVert {
+
+    public void setTestVar(int testVar){
+        asVertex().setProperty('foobar', testVar);
+    }
+
+    public int getTestVar(){
+        return (int)asVertex().getProperty('foobar');
+    }
+
+}
+</code></pre>
+
+<h3>Main method (Groovy)</h3>
+
+<pre><code>def g = TinkerGraphFactory.createTinkerGraph()
+FramedGraphFactory factory = new FramedGraphFactory(new JavaHandlerModule())
+FramedGraph framedGraph = factory.create(g)
+IVert vert = framedGraph.addVertex('myuniqueid', IVert)
+vert.setId(123)
+vert.setTestVar(456)
+IVert vert2 = framedGraph.getVertex('myuniqueid', IVert)
+assert vert2.id == 123
+assert vert2.testVar == 456
+</code></pre>

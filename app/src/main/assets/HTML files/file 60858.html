@@ -1,0 +1,38 @@
+<p>The data object PERM-AR-DO (tag 0xDB), just as the other data objects defined on the <a href="https://source.android.com/devices/tech/config/uicc.html" rel="nofollow">UICC Carrier Privileges page</a> (DeviceAppID-REF-DO with SHA-256 and PKG-REF-DO), is a Google-specific extension to the GP Secure Element Access Control specification. Consequently, you won't find anything about these DOs in the GP specifications. </p>
+
+<p>The page that you linked actually provides an answer to your question in the FAQ section:</p>
+
+<blockquote>
+  <p><strong>We assume we can grant access to all carrier-based permissions or have a finer-grained control. What will define the mapping between the bit mask and the actual permissions then? One permission per class? One permission per method specifically? Will 64 separate permissions be enough in the long run?</strong></p>
+  
+  <p><em>A: This is reserved for the future, and we welcome suggestions.</em></p>
+</blockquote>
+
+<p>So the answer is that the interpretation of the PERM-AR-DO is not yet defined. This is also reflected in the Android source code that parses the access rules (in <a href="https://android.googlesource.com/platform/frameworks/opt/telephony/+/android-7.0.0_r14/src/java/com/android/internal/telephony/uicc/UiccCarrierPrivilegeRules.java#591" rel="nofollow">UiccCarrierPrivilegeRules.java on lines 591-601</a>):</p>
+
+<pre><code>    } else if (rule.startsWith(TAG_AR_DO)) {
+        TLV arDo = new TLV(TAG_AR_DO); //E3
+        rule = arDo.parse(rule, false);
+        // Skip unrelated rules.
+        if (!arDo.value.startsWith(TAG_PERM_AR_DO)) {
+            return null;
+        }
+        TLV <b>permDo</b> = new TLV(TAG_PERM_AR_DO); //DB
+        <b>permDo</b>.parse(arDo.value, true);
+    } else  {
+</code></pre>
+
+<p>This code parses the AR-DO and extracts the PERM-AR-DO but then simply drops the extracted value (<code>permDo</code>).</p>
+
+<p>Similarly, the resulting <code>AccessRule</code> object contains a value <code>accessType</code> which is always set to 0:</p>
+
+<pre><code>    long accessType = <b>0</b>;
+    <i>[...]</i>
+    AccessRule accessRule = new AccessRule(IccUtils.hexStringToBytes(certificateHash),
+                                           packageName, <b>accessType</b>);
+</code></pre>
+
+<p>Moreover, inside the class <code>AccessRule</code> there is a comment besides the field <code>accessType</code> that indicates that the field is "<em>not currently used</em>":</p>
+
+<pre><code>    public long accessType;   // <b>This bit is not currently used, but reserved for future use.</b>
+</code></pre>

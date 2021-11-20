@@ -1,0 +1,88 @@
+<p>I think you might be interested in the <code>ax.transData</code> transformation. Using the <code>transform</code> method, you can convert points in 'Data' units to display units. See the <a href="http://matplotlib.sourceforge.net/users/transforms_tutorial.html" rel="nofollow">transformation tutorial</a> for more information about this. </p>
+
+<p>Below I have an example that includes an axes that fills the whole plot, so it is a bit easier to understand the transformation. I set three points in a scatter plot, then,  I take the data I used for the plot and get, using the transform, the corresponding point in pixels for each of the three points.</p>
+
+<pre><code>import matplotlib.pyplot as plt
+
+x = [1,2,4]
+y = [1,3,2]
+
+fig1 = plt.figure(figsize=(5,5),dpi=100)
+ax = fig1.add_axes([0,0,1,1])
+
+ax.scatter(x,y)
+
+ax.set_xlim(0,5)
+ax.set_ylim(0,5)
+transDataToFig1 = ax.transData+fig1.transFigure.inverted()
+for ix,iy in zip(x,y):
+    inDots = ax.transData.transform((ix,iy))
+    inFigIndirect = fig1.transFigure.inverted().transform(inDots)
+    inFigDirect = transDataToFig1.transform((ix,iy))
+    print inDots,"-&gt;",inFigIndirect," or ",inFigDirect
+
+fig1.savefig('scatterPos1.png')
+</code></pre>
+
+<p>Since (1) the axes spans the whole figure, (2) the axes limits are set from 0 to 5, and (3) the figure size is set to 5x5 and 100 dots-per-inch, then one axes unit corresponds to 100 pixels. This is confirmed by the output:</p>
+
+<pre><code>[ 100.  100.] -&gt; [ 0.2  0.2]  or  [ 0.2  0.2]
+[ 200.  300.] -&gt; [ 0.4  0.6]  or  [ 0.4  0.6]
+[ 400.  200.] -&gt; [ 0.8  0.4]  or  [ 0.8  0.4]
+</code></pre>
+
+<p>The above code also shows you how to get from dpi to figure units (the values within the bbox, between 0 and 1), and it provides an example of a transform pipeline (see tutorial linked above). For reference, this is the resulting figure:</p>
+
+<p><img src="http://i.stack.imgur.com/AzduB.png" alt="enter image description here"></p>
+
+<p>Now if you make a second figure that has subplots, the process still works, but the pixel values are not as special. Take for example this additional code:</p>
+
+<pre><code>fig2=plt.figure(figsize=(5,5),dpi=100)
+ax1 = fig2.add_subplot(121)
+ax2 = fig2.add_subplot(122)
+ax1.scatter(x,y)
+ax1.set_xlim(0,5)
+ax2.set_ylim(0,5)
+ax2.plot(range(10))
+
+transDataToFig2 = ax1.transData+fig2.transFigure.inverted()
+for ix,iy in zip(x,y):
+    inDots = ax1.transData.transform((ix,iy))
+    inFigIndirect = fig2.transFigure.inverted().transform(inDots)
+    inFigDirect = transDataToFig2.transform((ix,iy))
+    print inDots,"-&gt;",inFigIndirect," or ",inFigDirect
+
+fig2.savefig('scatterPos2.png')
+</code></pre>
+
+<p>It results in this figure:</p>
+
+<p><img src="http://i.stack.imgur.com/xx5HY.png" alt="enter image description here"></p>
+
+<p>And this output:</p>
+
+<pre><code>[  97.72727273  116.66666667] -&gt; [ 0.19545455  0.23333333]  or  [ 0.19545455  0.23333333]
+[ 132.95454545  383.33333333] -&gt; [ 0.26590909  0.76666667]  or  [ 0.26590909  0.76666667]
+[ 203.40909091  250.        ] -&gt; [ 0.40681818  0.5       ]  or  [ 0.40681818  0.5       ]
+</code></pre>
+
+<p>Note that in this case, the transformation is sensitive to which axes you used. I used the axes <code>ax1</code> because that is the one with the scatter plot that corresponds to the points stored in <code>x</code> and <code>y</code>. </p>
+
+<p>These examples are different from what it sounds like you want to do. You have x,y positions in pixels and you want to see what point is selected. That is simply the inverted transform of <code>transData</code>, which normally (un-inverted) takes points in data units and returns them to points in display units (pixels). Each axes has it's own unique <code>transData</code>, which is sensitive to the axes limits. </p>
+
+<p>For example, if I simulate a mouse click at position (120,480), in pixels, then each subplot would convert that into different data coordinates, like so:</p>
+
+<pre><code>click = (120,480)
+print "Click ",click," transforms into:"
+print ax1.transData.inverted().transform(click)," for axes 1"
+print ax2.transData.inverted().transform(click)," for axes 2"
+</code></pre>
+
+<p>This results in:</p>
+
+<pre><code>Click  (120, 480)  transforms into:
+[ 1.63225806  3.725     ]  for axes 1
+[-7.86193548  9.675     ]  for axes 2
+</code></pre>
+
+<p>Note that the transformation for <code>ax2</code> (the second subplot) leads to a negative x position. This is because the pixel position (120,480) is outside the x limits of the second subplot.</p>

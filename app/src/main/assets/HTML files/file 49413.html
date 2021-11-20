@@ -1,0 +1,57 @@
+<p>In this particular case if no verification will be done to <code>rh</code> filed you just need a plain <code>Stub</code> - just to ensure no <code>NullPointerException</code> is thrown when testing the <code>docall</code> method. <code>Mock</code> will also be sufficient however is more advanced object and using it here is pointless. When it comes to <code>Spy</code> it's used to verify invocations on a real (in terms of not being mocked) object. Have a look at the example below - runs smoothly just with <code>Stub</code>:</p>
+
+<pre><code>@Grab('org.spockframework:spock-core:1.0-groovy-2.4')
+@Grab('cglib:cglib-nodep:3.1')
+
+import spock.lang.*
+
+class Test extends Specification {
+    def 'spec'() {
+        given:
+        def service = new ServiceClient()    
+        service.rh = Mock(RequestHelper)
+
+        when:
+        service.doCall(new Order())
+
+        then:
+        noExceptionThrown()
+    }
+}
+
+class Order {
+    String product
+    String quantity
+    String profile
+}
+
+class OrderType { }
+
+class FACTORY {
+    static OrderType CreateOrderType = new OrderType()
+}
+
+class RequestHelper {
+    public void populateOrderRequestBody(String product, String quantity, String profile, OrderType orderType) {
+        orderType.setProduct(product);
+        orderType.setQuantity(Integer.parseInt(quantity));
+        orderType.setUser(profile.getUserId());
+    } 
+}
+
+class ServiceClient {
+   RequestHelper rh;
+
+   public void doCall(Order order) {
+      OrderType  orderType = FACTORY.CreateOrderType;
+      rh.populateOrderRequestBody(order.getProduct(), order.getQuantity(), order.getProfile(), orderType);
+   }
+
+    public setRequestHelper(RequestHelper rh){
+        this.rh=rh;
+    }
+    public RequestHelper getRequestHelper(){
+        return this.rh;
+    }
+}
+</code></pre>

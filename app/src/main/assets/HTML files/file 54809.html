@@ -1,0 +1,19 @@
+<p>I would suggest you use ImageIO to accomplish that:</p>
+
+<pre><code>-(void)frameReadyToSave:(UIImage*)image withExifAttachments:(NSMutableDictionary*)mutableDict
+{
+    NSData* imageData = UIImageJPEGRepresentation(image, 1.0f);
+    CGImageSourceRef source = CGImageSourceCreateWithData((__bridge CFDataRef) imageData, NULL);
+    __block NSURL* tmpURL = [NSURL fileURLWithPath:@"example.jpg"]; //modify to your needs
+    CGImageDestinationRef destination = CGImageDestinationCreateWithURL((__bridge CFURLRef) tmpURL, kUTTypeJPEG, 1, NULL);
+    CGImageDestinationAddImageFromSource(destination, source, 0, (__bridge CFDictionaryRef) mutableDict);
+    CGImageDestinationFinalize(destination);
+    CFRelease(source);
+    CFRelease(destination);
+    [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+        [PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:tmpURL];
+    }   completionHandler:^(BOOL success, NSError *error) {
+        //cleanup the tmp file after import, if needed
+    }];
+}
+</code></pre>

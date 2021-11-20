@@ -1,0 +1,66 @@
+<p>After trying for a long time I got the result using the code below:</p>
+
+<pre><code>-(void) requestFinished: (ASIHTTPRequest *) request
+{
+    NSString *theJSON = [request responseString];
+
+    SBJsonParser *parser = [[SBJsonParser alloc] init];
+
+    NSMutableArray *jsonDictionary = [parser objectWithString:theJSON error:nil];
+
+    headData = [[NSMutableArray alloc] init];
+    NSMutableArray *head = [[NSMutableArray alloc] init];
+
+    leftTableData = [[NSMutableArray alloc] init];
+    NSMutableArray *left = [[NSMutableArray alloc] init];
+
+    rightTableData = [[NSMutableArray alloc]init];
+
+    for (NSMutableArray *dictionary in jsonDictionary)
+    {
+        Model *model = [[Model alloc]init];
+
+        model.cid = [[dictionary valueForKey:@"cid"]intValue];
+        model.iid = [[dictionary valueForKey:@"iid"]intValue];
+        model.yr = [[dictionary valueForKey:@"yr"]intValue];
+        model.val = [dictionary valueForKey:@"val"];
+
+        [mainTableData addObject:model];
+
+        [head addObject:[NSString stringWithFormat:@"%ld", model.yr]];
+        [left addObject:[NSString stringWithFormat:@"%ld", model.iid]];
+    }
+    NSOrderedSet *orderedSet = [NSOrderedSet orderedSetWithArray:head];
+    headData = [[orderedSet array] mutableCopy];
+
+    NSOrderedSet *orderedSet1 = [NSOrderedSet orderedSetWithArray:left];
+    NSMutableArray *arrLeft = [[orderedSet1 array] mutableCopy];
+
+    //remove duplicate enteries from header array
+    [leftTableData addObject:arrLeft];
+
+
+    NSMutableArray *right = [[NSMutableArray alloc]init];
+    for (int i = 0; i &lt; arrLeft.count; i++)
+    {
+        NSMutableArray *array = [[NSMutableArray alloc] init];
+        for (int j = 0; j &lt; headData.count; j++)
+        {
+            /* NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF.iid == %ld", [[arrLeft objectAtIndex:i] intValue]];
+             NSArray *filteredArray = [mainTableData filteredArrayUsingPredicate:predicate];*/
+             NSPredicate *predicate = [NSPredicate predicateWithFormat:@"SELF.iid == %ld AND SELF.yr == %ld", [[arrLeft objectAtIndex:i] intValue], [[headData objectAtIndex:j] intValue]];
+             NSArray *filteredArray = [mainTableData filteredArrayUsingPredicate:predicate];
+
+            if([filteredArray count]&gt;0)
+            {
+                Model *model = [filteredArray objectAtIndex:0];
+                [array addObject:model.val];
+            }
+        }
+        [right addObject:array];
+    }
+    [rightTableData addObject:right];
+}
+</code></pre>
+
+<p>Hope it helps others.</p>

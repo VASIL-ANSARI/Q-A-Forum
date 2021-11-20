@@ -1,0 +1,55 @@
+<p><strong>Edit</strong></p>
+
+<p>Sorry, when reading your question again I understand that you don't control the plugins.</p>
+
+<p>You want to restrict usage of the foundation assembly based on the assembly calling it.</p>
+
+<p>Unfortunatly there is no other way to do that than checking the calling assembly in the sensitive parts. If you avoid public static members you can do the check in the constructor.</p>
+
+<pre><code>public class SensitiveClass {
+    private readonly byte[] SupplierXKey = new[] {...};
+
+    public SensitiveClass() {
+        var key = Assembly.CallingAssembly().GetName().GetPublicKey();
+
+        if (!key.SequenceEqual(SupplierXKey)) {
+            throw new SecurityException();
+        }
+    }
+}
+</code></pre>
+
+<p>Note that this solution requires that your supplier protects their code as well. You might need to extend the above code to check the caller's caller and so on.</p>
+
+<hr>
+
+<p><strong>old wrong answer</strong>  </p>
+
+<p>Are you using MEF to load the plugins?</p>
+
+<p>Then you can create your own catalog that only allows assemblies signed with a specific key.</p>
+
+<p>Something like:  </p>
+
+<pre><code>public class OnlyAssembliesFromX : ComposablePartCatalog
+{
+    private readonly byte[] SupplierXKey = new[] {...};
+
+    AggregateCatalog _catalog = new AggregateCatalog();
+
+    public OnlyAssemblisFromX(string path) {
+        foreach (var file in Directory.GetFiles(path)) {
+            var key = AssemblyName.GetAssemblyName(file)
+                                  .GetPublicKey();
+
+            if (key.SequenceEqual(SupplierXKey)) {
+                _catalog.Catalogs.Add(new AssemblyCatalog(file));
+            }
+        }
+    }
+
+    public override IQueryable&lt;ComposablePartDefinition&gt; Parts {
+        get { return _aggregateCatalog.Parts; }
+    }
+}
+</code></pre>

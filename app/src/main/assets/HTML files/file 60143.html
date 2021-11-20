@@ -1,0 +1,84 @@
+<p>Blocking on strings is bad. Blocking your webserver is bad. </p>
+
+<p><code>AsyncLocker</code> is a handy class that I wrote to allow locking on any type that behaves nicely as a key in a dictionary. It also requires asynchronous awaiting before entering the critical section (as opposed to the normal blocking behaviour of locks):</p>
+
+<pre><code>public class AsyncLocker&lt;T&gt;
+{
+    private LazyDictionary&lt;T, SemaphoreSlim&gt; semaphoreDictionary = 
+        new LazyDictionary&lt;T, SemaphoreSlim&gt;();
+
+    public async Task&lt;IDisposable&gt; LockAsync(T key)
+    {
+        var semaphore = semaphoreDictionary.GetOrAdd(key, () =&gt; new SemaphoreSlim(1,1));
+        await semaphore.WaitAsync();
+        return new ActionDisposable(() =&gt; semaphore.Release());
+    }
+}
+</code></pre>
+
+<p>It depends on the following two helper classes:</p>
+
+<p>LazyDictionary:</p>
+
+<pre><code>public class LazyDictionary&lt;TKey,TValue&gt;
+{
+    //here we use Lazy&lt;TValue&gt; as the value in the dictionary
+    //to guard against the fact the the initializer function
+    //in ConcurrentDictionary.AddOrGet *can*, under some conditions, 
+    //run more than once per key, with the result of all but one of 
+    //the runs being discarded. 
+    //If this happens, only uninitialized
+    //Lazy values are discarded. Only the Lazy that actually 
+    //made it into the dictionary is materialized by accessing
+    //its Value property.
+    private ConcurrentDictionary&lt;TKey, Lazy&lt;TValue&gt;&gt; dictionary = 
+        new ConcurrentDictionary&lt;TKey, Lazy&lt;TValue&gt;&gt;();
+    public TValue GetOrAdd(TKey key, Func&lt;TValue&gt; valueGenerator)
+    {
+        var lazyValue = dictionary.GetOrAdd(key,
+            k =&gt; new Lazy&lt;TValue&gt;(valueGenerator));
+        return lazyValue.Value;
+    }
+}
+</code></pre>
+
+<p>ActionDisposable:</p>
+
+<pre><code>public sealed class ActionDisposable:IDisposable
+{
+    //useful for making arbitrary IDisposable instances
+    //that perform an Action when Dispose is called
+    //(after a using block, for instance)
+    private Action action;
+    public ActionDisposable(Action action)
+    {
+        this.action = action;
+    }
+    public void Dispose()
+    {
+        var action = this.action;
+        if(action != null)
+        {
+            action();
+        }
+    }
+}
+</code></pre>
+
+<p>Now, if you keep a static instance of this somewhere:</p>
+
+<pre><code>static AsyncLocker&lt;string&gt; userLock = new AsyncLocker&lt;string&gt;();
+</code></pre>
+
+<p>you can use it in an <code>async</code> method, leveraging the delights of <code>LockAsync</code>'s <code>IDisposable</code> return type to write a <code>using</code> statement that neatly wraps the critical section:</p>
+
+<pre><code>using(await userLock.LockAsync(userId))
+{
+    //user with userId only allowed in this section
+    //one at a time.
+}
+</code></pre>
+
+<p>If we need to wait before entering, it's done asynchronously, freeing up the thread to service other requests, instead of blocking until the wait is over and potentially messing up your server's performance under load.</p>
+
+<p>Of course, when you need to scale to more than one webserver, this approach will no longer work, and you'll need to synchronize using a different means (probably via the DB).</p>

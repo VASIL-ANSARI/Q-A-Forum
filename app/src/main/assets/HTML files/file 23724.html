@@ -1,0 +1,88 @@
+<p>To test that it works here's an image <img src="http://i.stack.imgur.com/vwZnL.jpg" alt="enter image description here"><br>
+and here's the expected result after applying DFT. <img src="http://i.stack.imgur.com/0Ihgd.jpg" alt="enter image description here">  </p>
+
+<p>And without further ado here's the code:</p>
+
+<pre><code>// Load image
+Image&lt;Gray, float&gt; image = new Image&lt;Gray, float&gt;(@"C:\Users\me\Desktop\lines.png");
+
+// Transform 1 channel grayscale image into 2 channel image
+IntPtr complexImage = CvInvoke.cvCreateImage(image.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_32F, 2);
+CvInvoke.cvSetImageCOI(complexImage, 1); // Select the channel to copy into
+CvInvoke.cvCopy(image, complexImage, IntPtr.Zero);
+CvInvoke.cvSetImageCOI(complexImage, 0); // Select all channels
+
+// This will hold the DFT data
+Matrix&lt;float&gt; forwardDft = new Matrix&lt;float&gt;(image.Rows, image.Cols, 2); 
+CvInvoke.cvDFT(complexImage, forwardDft, Emgu.CV.CvEnum.CV_DXT.CV_DXT_FORWARD, 0);
+
+CvInvoke.cvReleaseImage(ref complexImage);
+
+// We'll display the magnitude
+Matrix&lt;float&gt; forwardDftMagnitude = GetDftMagnitude(forwardDft); 
+SwitchQuadrants(ref forwardDftMagnitude); 
+
+// Now compute the inverse to see if we can get back the original
+Matrix&lt;float&gt; reverseDft = new Matrix&lt;float&gt;(forwardDft.Rows, forwardDft.Cols, 2);
+CvInvoke.cvDFT(forwardDft, reverseDft, Emgu.CV.CvEnum.CV_DXT.CV_DXT_INV_SCALE, 0);
+Matrix&lt;float&gt; reverseDftMagnitude = GetDftMagnitude(reverseDft);    
+
+pictureBox1.Image = image.ToBitmap();
+pictureBox2.Image = Matrix2Bitmap(forwardDftMagnitude);
+pictureBox3.Image = Matrix2Bitmap(reverseDftMagnitude);
+
+private Bitmap Matrix2Bitmap(Matrix&lt;float&gt; matrix)
+{
+    CvInvoke.cvNormalize(matrix, matrix, 0.0, 255.0, Emgu.CV.CvEnum.NORM_TYPE.CV_MINMAX, IntPtr.Zero);            
+
+    Image&lt;Gray, float&gt; image = new Image&lt;Gray, float&gt;(matrix.Size);
+    matrix.CopyTo(image);
+
+    return image.ToBitmap();
+}
+
+// Real part is magnitude, imaginary is phase. 
+// Here we compute log(sqrt(Re^2 + Im^2) + 1) to get the magnitude and 
+// rescale it so everything is visible
+private Matrix&lt;float&gt; GetDftMagnitude(Matrix&lt;float&gt; fftData)
+{
+    //The Real part of the Fourier Transform
+    Matrix&lt;float&gt; outReal = new Matrix&lt;float&gt;(fftData.Size);
+    //The imaginary part of the Fourier Transform
+    Matrix&lt;float&gt; outIm = new Matrix&lt;float&gt;(fftData.Size);
+    CvInvoke.cvSplit(fftData, outReal, outIm, IntPtr.Zero, IntPtr.Zero);
+
+    CvInvoke.cvPow(outReal, outReal, 2.0);
+    CvInvoke.cvPow(outIm, outIm, 2.0);
+
+    CvInvoke.cvAdd(outReal, outIm, outReal, IntPtr.Zero);
+    CvInvoke.cvPow(outReal, outReal, 0.5);
+
+    CvInvoke.cvAddS(outReal, new MCvScalar(1.0), outReal, IntPtr.Zero); // 1 + Mag
+    CvInvoke.cvLog(outReal, outReal); // log(1 + Mag)            
+
+    return outReal;
+}
+
+// We have to switch quadrants so that the origin is at the image center
+private void SwitchQuadrants(ref Matrix&lt;float&gt; matrix)
+{
+    int cx = matrix.Cols / 2;
+    int cy = matrix.Rows / 2;
+
+    Matrix&lt;float&gt; q0 = matrix.GetSubRect(new Rectangle(0, 0, cx, cy));
+    Matrix&lt;float&gt; q1 = matrix.GetSubRect(new Rectangle(cx, 0, cx, cy));
+    Matrix&lt;float&gt; q2 = matrix.GetSubRect(new Rectangle(0, cy, cx, cy));
+    Matrix&lt;float&gt; q3 = matrix.GetSubRect(new Rectangle(cx, cy, cx, cy));
+    Matrix&lt;float&gt; tmp = new Matrix&lt;float&gt;(q0.Size);
+
+    q0.CopyTo(tmp);
+    q3.CopyTo(q0);
+    tmp.CopyTo(q3);
+    q1.CopyTo(tmp);
+    q2.CopyTo(q1);
+    tmp.CopyTo(q2);
+}
+</code></pre>
+
+<p>Most of the information in this answer is from a <a href="http://opencv-users.1802565.n2.nabble.com/faint-image-after-Inverse-DFT-using-cvDFT-td2193072.html">question</a> on the OpenCV mailing list and Steve Eddins' <a href="http://blogs.mathworks.com/steve/2009/12/04/fourier-transform-visualization-using-windowing/">article</a> on FFT in image processing.</p>

@@ -1,0 +1,42 @@
+<p>I can tell you why the ModelState is invalid.  You don't have to have DataAnnotations to make a property required. As you can't set the primitives to null, they also count as "Required" properties and ModelState becomes invalid if none is provided.</p>
+
+<p>In the above example, I think you are not posting the CreatedOn or PostId properties (or both). As you are only posting two properties that are of value to you(Title and Content), you will be better off creating a simple view model that just contained those two properties. If you don't want to do that, even accepting two named parameters would be better.</p>
+
+<p>The following is an example that uses the view model. Please note that you can add the ReplyTo property to the view model.</p>
+
+<pre><code>public class PostViewModel
+{
+    public int ReplyTo {get; set;}
+    public string Title { get; set; }
+    [DataType(DataType.MultilineText)]
+    public string Content { get; set; }
+ }
+</code></pre>
+
+<p>and you can use it like so:</p>
+
+<pre><code>    [HttpPost]
+    public ActionResult Reply(PostViewModel viewModel)
+    {
+        Post masterPost = db.Posts.FirstOrDefault(p =&gt; p.PostID == viewModel.ReplyTo);
+        Post post = new Post();
+        post.PostID = 0;
+        post.CreatedOn = DateTime.Now;
+        post.ModifiedOn = DateTime.Now;
+        post.ReplyTo = masterPost;
+        post.Forum = db.Forums.FirstOrDefault(f=&gt;f.ForumID == masterPost.Forum.ForumID);
+        post.User = (User)Session["User"];
+        post.Title = viewModel.Title;
+        post.Content = viewModel.Content;
+
+        if (ModelState.IsValid)
+        {
+            db.Posts.Add(post);
+            db.SaveChanges();
+            return RedirectToAction("View", "Posts", new { id = ReplyTo });
+        }
+        return View(post);
+    }
+</code></pre>
+
+<p>As for the user being duplicated, I think the reason for that is the lack of Key attribute in the User class.</p>

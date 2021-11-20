@@ -1,0 +1,80 @@
+<p>as I stated in the comments This is what you have</p>
+
+<pre><code>  //encrypt
+ $encryptxt=mcrypt_encrypt(MCRYPT_RIJNDAEL_256,$key,$str,MCRYPT_MODE_CBC,$iv);  
+  $encryptxt64=base64_encode($encryptxt);
+
+ //decrypt 
+   $decryptxt=mcrypt_decrypt(MCRYPT_RIJNDAEL_256,$key,$str,MCRYPT_MODE_CBC,$iv);  
+  $decryptxt64=base64_decode($decryptxt);
+</code></pre>
+
+<ol>
+<li>encrypt </li>
+<li>base64 encode</li>
+<li>decrypt </li>
+<li>base64 decode </li>
+</ol>
+
+<p>it should be FILO ( first in last out )</p>
+
+<ol>
+<li>encrypt </li>
+<li>base64 encode</li>
+<li>base64 decode</li>
+<li>decrypt </li>
+</ol>
+
+<p>That way you are decrypting the output of encrypt and <strong>not</strong> the base64 encoded output,</p>
+
+<p>Like So:</p>
+
+<pre><code>$encryptxt=mcrypt_encrypt(MCRYPT_RIJNDAEL_256,$key,$str,MCRYPT_MODE_CBC,$iv);  
+  $encryptxt64=base64_encode($encryptxt);
+
+//decrypt 
+ $decryptxt64=base64_decode($str);
+$decryptxt=mcrypt_decrypt(MCRYPT_RIJNDAEL_256,$key,$decryptxt64,MCRYPT_MODE_CBC,$iv);  
+</code></pre>
+
+<p>As a note  MCRYPT_RIJNDAEL_256 is NOT AES 256, for that you need MCRYPT_RIJNDAEL_128 with a 32byte  key, So in some regards 128 is better, ( 128 being a smaller block cypher )</p>
+
+<p>One other thing I would suggest doing is taking a md5 hash of the input string and then preending that to the input string, before encryption.  This is so that when you unecrypt it you can substr the first 32 characters and use that to check the input.  Basically you need to know the input string in order to see if it was decrypted.  But, by hashing it and then comparing like this you no longer need to know that to check that it works.</p>
+
+<p>So all together ( haven't tested it but should get you close )</p>
+
+<pre><code>function encrypt ($key,$iv,$str)
+{     
+  $block=mcrypt_get_block_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC);
+  $padding=$block-(strlen($str) % $block);
+  $str.=str_repeat(chr($padding), $padding);  
+
+  ///prepend a md5 hash of the plain text input before encrypting it ( so we can check it later )
+  $str = md5( $str ) . $str;
+
+    $encryptxt=mcrypt_encrypt(MCRYPT_RIJNDAEL_256,$key,$str,MCRYPT_MODE_CBC,$iv);  
+  $encryptxt64=base64_encode($encryptxt);
+  return $encryptxt64;
+}
+function decrypt ($key,$iv,$str)
+{     
+  $block=mcrypt_get_block_size(MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC);
+  $padding=$block-(strlen($str) % $block);
+  $str.=str_repeat(chr($padding), $padding);  
+
+  $decryptxt64=base64_decode($str);
+  $decryptxt=mcrypt_decrypt(MCRYPT_RIJNDAEL_256,$key,$decryptxt64,MCRYPT_MODE_CBC,$iv);  
+
+   ///Separate the md5 hash from the other text, and then hash the other text and compare to the hash we included when encrypting  if they are = it all worked.
+  /// it is perfectly safe to use md5 here because it will be part of what we encrypt, and not accessible until it is decrypted. 
+ ///it's sole purpose is to give us 2 things we can compare to check that the decryption worked
+  $hash = substr( $decryptxt, 0, 32); //find first 32 characters (md5 output is always 32 characters long )
+  $decryptxt = substr($decryptxt, 33); //find everything after the fist 32
+  if( $hash != md5($decryptxt) ){
+        die( 'fail' ); /// or some other error
+  }
+
+
+  return $decryptxt64;
+}
+</code></pre>

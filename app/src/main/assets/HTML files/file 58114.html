@@ -1,0 +1,100 @@
+<p>I have implemented the same for my app. Have a look at the code and you will understand how to do it. I have used Retrofit for the same. I have checked if the nursejson which is in sharedpreference is null. if it is null then continue further to hit API if not then load data from that sharedpreference.</p>
+
+<p>To refresh the list, just check if you have internet connectivity and then delete that sharedpreference and call getnurse method again.</p>
+
+<pre><code>//After Oncreate
+pref = getApplicationContext().getSharedPreferences("CachedResponse", 0);
+editor = pref.edit();
+editor.apply();
+// Call getNurses method
+getNurses();
+
+
+
+//Method to get Nurses
+public void getNurses() {
+
+    nurseJson = pref.getString("nurseJson", null);
+
+    if (nurseJson != null) {
+
+        progressBar.setVisibility(View.INVISIBLE);
+
+        gson = new Gson();
+        nurse = gson.fromJson(nurseJson, Nurse.class);
+        nurseList = nurse.getNurse();
+        namesArrayList.clear();
+
+        for (String nurses : nurseList) {
+            namesArrayList.add(nurses);
+        }
+
+        namesAdapter.notifyDataSetChanged();
+
+    } else {
+
+        Call&lt;Nurse&gt; call = apiInterface.getNursesList();
+        call.enqueue(new Callback&lt;Nurse&gt;() {
+            @Override
+            public void onResponse(Call&lt;Nurse&gt; call, Response&lt;Nurse&gt; response) {
+
+                progressBar.setVisibility(View.INVISIBLE);
+
+                onItemsLoadComplete();
+
+                if (response.isSuccessful()) {
+
+                    nurse = response.body();
+
+                    nurseJson = new Gson().toJson(nurse);
+                    editor.putString("nurseJson", nurseJson);
+                    editor.commit();
+
+                    nurseList = nurse.getNurse();
+
+                    namesArrayList.clear();
+
+                    for (String nurses : nurseList) {
+                        namesArrayList.add(nurses);
+                    }
+
+                    namesAdapter.notifyDataSetChanged();
+
+                } else {
+
+                    utility.createSnackbar(coordinatorLayout, "Error Occurred, Please Try Again Later!");
+
+                }
+            }
+
+            @Override
+            public void onFailure(Call&lt;Nurse&gt; call, Throwable t) {
+
+                progressBar.setVisibility(View.INVISIBLE);
+
+                onItemsLoadComplete();
+
+                if (t.getLocalizedMessage() != null) {
+
+                    if (t.getLocalizedMessage().contains("Unable to resolve host")) {
+
+                        utility.createSnackbar(coordinatorLayout, "Please Check Internet Connection!");
+
+                    } else {
+
+                        utility.createSnackbar(coordinatorLayout, "Error Occurred, Please Try Again Later!");
+
+                    }
+
+                } else {
+
+                    utility.createSnackbar(coordinatorLayout, "Error Occurred, Please Try Again Later!");
+
+                }
+            }
+        });
+
+    }
+
+}
+</code></pre>

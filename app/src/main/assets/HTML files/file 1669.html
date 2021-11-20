@@ -1,0 +1,85 @@
+<p>When the compiler compiles the class <code>User</code> and gets to the <code>MyMessageBox</code> line, <code>MyMessageBox</code> has not yet been defined. It has no idea it exists, so cannot understand the meaning of your class member.</p>
+
+<p>You need to make sure <code>MyMessageBox</code> is defined <em>before</em> you use it as a member. This is solved by reversing the definition order. However, you have a cyclic dependency: if you move <code>MyMessageBox</code> above <code>User</code>, then in the definition of <code>MyMessageBox</code> the name <code>User</code> won't be defined!</p>
+
+<p>What you can do is <em>forward declare</em> <code>User</code>; that is, declare it but don't define it. During compilation, a type that is declared but not defined is called an <em>incomplete type</em>.
+Consider the simpler example:</p>
+
+<pre><code>struct foo; // foo is *declared* to be a struct, but that struct is not yet defined
+
+struct bar
+{
+    // this is okay, it's just a pointer;
+    // we can point to something without knowing how that something is defined
+    foo* fp; 
+
+    // likewise, we can form a reference to it
+    void some_func(foo&amp; fr);
+
+    // but this would be an error, as before, because it requires a definition
+    /* foo fooMember; */
+};
+
+struct foo // okay, now define foo!
+{
+    int fooInt;
+    double fooDouble;
+};
+
+void bar::some_func(foo&amp; fr)
+{
+    // now that foo is defined, we can read that reference:
+    fr.fooInt = 111605;
+    fr.foDouble = 123.456;
+}
+</code></pre>
+
+<p>By forward declaring <code>User</code>, <code>MyMessageBox</code> can still form a pointer or reference to it:</p>
+
+<pre><code>class User; // let the compiler know such a class will be defined
+
+class MyMessageBox
+{
+public:
+    // this is ok, no definitions needed yet for User (or Message)
+    void sendMessage(Message *msg, User *recvr); 
+
+    Message receiveMessage();
+    vector&lt;Message&gt;* dataMessageList;
+};
+
+class User
+{
+public:
+    // also ok, since it's now defined
+    MyMessageBox dataMsgBox;
+};
+</code></pre>
+
+<p>You <em>cannot</em> do this the other way around: as mentioned, a class member needs to have a definition. (The reason is that the compiler needs to know how much memory <code>User</code> takes up, and to know that it needs to know the size of its members.) If you were to say:</p>
+
+<pre><code>class MyMessageBox;
+
+class User
+{
+public:
+    // size not available! it's an incomplete type
+    MyMessageBox dataMsgBox;
+};
+</code></pre>
+
+<p>It wouldn't work, since it doesn't know the size yet.</p>
+
+<hr>
+
+<p>On a side note, this function:</p>
+
+<pre><code> void sendMessage(Message *msg, User *recvr);
+</code></pre>
+
+<p>Probably shouldn't take either of those by pointer. You can't send a message without a message, nor can you send a message without a user to send it to. And both of those situations are expressible by passing null as an argument to either parameter (null is a perfectly valid pointer value!)</p>
+
+<p>Rather, use a reference (possibly const):</p>
+
+<pre><code> void sendMessage(const Message&amp; msg, User&amp; recvr);
+</code></pre>

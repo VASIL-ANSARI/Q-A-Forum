@@ -1,0 +1,63 @@
+<p>UPDATE wants the new value for each changed column, so you have to formulate your requirements this way:</p>
+
+<p>The balance</p>
+
+<ul>
+<li>increases by the amount for a deposit,</li>
+<li>decreases by the amount for a withdrawal.</li>
+</ul>
+
+<p>The remaining allowance</p>
+
+<ul>
+<li>decreases by the amount for a discetionary withdrawal.</li>
+</ul>
+
+<p>As for the syntax, you cannot use an alias for the UPDATEd table:</p>
+
+<pre><code>CREATE TRIGGER update_account
+AFTER INSERT ON transactions
+BEGIN
+    UPDATE accounts
+    SET balance = CASE
+                  WHEN new.withdrawal THEN balance - new.amount
+                  ELSE                     balance + new.amount
+                  END,
+        allowanceRemaining = CASE
+                             WHEN new.withdrawal AND new.discretionary
+                             THEN allowanceRemaining - new.amount
+                             ELSE allowanceRemaining
+                             END
+    WHERE id = NEW.accountID;
+END;
+</code></pre>
+
+<p>It might be simpler to use the WHEN clause of the trigger:</p>
+
+<pre><code>CREATE TRIGGER update_balance_for_deposit
+AFTER INSERT ON transactions
+WHEN NOT NEW.withdrawal
+BEGIN
+    UPDATE accounts
+    SET balance = balance + NEW.amount
+    WHERE id = NEW.accountID;
+END;
+
+CREATE TRIGGER update_balance_for_withdrawal
+AFTER INSERT ON transactions
+WHEN NEW.withdrawal
+BEGIN
+    UPDATE accounts
+    SET balance = balance - NEW.amount
+    WHERE id = NEW.accountID;
+END;
+
+CREATE TRIGGER update_allowance_for_discretionary_withdrawal
+AFTER INSERT ON transactions
+WHEN NEW.withdrawal AND NEW.discretionary
+BEGIN
+    UPDATE accounts
+    SET allowanceRemaining = allowanceRemaining - NEW.amount
+    WHERE id = NEW.accountID;
+END;
+</code></pre>

@@ -1,0 +1,24 @@
+<p>Your code is broken, the comparisons against <code>""</code> make no sense.</p>
+
+<p>You should just <code>free()</code> all of them; if any allocation failed the pointer will be <code>NULL</code> but passing <code>NULL</code> to <code>free()</code> is fine. There is no need to check at the application level.</p>
+
+<p>I assume that your code is some kind of fragment meant to illustrate a point, rather than actual code. If so, then of course you should remove the whole <code>strdup()</code>/<code>free()</code> dance and just use constant strings:</p>
+
+<pre><code>const char *a = "test1", *b = "test2" /* and so on */;
+</code></pre>
+
+<p><strong>UPDATE</strong> After the question has been edited, it makes even less sense to me. It's <em>not</em> a good idea to ever <code>strcpy()</code> into a string returned by <code>strdup()</code>, since you don't know the length of the buffer there's no way to make the copy safe. Also, even if you do overwrite the string with an empty string, you <em>still</em> (of course) own the memory and should call <code>free()</code> on it.</p>
+
+<p>That said, perhaps you're looking for something like this:</p>
+
+<pre><code>#define MAYBE_FREE(s)    do { if(s != NULL &amp;&amp; s[0] != '\0') free(s); } while(0)
+</code></pre>
+
+<p>The wrapping in a <code>do/while</code> loop makes the macro behave as a statement, so you can do:</p>
+
+<pre><code>MAYBE_FREE(a);
+if(something())
+  MAYBE_FREE(b);
+</code></pre>
+
+<p>and so on.</p>

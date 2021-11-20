@@ -1,0 +1,75 @@
+<blockquote>
+  <p><code>getMoviesFromApi</code> is declared as <code>async function</code>. which means it will execute functions one after other.</p>
+</blockquote>
+
+<p>No. That only means that it will return a promise when called, and that you can use the <code>await</code> operator in the function body.</p>
+
+<blockquote>
+  <p>it will first wait for fetch to finish then call response.json, right?</p>
+</blockquote>
+
+<p>Yes, because it uses <code>await</code> to stop evaluation of the method until the promise resolves.</p>
+
+<blockquote>
+  <p>I have few functions, which get data from a server via fetch, then insert them to sqlite database. so they don't return anything.</p>
+</blockquote>
+
+<p>They should return promises - even if they're promises for nothing, they still could be awaited.</p>
+
+<p>But in your case, they actually <em>should</em> return something. Your global static <code>query</code> array is a horrible antipattern. Instead of filling it with queries, each method should return (a promise for) a query, which then can be passed to the executor on a per-instance and per-call basis. Only then using a <em>transaction</em> actually begins to make sense.</p>
+
+<p>Your code should look like this:</p>
+
+<pre><code>class Main extends Component() {
+  â¦
+  async getBookable(){
+    var response = await lfetch(host, {
+      method: 'POST',
+      headers: â¦
+    });
+    var responseData = await response.json();
+    return 'INSERT INTO bookable (data) VALUES (' + responseData + ')'); // beware of SQL injections!!!
+  }
+
+  getBooked(){
+    // the very same - here written without async/await:
+    return fetch(host, {
+//  ^^^^^^ important - return a promise
+      method: 'POST',
+      headers: â¦
+    })
+    .then(response =&gt; response.json())
+    .then(responseData =&gt; {
+      return 'INSERT INTO booked (data) VALUES (' + responseData + ')';
+    });
+    // don't `catch` anything, don't call `done` - just return the promise chain
+    // errors will be handled in the try/catch below
+  }
+
+  async runQuery(query) {
+    await db.transaction(tx =&gt; {
+      return Promise.all(query.map(async (q) =&gt; {
+        try {
+          let results = await tx.executeSql(q, []);
+          console.log('Query', q, 'Executed. results:', results);
+        } catch(err) {
+          console.log('Something went wrong while executing query', q, 'error is', err);
+        }
+      }));
+    });
+    return true;
+  }
+
+  async function getStore() {
+    try {
+      // actually you can fetch these in parallel, right?
+      let [bookable, booked] = await Promise.all([getBookable(), getBooked()]);
+      let query = [bookable, booked];
+      await runQuery(query);
+      redirectUser();
+    } catch(error) {
+      console.error(error);
+    }
+  }
+}
+</code></pre>

@@ -1,0 +1,24 @@
+<p>You are likely suffering from an implicit OPTION(OPTIMIZE FOR UNKNOWN) by using the intermediate variables.  See <a href="http://www.sqlskills.com/blogs/kimberly/stored-procedure-execution-with-parameters-variables-and-literals/" rel="nofollow">here</a>.  The optimizer is not providing a good plan for your query this way.</p>
+
+<p>You would have the same issue with the second query if <code>@CurrentUserID</code> is a variable and not a parameter.  Try this query to see if it will perform better:</p>
+
+<pre><code>CREATE PROC spXXXXXXX
+    @UserID INT
+AS
+SELECT DISTINCT 
+    U.UserID,
+    U.UserName, 
+    U.FirstName,
+    U.LastName,
+    C.CompanyName,
+    U.Email,
+    U.IsActive,
+FROM [User] CU -- current user
+INNER JOIN [User] U -- users with same company
+ON      CU.CompanyID = U.CompanyID
+LEFT JOIN Company C
+ON      C.CompanyID =U.CompanyID 
+WHERE   CU.[UserID] = @UserID
+</code></pre>
+
+<p>You may still have some issues with Parameter Sniffing, but this should help the optimizer generate a better execution plan for your procedure.</p>

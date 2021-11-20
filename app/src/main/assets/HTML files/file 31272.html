@@ -1,0 +1,26 @@
+<p>You could create a second scheduled thread pool to which you would submit cancellation tasks for each of the returned <code>Future</code>s. Each of these tasks after a given timeout would check if it's associated <code>Future</code> is done and if not, cancel it. Cancellation would trigger thread interruption, so you might need to support it in your tasks by checking the interrupted flag: <code>Thread.interrupted()</code>.</p>
+
+<p>The size of this second thread pool could be minimal, i.e. 1 as this job takes minimum of CPU time.</p>
+
+<p>Code example:</p>
+
+<pre><code>ScheduledExecutorService service = Executors.newScheduledThreadPool(1);
+
+...
+
+while(...){
+    final Future&lt;?&gt; f = pool.submit(...);
+
+    service.schedule(new Runnable() {
+        @Override
+        public void run() {
+            if(!f.isDone()){
+                f.cancel(true);
+            }
+        }
+    }, 1, TimeUnit.MINUTES);
+}
+
+service.awaitTermination(1, TimeUnit.MINUTES);
+service.shutdown();
+</code></pre>

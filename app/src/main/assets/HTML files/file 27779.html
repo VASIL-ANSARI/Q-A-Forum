@@ -1,0 +1,37 @@
+<p>What you have here is class <code>User</code> which essentially refers to itself.  In other words, it's a <a href="http://docs.sqlalchemy.org/en/rel_0_8/orm/relationships.html#self-referential-many-to-many-relationship" rel="nofollow">self-referential many-to-many relationship</a>.  Your model definitions should look like this:</p>
+
+<pre class="lang-py prettyprint-override"><code># This is so called association table, which links two tables in many-to-many
+# relationship.  In this case it links same table's ('users') different rows.
+user_contacts = Table(
+    'user_contacts', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
+    Column('contact_id', Integer, ForeignKey('users.id'), primary_key=True),
+)
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    first_name = Column(String)
+    last_name = Column(String)
+    contacts = relationship(
+        'User',
+        secondary=user_contacts,
+        primaryjoin=id==user_contacts.c.user_id,
+        secondaryjoin=id==user_contacts.c.contact_id
+    )
+</code></pre>
+
+<p>Then you can do things like the following:</p>
+
+<pre class="lang-py prettyprint-override"><code>u1 = User(first_name='Foo', last_name='Foo')
+u2 = User(first_name='Bar', last_name='Bar')
+u3 = User(first_name='Baz', last_name='Baz')
+u1.contacts = [u2, u3]
+session.add(u1)
+session.commit()
+
+# ... and in some other place in your code ...
+
+u = User.query.get(1)
+print u.contacts[0].first_name
+</code></pre>

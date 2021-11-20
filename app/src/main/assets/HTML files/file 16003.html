@@ -1,0 +1,38 @@
+<p>You can call the special KSS view <code>@@refreshPortlet</code> for loading portlets over AJAX. The response is a XML document with a <code>&lt;param name="html"&gt;</code> element containing the new HTML snippet. You can call this on the site root or on the current context, whatever works better for your cachability.</p>
+
+<p>The following is taken from a production site, and is not entirely complete, but should give you an idea:</p>
+
+<pre class="lang-js prettyprint-override"><code>// $wrapper is the portlet wrapper div
+var portlethash = $wrapper.attr('id').split('-')[1];
+var base = $wrapper.data('baseurl') || $('link[rel=kss-base-url]').attr('href');
+$.ajax({url: base + '/@@refreshPortlet', type: 'GET', dataType: 'xml',
+    data: { portlethash: portlethash },
+    success: function(data) {
+        var contents = $('dd.portletItem', $(data).find('param[name="html"]').text());
+        $wrapper.find('dd.portletItem')
+            .replaceWith(contents);
+    }
+});
+</code></pre>
+
+<p>The variable <code>$wrapper</code> refers to the <code>portletWrapper</code> div:</p>
+
+<pre class="lang-html prettyprint-override"><code>&lt;div id="portletwrapper-[long string of characters]"
+     class="portletWrapper kssattr-portlethash-[long string of characters]"&gt;
+  &lt;dl class="portlet portletSpecificClass"&gt;
+    &lt;dt class="portletHeader"&gt;
+        ...
+    &lt;/dt&gt;
+    &lt;dd class="portletItem"&gt;
+        ...
+    &lt;/dd&gt;
+    &lt;dd class="portletFooter"&gt;
+        ...
+    &lt;/dd&gt;
+  &lt;/dl&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>Note that we use the portlet hash from the <code>id</code> attribute, which is how the KSS <code>@@refreshPortlet</code> view knows how to render just the portlet.</p>
+
+<p>I store the portlet base url on the wrapper in a data attribute in a certain to make sure I retrieve the portlets in the right context as it'd would display the wrong info otherwise.</p>

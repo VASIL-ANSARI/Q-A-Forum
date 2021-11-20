@@ -1,0 +1,43 @@
+<p>The solution is to use the OpenDesktop API call. Basically it just attempts to switch the the default desktop which will fail if it's locked.</p>
+
+<p>Note1: the following function loads the relevant dlls and functions dynamically so that apps will still run on Windows 9.x :)</p>
+
+<p>Note2: DESKTOP&amp; #95;SWITCHDESKTOP should read DESKTOP&#95;SWITCHDESKTOP</p>
+
+<pre><code>BOOL Misc::IsWorkStationLocked()
+{
+    // note: we can't call OpenInputDesktop directly because it's not
+    // available on win 9x
+    typedef HDESK (WINAPI *PFNOPENDESKTOP)(LPSTR lpszDesktop, DWORD dwFlags, BOOL fInherit, ACCESS_MASK dwDesiredAccess);
+    typedef BOOL (WINAPI *PFNCLOSEDESKTOP)(HDESK hDesk);
+    typedef BOOL (WINAPI *PFNSWITCHDESKTOP)(HDESK hDesk);
+
+    // load user32.dll once only
+    static HMODULE hUser32 = LoadLibrary("user32.dll");
+
+    if (hUser32)
+    {
+    	static PFNOPENDESKTOP fnOpenDesktop = (PFNOPENDESKTOP)GetProcAddress(hUser32, "OpenDesktopA");
+    	static PFNCLOSEDESKTOP fnCloseDesktop = (PFNCLOSEDESKTOP)GetProcAddress(hUser32, "CloseDesktop");
+    	static PFNSWITCHDESKTOP fnSwitchDesktop = (PFNSWITCHDESKTOP)GetProcAddress(hUser32, "SwitchDesktop");
+
+    	if (fnOpenDesktop &amp;&amp; fnCloseDesktop &amp;&amp; fnSwitchDesktop)
+    	{
+    		HDESK hDesk = fnOpenDesktop("Default", 0, FALSE, DESKTOP_SWITCHDESKTOP);
+
+    		if (hDesk)
+    		{
+    			BOOL bLocked = !fnSwitchDesktop(hDesk);
+
+    			// cleanup
+    			fnCloseDesktop(hDesk);
+
+    			return bLocked;
+    		}
+    	}
+    }
+
+    // must be win9x
+    return FALSE;
+}
+</code></pre>

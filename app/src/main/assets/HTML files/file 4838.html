@@ -1,0 +1,42 @@
+<pre><code>import lxml.etree as le
+import io
+
+content='''\
+&lt;foo&gt;&lt;X&gt;&lt;Y&gt;skip this&lt;/Y&gt;&lt;Y&gt;&lt;Z name="apple"&gt;&lt;W&gt;not here&lt;/W&gt;&lt;/Z&gt;
+&lt;Z name="bacon"&gt;&lt;W&gt;&lt;A&gt;42&lt;/A&gt;&lt;B&gt;b&lt;/B&gt;&lt;C&gt;c&lt;/C&gt;&lt;/W&gt;&lt;W&gt;&lt;A&gt;256&lt;/A&gt;&lt;B&gt;b&lt;/B&gt;&lt;C&gt;c&lt;/C&gt;&lt;/W&gt;&lt;/Z&gt;
+&lt;Z name="bacon"&gt;&lt;W&gt;&lt;A&gt;42&lt;/A&gt;&lt;B&gt;b&lt;/B&gt;&lt;C&gt;c&lt;/C&gt;&lt;/W&gt;&lt;W&gt;&lt;A&gt;256&lt;/A&gt;&lt;B&gt;b&lt;/B&gt;&lt;C&gt;c&lt;/C&gt;&lt;/W&gt;&lt;/Z&gt;
+&lt;/Y&gt;&lt;/X&gt;&lt;/foo&gt;
+'''
+doc=le.parse(io.BytesIO(content))
+# print(le.tostring(doc, pretty_print=True))
+result=[]
+Zs=doc.xpath('//X/Y[2]/Z[@name="bacon"]')
+for Z in Zs:
+    Ws=Z.xpath('W')
+    record=[]
+    assert(len(Ws)==2)  #&lt;--- Change to 9        
+    abc=Ws[0].xpath('descendant::text()')
+    # print(abc)
+    # ['42', 'b', 'c']
+    assert(abc[0] == '42')
+    record.append(' '.join(abc))
+    abc=Ws[1].xpath('descendant::text()')    
+    assert(abc[0] == '256')
+    result.append(record)
+print(result)
+# [['42 b c'], ['42 b c']]
+</code></pre>
+
+<p>This might be a way to tighten-up the inner loop, though I'm only guessing what records you wish to keep:</p>
+
+<pre><code>for Z in Zs:
+    Ws=Z.xpath('W')
+    assert(len(Ws)==2)  #&lt;--- Change to 9
+    a_vals=('42','256')
+    for W,a_val in zip(Ws,a_vals):
+        abc=W.xpath('descendant::text()')
+        assert(abc[0] == a_val)
+        result.append([' '.join(abc)])
+print(result)
+# [['42 b c'], ['256 b c'], ['42 b c'], ['256 b c']]
+</code></pre>

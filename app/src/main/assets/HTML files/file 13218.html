@@ -1,0 +1,25 @@
+<p>Killing a process and stoping a service are two different things. A service could spawn other processes that will remain lingering. Also, you are effectively pulling the plug on the process. It isn't being given any time to stop gracefully, write everything to disk, etc.</p>
+
+<p>Instead you should use the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa394418%28v=vs.85%29.aspx" rel="nofollow"><code>Win32_Service</code></a> WMI object to find your service. This has a <code>StartService</code> and <code>StopService</code> method, which will allow you to stop and start it as you need.</p>
+
+<p>Mind you, this WMI object is about <em>services</em>, not processes, so you will have to tweak your code to stop it by the service name, not the process name. Something like this:</p>
+
+<pre><code>ConnectionOptions options = new ConnectionOptions();
+options.Username = userName;
+options.Password = password;
+
+ManagementScope scope = new ManagementScope(string.Format(@"\\{0}\root\cimv2", serverFullName), options);
+scope.Connect();
+
+ObjectQuery query = new ObjectQuery(string.Format(@"SELECT * FROM Win32_Service WHERE Name='{0}'",serviceToStop));
+ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+
+ManagementObjectCollection queryCollection = searcher.Get();
+
+foreach (ManagementObject m in queryCollection)
+{
+   m.InvokeMethod("StopService", null);
+}
+</code></pre>
+
+<p>Then later on you can use <code>InvokeMethod</code> on StartService.</p>

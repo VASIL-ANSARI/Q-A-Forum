@@ -1,0 +1,51 @@
+<blockquote>
+  <p>I define the same struct on the c++ side using <code>std::vector&lt;float&gt;</code> and <code>std::vector&lt;unsigned int&gt;</code>.</p>
+</blockquote>
+
+<p>Important detail, needs to be in the question.  But no, that can never work. C++ language types have no interop story, class implementation details vary entirely too much between compiler implementations.  Or for that matter, vary too much in the same compiler.  A standard aid like iterator debugging changes the layout of the C++ standard library objects.</p>
+
+<p>Pinvoke interop is based on C language types.  Your C# declaration you have now matches</p>
+
+<pre><code>typedef struct LabeledData {
+    float* floatArray;
+    unsigned int* uintArray;
+}
+</code></pre>
+
+<p>And you no doubt can see the big, big problem with this structure.  There isn't any decent way you can actually use these arrays.  You have no idea how big they are.  You can use UnmanagedType.ByValArray but then the equivalent C++ declaration needs to look like:</p>
+
+<pre><code>typedef struct LabeledData {
+    float floatArray[42];
+    unsigned int uintArray[666];
+}
+</code></pre>
+
+<p>You no doubt see the big, big problem with this structure, the array lengths are fixed.  And when you are thinking std::vector&lt;> then you surely don't like fixed array lengths.</p>
+
+<hr>
+
+<p>Well, that's why .NET likes the COM interop type.  SafeArray is safe because it also stores the array length.  And has a well-defined way to allocate and destroy them, another big issue with raw arrays.  Without them, best you can do is:</p>
+
+<pre><code>typedef struct LabeledData {
+    size_t floatArraySize;
+    float* floatArray;
+    size_t uintArraySize;
+    unsigned int* uintArray;
+}
+</code></pre>
+
+<p>And match it on the C# side with:</p>
+
+<pre><code>internal struct LabelData {
+    public int floatArraySize;
+    public IntPtr floatArray;
+    public int uintArraySize;
+    public IntPtr uintArray;
+}
+</code></pre>
+
+<p>You need Marshal.AllocHGlobal() to allocate the arrays, you already know how to do that.  And fret about who and when calls Marshal.FreeHGlobal().  Since you probably still want to keep std::vector, you'd copy the arrays so can release memory after the pinvoke call.</p>
+
+<hr>
+
+<p>The array data copying is very, very ugly of course.  Get ahead by not using a structure at all but using four functions.  Like CreateLabeledData, DestroyLabeledData, SetLabeledDataFloats, SetLabeledDataIntegers.  And a corresponding C++ class with a factory method that implements these functions.</p>

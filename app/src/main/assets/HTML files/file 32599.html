@@ -1,0 +1,111 @@
+<p>First problem is that i'm created new httpclient every time before download, so every time was created new instance of HttpCacheStorage, this is why files had different names.<br>
+Second, default HttpCacheStorage stores info of downloaded data just in LinkedHashMap so after every new launch of app cacheStorage don't know anything about cached data in previous launch.<br>
+Solutions was to create own HttpCacheStorage, wich will save cached data to file system and will get data from files when response can be got from cache.</p>
+
+<p>I just added one line to CachingHttpClientBuilder - setHttpCacheStorage</p>
+
+<pre><code>CachingHttpClientBuilder.create()
+                        .setCacheConfig(cacheConfig)
+                        .setHttpCacheStorage(new ImagesCacheStorage(cacheConfig, cacheDir))
+                        .setDefaultRequestConfig(config)
+                        .build();
+</code></pre>
+
+<p>and created new class FileCacheStorage</p>
+
+<pre><code>import myapp.org.apache.http.client.cache.HttpCacheEntry;
+import myapp.org.apache.http.client.cache.HttpCacheUpdateCallback;
+import myapp.org.apache.http.impl.client.cache.CacheConfig;
+import myapp.org.apache.http.impl.client.cache.ManagedHttpCacheStorage;
+
+public class FileCacheStorage extends ManagedHttpCacheStorage {
+
+    private File mCacheDir;
+
+    public FileCacheStorage(final CacheConfig config, File cacheDir) {
+        super(config);
+        mCacheDir = cacheDir;
+    }
+
+    @Override
+    public HttpCacheEntry getEntry(final String url) throws IOException {
+        HttpCacheEntry entry = super.getEntry(url);
+        if (entry == null) {
+            entry = loadCacheEnrty(url);
+        }
+        return entry;
+    }
+
+    @Override
+    public void putEntry(final String url, final HttpCacheEntry entry) throws IOException {
+        super.putEntry(url, entry);
+        saveCacheEntry(url, entry);
+    }
+
+    @Override
+    public void removeEntry(final String url) throws IOException {
+        super.removeEntry(url);
+        File cache = getCacheFile(url);
+        if (cache != null &amp;&amp; cache.exists()) {
+            cache.delete();
+        }
+    }
+
+    @Override
+    public void updateEntry(
+            final String url,
+            final HttpCacheUpdateCallback callback) throws IOException {
+        super.updateEntry(url, callback);
+        HttpCacheEntry entry = loadCacheEnrty(url);
+        if (entry != null) {
+            callback.update(entry);
+        }
+    }
+
+    private void saveCacheEntry(String url, HttpCacheEntry entry) {
+        ObjectOutputStream stream = null;
+        try {
+            File cache = getCacheFile(url);
+            stream = new ObjectOutputStream(new FileOutputStream(cache));
+            stream.writeObject(entry);
+            stream.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private HttpCacheEntry loadCacheEnrty(String url) {
+        HttpCacheEntry entry = null;
+        File cache = getCacheFile(url);
+        if (cache != null &amp;&amp; cache.exists()) {
+            synchronized (this) {
+                ObjectInputStream stream = null;
+                try {
+                    stream = new ObjectInputStream(new FileInputStream(cache));
+                    entry = (HttpCacheEntry) stream.readObject();
+                    stream.close();
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                } catch (StreamCorruptedException e) {
+                    e.printStackTrace();
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return entry;
+    }
+
+    private File getCacheFile(String url) {
+        return new File(mCacheDir, MD5.getHash(url));
+    }
+
+}
+</code></pre>
+
+<p>As you can see Apache classes have package name with prefix myapp. I got errors when tryed to use origin jar files, I think it's because many classes are already present in Android. So I combined few jar files from apache and made from them one jar with that prefix. If someone have a better solution let me know.
+Hope it help someone.</p>

@@ -1,0 +1,33 @@
+<p>I have confirmed that the NSURLSession way (second bullet under the "considering" options above) indeed does work. I'm still working out some kinks, but here are the basics. Using this method, you can indeed open your app from a share extension.</p>
+
+<p>This method requires 3 main steps, as follows:</p>
+
+<ol>
+<li>Make a background NSURLSession in a Share Extension.</li>
+<li>Start a download task.</li>
+<li>Call exit(0).</li>
+</ol>
+
+<p>Make sure the thing you are downloading takes long enough so that the extension terminates before the download task finishes. </p>
+
+<pre><code>NSString *address = @"https://googledrive.com/host/0B5zObXR9UzgmbFpob2J5eXpjNXc/file3m";
+self.mySession = [self configureMySession];
+NSURL *url = [NSURL URLWithString:address];
+NSURLSessionTask *myTask = [self.mySession downloadTaskWithURL:url];
+[myTask resume];
+exit(0);
+</code></pre>
+
+<p>Then, in your containing application's UIApplicationDelegate class, implement the </p>
+
+<pre><code>application:handleEventsForBackgroundURLSession:completionHandler: 
+</code></pre>
+
+<p>method. This method gets called when the download task finishes after your extension has been terminated. Then, in this method, you can call </p>
+
+<pre><code>[[UIApplication sharedApplication] openURL:url];
+</code></pre>
+
+<p>or do some other stuff in your containing app. </p>
+
+<p>The main problem with this method is that there is a delay between the time when the extension terminates and the time when the the containing app starts up. The main advantage of this method over the UIDocumentInteractionController method is that no extra user interaction is needed. More details will come as I continue to experiment.</p>

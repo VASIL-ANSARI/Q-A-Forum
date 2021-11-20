@@ -1,0 +1,57 @@
+<p>I was referred to the source code of <a href="https://github.com/apache/jena/blob/master/jena-spatial/src/main/java/jena/spatialindexer.java" rel="nofollow">spatialindexer.java</a> by the people from the Apache Jena mailing list. It turns out that I needed to manually add the triples to be indexed into the spatial index. Here I provide the source code with the indexing. It works for me- the above SPARQL query finds triples within the given radius. The modified code is:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>String queryStr =
+		"PREFIX spatial: &lt;http://jena.apache.org/spatial#&gt; " +
+		"PREFIX rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; " +
+		"PREFIX geo: &lt;http://www.w3.org/2003/01/geo/wgs84_pos#&gt; " +
+		"PREFIX xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; " +
+		"PREFIX ssn: &lt;http://purl.oclc.org/NET/ssnx/ssn#&gt; " +
+		"SELECT ?loc ?lat " +
+		"WHERE {?loc spatial:nearby(35.5 32 1000 'km' ) . ?loc geo:lat ?lat}";
+
+Model m = SemanticSensorModel.getIntance().getJenaModel();
+EntityDefinition entDef = new EntityDefinition("1", "2");				
+Dataset baseDataset = DatasetFactory.create(m);
+try {
+	Directory dir = FSDirectory.open( new File("/home/martin/spatial_index"));
+	Dataset spatialDataset = SpatialDatasetFactory.createLucene(baseDataset, dir, entDef); 
+			
+	DatasetGraphSpatial dataset = (DatasetGraphSpatial) (spatialDataset.asDatasetGraph());
+	SpatialIndex spatialIndex = dataset.getSpatialIndex();
+	SpatialIndexContext context = new SpatialIndexContext(spatialIndex);
+	spatialIndex.startIndexing();
+				
+	Iterator&lt;Quad&gt; quadIter = dataset.find(Node.ANY, Node.ANY, Node.ANY, Node.ANY);
+	for (; quadIter.hasNext();) {
+		Quad quad = quadIter.next();
+		context.index(quad.getGraph(), quad.getSubject(), quad.getPredicate(), quad.getObject());
+	}
+	spatialIndex.finishIndexing();
+							
+	Query query = QueryFactory.create(queryStr) ;
+	QueryExecution qexec = QueryExecutionFactory.create(query, spatialDataset);
+	ResultSet results = qexec.execSelect() ;
+
+	for ( ; results.hasNext() ; )
+	{
+		QuerySolution soln = results.nextSolution() ;
+		System.out.println(soln.get("loc").toString() + " " + soln.get("lat").toString());
+	}
+				
+	System.out.println("Done printing results");
+} catch (IOException e) {
+	e.printStackTrace();
+}</code></pre>
+</div>
+</div>
+</p>
+
+<p>Note the creation of the SpatialIndex, and the use of startIndexing()/index()/finishIndexing() methods. 
+The above code could be used as a starting point to anybody who
+wants to start with geospatial SPARQL queries with Jena.</p>
+
+<p>Regards</p>
+
+<p>Martin</p>

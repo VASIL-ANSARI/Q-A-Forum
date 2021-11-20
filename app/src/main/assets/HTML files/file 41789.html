@@ -1,0 +1,72 @@
+<p>This question had me confused about quite a few things..</p>
+
+<p>Here is a solution that writes an image file from a <code>Panel</code> of rather large sizes..</p>
+
+<p>One of the limiting factors is the size of the resulting Bitmap. I have tested for sizes of up to <code>12.5k * 25k</code> and found it to work fine; the sizes may depend on your machine, though. I think you need quite some contiguous memory to create such a large <code>Bitmap</code>.</p>
+
+<p>The other problem is, as your title suggests, indeed with the <code>DrawToBitmap</code> method itself. It looks as if it can't reliably write onto large Bitmaps, which is why I had to buffer its results in a temporary Bitmap. Nor can it work if any dimension of the control is over some size, maybe 4k, but maybe not..</p>
+
+<p>The solution first creates a <code>Bitmap</code> of the <code>Panel</code>'s size. Then it creates a temporary <code>Panel</code> to house the large <code>Panel</code>. This container it small enough for <code>DrawToBitmap</code> to work. </p>
+
+<p>Then it loops over the width and height, moving the large <code>Panel</code> up and left, pasting the portions <code>DrawToBitmap</code> brings back, step by step into the large <code>Bitmap</code>.</p>
+
+<p>Finally it writes it back as <code>PNG</code> for best readability and size..</p>
+
+<pre><code>private void button2_Click(object sender, EventArgs e)
+{
+    Bitmap bmp = new Bitmap(largePanel.ClientSize.Width, largePanel.ClientSize.Height);
+
+    DrawToBitmap(largePanel, bmp);      // the patchwork method
+
+    bmp.Save(yourFileName, System.Drawing.Imaging.ImageFormat.Png);
+    bmp.Dispose();                      // get rid of the big one!
+
+    GC.Collect();                       // not sure why, but it helped
+}
+
+
+void DrawToBitmap(Control ctl, Bitmap bmp)
+{
+    Cursor = Cursors.WaitCursor;         // yes it takes a while
+    Panel p = new Panel();               // the containing panel
+    Point oldLocation = ctl.Location;    // 
+    p.Location = Point.Empty;            //
+    this.Controls.Add(p);                //
+
+    int maxWidth = 2000;                 // you may want to try other sizes
+    int maxHeight = 2000;                //
+
+    Bitmap bmp2 = new Bitmap(maxWidth, maxHeight);  // the buffer
+
+    p.Height = maxHeight;               // set up the..
+    p.Width = maxWidth;                 // ..container
+
+    ctl.Location = new Point(0, 0);     // starting point
+    ctl.Parent = p;                     // inside the container
+    p.Show();                           // 
+    p.BringToFront();                   //
+
+    // we'll draw onto the large bitmap with G
+    using (Graphics G = Graphics.FromImage(bmp))
+    for (int y = 0; y &lt; ctl.Height; y += maxHeight)
+    {
+        ctl.Top = -y;                   // move up
+        for (int x = 0; x &lt; ctl.Width; x += maxWidth)
+        {
+            ctl.Left = -x;             // move left
+            p.DrawToBitmap(bmp2, new Rectangle(0, 0, maxWidth, maxHeight));
+            G.DrawImage(bmp2, x, y);   // patch together
+        }
+    }
+
+    ctl.Location = p.Location;         // restore..
+    ctl.Parent = this;                 // form layout &lt;&lt;&lt;==== ***
+    p.Dispose();                       // clean up
+
+    Cursor = Cursors.Default;          // done
+}
+</code></pre>
+
+<p>I have drawn a few things onto the <code>Panel</code> and thrown in a few hundred <code>Buttons</code> and the result looks seamless. Can't post it, for obvious reasons..</p>
+
+<p><strong>*** Note:</strong>  If your Panel doesn't sit on the form you should change <code>this</code> to the real <code>Parent</code>!</p>

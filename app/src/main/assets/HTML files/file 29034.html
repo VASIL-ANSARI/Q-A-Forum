@@ -1,0 +1,40 @@
+<p>OK, I got it!</p>
+
+<p>I think. At least I have a guess</p>
+
+<p>See, that line <code>logger._has_logged_something = true</code> is the only line that used the data of the class <code>logger</code>. So my guess is that the class is invalid</p>
+
+<p>I mean that you didn't really create that class. For some reason it wasn't really allocated.</p>
+
+<p>For example if you did:</p>
+
+<pre><code>Logger *log; // see - I didn't put any value to it!
+
+(*log)&lt;&lt;value; // this will do a segmentation fault or something 
+               // ONLY if you have the line logger._has_logged_something = true
+</code></pre>
+
+<p>This is just an example. There are other options like:</p>
+
+<pre><code>struct blah{
+  blah(Logger &amp;log):logger(log);
+  Logger &amp;logger;
+};
+blah func(){
+  Logger log;
+  return blah(log);
+}
+...
+blah b=func(); // b has an invalid logger in it, because it was destroyed after func
+blah.logger &lt;&lt; value ; // will do a segmentation fault too
+</code></pre>
+
+<p><strong>Edit</strong></p>
+
+<p>Just saw your edit. So it seems to be my first example. Specifically, I believe you did <code>LOG_STOP()</code> before you logged.</p>
+
+<p><strong>Edit 2</strong></p>
+
+<p>You have an intrinsic problem in your code. <code>LOG_STOP</code> deletes the logger, but <strong>doesn't reset it to <code>NULL</code></strong>. So if you want to restart logging after that, the logger won't be recreated (as <code>get_global_instance</code> checks if the logger is <code>NULL</code> before deciding to create it).</p>
+
+<p>Try changing <code>LOG_STOP</code> to set <code>_global_logger</code> to NULL and see if that fixes it.</p>

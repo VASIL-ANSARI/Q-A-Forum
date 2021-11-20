@@ -1,0 +1,59 @@
+<p>When dealing with this type of problems, first think about the data you're trying to capture.</p>
+
+<p>Dealing with implicit cursors in PL/SQL require 1-row, so you need to make sure you understand the data.</p>
+
+<p>In this case, you pass in a variable that you don't use in any of your queries, so I suggest you re-evaluate.</p>
+
+<p>I don't have a database at hand to run this, but you should be able to work this out and hopefully get you a bit closer. I put it in an anonymous block so that I can write it really quick.</p>
+
+<pre><code>DECLARE
+    PROCEDURE model_details_sp (p_model IN VARCHAR2, p_noofcars OUT NUMBER)
+    IS
+        p_description   VARCHAR2 (200);
+    BEGIN
+        --2
+        SELECT COUNT (model_name)
+          INTO p_noofcars
+          FROM i_car
+         WHERE model_name = p_model;
+
+        DBMS_OUTPUT.put_line ('No of Cars for model: ' || p_noofcars);
+
+        --3
+        SELECT model_description
+          INTO p_description
+          FROM i_car --the table should be the car_model table so that only one record is returned
+         WHERE model_name = p_model;
+
+        DBMS_OUTPUT.put_line ('Model Desc' || p_description);
+    END model_details_sp;
+BEGIN
+    dbms_output.put_line('');
+END;
+</code></pre>
+
+<p>To @David Aldridge comment:</p>
+
+<p>Try running this--the result should be a failure--as you cannont select multiple rows using the into CLAUS, unless you aggregate the data:</p>
+
+<pre><code>DECLARE
+  p_num NUMBER;
+BEGIN
+  SELECT LEVEL INTO p_num FROM DUAL CONNECT BY LEVEL &lt;= 10;
+  dbms_output.put(p_num);
+END;
+</code></pre>
+
+<p>The error you should see is this: </p>
+
+<blockquote>
+  <p>Error report:</p>
+  
+  <blockquote>
+    <p>ORA-01422: exact fetch returns more than requested number of rows
+    ORA-06512: at line 4
+    01422. 00000 -  "exact fetch returns more than requested number of rows"
+    *Cause:    The number specified in exact fetch is less than the rows returned.
+    *Action:   Rewrite the query or change number of rows requested</p>
+  </blockquote>
+</blockquote>

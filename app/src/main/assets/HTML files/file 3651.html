@@ -1,0 +1,726 @@
+<p>Get the latest version from the code on <a href="http://meta.stackexchange.com/questions/44330/do-you-want-to-quickly-and-easily-import-the-so-data-dump-into-your-sql-server">this post</a></p>
+
+<p>Nothing like code churn in plain sight: Here is a pretty complete  implementation. You  can instantiate  an IDataReader  over IList IEnumerable, IEnumerable (ergo IQueryable). There is no compelling reason to expose a generic type parameter on the reader and by omitting it, I can allow IEnumerable&lt;'a>  (anonymous types). See tests.</p>
+
+<p>The source, less xmldocs, is short enough to include here with a couple tests. The rest of the source, with xmldocs, and tests is <a href="http://spikes.codeplex.com/SourceControl/list/changesets" rel="nofollow"><strong>here</strong></a> under Salient.Data. </p>
+
+<hr>
+
+<pre><code>using System;
+using System.Linq;
+using NUnit.Framework;
+
+namespace Salient.Data.Tests
+{
+    [TestFixture]
+    public class EnumerableDataReaderEFFixture
+    {
+        [Test]
+        public void TestEnumerableDataReaderWithIQueryableOfAnonymousType()
+        {
+            var ctx = new NorthwindEntities();
+
+            var q =
+                ctx.Orders.Where(o =&gt; o.Customers.CustomerID == "VINET").Select(
+                    o =&gt;
+                    new
+                        {
+                            o.OrderID,
+                            o.OrderDate,
+                            o.Customers.CustomerID,
+                            Total =
+                        o.Order_Details.Sum(
+                        od =&gt; od.Quantity*((float) od.UnitPrice - ((float) od.UnitPrice*od.Discount)))
+                        });
+
+            var r = new EnumerableDataReader(q);
+            while (r.Read())
+            {
+                var values = new object[4];
+                r.GetValues(values);
+                Console.WriteLine("{0} {1} {2} {3}", values);
+            }
+        }
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Data;
+using NUnit.Framework;
+
+namespace Salient.Data.Tests
+{
+    public class DataObj
+    {
+        public string Name { get; set; }
+        public int Age { get; set; }
+    }
+
+    [TestFixture]
+    public class EnumerableDataReaderFixture
+    {
+
+        private static IEnumerable&lt;DataObj&gt; DataSource
+        {
+            get
+            {
+                return new List&lt;DataObj&gt;
+                           {
+                               new DataObj {Name = "1", Age = 16},
+                               new DataObj {Name = "2", Age = 26},
+                               new DataObj {Name = "3", Age = 36},
+                               new DataObj {Name = "4", Age = 46}
+                           };
+            }
+        }
+
+        [Test]
+        public void TestIEnumerableCtor()
+        {
+            var r = new EnumerableDataReader(DataSource, typeof(DataObj));
+            while (r.Read())
+            {
+                var values = new object[2];
+                int count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                values = new object[1];
+                count = r.GetValues(values);
+                Assert.AreEqual(1, count);
+
+                values = new object[3];
+                count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                Assert.IsInstanceOf(typeof(string), r.GetValue(0));
+                Assert.IsInstanceOf(typeof(int), r.GetValue(1));
+
+                Console.WriteLine("Name: {0}, Age: {1}", r.GetValue(0), r.GetValue(1));
+            }
+        }
+
+        [Test]
+        public void TestIEnumerableOfAnonymousType()
+        {
+            // create generic list
+            Func&lt;Type, IList&gt; toGenericList =
+                type =&gt; (IList)Activator.CreateInstance(typeof(List&lt;&gt;).MakeGenericType(new[] { type }));
+
+            // create generic list of anonymous type
+            IList listOfAnonymousType = toGenericList(new { Name = "1", Age = 16 }.GetType());
+
+            listOfAnonymousType.Add(new { Name = "1", Age = 16 });
+            listOfAnonymousType.Add(new { Name = "2", Age = 26 });
+            listOfAnonymousType.Add(new { Name = "3", Age = 36 });
+            listOfAnonymousType.Add(new { Name = "4", Age = 46 });
+
+            var r = new EnumerableDataReader(listOfAnonymousType);
+            while (r.Read())
+            {
+                var values = new object[2];
+                int count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                values = new object[1];
+                count = r.GetValues(values);
+                Assert.AreEqual(1, count);
+
+                values = new object[3];
+                count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                Assert.IsInstanceOf(typeof(string), r.GetValue(0));
+                Assert.IsInstanceOf(typeof(int), r.GetValue(1));
+
+                Console.WriteLine("Name: {0}, Age: {1}", r.GetValue(0), r.GetValue(1));
+            }
+        }
+
+        [Test]
+        public void TestIEnumerableOfTCtor()
+        {
+            var r = new EnumerableDataReader(DataSource);
+            while (r.Read())
+            {
+                var values = new object[2];
+                int count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                values = new object[1];
+                count = r.GetValues(values);
+                Assert.AreEqual(1, count);
+
+                values = new object[3];
+                count = r.GetValues(values);
+                Assert.AreEqual(2, count);
+
+                Assert.IsInstanceOf(typeof(string), r.GetValue(0));
+                Assert.IsInstanceOf(typeof(int), r.GetValue(1));
+
+                Console.WriteLine("Name: {0}, Age: {1}", r.GetValue(0), r.GetValue(1));
+            }
+        } 
+        // remaining tests omitted for brevity
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>/*!
+ * Project: Salient.Data
+ * File   : EnumerableDataReader.cs
+ * http://spikes.codeplex.com
+ *
+ * Copyright 2010, Sky Sanders
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * See LICENSE.TXT
+ * Date: Sat Mar 28 2010 
+ */
+
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+namespace Salient.Data
+{
+    /// &lt;summary&gt;
+    /// Creates an IDataReader over an instance of IEnumerable&amp;lt;&gt; or IEnumerable.
+    /// Anonymous type arguments are acceptable.
+    /// &lt;/summary&gt;
+    public class EnumerableDataReader : ObjectDataReader
+    {
+        private readonly IEnumerator _enumerator;
+        private readonly Type _type;
+        private object _current;
+
+        /// &lt;summary&gt;
+        /// Create an IDataReader over an instance of IEnumerable&amp;lt;&gt;.
+        /// 
+        /// Note: anonymous type arguments are acceptable.
+        /// 
+        /// Use other constructor for IEnumerable.
+        /// &lt;/summary&gt;
+        /// &lt;param name="collection"&gt;IEnumerable&amp;lt;&gt;. For IEnumerable use other constructor and specify type.&lt;/param&gt;
+        public EnumerableDataReader(IEnumerable collection)
+        {
+            // THANKS DANIEL!
+            foreach (Type intface in collection.GetType().GetInterfaces())
+            {
+                if (intface.IsGenericType &amp;&amp; intface.GetGenericTypeDefinition() == typeof (IEnumerable&lt;&gt;))
+                {
+                    _type = intface.GetGenericArguments()[0]; 
+                }
+            }
+
+            if (_type ==null &amp;&amp; collection.GetType().IsGenericType)
+            {
+                _type = collection.GetType().GetGenericArguments()[0];
+
+            }
+
+
+            if (_type == null )
+            {
+                throw new ArgumentException(
+                    "collection must be IEnumerable&lt;&gt;. Use other constructor for IEnumerable and specify type");
+            }
+
+            SetFields(_type);
+
+            _enumerator = collection.GetEnumerator();
+
+        }
+
+        /// &lt;summary&gt;
+        /// Create an IDataReader over an instance of IEnumerable.
+        /// Use other constructor for IEnumerable&amp;lt;&gt;
+        /// &lt;/summary&gt;
+        /// &lt;param name="collection"&gt;&lt;/param&gt;
+        /// &lt;param name="elementType"&gt;&lt;/param&gt;
+        public EnumerableDataReader(IEnumerable collection, Type elementType)
+            : base(elementType)
+        {
+            _type = elementType;
+            _enumerator = collection.GetEnumerator();
+        }
+
+        /// &lt;summary&gt;
+        /// Helper method to create generic lists from anonymous type
+        /// &lt;/summary&gt;
+        /// &lt;param name="type"&gt;&lt;/param&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static IList ToGenericList(Type type)
+        {
+            return (IList) Activator.CreateInstance(typeof (List&lt;&gt;).MakeGenericType(new[] {type}));
+        }
+
+        /// &lt;summary&gt;
+        /// Return the value of the specified field.
+        /// &lt;/summary&gt;
+        /// &lt;returns&gt;
+        /// The &lt;see cref="T:System.Object"/&gt; which will contain the field value upon return.
+        /// &lt;/returns&gt;
+        /// &lt;param name="i"&gt;The index of the field to find. 
+        /// &lt;/param&gt;&lt;exception cref="T:System.IndexOutOfRangeException"&gt;The index passed was outside the range of 0 through &lt;see cref="P:System.Data.IDataRecord.FieldCount"/&gt;. 
+        /// &lt;/exception&gt;&lt;filterpriority&gt;2&lt;/filterpriority&gt;
+        public override object GetValue(int i)
+        {
+            if (i &lt; 0 || i &gt;= Fields.Count)
+            {
+                throw new IndexOutOfRangeException();
+            }
+
+            return Fields[i].Getter(_current);
+        }
+
+        /// &lt;summary&gt;
+        /// Advances the &lt;see cref="T:System.Data.IDataReader"/&gt; to the next record.
+        /// &lt;/summary&gt;
+        /// &lt;returns&gt;
+        /// true if there are more rows; otherwise, false.
+        /// &lt;/returns&gt;
+        /// &lt;filterpriority&gt;2&lt;/filterpriority&gt;
+        public override bool Read()
+        {
+            bool returnValue = _enumerator.MoveNext();
+            _current = returnValue ? _enumerator.Current : _type.IsValueType ? Activator.CreateInstance(_type) : null;
+            return returnValue;
+        }
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>// &lt;copyright project="Salient.Data" file="ObjectDataReader.cs" company="Sky Sanders"&gt;
+// This source is a Public Domain Dedication.
+// Please see http://spikes.codeplex.com/ for details.   
+// Attribution is appreciated
+// &lt;/copyright&gt; 
+// &lt;version&gt;1.0&lt;/version&gt;
+
+
+using System;
+using System.Collections.Generic;
+using System.Data;
+using Salient.Reflection;
+
+namespace Salient.Data
+{
+    public abstract class ObjectDataReader : IDataReader
+    {
+        protected bool Closed;
+        protected IList&lt;DynamicProperties.Property&gt; Fields;
+
+        protected ObjectDataReader()
+        {
+        }
+
+        protected ObjectDataReader(Type elementType)
+        {
+            SetFields(elementType);
+            Closed = false;
+        }
+
+        #region IDataReader Members
+
+        public abstract object GetValue(int i);
+        public abstract bool Read();
+
+        #endregion
+
+        #region Implementation of IDataRecord
+
+        public int FieldCount
+        {
+            get { return Fields.Count; }
+        }
+
+        public virtual int GetOrdinal(string name)
+        {
+            for (int i = 0; i &lt; Fields.Count; i++)
+            {
+                if (Fields[i].Info.Name == name)
+                {
+                    return i;
+                }
+            }
+
+            throw new IndexOutOfRangeException("name");
+        }
+
+        object IDataRecord.this[int i]
+        {
+            get { return GetValue(i); }
+        }
+
+        public virtual bool GetBoolean(int i)
+        {
+            return (Boolean) GetValue(i);
+        }
+
+       public virtual byte GetByte(int i)
+        {
+            return (Byte) GetValue(i);
+        }
+
+        public virtual char GetChar(int i)
+        {
+            return (Char) GetValue(i);
+        }
+
+        public virtual DateTime GetDateTime(int i)
+        {
+            return (DateTime) GetValue(i);
+        }
+
+        public virtual decimal GetDecimal(int i)
+        {
+            return (Decimal) GetValue(i);
+        }
+
+        public virtual double GetDouble(int i)
+        {
+            return (Double) GetValue(i);
+        }
+
+        public virtual Type GetFieldType(int i)
+        {
+            return Fields[i].Info.PropertyType;
+        }
+
+        public virtual float GetFloat(int i)
+        {
+            return (float) GetValue(i);
+        }
+
+        public virtual Guid GetGuid(int i)
+        {
+            return (Guid) GetValue(i);
+        }
+
+        public virtual short GetInt16(int i)
+        {
+            return (Int16) GetValue(i);
+        }
+
+        public virtual int GetInt32(int i)
+        {
+            return (Int32) GetValue(i);
+        }
+
+        public virtual long GetInt64(int i)
+        {
+            return (Int64) GetValue(i);
+        }
+
+        public virtual string GetString(int i)
+        {
+            return (string) GetValue(i);
+        }
+
+        public virtual bool IsDBNull(int i)
+        {
+            return GetValue(i) == null;
+        }
+
+        object IDataRecord.this[string name]
+        {
+            get { return GetValue(GetOrdinal(name)); }
+        }
+
+
+        public virtual string GetDataTypeName(int i)
+        {
+            return GetFieldType(i).Name;
+        }
+
+
+        public virtual string GetName(int i)
+        {
+            if (i &lt; 0 || i &gt;= Fields.Count)
+            {
+                throw new IndexOutOfRangeException("name");
+            }
+            return Fields[i].Info.Name;
+        }
+
+        public virtual int GetValues(object[] values)
+        {
+            int i = 0;
+            for (; i &lt; Fields.Count; i++)
+            {
+                if (values.Length &lt;= i)
+                {
+                    return i;
+                }
+                values[i] = GetValue(i);
+            }
+            return i;
+        }
+
+        public virtual IDataReader GetData(int i)
+        {
+            // need to think about this one
+            throw new NotImplementedException();
+        }
+
+        public virtual long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length)
+        {
+            // need to keep track of the bytes got for each record - more work than i want to do right now
+            // http://msdn.microsoft.com/en-us/library/system.data.idatarecord.getbytes.aspx
+            throw new NotImplementedException();
+        }
+
+        public virtual long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length)
+        {
+            // need to keep track of the bytes got for each record - more work than i want to do right now
+            // http://msdn.microsoft.com/en-us/library/system.data.idatarecord.getchars.aspx
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+        #region Implementation of IDataReader
+
+        public virtual void Close()
+        {
+            Closed = true;
+        }
+
+
+        public virtual DataTable GetSchemaTable()
+        {
+            var dt = new DataTable();
+            foreach (DynamicProperties.Property field in Fields)
+            {
+                dt.Columns.Add(new DataColumn(field.Info.Name, field.Info.PropertyType));
+            }
+            return dt;
+        }
+
+        public virtual bool NextResult()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        public virtual int Depth
+        {
+            get { throw new NotImplementedException(); }
+        }
+
+        public virtual bool IsClosed
+        {
+            get { return Closed; }
+        }
+
+        public virtual int RecordsAffected
+        {
+            get
+            {
+                // assuming select only?
+                return -1;
+            }
+        }
+
+        #endregion
+
+        #region Implementation of IDisposable
+
+        public virtual void Dispose()
+        {
+            Fields = null;
+        }
+
+        #endregion
+
+        protected void SetFields(Type elementType)
+        {
+            Fields = DynamicProperties.CreatePropertyMethods(elementType);
+        }
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>// &lt;copyright project="Salient.Reflection" file="DynamicProperties.cs" company="Sky Sanders"&gt;
+// This source is a Public Domain Dedication.
+// Please see http://spikes.codeplex.com/ for details.   
+// Attribution is appreciated
+// &lt;/copyright&gt; 
+// &lt;version&gt;1.0&lt;/version&gt;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+
+namespace Salient.Reflection
+{
+    /// &lt;summary&gt;
+    /// Gets IL setters and getters for a property.
+    /// 
+    /// started with http://jachman.wordpress.com/2006/08/22/2000-faster-using-dynamic-method-calls/
+    /// &lt;/summary&gt;
+    public static class DynamicProperties
+    {
+        #region Delegates
+
+        public delegate object GenericGetter(object target);
+
+        public delegate void GenericSetter(object target, object value);
+
+        #endregion
+
+        public static IList&lt;Property&gt; CreatePropertyMethods(Type T)
+        {
+            var returnValue = new List&lt;Property&gt;();
+
+            foreach (PropertyInfo prop in T.GetProperties())
+            {
+                returnValue.Add(new Property(prop));
+            }
+            return returnValue;
+        }
+
+
+        public static IList&lt;Property&gt; CreatePropertyMethods&lt;T&gt;()
+        {
+            var returnValue = new List&lt;Property&gt;();
+
+            foreach (PropertyInfo prop in typeof (T).GetProperties())
+            {
+                returnValue.Add(new Property(prop));
+            }
+            return returnValue;
+        }
+
+
+        /// &lt;summary&gt;
+        /// Creates a dynamic setter for the property
+        /// &lt;/summary&gt;
+        /// &lt;param name="propertyInfo"&gt;&lt;/param&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static GenericSetter CreateSetMethod(PropertyInfo propertyInfo)
+        {
+            /*
+            * If there's no setter return null
+            */
+            MethodInfo setMethod = propertyInfo.GetSetMethod();
+            if (setMethod == null)
+                return null;
+
+            /*
+            * Create the dynamic method
+            */
+            var arguments = new Type[2];
+            arguments[0] = arguments[1] = typeof (object);
+
+            var setter = new DynamicMethod(
+                String.Concat("_Set", propertyInfo.Name, "_"),
+                typeof (void), arguments, propertyInfo.DeclaringType);
+            ILGenerator generator = setter.GetILGenerator();
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
+            generator.Emit(OpCodes.Ldarg_1);
+
+            if (propertyInfo.PropertyType.IsClass)
+                generator.Emit(OpCodes.Castclass, propertyInfo.PropertyType);
+            else
+                generator.Emit(OpCodes.Unbox_Any, propertyInfo.PropertyType);
+
+            generator.EmitCall(OpCodes.Callvirt, setMethod, null);
+            generator.Emit(OpCodes.Ret);
+
+            /*
+            * Create the delegate and return it
+            */
+            return (GenericSetter) setter.CreateDelegate(typeof (GenericSetter));
+        }
+
+
+        /// &lt;summary&gt;
+        /// Creates a dynamic getter for the property
+        /// &lt;/summary&gt;
+        /// &lt;param name="propertyInfo"&gt;&lt;/param&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static GenericGetter CreateGetMethod(PropertyInfo propertyInfo)
+        {
+            /*
+            * If there's no getter return null
+            */
+            MethodInfo getMethod = propertyInfo.GetGetMethod();
+            if (getMethod == null)
+                return null;
+
+            /*
+            * Create the dynamic method
+            */
+            var arguments = new Type[1];
+            arguments[0] = typeof (object);
+
+            var getter = new DynamicMethod(
+                String.Concat("_Get", propertyInfo.Name, "_"),
+                typeof (object), arguments, propertyInfo.DeclaringType);
+            ILGenerator generator = getter.GetILGenerator();
+            generator.DeclareLocal(typeof (object));
+            generator.Emit(OpCodes.Ldarg_0);
+            generator.Emit(OpCodes.Castclass, propertyInfo.DeclaringType);
+            generator.EmitCall(OpCodes.Callvirt, getMethod, null);
+
+            if (!propertyInfo.PropertyType.IsClass)
+                generator.Emit(OpCodes.Box, propertyInfo.PropertyType);
+
+            generator.Emit(OpCodes.Ret);
+
+            /*
+            * Create the delegate and return it
+            */
+            return (GenericGetter) getter.CreateDelegate(typeof (GenericGetter));
+        }
+
+        #region Nested type: Property
+
+        public class Property
+        {
+            public GenericGetter Getter;
+            public PropertyInfo Info;
+            public GenericSetter Setter;
+
+            public Property(PropertyInfo info)
+            {
+                Info = info;
+                Setter = CreateSetMethod(info);
+                Getter = CreateGetMethod(info);
+            }
+        }
+
+        #endregion
+
+        ///// &lt;summary&gt;
+        ///// An expression based Getter getter found in comments. untested.
+        ///// Q: i don't see a reciprocal setter expression?
+        ///// &lt;/summary&gt;
+        ///// &lt;typeparam name="T"&gt;&lt;/typeparam&gt;
+        ///// &lt;param name="propName"&gt;&lt;/param&gt;
+        ///// &lt;returns&gt;&lt;/returns&gt;
+        //public static Func&lt;T&gt; CreateGetPropValue&lt;T&gt;(string propName)
+        //{
+        //    var param = Expression.Parameter(typeof(object), "container");
+        //    var func = Expression.Lambda(
+        //    Expression.Convert(Expression.PropertyOrField(Expression.Convert(param, typeof(T)), propName), typeof(object)), param);
+        //    return (Func&lt;T&gt;)func.Compile();
+        //}
+    }
+}
+</code></pre>
+
+<hr>

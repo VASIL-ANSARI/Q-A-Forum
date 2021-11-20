@@ -1,0 +1,95 @@
+<p>You can use a <code>htaccess</code> file for this purpose: </p>
+
+<p>When the browser loads an embedded image, he already knows the format to expect, so he will add this information to the <code>HTTP:Accept</code> headers when requesting the file. (or at least reduce it to any image-type)</p>
+
+<p>If the Browser is Accessing a file directly (url in the addressbar) he does not know this, so he will add <code>text/html</code> to the <code>HTTP:Accept</code> Header.</p>
+
+<p>Extract from chrome:</p>
+
+<p>direct: <code>Accept text/html, application/xhtml+xml, */*</code></p>
+
+<p>embedded: <code>Accept image/png, image/svg+xml, image/*;q=0.8, */*;q=0.5</code></p>
+
+<p>Use this information to catch the direct access cases: The example bellow will redirect Access on <code>http://localhost/test/myimage.gif</code> to <code>index.php?url=/test/myimage.gif</code>.</p>
+
+<pre><code>RewriteEngine on
+
+RewriteCond %{REQUEST_URI} .*\.gif        # redirect gifs
+RewriteCond %{REQUEST_URI} !.*index\.php  # make sure there is no loop
+RewriteCond %{HTTP:Accept} .*text/html.*  # redirect direct access
+RewriteRule (.*) http://localhost/test/index.php?url=$1 [R,L]  
+</code></pre>
+
+<p>another file like <code>http://localhost/test/test.php</code> could properly use <code>&lt;img src="http://localhost/test/myimage.gif" /&gt;</code> No redirect will happen, since no <code>Accept: text/html</code> will be send.</p>
+
+<p>Keep in mind, that this is a little bad to <em>test</em>: Once you had the image embedded somewhere, the browser cache will no longer load data when you access the image directly. Hence it will look like <em>direct access</em> is possible. But if you hit F5 to refresh the cached image, the redirect will apply. 
+(Leave debugging tools open to have the cache disabled)</p>
+
+<hr>
+
+<h1>Update</h1>
+
+<p>As to your comment. I overlooked that you want to use an artifical url to present the image at any time. This changes the way to design the htaccess ofc. </p>
+
+<p>The following htaccess should behave as you expect: </p>
+
+<ul>
+<li>If the Request Uri ends with slash followed by numbers only (i.e. <code>/2537263</code>) it is considered to be eligible for rewrite.</li>
+<li>If it is diret access (Http-Accept says <em>text/html</em>) it is rewritten to <code>wrapperpage.php</code></li>
+<li>If it is embedded access (HTTP-Accept says <strong>not</strong> *text/html) it is rewritten to <code>image.php</code></li>
+</ul>
+
+<p>htaccess:</p>
+
+<pre><code>RewriteEngine on
+
+RewriteCond %{REQUEST_URI} /\d+$   
+RewriteCond %{HTTP:Accept} .*text/html.*  
+RewriteRule ^(.*?)$ http://localhost/test/wrapperpage.php?id=$1 [R,L]
+
+RewriteCond %{REQUEST_URI} /\d+$   
+RewriteCond %{HTTP:Accept} !.*text/html.*      
+RewriteRule ^(.*?)$ http://localhost/test/image.php?id=$1 [R,L]
+</code></pre>
+
+<p>Note: if you ommit the <code>[R]</code> Option, users will not see the redirect reflected in the url. </p>
+
+<p>Example page code I used:  </p>
+
+<p>wrapperpage.php:</p>
+
+<pre><code>THIS IS MY WRAPPER PAGE: 
+
+&lt;br /&gt;                   
+&lt;img src = "http://localhost/test/&lt;?=$_GET["id"]?&gt;" /&gt;
+&lt;br /&gt;
+
+IMAGE IS WRAPPED.
+</code></pre>
+
+<p>image.php (Your logic to determine the picture goes there i assume)</p>
+
+<pre><code>&lt;?php
+
+//Load Image
+$id = $_GET["id"];
+
+//pseudoloading based on id... 
+// loading... 
+// done. 
+$image = imagecreatefromgif("apache_pb.gif"); 
+
+//output image as png.
+header("Content-type: image/png");
+imagepng($image);
+
+?&gt;
+</code></pre>
+
+<p>So:</p>
+
+<ul>
+<li><code>http://localhost/test/1234</code> in browser -> <code>wrapperpage.php?id=1234</code></li>
+<li><code>http://localhost/test/1234</code> embedded -> <code>image.php?id=1234</code></li>
+<li><code>http://localhost/test/image.php?id=1234</code> -> Returns png-image.</li>
+</ul>

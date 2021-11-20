@@ -1,0 +1,42 @@
+<pre><code>class MemberBulk &lt; ActiveRecord::Base
+
+  #Tells Rails this is not actually tied to a database table
+  # or is it self.abstract_class = true
+  # or @abstract_class = true
+  # ?
+  abstract_class = true
+
+  # members holds array of members to be saved
+  # submitted_text is the data submitted in the form for a bulk update
+  attr_accessor :members, :submitted_text
+  attr_accessible :submitted_text
+
+  before_validation :build_members_from_text
+
+  def build_members_from_text
+    self.members = []
+    submitted_text.each_line("\r\n") do |member_as_text|
+      member_as_array = member_as_text.split(";")
+      self.members &lt;&lt; Member.new(:number =&gt; member_as_array[0], :name =&gt; member_as_array[1])
+    end
+  end
+
+  def valid?
+    self.members.all?{ |m| m.valid? }
+  end
+
+  def save
+    self.members.all?{ |m| m.save }
+  end
+
+end
+
+class Member &lt; ActiveRecord::Base
+
+  validates :number,  :presence =&gt; true, :numericality =&gt; true
+  validates :name,    :presence =&gt; true
+
+end
+</code></pre>
+
+<p>So, in this code, members is an array that is a collection of the individual Member objects.  And my thinking is that as much as possible, you want to hand off work to the Member class, as it is the class that will actually be tied to a database table, and on which you can expect standard rails model behavior.  In order to accomplish this, I override two methods common to all ActiveRecord models: save and valid.  A MemberBulk will only be valid if all it's members are valid and it will only count as saved if all of it's members are saved.  You should probably also override the errors method to return the errors of it's underlying members, possibly with an indication of which one it is in the submitted text.</p>

@@ -1,0 +1,108 @@
+<p>Like suggested in the comments, here is what I meant by using <code>Proxy design pattern</code>. </p>
+
+<p>The contract <code>IAccountsService</code> might be defined by multiple classes. Since you want to be specific on which functionality should be used, a <code>proxy</code> class can be defined which implements the same <code>contract</code>, but uses the implementation from other classes. </p>
+
+<p>Sample code below for reference. </p>
+
+<p>The <code>contract</code> - <code>IAccountsService</code></p>
+
+<pre><code>public interface IAccountsService
+{
+    int Add(int baseNumber, int toIncrement);
+
+    int Divide(int dividend, int divisor);
+}
+</code></pre>
+
+<p>First Implementation of the <code>contract</code> - say <code>AccountServiceFirst</code></p>
+
+<pre><code>public class AccountServiceFirst : IAccountsService
+{
+    public int Add(int baseNumber, int toIncrement)
+    {
+        return baseNumber + toIncrement;
+    }
+
+    public int Divide(int dividend, int divisor)
+    {
+        throw new NotImplementedException();
+    }
+}
+</code></pre>
+
+<p>Second implementation of the <code>contract</code> - say <code>AccountServiceSecond</code></p>
+
+<pre><code>public class AccountServiceSecond : IAccountsService
+{
+    public int Add(int baseNumber, int toIncrement)
+    {
+        throw new NotImplementedException();
+    }
+
+    public int Divide(int dividend, int divisor)
+    {
+        return dividend / divisor;
+    }
+}
+</code></pre>
+
+<p>Using the <code>proxy design pattern</code> to implement the same <code>contract</code>, but the <code>proxy class</code> doesn't have own implementation, but uses the <code>implementations</code> of other entities which has already implemented the <code>contract</code>: </p>
+
+<pre><code>public class AccountServiceProxy : IAccountsService
+{
+    private AccountServiceFirst FirstAccountService;
+    private AccountServiceSecond SecondAccountService;
+
+    public AccountServiceProxy(AccountServiceFirst firstAccountService, AccountServiceSecond secondAccountService)
+    {
+        this.FirstAccountService = firstAccountService;
+        this.SecondAccountService = secondAccountService;
+    }
+
+    public int Add(int baseNumber, int toIncrement)
+    {
+        return this.FirstAccountService.Add(baseNumber, toIncrement);
+    }
+
+    public int Divide(int dividend, int divisor)
+    {
+        return this.SecondAccountService.Divide(dividend, divisor);
+    }
+}
+</code></pre>
+
+<p>The <code>DI</code> registration: </p>
+
+<pre><code>var container = new UnityContainer();
+container.RegisterType&lt;IAccountsService, AccountServiceProxy&gt;();
+GlobalConfiguration.Configuration.DependencyResolver = new UnityDependencyResolver(container);
+</code></pre>
+
+<p>The <code>AccountsServiceController</code>: </p>
+
+<pre><code>public class AccountsController : ApiController
+{
+    private IAccountsService AccountsService;
+
+    public AccountsController(IAccountsService accountsService)
+    {
+        this.AccountsService = accountsService;
+    }
+
+    [Route("api/accounts/add")]
+    [HttpGet]
+    public int Add(int baseNumber = 1, int toIncrement = 2)
+    {
+        return this.AccountsService.Add(baseNumber, toIncrement = 1);
+    }
+
+    [Route("api/accounts/divide")]
+    [HttpGet]
+    public int Divide(int dividend = 1, int divisor = 1)
+    {
+        return this.AccountsService.Divide(dividend, divisor = 1);
+    }
+}
+</code></pre>
+
+<p>Doing so, single <code>controller</code> can be used as the it holds the related <code>actions</code> for the <code>AccountsController</code> and changes would only involve in the <code>Proxy class</code>. It will also make the code more <code>testable</code></p>

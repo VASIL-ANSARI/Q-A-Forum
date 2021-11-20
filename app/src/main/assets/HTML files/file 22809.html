@@ -1,0 +1,49 @@
+<p>The key is to realise that you will have to provide your own driving loopâI have provided a simple demo below. I was lazy and used a Queue object to provide a FIFO, I haven't used python for a significant project for a while.</p>
+
+<pre><code>#!/usr/bin/python
+
+import Queue
+
+def foo():
+    print('Constructing foo')
+    yield
+    print('Running in foo')
+    yield
+    print('Explicit context switch to foo again')
+
+def bar():
+    print('Constructing bar')
+    yield
+    print('Explicit context to bar')
+    yield
+    print('Implicit context switch back to bar')
+
+def trampoline(taskq):
+    while not taskq.empty():
+        task = taskq.get()
+        try:
+            task.next()
+            taskq.put(task)
+        except StopIteration:
+            pass
+
+tasks = Queue.Queue()
+tasks.put(foo())
+tasks.put(bar())
+
+trampoline(tasks)
+
+print('Finished')
+</code></pre>
+
+<p>And when run:</p>
+
+<pre><code>$ ./coroutines.py 
+Constructing foo
+Constructing bar
+Running in foo
+Explicit context to bar
+Explicit context switch to foo again
+Implicit context switch back to bar
+Finished
+</code></pre>

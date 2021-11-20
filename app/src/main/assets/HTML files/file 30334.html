@@ -1,0 +1,43 @@
+<p>One issue I think is this:</p>
+
+<pre><code>Matrix.setLookAtM(mViewMatrix, 0, 0, 0, 5, 0f, 0f, 0f, 0f, 1.0f, 0.0f);
+</code></pre>
+
+<p>Your look vector is (0,0,0) which doesn't describe a direction. Your eye position is (0,0,5), indicating a position towards you along the z-axis from the origin. So your look vector needs to be away from you back towards the origin. Therefore try changing the look vector to (0,0,-1):</p>
+
+<pre><code>Matrix.setLookAtM(mViewMatrix, 0, 0, 0, 5, 0f, 0f, -1f, 0f, 1.0f, 0.0f);
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>For starters, move this to onSurfaceChanged since you don't need to call it on every frame, just when the surface gets constructed:</p>
+
+<pre><code>Matrix.setLookAtM(mViewMatrix, 0, 0, 0, 5, 0f, 0f, -1f, 0f, 1.0f, 0.0f);
+</code></pre>
+
+<p>Now for the ImageObject class. In your vertex shader, change 'a_TextureCoordinates' to 'a_TexCoordinate' so that the name matches what you use in your constructor code.</p>
+
+<p>In the constructor, make this change:</p>
+
+<pre><code>//GLES20.glBindAttribLocation(shaderProgram, 0, "a_TexCoordinate");
+GLES20.glBindAttribLocation(shaderProgram, 0, "a_Position");
+GLES20.glBindAttribLocation(shaderProgram, 1, "a_TexCoordinate");
+</code></pre>
+
+<p>Before you were binding "a_TexCoordinate" to position 0 but it should be position 1 since it's the 2nd attribute in the shader. The first attribute in your shader is "a_Position" so should be bound to position 0.</p>
+
+<p>In Draw, make these changes:</p>
+
+<pre><code>//mPositionHandle = GLES20.glGetAttribLocation(shaderProgram, "vPosition");
+mPositionHandle = GLES20.glGetAttribLocation(shaderProgram, "a_Position");
+
+//mTextureUniformHandle = GLES20.glGetAttribLocation(shaderProgram, "u_Texture");
+mTextureUniformHandle = GLES20.glGetUniformLocation(shaderProgram, "u_TextureUnit");
+
+//mMVPMatrixHandle = GLES20.glGetUniformLocation(shaderProgram, "uMVPMatrix");
+mMVPMatrixHandle = GLES20.glGetUniformLocation(shaderProgram, "u_Matrix");
+</code></pre>
+
+<p>That's because the names don't match up correctly with the names in the shaders. For the texture handler, this is a Uniform, not an Attribute hence you need to use glGetUniformLocation.</p>
+
+<p>That should be it I think. I've run your code and I'm getting a texture drawn across the screen.</p>

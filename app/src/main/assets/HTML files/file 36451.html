@@ -1,0 +1,58 @@
+<p>Well, what I did here works though there may be another, more efficient (yet less straight-forward) way.</p>
+
+<p>What I did was just calculate the size of the rect needed for the text, see if it fits in the label's frame, and if not, chop off a character and try again.</p>
+
+<pre><code>@interface LTViewController ()
+
+@property (nonatomic, weak) IBOutlet UILabel *label1;
+@property (nonatomic, weak) IBOutlet UILabel *label2;
+
+@end
+
+@implementation LTViewController
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+
+    UILabel *label1 = self.label1;
+    UILabel *label2 = self.label2;
+
+    UIFont *font = label1.font;
+    NSString *text = @"This is some text that will go into labels 1 and 2.";
+
+    CGRect label1Frame = label1.frame;
+
+    NSUInteger numberOfCharsInLabel1 = NSNotFound;
+
+    for (int i = [text length]; i &gt;= 0; i--) {
+        NSString *substring = [text substringToIndex:i];
+        NSAttributedString *attributedText = [[NSAttributedString alloc] initWithString:substring
+                                                                             attributes:@{ NSFontAttributeName : font }];
+        CGSize size = CGSizeMake(label1Frame.size.width, CGFLOAT_MAX);
+        CGRect textFrame = [attributedText boundingRectWithSize:size
+                                                        options:NSStringDrawingUsesLineFragmentOrigin
+                                                        context:nil];
+
+        if (CGRectGetHeight(textFrame) &lt;= CGRectGetHeight(label1Frame)) {
+            numberOfCharsInLabel1 = i;
+            break;
+        }
+    }
+
+    if (numberOfCharsInLabel1 == NSNotFound) {
+        // TODO: Handle this case.
+    }
+
+    label1.text = [text substringToIndex:numberOfCharsInLabel1];
+    label2.text = [text substringWithRange:NSMakeRange(numberOfCharsInLabel1, [text length] - numberOfCharsInLabel1)];
+}
+
+@end
+</code></pre>
+
+<p>This yields:</p>
+
+<p><img src="http://i.stack.imgur.com/HZ0sD.png" alt="screen shot"></p>
+
+<p>It's up to you to handle the error conditions.  For example, the rest doesn't completely fit into label2 and it's probably going to chop in the middle of a word more often then not.</p>

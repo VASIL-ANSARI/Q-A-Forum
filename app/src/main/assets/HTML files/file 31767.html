@@ -1,0 +1,75 @@
+<p>I was working the other day with a one to many relation, and settled to this solution (I modified a bit the names from my source to yours just for understanding).
+I haven't tested YOUR example, but it should work with small modifications (if needed), remember that formsets work only on ForeignKeys, If the bellow does not work, try also model = Recipe.fruits.through or Recipe.vegetables.through.
+The bellow is for only one inline formset, but you could add additional formsets with the same way:</p>
+
+<pre><code>    # forms.py
+
+class RecipeForm(forms.ModelForm):
+    ...
+    class Meta:
+        model = Recipe
+        ....
+
+class FruitForm(forms.ModelForm):
+    ...
+    class Meta:
+        model = RecipeFruit
+    ...
+
+
+RecipeFormSet = inlineformset_factory(Recipe, RecipeFruit, form=FruitForm, extra=1)
+
+
+# views.py
+
+class RecipeCreateView(CreateView):
+    form_class = RecipeForm
+    template_name = "recipes/recipe_add.html"
+    success_url = reverse_lazy('recipe-lists')
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handles GET requests and instantiates blank versions of the form
+        and its inline formsets.
+        """
+        self.object = None
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        recipe_formset = RecipeFormSet()
+        return self.render_to_response(
+            self.get_context_data(form=form,recipe_formset=recipe_formset))
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests, instantiating a form instance and its inline
+        formsets with the passed POST variables and then checking them for
+        validity.
+        """
+        self.object = None
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        recipe_formset = RecipeFormSet(request.POST)
+        if (form.is_valid() and recipe_formset.is_valid()):
+            return self.form_valid(form, recipe_formset)
+        else:
+            return self.form_invalid(form, recipe_formset)
+
+    def form_valid(self, form, recipe_formset):
+        """
+        Called if all forms are valid. Creates a Recipe instance along with
+        associated Ingredients and Instructions and then redirects to a
+        success page.
+        """
+        self.object = form.save()
+        recipe_formset.instance = self.object
+        recipe_formset.save()
+        return super(RecipeCreateView, self).form_valid(form)
+
+    def form_invalid(self, form, recipe_formset):
+        """
+        Called if a form is invalid. Re-renders the context data with the
+        data-filled forms and errors.
+        """
+        return self.render_to_response(
+            self.get_context_data(form=form,recipe_formset=recipe_formset))
+</code></pre>

@@ -1,0 +1,69 @@
+<ul>
+<li><h3>Chrome</h3>
+
+<p>Extract from all Chrome "persons":</p>
+
+<pre><code>@echo off
+set js="%temp%\extractChromeHomepage%random%.js"
+
+rem List all Chrome persons
+(
+    set /p .=settings=&lt;nul
+    type "%LocalAppData%\Google\Chrome\User Data\Local State"
+    echo ;for^(var k in settings.profile.info_cache^) WScript.echo^(k^);
+)&gt;%js%
+
+rem Get the homepage for each Chrome person
+for /f "delims=" %%a in ('cscript //nologo %js%') do (
+    (
+        set /p .=settings=&lt;nul
+        type "%LocalAppData%\Google\Chrome\User Data\%%a\Secure Preferences"
+        echo ;WScript.echo^("Chrome homepage (%%a): " + settings.homepage^);
+    )&gt;%js%
+    cscript //nologo %js%
+)
+del %js%
+</code></pre>
+
+<p>The output:</p>
+
+<blockquote>
+  <p>Chrome homepage (Default): <a href="https://www.google.com/" rel="nofollow">https://www.google.com/</a><br>
+  Chrome homepage (Profile 4): undefined</p>
+</blockquote>
+
+<ul>
+<li>If the homepage is not set it prints <code>undefined</code>, this can be customized if you like</li>
+<li>To redirect the output to a file add <code>&gt;&gt;somefile.txt</code> on the last <code>cscript</code> line</li>
+</ul></li>
+<li><h3>Firefox</h3>
+
+<p>Extract from all profiles:</p>
+
+<pre><code>@echo off
+setlocal enableDelayedExpansion
+for /f "delims== tokens=1*" %%a in ('
+    findstr /i "Name= Path=" "%AppData%\Mozilla\Firefox\profiles.ini"
+') do (
+    if %%a==Name (
+        set "name=%%b"
+    ) else (
+        set "profile=%%b"
+        set "profile=%AppData%\Mozilla\Firefox\!profile:/=\!\prefs.js"
+        if exist "!profile!" (
+            for /f "tokens=2 delims=,) " %%b in ('
+                findstr "\&lt;browser.startup.homepage\&gt;" "!profile!"
+            ') do echo Firefox homepage ^(!name!^): %%~b
+        )
+    )
+)
+endlocal
+</code></pre>
+
+<p>The output:</p>
+
+<blockquote>
+  <p>Firefox homepage (default): about:newtab<br>
+  Firefox homepage (nightly): about:newtab</p>
+</blockquote></li>
+</ul>

@@ -1,0 +1,21 @@
+<p>My initial suggestion would be a mutex for this specific job.  But as there's a chance that you may have multiple application servers working the sidekiq jobs, I would suggest something at the redis level.</p>
+
+<p>For instance, use <a href="https://github.com/dv/redis-semaphore">redis-semaphore</a> within your sidekiq worker definition.  <em>An untested example</em>:</p>
+
+<pre class="lang-rb prettyprint-override"><code>def perform
+  s = Redis::Semaphore.new(:map_reduce_semaphore, connection: "localhost")
+
+  # verify that this sidekiq worker is the first to reach this semaphore.
+  unless s.locked?
+
+    # auto-unlocks in 90 seconds. set to what is reasonable for your worker.
+    s.lock(90)
+    your_map_reduce()
+    s.unlock
+  end
+end
+
+def your_map_reduce
+  # ...
+end
+</code></pre>

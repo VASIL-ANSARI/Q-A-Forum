@@ -1,0 +1,49 @@
+<p>This query will do it - however, it's not very clean in that you have to "manually" define the nesting and it won't just automatically scale to more levels deep....</p>
+
+<pre><code>SELECT 
+    n.ID AS '@Id', 
+    n.NAME AS '@Name',
+    (SELECT 
+        n2.ID AS '@Id', 
+        n2.NAME AS '@Name',
+        (SELECT 
+            n3.ID AS '@Id', 
+            n3.NAME AS '@Name'
+         FROM 
+            dbo.Nodes n3
+         WHERE 
+             n3.ParentNode = n2.ID
+         FOR XML PATH('Node'), TYPE
+        ) 
+     FROM 
+        dbo.Nodes n2
+     WHERE 
+         n2.ParentNode = n.ID
+     FOR XML PATH('Node'), TYPE
+    ) 
+FROM 
+    dbo.Nodes n
+WHERE 
+    n.ParentNode IS NULL
+FOR XML PATH('Node'), ROOT('Nodes')
+</code></pre>
+
+<p>Output is:</p>
+
+<pre><code>&lt;Nodes&gt;
+  &lt;Node Id="1" Name="node1"&gt;
+    &lt;Node Id="11" Name="node11"&gt;
+      &lt;Node Id="111" Name="node111" /&gt;
+      &lt;Node Id="112" Name="node112" /&gt;
+    &lt;/Node&gt;
+  &lt;/Node&gt;
+  &lt;Node Id="2" Name="node2"&gt;
+    &lt;Node Id="21" Name="node21"&gt;
+      &lt;Node Id="211" Name="node211" /&gt;
+      &lt;Node Id="212" Name="node212" /&gt;
+    &lt;/Node&gt;
+  &lt;/Node&gt;
+&lt;/Nodes&gt;
+</code></pre>
+
+<p>I was hoping there would be a way to do this with a recursive CTE (Common Table Expression), but that didn't work out :-(</p>

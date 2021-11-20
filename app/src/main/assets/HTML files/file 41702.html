@@ -1,0 +1,46 @@
+<p>This is why we recommend to use lock on a private readonly field.</p>
+
+<p>Your <code>dataReceived</code> could be changed by another thread in <code>_port_DataReceived</code> method(since access is not synchronized) while it is executing <code>ParseAnswers</code> for previous event.</p>
+
+<p>So what happens, now two threads race to the <code>lock(_dataReceived)</code>, they both are permitted because both use different references of the lock object.</p>
+
+<p>Remember lock statement works on references, <code>_dataReceived += newData;</code> changes the reference, so another thread is freely allowed to enter the critical region(as it uses different instance of string now).</p>
+
+<p>Simple fix would be:</p>
+
+<pre><code>private string _dataReceived;
+private readonly object padLock = new object();
+
+private void _port_DataReceived(object sender, SerialDataReceivedEventArgs e)
+{
+    string newData = _port.ReadExisting();
+
+    lock (padLock)
+    {
+        _dataReceived += newData;
+    }
+
+    new Action(() =&gt;
+    {
+        Debug("Data received: {0}", newData);
+        ParseAnswers();
+    }).BeginInvoke(null, null);
+}
+
+private void ParseAnswers()
+{
+    ...
+    lock (padLock)
+    {
+        idx = _dataReceived.IndexOf(Environment.NewLine);
+        if (idx != -1)
+        {
+            cmd = _dataReceived.Substring(0, idx);
+            _dataReceived = _dataReceived.Substring(idx + 2);
+        }
+    }
+    ...
+}
+</code></pre>
+
+<p>Do note that I've removed the <code>volatile</code> modifier(which is redundant) and also I've synchronized the access to <code>_dataReceived</code> in <code>_port_DataReceived</code> method also(very very important)</p>

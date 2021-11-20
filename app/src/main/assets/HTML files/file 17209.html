@@ -1,0 +1,49 @@
+<p>First, I'm not sure why you are referring to the sum of the absolute values of the elements of a vector as the "energy". I would have expected the "energy" to the be the sum of the <em>squares</em> of the elements (or the sum of the squares of the norms, if this is a complex vector).</p>
+
+<p>Second, this strikes me as fairly goofy code (and believe me, I know goofy code ;-) ). Looking at it line-by-line:</p>
+
+<pre><code>len = length(blocks);
+</code></pre>
+
+<p>Easy enough, you are grabbing the <a href="http://www.mathworks.com/help/matlab/ref/length.html" rel="nofollow">"length of vector or largest array dimension"</a></p>
+
+<pre><code>n = sum(size(blocks)) - len;
+</code></pre>
+
+<p>In your question you said that you were calculating the energy in a "vector", but if <code>blocks</code> is really a vector then this will always return the number 1, so why bother calculating it? If <code>blocks</code> is really a 2-D array, <code>n</code> is now set to the length of the smaller of the two dimensions. If <code>blocks</code> is an N-d array ... why would you want to calculate this value?</p>
+
+<pre><code>currsum = sum(abs(blocks(n,1:len)));
+</code></pre>
+
+<p>Here you seem to be assuming that <code>blocks</code>  is 2-D. But you are also assuming that the largest dimension is the second one (note that this line of code will fail if you set <code>blocks</code> to an array like <code>zeros(10,3)</code>, or to a column vector).</p>
+
+<p>Given your implicit assumptions (<code>blocks</code> is a 2-D array with the longest dimension the last one), you can replace all this code with:</p>
+
+<pre><code>currsum = sum(abs(blocks(end,:)))
+</code></pre>
+
+<p>Now it's much clearer what's going on, but why would you want to calculate the sum of the absolute values of the last row in an array? Maybe that's really what you want, but it seems strange to me.</p>
+
+<p>Looking at your C++ code:</p>
+
+<pre><code>int n = (this-&gt;width + this-&gt;height) - this-&gt;width;
+</code></pre>
+
+<p>Why not just say:</p>
+
+<pre><code>int n = this-&gt;height;
+</code></pre>
+
+<p>Then, inside the loop you have</p>
+
+<pre><code>currsum += blocks[i];
+</code></pre>
+
+<p>First, why aren't you calling <code>abs()</code>? Second, C and C++ store arrays in row-major order, so you aren't you summing over the <em>first</em> row here, instead of the <em>last</em> row? Assuming that your MATLAB code is really doing what you want, I think you want something like:</p>
+
+<pre><code>double currsum = 0;
+for(int i=0; (i &lt; this-&gt;width); i++)
+{
+    currsum += abs(blocks[this-&gt;height-1][i]);
+}
+</code></pre>

@@ -1,0 +1,50 @@
+<p>I even wonder that tables and relations are correctly created especially when none of your entities have defined key and context doesn't define set for <code>Photos</code>. Anyway <code>ICollection&lt;T&gt;</code> <strong>is a must</strong>. Your class is not valid entity and even if you somehow make it work I expect that you will have troubles to use it - for example you can forget about lazy loading. </p>
+
+<p>Also handling it this way doesn't make sense because anybody can convert your enumerable back to collection. You must make enumerable copy of the collection to make it work as supposed.</p>
+
+<p>The only way which can perhaps work is:</p>
+
+<pre><code>public class Album
+{
+    public class AlbumConfiguration : EntityTypeConfiguration&lt;Album&gt; 
+    {
+        public AlbumConfiguration()
+        {
+            // Inner class will see private members of the outer class
+            HasMany(a =&gt; a._photos)...
+        }
+    }
+
+    private readonly ICollection&lt;Photo&gt; _photos = new List&lt;Photo&gt;();
+    public string Name {get; set;}
+    public virtual IEnumerable&lt;Photo&gt; Photos
+    {
+        get{ return _photos;}
+    }
+
+    public void AddPhoto(byte[] bytes, string name)
+    {
+        //some biz rules
+        Photo p = new Photo();
+        p.Bytes = bytes;
+        p.Name = name;
+        _photos.Add(p);
+    }
+}
+</code></pre>
+
+<p>And your context will look like:</p>
+
+<pre><code>public class AlbumDbContext : DbContext
+{
+    public DbSet&lt;Album&gt; Albums { get; set; }        
+    public DbSet&lt;Photo&gt; Photos { get; set; }
+
+    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {    
+        modelBuilder.Configurations.Add(new Album.AlbumConfiguration());          
+    }
+}
+</code></pre>
+
+<p>This solution is pretty ugly because it makes your entity dependent on entity framework.</p>

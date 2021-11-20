@@ -1,0 +1,56 @@
+<p>I too had the same issue and I solved it by editing nginx.conf file. In most cases, this can be fixed by adding / increasing the send_timeout directive in nginx.conf.</p>
+
+<p>Find your nginx.conf file (usually located at <code>/usr/local/nginx/nginx.conf</code> or sometimes <code>/etc/nginx/sites-available/default</code>), open it using <strong>nano</strong> or any other text editor, and add the following lines between the <strong>http { }</strong> so it looks like:</p>
+
+<pre><code>http {
+include       mime.types;
+default_type  application/octet-stream;
+
+#log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+#                  '$status $body_bytes_sent "$http_referer" '
+#                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+#access_log  /var/log/nginx/access.log  main;
+
+sendfile        on;
+#tcp_nopush     on;
+#keepalive_timeout  0;
+keepalive_timeout  120;
+#tcp_nodelay        on;
+
+#gzip  on;
+#gzip_disable "MSIE [1-6]\.(?!.*SV1)";
+
+server_tokens off;
+
+send_timeout 10m;
+
+include /etc/nginx/conf.d/*.conf;
+}
+</code></pre>
+
+<p>In my case, I had to increase some other directives like:</p>
+
+<pre><code>client_header_timeout 10m;
+client_body_timeout 10m;
+send_timeout 10m;
+fastcgi_read_timeout 10m;
+</code></pre>
+
+<p>too.</p>
+
+<p>Once you've edited the file, just reload nginx with:</p>
+
+<pre><code>kill -HUP `ps -ef | grep nginx | grep master | awk {'print $2'}`
+</code></pre>
+
+<p>or</p>
+
+<pre><code>sudo service nginx restart
+</code></pre>
+
+<p>That should fix it.</p>
+
+<p>(I found the directives here: <a href="http://blog.secaserver.com/2011/10/nginx-gateway-time-out/" rel="nofollow">http://blog.secaserver.com/2011/10/nginx-gateway-time-out/</a> )</p>
+
+<p>PS: I saw the comment by the OP with a link to their blog but I thought adding the relevant information here might help. </p>

@@ -1,0 +1,113 @@
+<p>As for me, this plugin is not the best that you could use.</p>
+
+<p>I would go with </p>
+
+<ol>
+<li><strong>Chosen</strong> <a href="http://harvesthq.github.io/chosen/">http://harvesthq.github.io/chosen/</a> or </li>
+<li><strong>jQuery Tokeninput</strong> <a href="http://loopj.com/jquery-tokeninput/">http://loopj.com/jquery-tokeninput/</a>.</li>
+</ol>
+
+<p>Used to like 2nd more, but Chosen is a great plugin that is my favorite now.</p>
+
+<p>As for implementing them in rails:</p>
+
+<p><strong>Chosen</strong></p>
+
+<p><strong>Gemfile</strong></p>
+
+<pre><code>group :assets do
+  gem 'chosen-rails'
+end
+</code></pre>
+
+<p><strong>app/assets/javascripts/application.js</strong></p>
+
+<pre><code>//= require chosen-jquery
+</code></pre>
+
+<p><strong>app/assets/stylesheets/application.css</strong></p>
+
+<pre><code>*= require chosen
+</code></pre>
+
+<p><strong>app/assets/javascripts/questions.js.coffee</strong></p>
+
+<pre><code>jQuery -&gt;
+  $('#question_tags_ids').chosen()
+</code></pre>
+
+<p><strong>questions/_form.html.erb</strong></p>
+
+<pre><code>&lt;div class="field"&gt;
+  &lt;%= f.label :tag_ids, "Tags" %&gt;&lt;br /&gt;
+  &lt;%= f.collection_select :tag_ids, Tag.order(:name), :id, :name, {}, {multiple: true} %&gt;
+&lt;/div&gt;
+</code></pre>
+
+<hr>
+
+<p><strong>jQuery Tokeninput</strong></p>
+
+<p><strong>app/assets/javascripts/application.js</strong></p>
+
+<pre><code>//= require jquery.tokeninput
+</code></pre>
+
+<p><strong>app/assets/stylesheets/application.css</strong></p>
+
+<pre><code>*= require token-input-facebook
+</code></pre>
+
+<p><strong>app/assets/javascripts/questions.js.coffee</strong></p>
+
+<pre><code>jQuery -&gt;
+  $('#question_tag_tokens').tokenInput '/tags.json'
+    theme: 'facebook'
+    prePopulate: $('#question_tag_tokens').data('load')
+</code></pre>
+
+<p><strong>questions/_form.html.erb</strong></p>
+
+<pre><code>&lt;div class="field"&gt;
+  &lt;%= f.label :tag_tokens, "Tags" %&gt;&lt;br /&gt;
+  &lt;%= f.text_field :tag_tokens, data: {load: @question.tags} %&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p><strong>models/question.rb</strong></p>
+
+<pre><code>attr_accessible :name, :tag_tokens
+attr_reader :tag_tokens
+
+def tag_tokens=(tokens)
+  self.tag_ids = Tag.ids_from_tokens(tokens)
+end
+</code></pre>
+
+<p><strong>tags_controller.rb</strong></p>
+
+<pre><code>def index
+  @tags = Tag.order(:name)
+  respond_to do |format|
+    format.html
+    format.json { render json: @tags.tokens(params[:q]) }
+  end
+end
+</code></pre>
+
+<p><strong>models/tag.rb</strong></p>
+
+<pre><code>def self.tokens(query)
+  tags = where("name like ?", "%#{query}%")
+  if tags.empty?
+    [{id: "&lt;&lt;&lt;#{query}&gt;&gt;&gt;", name: "New: \"#{query}\""}]
+  else
+    tags
+  end
+end
+
+def self.ids_from_tokens(tokens)
+  tokens.gsub!(/&lt;&lt;&lt;(.+?)&gt;&gt;&gt;/) { create!(name: $1).id }
+  tokens.split(',')
+end
+</code></pre>

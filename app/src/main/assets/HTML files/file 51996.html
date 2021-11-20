@@ -1,0 +1,33 @@
+<p>Making a composite unique index from <code>book_title</code> and <code>book_edition</code> should fix the problem from the start:</p>
+
+<pre class="lang-sql prettyprint-override"><code>ALTER TABLE `books` ADD UNIQUE `unique_edition`(`book_title`, `book_edition`);
+</code></pre>
+
+<p>Adding a transaction in this case does not offer any benefits as you're only doing one write operation, which while dependent on the result of the read one, would be already protected from any race conditions by the unique index constraint.</p>
+
+<p>To handle unique exceptions you can do this:</p>
+
+<pre><code>function saveBook()
+{
+    ...
+
+    $latestEdition = Book::where('book_title', 'Harry Potter')-&gt;max('book_edition');
+    $this-&gt;book_edition = $latestEdition + 1;
+
+    try {
+        $this-&gt;save();
+    } catch (Illuminate\Database\QueryException $e) {
+        // Your checking for 1062 because that's
+        // the MySQL error message for duplicate entry
+        if ($e-&gt;errorInfo[1] == 1062) {
+            // set your error message here
+        }
+    }
+
+    ...
+}
+</code></pre>
+
+<hr>
+
+<p>You can also take a look at using <a href="https://laravel.com/docs/5.2/queries#pessimistic-locking" rel="nofollow">Pessimistic Locking</a>, but only as an alternative since locking would just be redundant if you're already using a unique constraint. But in this case a unique constraint makes more sense.</p>

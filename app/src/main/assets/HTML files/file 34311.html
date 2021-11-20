@@ -1,0 +1,16 @@
+<p>There are no such feature like retry attempts in RabbitMQ (as well as in AMQP protocol).</p>
+
+<p>Possible solution to implement retry attempts limit behavior:</p>
+
+<ol>
+<li><p>Redeliver message if it was not previously redelivered (check <code>redelivered</code> parameter on <code>basic.deliver</code> method - your library should have some interface for this) and drop it and than catch in <a href="http://www.rabbitmq.com/dlx.html">dead letter exchange</a>, then process somehow.</p></li>
+<li><p>Each time message cannot be processed publish it again but set or increment/decrement header filed, say <code>x-redelivered-count</code> (you can chose any name you like, though). To get control over redeliveries in this case you have to check field you set whether it reaches some limit (top or bottom - 0 is my choise, a-la <code>ttl</code> in ip header from tcp/ip).</p></li>
+<li><p>Store message unique key (say uuid, but you have to set it manually when you publish message) in Redis, memcache or other storage, even in mysql alongside with redeliveries count and then on each redelivery increment/decrement this value until it reach the limit.</p></li>
+<li><p>(for real geeks) write plugin that will implement such behavior like you want.</p></li>
+</ol>
+
+<p>The pro of <strong>#3</strong> is that redelivered message stay in queue head. This is important if you have long queue or if messages order is important for you (note, that redeliveries will break strict messages order, see official docs for details or <a href="http://stackoverflow.com/questions/21363302/rabbitmq-message-order-of-delivery">this question on SO</a>).</p>
+
+<p><strong>P.S.:</strong> </p>
+
+<p>There is <a href="http://stackoverflow.com/a/17657309/1461984">similar answer</a> in this topic, but in php. Look through it, maybe it helps you a bit (start reading it from words <em>"There are multiple techniques to deal with cycle redeliver problem"</em>.</p>

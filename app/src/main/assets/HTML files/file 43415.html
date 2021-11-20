@@ -1,0 +1,40 @@
+<p>The problem is that you've never started the database - you need to explicitly start services in most Docker images. But if you want to run two processes in Docker (the DB and your python program), things get a little more complex. You either have to use a process manager like supervisor, or be a bit cleverer in your start-up script.</p>
+
+<p>To see what I mean, create the following script, and call it <code>cmd.sh</code>:</p>
+
+<pre><code>#!/bin/bash
+
+mysqld &amp;
+python main.py
+</code></pre>
+
+<p>Add it to the Dockerfile:</p>
+
+<pre><code>FROM ubuntu:saucy
+
+# Install required packages
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install python
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install mysql-server python-mysqldb
+
+# Add our python app code to the image
+RUN mkdir -p /app
+ADD . /app
+WORKDIR /app
+
+# Set the default command to execute
+COPY cmd.sh /cmd.sh
+RUN chmod +x /cmd.sh
+CMD cmd.sh
+</code></pre>
+
+<p>Now build and try again. (Apologies if this doesn't work, it's off the top of my head and I haven't tested it).</p>
+
+<p>Note that this is <em>not</em> a good solution; mysql will not be getting signals proxied to it, so probably won't shutdown properly when the container stops. You could fix this by using a process manager like supervisor, but the easiest and best solution is to use separate containers. You can find stock containers for <a href="https://registry.hub.docker.com/_/mysql/" rel="nofollow">mysql</a> and also for <a href="https://registry.hub.docker.com/_/python/" rel="nofollow">python</a>, which would save you a lot of trouble. To do this:</p>
+
+<ol>
+<li>Take the mysql installation stuff out of the Dockerfile</li>
+<li>Change <code>localhost</code> in your python code to <code>mysql</code> or whatever you want to call your MySQL container.</li>
+<li>Start a MySQL container with something like <code>docker run -d --name mysql mysql</code></li>
+<li>Start your container and link to the mysql container e.g: <code>docker run myapp --link mysql:mysql</code></li>
+</ol>

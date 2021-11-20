@@ -1,0 +1,28 @@
+<p>You are querying for fields matching the session variable <code>@fieldid</code> but I would guess you're not defining that variable in your mysqli session or in your phpmyadmin environment.</p>
+
+<pre><code>SET @fieldid := 1234;
+SELECT ... WHERE fieldid = @fieldid ...
+</code></pre>
+
+<p>Or else you can use <code>?</code> as a query parameter placeholder for the fieldid and bind it to a PHP variable.  </p>
+
+<p>See <a href="http://php.net/manual/en/mysqli-stmt.bind-param.php" rel="nofollow">http://php.net/manual/en/mysqli-stmt.bind-param.php</a></p>
+
+<hr>
+
+<p>Does the following query do what you want, without using the @fieldid session variable?</p>
+
+<pre><code>SELECT x.fieldid, x.var_name, x.field, x.type, x.groupid, COUNT(*) AS total,
+  CAST(GROUP_CONCAT(CONCAT(x.value,'(',x.qty,')') SEPARATOR ', ') AS CHAR) a 
+FROM ( 
+  SELECT v.value, v.fieldid, f.var_name, f.field, f.type, g.groupid, COUNT(*) AS qty 
+  FROM extra_field_values AS v
+  INNER JOIN extra_fields AS f ON f.fieldid=v.fieldid
+  INNER JOIN extra_fields_groups_item AS g ON g.itemid=v.fieldid
+  WHERE f.module = 'listings'
+   AND f.itemid IN (7,8,10,12,15,16,17,18,19,20,21,22,23,24,25,26) 
+   AND f.settings LIKE '%"search";s:1:"1"%' 
+  GROUP BY v.value, v.fieldid
+  ) as x
+GROUP BY x.fieldid
+</code></pre>

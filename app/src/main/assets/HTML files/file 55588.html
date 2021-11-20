@@ -1,0 +1,37 @@
+<p>PORTD, on the ATxmega128A4U, is at address 0x0660, as stated in its
+<a href="http://www.atmel.com/images/Atmel-8387-8-and16-bit-AVR-Microcontroller-XMEGA-A4U_Datasheet.pdf" rel="nofollow">datasheet</a>,
+page 62. The port is therefore not accessible to the <code>in</code> instruction.
+You should use <code>lds</code> instead, with the constraint</p>
+
+<pre><code>[port]  "i" (_SFR_MEM_ADDR(OUTPORT))
+</code></pre>
+
+<p>Notice the lowercase "i".</p>
+
+<p><strong>Addendum</strong>: I just tried compiling the following:</p>
+
+<pre><code>#include &lt;avr/io.h&gt;
+
+void test(void)
+{
+    uint8_t rport;
+
+    asm volatile(
+        "in __tmp_reg__, __SREG__  \n\t"
+        "cli                       \n\t"
+        "lds %[rport], %[port]     \n\t"
+        : [rport] "=&amp;r" (rport)               // output
+        : [port]  "i" (_SFR_MEM_ADDR(PORTD))  // input
+        : "r0"                                // clobber
+    );
+}
+</code></pre>
+
+<p>Using avr-gcc 4.9.2 with the options <code>-mmcu=atxmega128a4u -c</code> I get the
+correct generated code and no warnings, even with <code>-Wall -Wextra</code>.</p>
+
+<p>The "i" constraints is
+<a href="https://gcc.gnu.org/onlinedocs/gcc/Simple-Constraints.html" rel="nofollow">documented</a>
+to mean an âimmediate integer operandâ, whereas <a href="https://gcc.gnu.org/onlinedocs/gcc/Machine-Constraints.html" rel="nofollow">"I"
+means</a>
+âConstant greater than â1, less than 64â.</p>

@@ -1,0 +1,17 @@
+<p>Unless I'm mistaken, the InverseProperty attribute  helps EF pair up one side of a relationship with the other side, but it doesn't tell EF anything about what kind of relationship it is. I'm assuming that when you say you want to create an "m:n" relationship what you mean is "many to many", and I've found EF doesn't always figure it out correctly. I've made it a habit to specify the mapping manually for many-to-many relations by overriding the OnModelCreating method. The following is a sample code snippet:</p>
+
+<pre><code>    protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity&lt;User&gt;()
+            .HasMany(a =&gt; a.Roles)
+            .WithMany(r =&gt; r.Users)
+            .Map(config =&gt;
+            {
+                config.ToTable("UserRoles");
+                config.MapLeftKey("UserId");
+                config.MapRightKey("RoleId");
+            });
+    }
+</code></pre>
+
+<p>The above snippet is taken from a project of mine where it's used to define a many-to-many relation between users and their roles in the system. This way EF doesn't get "confused" about what kind of relationship, the name of the intermediary table in the database, or the keys used to map the one side to the other. I'm not sure why you're seeing the problems on only one side of the relation, but I'd be willing to bet it's because EF hasn't been able to quite figure out what you're trying to do.</p>

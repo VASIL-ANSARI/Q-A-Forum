@@ -1,0 +1,30 @@
+<p>I had two issues:</p>
+
+<ol>
+<li>Pasting in the Private Key.</li>
+<li>Missing some parameters in the openssl_sign</li>
+<li>Also my $stringtosign seems to mess it up. Changing to all one line fixed that part.</li>
+</ol>
+
+<p>I found this "<a href="http://stackoverflow.com/questions/25778840/google-cloud-storage-signed-url-for-media?rq=1">Google Cloud Storage Signed Url for media</a>" and was able to use the function (below) from hdezela to get it working!</p>
+
+<pre><code>function storageURL($bucket,$archivo) {
+    $expires = time()+60; 
+    $to_sign = ("GET\n\n\n".$expires."\n/".$bucket.'/'.$archivo);
+    $fp = fopen('/path/to/google.pem', 'r');
+    $priv_key = fread($fp, 8192);
+    fclose($fp);
+    $pkeyid = openssl_get_privatekey($priv_key);
+    if(!openssl_sign($to_sign,$signature,$pkeyid,'sha256')) {
+        $signature = 'sinfirma';
+    } else {
+        $signature = urlencode(base64_encode($signature));
+    }
+    return ('https://'.$bucket.'.storage.googleapis.com/'.$archivo.'?GoogleAccessId=XXXXXXX@developer.gserviceaccount.com&amp;Expires='.$expires.'&amp;Signature='.$signature);
+}
+</code></pre>
+
+<p>I originally thought it was the url but this works as well.</p>
+
+<pre><code>"https://storage.googleapis.com/".$bucketName ."/
+</code></pre>

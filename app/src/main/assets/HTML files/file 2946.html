@@ -1,0 +1,33 @@
+<p>Well to get a default value if the key does not exits you can provide a second parameter:</p>
+
+<pre><code>cache.get('key', 'default')
+</code></pre>
+
+<blockquote>
+  <p><a href="http://docs.djangoproject.com/en/dev/topics/cache/#the-low-level-cache-api" rel="nofollow"><code>cache.get()</code></a> can take a default argument. This specifies which value to return if the object doesn't exist in the cache.</p>
+</blockquote>
+
+<p>To save the default value in cache if the key does not exist, you can provide your <a href="http://docs.djangoproject.com/en/dev/topics/cache/#using-a-custom-cache-backend" rel="nofollow">custom cache backend</a>. E.g. this extends the <code>db</code> cache backend (but works the same with others):</p>
+
+<pre><code>from django.core.cache.backends import db
+
+class CustomCache(db.CacheClass):
+
+    def get(self, key, default=None):
+        result = super(CustomCache, self).get(key, default)
+
+        if result == default:
+            self.add(key, default)
+            return default
+
+        return result
+</code></pre>
+
+<p>But I don't think that this adds any value.</p>
+
+<p><strong>Update:</strong><br>
+In response to the comment on the other post: Yes it <strong>compares</strong> the default value with the returned value and if both are equal, the value gets added to the cache. <strong>But</strong> <code>cache.add</code> only sets the new value if the key is <strong>not</strong> already in the cache (contrast to <code>cache.set</code> which always overrides):</p>
+
+<blockquote>
+  <p>To add a key <strong>only if it doesn't already exist</strong>, use the <strong><code>add()</code></strong> method. It takes the same parameters as <code>set()</code>, but it will <strong>not attempt to update the cache</strong> if the key specified is already present.</p>
+</blockquote>

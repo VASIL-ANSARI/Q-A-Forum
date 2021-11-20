@@ -1,0 +1,111 @@
+<p>I think you can use rather <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.groupby.html" rel="nofollow"><code>groupby</code></a> as <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.pivot_table.html" rel="nofollow"><code>pivot_table</code></a>, because here <code>groupby</code> is faster.</p>
+
+<p>You can use <code>pivot_table</code>, but default <code>aggfunc</code> is <code>np.mean</code>. It is easy forget for it:</p>
+
+<pre><code>pivoting = pd.pivot_table(df, 
+                          index=['SOURCE OF BUSINESS'], 
+                          values=['INCOME'], 
+                          aggfunc=np.mean)
+</code></pre>
+
+<p>I think you need <code>aggfunc=np.sum</code>:</p>
+
+<pre><code>print df
+     A    B      C  D
+0  zoo  one  small  1
+1  zoo  one  large  2
+2  zoo  one  large  2
+3  foo  two  small  3
+4  foo  two  small  3
+5  bar  one  large  4
+6  bar  one  small  5
+7  bar  two  small  6
+8  bar  two  large  7
+
+print pd.pivot_table(df, values='D', index=['A'], aggfunc=np.sum)
+A
+bar    22
+foo     6
+zoo     5
+Name: D, dtype: int64
+
+df1 = df.groupby('A')['D'].sum()
+print df1
+A
+bar    22
+foo     6
+zoo     5
+Name: D, dtype: int64
+</code></pre>
+
+<p>If you need add <code>Total</code> to Series, use <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.Series.loc.html" rel="nofollow"><code>loc</code></a> and <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.Series.sum.html" rel="nofollow"><code>sum</code></a>:</p>
+
+<pre><code>print df1.sum()
+33
+
+df1.loc['Total'] = df1.sum()
+print df1
+A
+bar      22
+foo       6
+zoo       5
+Total    33
+Name: D, dtype: int64
+</code></pre>
+
+<p><strong>Timings</strong>:</p>
+
+<pre><code>In [111]: %timeit df.groupby('A')['D'].sum()
+1000 loops, best of 3: 581 Âµs per loop
+
+In [112]: %timeit pd.pivot_table(df, values='D', index=['A'], aggfunc=np.sum)
+100 loops, best of 3: 2.28 ms per loop
+</code></pre>
+
+<p>Adding <code>Total</code> in your <code>df</code> by <a href="http://pandas.pydata.org/pandas-docs/stable/indexing.html#setting-with-enlargement" rel="nofollow">setting with enlargement</a>:</p>
+
+<pre><code>print df
+                              INCOME
+SOURCE OF BUSINESS                  
+BYD - Other                    500.0
+BYD - Retail                  1584.0
+BYD - Transport              42498.0
+BYD Beverage - A La Carte    39401.5
+BYD Food - A La Carte        68365.0
+BYD Food - Catering Banquet  53796.0
+BYD Rooms                     5148.0
+GS - Retail                    386.0
+GS Food - A La Carte            48.0
+Orchard Retail                 130.0
+SCH - Food - A La Carte         96.0
+SCH - Retail                   375.4
+SCH - Transport                888.0
+SCH Beverage - A La Carte      119.0
+Spa                           3052.0
+XLM Beverage - A La Carte       38.0
+</code></pre>
+
+
+
+<pre><code>df.loc['Total', 'INCOME'] = df['INCOME'].sum()
+print df
+                               INCOME
+SOURCE OF BUSINESS                   
+BYD - Other                     500.0
+BYD - Retail                   1584.0
+BYD - Transport               42498.0
+BYD Beverage - A La Carte     39401.5
+BYD Food - A La Carte         68365.0
+BYD Food - Catering Banquet   53796.0
+BYD Rooms                      5148.0
+GS - Retail                     386.0
+GS Food - A La Carte             48.0
+Orchard Retail                  130.0
+SCH - Food - A La Carte          96.0
+SCH - Retail                    375.4
+SCH - Transport                 888.0
+SCH Beverage - A La Carte       119.0
+Spa                            3052.0
+XLM Beverage - A La Carte        38.0
+Total                        216424.9
+</code></pre>

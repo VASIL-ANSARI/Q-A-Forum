@@ -1,0 +1,73 @@
+<p><strong>Error #1:</strong></p>
+
+<p>Let's start with a small test that doesn't involve iText in any way. Try this:</p>
+
+<pre><code>byte[] test = "Test".getBytes();
+System.out.println("Test " + test);
+</code></pre>
+
+<p>What is written to the output? In my case, it's:</p>
+
+<pre><code>Test [B@3da3da69
+</code></pre>
+
+<p>The <code>[</code> indicates that I am trying to convert an array to a <code>String</code>; the <code>B</code> indicates that the array contains bytes; the <code>@</code> separates the type from the ID; the characters that follow are the ID in hexadecimal format (a hashcode). See <a href="http://stackoverflow.com/questions/1040868/java-syntax-and-meaning-behind-b1ef9157-binary-address">Java: Syntax and meaning behind &quot;[B@1ef9157&quot;? Binary/Address?</a></p>
+
+<p>If <code>result</code> is of type <code>byte[]</code> and you have this line:</p>
+
+<pre><code>Window.open("data:application/pdf;base64,"+result,"_parent", "location=no");
+</code></pre>
+
+<p>Then <code>"data:application/pdf;base64,"+result</code> results in something like <code>"data:application/pdf;base64,[B@154"</code>. That doesn't make any sense, does it?</p>
+
+<p>Now try this:</p>
+
+<pre><code>byte[] test = "Test".getBytes();
+System.out.println("Test " + new String(test));
+</code></pre>
+
+<p>The output is:</p>
+
+<pre><code>Test Test
+</code></pre>
+
+<p>You were using a <code>byte[]</code> as if it was a <code>String</code>. This is your first error.</p>
+
+<p>I was going to say something nasty because this is not an error that a Java developer would make. However, I've just read your bio, and I see that you're new at Java and you are (probably) teaching yourself how to code in Java (just like I did 20 years ago), so I censored myself ;-)</p>
+
+<p><strong>Error #2:</strong></p>
+
+<p>You can not solve your problem by replacing your code by:</p>
+
+<pre><code>Window.open("data:application/pdf;base64,"+ new String(result),"_parent", "location=no");
+</code></pre>
+
+<p>You can't do that because you are making a second error: the bytes in <code>result</code> represent a <em>binary file</em>, and the JavaScript in your browser expects a Base64 encoded file. Base64 encoding is used to convert binary to text, and vice-versa. See <a href="http://stackoverflow.com/questions/201479/what-is-base-64-encoding-used-for">What is base 64 encoding used for?</a></p>
+
+<p>If you want to send the binary PDF file to the browser as a Base64-encoded string, you have to Base64 encode your bytes. This can be done with this class: <a href="http://itextsupport.com/apidocs/itext5/latest/com/itextpdf/text/pdf/codec/Base64.html" rel="nofollow">http://itextsupport.com/apidocs/itext5/latest/com/itextpdf/text/pdf/codec/Base64.html</a></p>
+
+<p>For instance:</p>
+
+<pre><code>Window.open("data:application/pdf;base64,"+ Base64.encodeBytes(result),"_parent", "location=no");
+</code></pre>
+
+<p>This should already work for some browsers, but not for all. I have no idea where you are using <code>Window.open()</code>, nor why you want to involve Base64. You may want to elaborate on that. In my opinion, it's a bad idea.</p>
+
+<p><strong>How it should be done:</strong></p>
+
+<p>Typically, you will write a <code>Servlet</code> that runs in an application server. That servlet can be reached from a browser using a URL. <strong>You do not need to save the generated file on the server</strong> as suggested in the other answer (I down-voted that answer because it is not helpful and totally wrong). Your approach that creates a <code>ByteArrayOutputStream</code> and then gets a <code>byte[]</code> is correct, but you have to serve those bytes to a <code>HttpServletResponse</code> object.</p>
+
+<p>See <a href="http://stackoverflow.com/questions/30456901/how-can-i-serve-a-pdf-to-a-browser-without-storing-a-file-on-the-server-side">How can I serve a PDF to a browser without storing a file on the server side?</a> for a full example.</p>
+
+<p><strong>Regarding Window.open()</strong></p>
+
+<p>You can use <code>Window.open()</code> on the client side, to open a web page in a new window. For instance:</p>
+
+<pre><code>window.open("http://www.itextpdf.com");
+</code></pre>
+
+<p>You can serve a page that has contains this snippet, but in your case, you have to replace <code>http://www.itextpdf.com</code> with the URL that was defined for your servlet.</p>
+
+<p>You may have found your "solution" here: <a href="http://stackoverflow.com/questions/2805330/opening-pdf-string-in-new-window-with-javascript">Opening PDF String in new window with javascript</a></p>
+
+<p>But if you read the comments, you'll notice that this approach is problematic in combination with some browsers.</p>

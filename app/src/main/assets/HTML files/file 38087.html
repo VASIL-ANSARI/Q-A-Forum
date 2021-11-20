@@ -1,0 +1,190 @@
+<p>Here's what I did to achieve this :</p>
+
+<p>This a store procedure :</p>
+
+<pre><code>CREATE proc [dbo].[getTreeStructureForMember]
+(
+   @uplineID nvarchar(50)
+)
+as
+begin
+
+    select * from Member_detail where SponsorID=@uplineID order by JoiningDate
+
+end
+</code></pre>
+
+<p>In the controller:</p>
+
+<pre><code>    public ActionResult MemberTreeStructure()
+    {
+        return View();
+    }
+
+    public List&lt;getTreeStructureForMember_Result&gt; getTree(string MemberID)
+    {
+        var data = db.getTreeStructureForMember(MemberID).ToList();
+
+        return data;
+    }
+
+    public JsonResult getTreeDownline(string MemberID)
+    {
+        var data = getTree(MemberID);
+
+        return Json(data, JsonRequestBehavior.AllowGet);
+    } 
+</code></pre>
+
+<p>In View :</p>
+
+<pre><code>    &lt;script type="text/javascript"&gt;
+    $(document).ready(function () {
+    $('#btnShow').click(function () {
+        var memberid = $('#txtMemberID').val();
+        if (memberid == '') {
+            $('#txtMemberID').addClass('ErrorControl');
+            return false;
+        }
+
+        $("#btnShow").css({ display: "none" });
+        $("#loader").css({ display: "inline" });
+
+        $.post('/Member/tree',
+        {
+            "MemberID": memberid
+        },
+        function (data, status) {
+
+
+            $("#loader").css({ display: "none" });
+            $("#btnShow").css({ display: "inline" });
+            $("#result").html(data);
+
+        });
+
+    });
+
+     $(document).on('click','.tree li.parent_li &gt; span', function (e) {
+            var children = $(this).parent('li.parent_li').find(' &gt; ul &gt; li');
+            if (children.is(":visible")) {
+                children.hide('fast');
+                $(this).attr('title', 'Expand this tree').find(' &gt; i').addClass('icon-plus-sign').removeClass('icon-minus-sign');
+            } else {
+                children.show('fast');
+                $(this).attr('title', 'Collapse this tree').find(' &gt; i').addClass('icon-minus-sign').removeClass('icon-plus-sign');
+            }
+            e.stopPropagation();
+        }); 
+
+});
+ &lt;/script&gt;
+
+ &lt;div class="table-section"&gt;
+  &lt;table width="100%" border="0" cellspacing="0" cellpadding="0" class="table-style"&gt;
+    &lt;tr&gt;
+        &lt;td style="width: 25%"&gt;
+        &lt;/td&gt;
+        &lt;td style="width: 25%"&gt;
+            &lt;input type="text" id="txtMemberID" class="textfield" /&gt;
+        &lt;/td&gt;
+        &lt;td style="width: 25%"&gt;
+            &lt;input type="button" value="Show" class="normal-button2" id="btnShow" /&gt;
+            &lt;img id="loader" src="../../Content/BlueOpal/loading.gif" style="display: none; vertical-align: bottom" /&gt;
+        &lt;/td&gt;
+        &lt;td style="width: 25%"&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;div id="result" class="tree"&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>and in the css :</p>
+
+<pre><code>  .tree
+{
+    /*min-height: 20px;*/
+    height:auto;
+    padding: 19px;
+    margin-bottom: 20px;
+    background-color: #fbfbfb;
+    border: 1px solid #999;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    -moz-box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+.tree li
+{
+    list-style-type: none;
+    margin: 0 0 0 70px;
+    padding: 10px 5px 0 5px;
+    position: relative;
+}
+.tree li::before, .tree li::after
+{
+    content: '';
+    left: -36px;
+    position: absolute;
+    right: auto;
+}
+.tree li::before
+{
+    border-left: 1px solid #999;
+    bottom: 50px;
+    height: 100%;
+    top: 0;
+    width: 1px;
+}
+.tree li::after
+{
+    border-top: 1px solid #999;
+    height: 20px;
+    top: 25px;
+    width: 41px;
+}
+.tree li span
+{
+    -moz-border-radius: 5px;
+    -webkit-border-radius: 5px;
+    border: 1px solid #999;
+    border-radius: 5px;
+    display: inline-block;
+    padding: 3px 8px;
+    text-decoration: none;
+}
+.tree li.parent_li &gt; span
+{
+    cursor: pointer;
+}
+.tree &gt; ul &gt; li::before, .tree &gt; ul &gt; li::after
+{
+    border: 0;
+}
+.tree li:last-child::before
+{
+    height: 30px;
+}
+.tree li.parent_li &gt; span:hover, .tree li.parent_li &gt; span:hover + ul li span
+{
+    background: #eee;
+    border: 1px solid #94a0b4;
+    color: #000;
+}
+.icon-minus-sign
+{
+        background: url(../Images/minusTree.png) no-repeat;
+        margin: 0;
+        padding: 0 6px 0 9px;
+}
+.icon-plus-sign
+{
+        background: url(../Images/plusTree.png) no-repeat;
+        margin: 0;
+        padding: 0 6px 0 9px;
+}
+</code></pre>

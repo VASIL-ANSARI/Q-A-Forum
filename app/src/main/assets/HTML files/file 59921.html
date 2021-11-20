@@ -1,0 +1,105 @@
+<p>I took your code and shrunk it down a bit for testing, and it's working. (note Firebase 2.x on OS X and Swift 3 but the code is similar)</p>
+
+<p>Firebase structure:</p>
+
+<pre><code>  "what-am" : {
+    "results" : [ {
+      "code" : "738/B738",
+      "data" : "Boeing",
+      "engines" : "Rolls"
+    }, {
+      "code" : "727/B727",
+      "data" : "Boeing",
+      "engines" : "Pratt"
+    } ]
+  }
+</code></pre>
+
+<p>Here's the Planes struct</p>
+
+<pre><code>struct Planes {
+
+    var code:String!
+    var data: String!
+    var engines: String!
+
+    init(code: String, data: String, engines: String ) {
+
+        self.code = code
+        self.data = data
+        self.engines = engines
+    }
+
+    init(snapshot: FDataSnapshot) {
+
+        let snapshotValue = snapshot.value as! [String:AnyObject]
+
+        code = snapshotValue["code"] as! String
+        data = snapshotValue["data"] as! String
+        engines = snapshotValue["engines"] as! String
+    }
+}
+</code></pre>
+
+<p>and then the code that reads in two planes, populates and array and then prints the array.</p>
+
+<pre><code>let ref = self.myRootRef.child(byAppendingPath: "what-am/results")!
+
+ref.observe(.value, with: { snapshot in
+
+        if ( snapshot!.value is NSNull ) {
+            print("not found")
+        } else {
+
+            var newItems: [Planes] = []
+
+            for item in (snapshot?.children)! {
+                let planesItem = Planes(snapshot: item as! FDataSnapshot)
+                newItems.append(planesItem)
+            }
+
+            self.planes = newItems
+            print(self.planes)
+
+        }
+})
+</code></pre>
+
+<p>and finally the output</p>
+
+<pre><code>[Swift_Firebase_Test.Planes(code: 738/B738, data: Boeing, engines: Rolls),
+ Swift_Firebase_Test.Planes(code: 727/B727, data: Boeing, engines: Pratt)]
+</code></pre>
+
+<p>Key and name are nil as I removed then from the Planes structure.</p>
+
+<p>The line you asked about</p>
+
+<pre><code>let snapshotValue = snapshot.value as! [String:AnyObject]
+</code></pre>
+
+<p>is valid as the snapshot contains a series of key:value pairs so String:AnyObject works.</p>
+
+<p>This line changed due to Swift 3</p>
+
+<pre><code>for item in (snapshot?.children)!
+</code></pre>
+
+<p>but other than that, the code works.</p>
+
+<p>Try this to ensure you are reading the correct node. This reads the above structure and prints out each engine type. (tested and works)</p>
+
+<pre><code> let ref = self.myRootRef.child(byAppendingPath: "what-am/results")!
+ ref.observe(.value, with: { snapshot in
+      if ( snapshot!.value is NSNull ) {
+           print("not found")
+      } else {
+           for child in (snapshot?.children)! {
+                let snap = child as! FDataSnapshot
+                let dict = snap.value as! [String: String]
+                let engines = dict["engines"]
+                print(engines!)
+           }    
+      }
+ })
+</code></pre>

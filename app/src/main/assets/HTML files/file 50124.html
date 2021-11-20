@@ -1,0 +1,84 @@
+<p>I guess what you are looking for is called <a href="https://en.wikipedia.org/wiki/Proxy_pattern" rel="nofollow">proxy pattern</a>.</p>
+
+<p>A proxy is (as the name implies) an object that takes place of another object that is not available at the moment.</p>
+
+<p>You might want to implement it using <code>java.util.Observable</code> in this way</p>
+
+<pre><code>public class ObservableProxy extends Observable {
+
+
+    private ObservableProxyAdapter observableProxyAdapter = new ObservableProxyAdapter();
+
+    private Observable target;
+
+    public void setTarget(Observable target) {
+        if(this.target != null){
+            // if this proxy was connected to an observer... disconnect
+            this.target.deleteObserver(observableProxyAdapter);
+        }
+
+        this.target = target;
+
+        if(this.target != null){
+            // If a new target is set... connect to it
+            this.target.addObserver(observableProxyAdapter);
+        }
+    }
+
+
+    private class ObservableProxyAdapter implements Observer {
+
+        public void update(Observable o, Object arg) {
+            // forward notifications from the target
+            setChanged();
+            notifyObservers(arg);
+
+        }
+
+    }
+
+}
+</code></pre>
+
+<p>You hand out the <code>ObservableProxy</code> to clients. Clients can register themselves to the <code>ObservableProxy</code>. Later when the 'real' Observable becomes available, you can set it as the target of the <code>ObservableProxy</code>. The proxy registers itself as an <code>Observer</code> to the target and forwards notifications to it's Observers.</p>
+
+<pre><code>+-----------------+  notify  +---------------+   notify   +--------------+
+| real observable |  ------&gt; | proxy adapter |   ------&gt;  | observables  |
++-----------------+          +---------------+            |  of proxy    |
+                                                          +--------------+
+</code></pre>
+
+<p>Here is an example application</p>
+
+<pre><code>public class ObservableProxyTest {
+
+    public static void main(String[] args) {
+        ObservableProxy observableProxy = new ObservableProxy();
+
+        Observer someObserver = new Observer() {
+
+            public void update(Observable o, Object arg) {
+                System.out.println(arg);
+            }
+        };
+        observableProxy.addObserver(someObserver);
+
+
+        // Later the real observer becomes available
+        RealObservable realProxy = new RealObservable();
+        observableProxy.setTarget(realProxy);
+
+
+        // notifications will be forwarded
+        realProxy.notifyHello();
+    }
+
+    private static class RealObservable extends Observable {
+
+        public void notifyHello(){
+            setChanged();
+            super.notifyObservers("Hello World");
+        }
+    }
+}
+</code></pre>

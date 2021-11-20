@@ -1,0 +1,89 @@
+<h2>Sole PUB/SUB gives no means to create this</h2>
+
+<p><code>ZeroMQ</code> is a powerfull toolbox both conceptually and practically. One shall not try to "bend" library primitives --- that are on their own to be understood rather as just building blocks for more complex messaging &amp; signalling purposes, than a real-life solutions --- so as to do things that were not principally covered in the initial <strong>S</strong>caleable <strong>F</strong>ormal <strong>C</strong>ommunication <strong>P</strong>attern design archetype.</p>
+
+<p><strong><code>PUB/SUB</code></strong> archetype does <strong>just</strong> <code>PUB/SUB</code>.</p>
+
+<p><strong><code>PUB</code></strong>-broadcasts to all, if any, <code>SUB</code>s present at the very moment
+<br>&amp;<br>
+each, if any, <strong><code>SUB</code></strong> listens to what has arrived
+<br>( and if anything did arrive, it applies filter ... yes, filtering on <code>SUB</code>-side loads network ... )</p>
+
+<hr>
+
+<h2>Still - one may design a multi-archetype approach to solve this.</h2>
+
+<p>Let me sketch a basic scheme for the most straightforward one.</p>
+
+<p>Assuming you are in a full control of the both sides ( design-wise &amp; implementation-wise )</p>
+
+<pre><code># /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+#
+# [Side A]
+#        |_____aKnockSOCK = context.socket( zmq.PAIR )
+#        |     + .setsockopt( zmq.CONFLATE )
+#        |     + .bind()
+#        |
+#        |_____anEmitSOCK = context.socket( zmq.PUB )
+#              + .bind()
+#
+isNotReceivedSigEXIT  = False
+while( isNotReceviedSigEXIT ):
+       if ( 0 == aKnockSOCK.poll( aFastPollIN, zmq.POLLIN ) ):
+           # nobody new knocking to setup ...
+           # ------------------------------------------------
+           # do the main job,
+           #    with countdown segmentation
+           #    to escape to the outer loop
+           #    so as to check for new SUB-s
+           #    knocking as they come to the show
+           # ------------------------------------------------
+       else:
+           aKnockSOCK.send( "aKnockSOCK ACK: service is ready. Go .connect()" )
+#
+# --------------------------------------------------------
+# ZeroMQ resources gracefull termination 
+#        socket closes + context dismantle &amp; clean exit
+
+
+
+# /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+#
+#[Side B]
+#        |_____aKnockSOCK = context.socket( zmq.PAIR )
+#        |     + .setsockopt( zmq.CONFLATE )
+#        |
+#        |_____aRecvrSOCK = context.socket( zmq.SUB )
+#
+#
+isToBreakEXIT = False
+for nthAttempt in range( 10 ):
+    if ( isToBreakEXIT ):
+         break
+    try:
+          aKnockSOCK.connect( ... )
+    except:
+          ReportConnectERROR( ... )
+          sleep( ... )
+          continue
+    # ---------------------------------- once local aKnockSOCK got instantiated
+    for kthPoll in range( 10 ):
+        if ( 0 == aKnockSOCK.poll( aLongPollIN, zmq.POLLIN ) ):
+           sleep( thisCouldBeAddedToLongPollIN )
+        else:
+           # ----------------------------------------- .recv() + dismantle
+           aKnockSOCK.recv()
+           aKnockSOCK.setsockopt( zmq.LINGER, 0 )
+           aKnockSOCK.close()
+           # ----------------------------------------- .connect() + use
+           aRecvrSOCK.connect( ... )
+           aRecvrSOCK.setsockopt( zmq.SUBSCRIBE, ... )
+           # ----------------------------------------- [Side B] main job start
+           # ----------------------------------------- [Side B] main job end
+           isToBreakEXIT = True
+           break
+    pass
+# --------------------------------------------------------
+# ZeroMQ resources gracefull termination 
+#        socket closes + context dismantle &amp; clean exit
+</code></pre>

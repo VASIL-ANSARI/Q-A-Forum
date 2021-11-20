@@ -1,0 +1,27 @@
+<p>Here is my "hacking" solution that seem to be works:</p>
+
+<pre><code>private static Action&lt;XmlSchemaSet, DataSet&gt; GetLoadSchemaMethod()
+{
+    var type = (from aN in Assembly.GetExecutingAssembly().GetReferencedAssemblies()
+        where aN.FullName.StartsWith("System.Data")
+        let t = Assembly.Load(aN).GetType("System.Data.XSDSchema")
+        where t != null
+        select t).FirstOrDefault();
+
+    var pschema = Expression.Parameter(typeof (XmlSchemaSet));
+    var pdataset = Expression.Parameter(typeof (DataSet));
+    var exp = Expression.Lambda&lt;Action&lt;XmlSchemaSet, DataSet&gt;&gt;(Expression.Call
+        (Expression.New(type.GetConstructor(new Type[] {}), new Expression[] {}),
+            type.GetMethod("LoadSchema", new[]
+            {
+                typeof (XmlSchemaSet), typeof (DataSet)
+            }), new Expression[]
+            {
+                pschema, pdataset
+            }), new[] {pschema, pdataset});
+
+    return exp.Compile();
+}
+</code></pre>
+
+<p>However I still prefer not to do hacking.</p>

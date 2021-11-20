@@ -1,0 +1,87 @@
+<p>A couple of years later I tried this and  think I got it to work with no re-scaling needed for the data. Bandwidth values do need some scaling though:</p>
+
+<pre><code># For sklearn
+bw = 0.15
+
+# For scipy
+bw = 0.15/x.std(ddof=1)
+</code></pre>
+
+<p>The evaluation of both KDEs for the same point is not exactly equal. For example here's an evaluation for the <code>(x1, y1)</code> point:</p>
+
+<pre><code>iso1 =  0.00984751705005  # Scipy
+iso2 =  0.00989788224787  # Sklearn
+</code></pre>
+
+<p>but I guess it's close enough.</p>
+
+<p>Here's the MWE for the 2D case and the output which, as far as I can see, look almost exactly the same:</p>
+
+<p><a href="http://i.stack.imgur.com/cDHKs.jpg" rel="nofollow"><img src="http://i.stack.imgur.com/cDHKs.jpg" alt="enter image description here"></a></p>
+
+<pre><code>import numpy as np
+from scipy import stats
+from sklearn.neighbors import KernelDensity
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
+# Generate random data.
+n = 1000
+m1, m2 = np.random.normal(-3., 3., size=n), np.random.normal(-3., 3., size=n)
+# Define limits.
+xmin, xmax = min(m1), max(m1)
+ymin, ymax = min(m2), max(m2)
+ext_range = [xmin, xmax, ymin, ymax]
+# Format data.
+x, y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+positions = np.vstack([x.ravel(), y.ravel()])
+values = np.vstack([m1, m2])
+
+# Define some point to evaluate the KDEs.
+x1, y1 = 0.5, 0.5
+# Bandwidth value.
+bw = 0.15
+
+# -------------------------------------------------------
+# Perform a kernel density estimate on the data using scipy.
+# **Bandwidth needs to be scaled to match Sklearn results**
+kernel = stats.gaussian_kde(
+    values, bw_method=bw/np.asarray(values).std(ddof=1))
+# Get KDE value for the point.
+iso1 = kernel((x1, y1))
+print 'iso1 = ', iso1[0]
+
+# -------------------------------------------------------
+# Perform a kernel density estimate on the data using sklearn.
+kernel_sk = KernelDensity(kernel='gaussian', bandwidth=bw).fit(zip(*values))
+# Get KDE value for the point. Use exponential since sklearn returns the
+# log values
+iso2 = np.exp(kernel_sk.score_samples([[x1, y1]]))
+print 'iso2 = ', iso2[0]
+
+
+# Plot
+fig = plt.figure(figsize=(10, 10))
+gs = gridspec.GridSpec(1, 2)
+
+# Scipy
+plt.subplot(gs[0])
+plt.title("Scipy", x=0.5, y=0.92, fontsize=10)
+# Evaluate kernel in grid positions.
+k_pos = kernel(positions)
+kde = np.reshape(k_pos.T, x.shape)
+plt.imshow(np.rot90(kde), cmap=plt.cm.YlOrBr, extent=ext_range)
+plt.contour(x, y, kde, 5, colors='k', linewidths=0.6)
+
+# Sklearn
+plt.subplot(gs[1])
+plt.title("Sklearn", x=0.5, y=0.92, fontsize=10)
+# Evaluate kernel in grid positions.
+k_pos2 = np.exp(kernel_sk.score_samples(zip(*positions)))
+kde2 = np.reshape(k_pos2.T, x.shape)
+plt.imshow(np.rot90(kde2), cmap=plt.cm.YlOrBr, extent=ext_range)
+plt.contour(x, y, kde2, 5, colors='k', linewidths=0.6)
+
+fig.tight_layout()
+plt.savefig('KDEs', dpi=300, bbox_inches='tight')
+</code></pre>

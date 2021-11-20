@@ -1,0 +1,84 @@
+<p>If the lines are just short and there aren't many of them, you could use <code>realloc</code> to reallocate memory as needed. Or you can use smaller (or larger) chunks and reallocate. It's a little more wasteful but hopefully it should average out in the end.</p>
+
+<p>If you want to use just one allocation, then find the start of the next non-empty line and save the file position (use <code>ftell</code>). Then get the difference between the current position and the previous start position and you know how much memory to allocate. For the reading yes you have to seek back and forth but if it's not to big all data will be in the buffer to it's just modifying some pointers. After reading then seek to the saved position and make it the next start position.</p>
+
+<p>Then you could of course the possibility to <a href="https://en.wikipedia.org/wiki/Memory-mapped_file" rel="nofollow">memory-map the file</a>. This will put the file contents into your memory map like it was all allocated. For a 64-bit system the address space is big enough so you should be able to map multi-gigabyte files. Then you don't need to seek or allocate memory, all you do is manipulate pointers instead of seeking. Reading is just a simply memory copying (but then since the file is "in" memory already you don't really need it, just save the pointers instead).</p>
+
+<hr>
+
+<p>For a <em>very</em> simple example on <a href="http://en.cppreference.com/w/c/io/fseek" rel="nofollow"><code>fseek</code></a> and <a href="http://en.cppreference.com/w/c/io/ftell" rel="nofollow"><code>ftell</code></a>, that is somewhat related to your problem, I put together this little program for you. It doesn't really do anything special but it shows how to use the functions in a way that could be used for a prototype of the second method I discussed above.</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(void)
+{
+    FILE *file = fopen("some_text_file.txt", "r");
+
+    // The position after a successful open call is always zero
+    long start_of_line = 0;
+
+    int ch;
+
+    // Read characters until we reach the end of the file or there is an error
+    while ((ch = fgetc(file)) != EOF)
+    {
+        // Hit the *first* newline (which differs from your problem)
+        if (ch == '\n')
+        {
+            // Found the first newline, get the current position
+            // Note that the current position is the position *after* the newly read newline
+            long current_position = ftell(file);
+
+            // Allocate enough memory for the whole line, including newline
+            size_t bytes_in_line = current_position - start_of_line;
+            char *current_line = malloc(bytes_in_line + 1);  // +1 for the string terminator
+
+            // Now seek back to the start of the line
+            fseek(file, start_of_line, SEEK_SET);  // SEEK_SET means the offset is from the beginning of the file
+
+            // And read the line into the buffer we just allocated
+            fread(current_line, 1, bytes_in_line, file);
+
+            // Terminate the string
+            current_line[bytes_in_line] = '\0';
+
+            // At this point, if everything went well, the file position is
+            // back at current_position, because the fread call advanced the position
+            // This position is the start of the next line, so we use it
+            start_of_line = current_position;
+
+            // Then do something with the line...
+            printf("Read a line: %s", current_line);
+
+            // Finally free the memory we allocated
+            free(current_line);
+        }
+
+        // Continue loop reading character, to read the next line
+    }
+
+    // Did we hit end of the file, or an error?
+    if (feof(file))
+    {
+        // End of the file it is
+
+        // Now here's the tricky bit. Because files doesn't have to terminated
+        // with a newline, at this point we could actually have some data we
+        // haven't read. That means we have to do the whole thing above with
+        // the allocation, seeking and reading *again*
+
+        // This is a good reason to extract that code into its own function so
+        // you don't have to repeat it
+
+        // I will not repeat the code my self. Creating a function containing it
+        // and calling it is left as an exercise
+    }
+
+    fclose(file);
+
+    return 0;
+}
+</code></pre>
+
+<p>Please note that for brevity's sake the program doesn't contain any error handling. It should also be noted that I haven't actually <em>tried</em> the program, not even tried to compile it. It's all written  ad hoc for this answer.</p>

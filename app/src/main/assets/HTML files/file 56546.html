@@ -1,0 +1,60 @@
+<p>Is there some reason you're using an unsafe struct?  Can you not use marshalling attributes?  See <a href="https://msdn.microsoft.com/en-us/library/eshywdt7(v=vs.110).aspx" rel="nofollow">https://msdn.microsoft.com/en-us/library/eshywdt7(v=vs.110).aspx</a></p>
+
+<p>Regardless, you need to know how you're converting from a C# string to a byte array, and that depends on what encoding your C++ DLL expects that string to be in.  For example, on Windows, it is often the "ANSI code page", but on Linux/Unix it might be either "current locale" or explicitly "UTF-8".  </p>
+
+<p>So, one option that gives you the most control over the encoding would be to do somethiing like:</p>
+
+<pre><code>    [StructLayout(LayoutKind.Sequential)]
+    public struct MyDllInput
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 288)]
+        public int[] SomeList;
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public byte[] PathToData;
+    }
+    public static void Main()
+    {
+        MyDllInput dllInput = new MyDllInput()
+        {
+            SomeList = new int[288],
+            PathToData = new byte[256]
+        };
+
+        var listData = new int[] { 0, 12, 33, 67, 93 };
+        Array.Copy(listData, dllInput.SomeList, listData.Length);
+
+        var pathToDataBytes = Encoding.UTF8.GetBytes("C:\\some\\path\\to\\data");
+        Array.Copy(pathToDataBytes, dllInput.PathToData, pathToDataBytes.Length);
+    }
+</code></pre>
+
+<p>Alternatively, instead of doing the encoding conversion directly, you can try declaring the PathToData as a string and then using a marshalling attribute to have C# convert it for you; see <a href="https://msdn.microsoft.com/en-us/library/s9ts558h(v=vs.110).aspx" rel="nofollow">https://msdn.microsoft.com/en-us/library/s9ts558h(v=vs.110).aspx</a>:</p>
+
+<pre><code>    [StructLayout(LayoutKind.Sequential)]
+    public struct MyDllInput
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 288)]
+        public int[] SomeList;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst =256)]
+        public String PathToData;
+    }
+    public static void Main()
+    {
+        MyDllInput dllInput = new MyDllInput()
+        {
+            SomeList = new int[288],
+            PathToData = "C:\\some\\path\\to\\data"
+        };            
+
+        var listData = new int[] { 0, 12, 33, 67, 93 };
+        Array.Copy(listData, dllInput.SomeList, listData.Length);
+    }
+</code></pre>
+
+<p>In the second case, it's important that when you declare EntryPoint you set the CharSet property on the DllImportAttribute to get the string conversion to happen the way you want.  In your case, you <em>probably</em> want CharSet.Ansi since your DLL takes a char* and not a wchar_t*.  For example,</p>
+
+<pre><code>    [DllImport("MyDll.dll", CharSet = CharSet.Ansi)]
+    private static extern void EntryPoint(ref MyDllInput input);
+</code></pre>

@@ -1,0 +1,85 @@
+<p>Well, from the looks of it, it's a small mistake. When evaluating your $VersionBuild, you don't have any <em>else</em> statements. So if it fails the first evaluation:</p>
+
+<pre><code>if($versionBuild -eq $vs2008r2sp2)
+</code></pre>
+
+<p>Then it won't continue, and evaluate if it could be the other versions.</p>
+
+<p>The other thing I would do is instead of using <code>-eq</code> in your if statements, use <code>-match</code> and shorten your version string. That way if your version string has a better chance of matching if the version string doesn't match exactly. e.g. You were trying to check the version <code>$vs2005sp4 = "9.00.5000";</code> but the VersionString property is going to return <code>"9.00.5000.00"</code> which if you use <code>-eq</code> doesn't work, but if you use <code>-match</code> it will work.</p>
+
+<p>So, adding in the else statements, shortening the version strings, and using <code>-match</code> your code block will look something like this:</p>
+
+<pre><code># Sets the server versions
+$vs2005sp4 = "9.00.5000";
+$vs2008sp3 = "10.00.5500";
+$vs2008r2sp2 = "10.50.4000";
+
+#...
+
+    # Set background color to green if service pack is 2008r2 SP2
+    if($versionBuild -match $vs2008r2sp2)
+    {
+        $color = $greenColor           
+}
+else
+{
+        # Set background color to yellow if service pack is 2008 SP3
+        if($versionBuild -match $vs2008sp3)
+        {
+            $color = $yellowColor
+    }
+    else
+    {
+            # Set background color to orange if service pack is 2005 SP4
+            if($versionBuild -match $vs2005sp4)
+            {
+                $color = $orangeColor   
+
+                # Create table data rows 
+                #&lt;td width='15%' align='center'&gt;$instanceID&lt;/td&gt;
+                $dataRow = "
+                    &lt;tr&gt;
+                        &lt;td width='10%'&gt;$computer&lt;/td&gt;                        
+                        &lt;td width='5%' align='center'&gt;$versionBuild&lt;/td&gt;
+                        &lt;td width='10%' align='center'&gt;$versionName&lt;/td&gt;
+                    &lt;/tr&gt;
+                "
+    }
+    else
+    {
+                # If statement needed to remove label that were null
+                If ($versionID -ne 'null') 
+                {
+                    Add-Content $servicePackReport $dataRow;
+                    Write-Host -ForegroundColor DarkYellow "$computer $deviceID service pack build = $versionBuild";
+                    $i++        
+                }
+            }
+        }
+    }
+</code></pre>
+
+<p>-- Edit</p>
+
+<p>To answer @user1700796's question, I think that the real issue that @user1700796's encountering is that this script will not work against SQL servers that have multiple instances. i.e. when you get the Smo.Server object:</p>
+
+<pre><code>$svcPacks = New-Object -typeName Microsoft.SqlServer.Management.Smo.Server($computer)
+</code></pre>
+
+<p>Where <code>$computer</code> is a <strong>server name</strong>, and on that server there is multiple instances; a <strong>single</strong> Smo.Server object is returned, which is essentially empty. i.e. pulling the VersionString returns an empty string.</p>
+
+<p>If instead, you run the same command, except you put in the full SQL server name + the instance name, for each instance, then the Smo.Server object returns the correct information. </p>
+
+<p>This is because the Smo.Server object uses a SQL connection string to connect to the SQL server (see the <code>ConnectionContext</code> property), and it can only connect to a single instance at a time, and does not enumerate through your instances as you might have been expecting.</p>
+
+<p>So, instead of using the foreach loop on the Smo.Server object, you need to:</p>
+
+<ul>
+<li>First use a couple of commands to take the computer name and enumerate the names of the SQL server instances on that box
+<ul>
+<li>For ex. See: <a href="http://stackoverflow.com/questions/7516337/powershell-list-all-sql-instances-on-my-system.">PowerShell list all SQL instances on my system</a></li>
+</ul></li>
+<li>Take those SQL server instances, and <em>then</em> do a foreach loop on those names</li>
+<li>You use those SQL Server instance names to get your Smo.Server object</li>
+<li>Then you can then pull the version string from the Smo.Server object.</li>
+</ul>

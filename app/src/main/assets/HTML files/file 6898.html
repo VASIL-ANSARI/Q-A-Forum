@@ -1,0 +1,54 @@
+<p>It can be done when you invoke msdeploy manually - just add the following parameter:</p>
+
+<pre><code>-skip:Directory=\\App_Data
+</code></pre>
+
+<p>See <a href="http://technet.microsoft.com/en-us/library/dd569089%28WS.10%29.aspx">Web Deploy Operation Settings</a>. The path is a regular expression, so it is quite flexible.</p>
+
+<p>If you deploy using the VS-generated ProjectName.deploy.cmd script, you can also pass this parameter in the _MsDeployAdditionalFlags environment variable (when running that script).</p>
+
+<p>This is the best I've come up with for our needs (we have a similar situation as you). I haven't tried integrating it with VS's Publish button, since we deploy from command line.</p>
+
+<p><strong>EDIT:</strong></p>
+
+<p>I have learned a few things about MSDeploy since I posted this answer, so I thought I'd update it now.</p>
+
+<p>First of all, the above skip rule skips any operations on the matching path (App_Data). If more granular control is needed, a more verbose syntax is available. For example, to skip only deletes (to keep any extra files on target server, but add any new ones and update existing ones):</p>
+
+<pre><code>-skip:skipaction='Delete',objectname='filePath',absolutepath='\\App_Data\\.*' -skip:skipaction='Delete',objectname='dirPath',absolutepath='\\App_Data\\.*'
+</code></pre>
+
+<p>This skips deletes of all files and all subfolders (with all their content) in App_Data, but doesn't prevent adds and updates.</p>
+
+<p>Another useful thing is that skip rules can be defined in the project file (<code>.csproj</code>) so that they are automatically included in the <code>.deploy.cmd</code> script generated along with the package. This makes it unnecessary to pass them to the script through _MsDeployAdditionalFlags.</p>
+
+<p>The above skip rule will be added if the following is included in <code>csproj</code> file:</p>
+
+<pre><code>&lt;PropertyGroup&gt;
+  &lt;OnBeforePackageUsingManifest&gt;AddCustomSkipRules&lt;/OnBeforePackageUsingManifest&gt;
+&lt;/PropertyGroup&gt;
+&lt;Target Name="AddCustomSkipRules"&gt;
+  &lt;ItemGroup&gt;
+    &lt;MsDeploySkipRules Include="SkipDeleteAppData"&gt;
+      &lt;SkipAction&gt;Delete&lt;/SkipAction&gt;
+      &lt;ObjectName&gt;filePath&lt;/ObjectName&gt;
+      &lt;AbsolutePath&gt;$(_Escaped_PackageTempDir)\\App_Data\\.*&lt;/AbsolutePath&gt;
+      &lt;XPath&gt;
+      &lt;/XPath&gt;
+    &lt;/MsDeploySkipRules&gt;
+    &lt;MsDeploySkipRules Include="SkipDeleteAppData"&gt;
+      &lt;SkipAction&gt;Delete&lt;/SkipAction&gt;
+      &lt;ObjectName&gt;dirPath&lt;/ObjectName&gt;
+      &lt;AbsolutePath&gt;$(_Escaped_PackageTempDir)\\App_Data\\.*&lt;/AbsolutePath&gt;
+      &lt;XPath&gt;
+      &lt;/XPath&gt;
+    &lt;/MsDeploySkipRules&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Target&gt;
+</code></pre>
+
+<p>(the names <code>AddCustomSkipRules</code> and <code>SkipDeleteAppData</code> are completely arbitrary; <code>$(_Escaped_PackageTempDir)</code> is supposed to be <em>possibly</em> needed, but in practice I've always seen it evaluate to an empty string)</p>
+
+<p>See <a href="http://blog.alanta.nl/2011/02/web-deploy-customizing-deployment.html">Web Deploy: Customizing a deployment package </a> and <a href="http://stackoverflow.com/questions/7100751/how-to-set-msdeploy-settings-in-csproj-file">How to set MSDeploy settings in .csproj file</a> for more info.</p>
+
+<p>One caveat: this only adds those rules to the <code>.deploy.cmd</code> script, so it is useless if you want to use the graphical IIS Manager for package deployment, as it doesn't use that script (the same probably goes for deployment from VS, but I haven't checked).</p>

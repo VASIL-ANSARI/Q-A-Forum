@@ -1,0 +1,49 @@
+<p>You haven't really said what "works" means, but I'm assuming you're confused why <code>dest</code> isn't being changed to the new memory back in the calling function.</p>
+
+<p>The reason is that in your <code>mystringcopy</code> function, the parameter <code>dest</code> is a <em>copy</em> of the pointer <code>dest</code> in the calling function.</p>
+
+<p>You then assign that copy to a new buffer, do the copy, and then the copy goes away. The original is unchanged. You need to pass <code>dest</code> as a pointer (to a pointer).</p>
+
+<p>Also, I assume you wrote what you did from memory since it shouldn't compile as is (bad dereference in the calling function). Here's the fixed code:</p>
+
+<pre><code>char *src, *dest;
+src = (char *)malloc(BUFFSIZE); // no dereference on src, it's a pointer
+
+//Do something to fill the src
+mystringcpy(src, strlen(src), &amp;dest); // pass the address of dest
+
+// take a pointer to a char*
+void mystringcopy(char *src, size_t length, char **dest) {
+    // now you should dereference dest, to assign to
+    // the char* that was passed in
+    *dest = (char *)malloc(length + 1);
+
+    // for simplicity, make an auxiliary dest
+    char* destAux = *dest;
+
+    // and now the code is the same
+    for(; (*destAux = *src) != '\0'; ++src, ++destAux);
+}
+</code></pre>
+
+<p>Another method is to return the <code>dest</code> pointer:</p>
+
+<pre><code>char *src, *dest;
+src = (char *)malloc(BUFFSIZE);
+
+//Do something to fill the src
+dest = mystringcpy(src, strlen(src)); // assign dest
+
+char* mystringcopy(char *src, size_t length) {
+    char* dest = (char *)malloc(length + 1);
+
+    // for simplicity, make an auxiliary dest
+    char* destAux = dest;
+
+    for(; (*destAux = *src) != '\0'; ++src, ++destAux);
+
+    return dest; // give it back
+}
+</code></pre>
+
+<p>Keep in mind if length is smaller than the source buffer's real length that you'll overrun your destination buffer. See the comments for a solution, though this is left up to you.</p>

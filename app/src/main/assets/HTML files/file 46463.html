@@ -1,0 +1,68 @@
+<p><code>Content scripts</code> execute in a special environment called an <strong>isolated</strong> world. They have access to the DOM of the page they are injected into, but not to any JavaScript variables or functions created by the page. It looks to each content script as if there is no other JavaScript executing on the page it is running on. The same is true in reverse: JavaScript running on the page cannot call any functions or access any variables defined by <code>content scripts</code>.</p>
+
+<p>Although the execution environments of <code>content scripts</code> and the pages that host them are isolated from each other, they share access to the page's DOM. If the page wishes to communicate with the content script (or with the extension via the content script), it must do so through the shared DOM.</p>
+
+<ol>
+<li><strong>Using window.postMessage</strong></li>
+</ol>
+
+<p>In content script - </p>
+
+<pre><code>var port = chrome.runtime.connect();
+
+    window.addEventListener("message", function(event) {
+      // We only accept messages from ourselves
+      if (event.source != window)
+        return;
+
+      if (event.data.type &amp;&amp; (event.data.type == "FROM_PAGE")) {
+        console.log("Content script received: " + event.data.text);
+        port.postMessage(event.data.text);
+      }
+    }, false);
+</code></pre>
+
+<p>In your page script - </p>
+
+<pre><code>document.getElementById("theButton").addEventListener("click",
+    function() {
+  window.postMessage({ type: "FROM_PAGE", text: "Hello from the webpage!" }, "*");
+}, false);
+</code></pre>
+
+<ol start="2">
+<li><strong>Injecting script in your page:</strong></li>
+</ol>
+
+<p>In content script - </p>
+
+<pre><code>  function main() {
+      var elem = document.getElementById("test");
+      console.log(test.value);
+      test.value = 3;
+  }
+ var script = document.createElement('script');
+ script.appendChild(document.createTextNode('('+ main +')();'));
+ (document.body || document.head).appendChild(script);
+</code></pre>
+
+<ol start="3">
+<li><strong>Creating Custom Events</strong>:</li>
+</ol>
+
+<p>In either the injected or your content script add an event listener:</p>
+
+<pre><code>document.addEventListener('yourCustomEvent', function (e)
+{
+  var data=e.detail;
+  console.log("received "+data);
+});
+</code></pre>
+
+<p>On the other side (content or injected script) call the event:</p>
+
+<pre><code>var data="anything";
+var evt=document.createEvent("CustomEvent");
+evt.initCustomEvent("yourCustomEvent", true, true, data);
+document.dispatchEvent(evt);
+</code></pre>

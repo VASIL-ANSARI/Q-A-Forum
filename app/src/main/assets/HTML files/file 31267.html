@@ -1,0 +1,81 @@
+<p>You've clarified your question in the comments below. You're asking specifically about the <strong>user</strong> right-clicking a link and choosing "Open in new tab." (As opposed to the user clicking links that <em>you've</em> set up to open in new tabs, which is how I read it originally.)</p>
+
+<p>The simplest and most reliable way to do that is to modify the links on the page to pass the window name as a query string parameter:</p>
+
+<pre><code>var i, list, href;
+list = document.getElementsByTagName("a");
+for (i = 0; i &lt; list.length; ++i) {
+    href = list[i].href;
+    if (href.indexOf("?") === -1) {
+        href += "?wnd=" + encodeURIComponent(window.name);
+    }
+    else {
+        href += "&amp;wnd=" + encodeURIComponent(window.name);
+    }
+}
+</code></pre>
+
+<p>Then the target page just checks for the query string parameter in <code>location.search</code>.</p>
+
+<p>Alternately, you can set some information in <a href="http://www.w3.org/TR/webstorage/#the-sessionstorage-attribute" rel="nofollow">web session storage</a> when the user clicks the link, and then check for it on the target page:</p>
+
+<p>On the first page:</p>
+
+<pre><code>var i, list;
+list = document.getElementsByTagName("a");
+for (i = 0; i &lt; list.length; ++i) {
+    list[i].addEventListener("click", setWindowName, false);
+    // If you need to handle IE8, you'll need to do the addEventListener / attachEvent dance
+}
+function setWindowName() {
+    sessionStorage.wndname = window.name;
+}
+</code></pre>
+
+<p>Then on the target page:</p>
+
+<pre><code>var sourceWindow = sessionStorage.wndname;
+</code></pre>
+
+<p>Other than that, you can give them a link that will open the window in a new tab for them (see below), but if <em>they</em> right-click the link and say "open in new tab," I don't think there's any connection between the two windows. On the <strong>server</strong> side you could check the REFERER [sic] HTTP header, but I don't think there's anything purely client-side.</p>
+
+<blockquote>
+  <p>Can i handle "open in a new tab" as an event...</p>
+</blockquote>
+
+<p>I don't believe any event is raised when the user opens a link in a new window or tab.</p>
+
+<hr>
+
+<p>If the window is opened via <code>window.open</code> or a link with <code>target="..."</code>, the new window will have an <code>opener</code> global, which is a reference to the window that opened it. So, <code>opener.name</code>.</p>
+
+<p>Parent window example: <a href="http://jsbin.com/IBuCOVo/1" rel="nofollow">Live Copy</a> | <a href="http://jsbin.com/IBuCOVo/1/edit" rel="nofollow">Live Source</a></p>
+
+<pre><code>window.name = "parentwin";
+document.querySelector('p').onclick = function() {
+    window.open("/uTEzowOQ/1");
+};
+</code></pre>
+
+<p>Or alternately via a link: <a href="http://jsbin.com/IBuCOVo/2" rel="nofollow">Live Copy</a> | <a href="http://jsbin.com/IBuCOVo/2/edit" rel="nofollow">Live Source</a></p>
+
+<pre><code>&lt;p&gt;&lt;a href="/uTEzowOQ/1" target="_blank"&gt;Click me&lt;/a&gt;&lt;/p&gt;
+&lt;script&gt;
+window.name = "parentwin";
+&lt;/script&gt;
+</code></pre>
+
+<p>Child window: <a href="http://jsbin.com/uTEzowOQ/1/edit" rel="nofollow">Source</a></p>
+
+<pre><code>if (!opener) {
+    display("My &lt;code&gt;opener&lt;/code&gt; isn't set.");
+}
+else if (!opener.name) {
+    display("&lt;code&gt;opener.name&lt;/code&gt; is blank");
+}
+else {
+    display("My opener's name is " + opener.name);
+}
+</code></pre>
+
+<p>Note that if you just go <a href="http://jsbin.com/uTEzowOQ/1" rel="nofollow">directly to the child page</a>, it says "My opener isn't set". But if you go there via either of the parent pages above, you see "My opener's name is parentwin".</p>

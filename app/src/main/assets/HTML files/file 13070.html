@@ -1,0 +1,34 @@
+<p>One approach could be to make use of Python module level singleton pattern. 
+Create a module having 'conn' object, (using just plain PyMongo)</p>
+
+<pre><code>try:
+    conn = Connection(max_pool_size=20)
+except ConnectionFailure:
+    app.logger.critical("Unable to connect to MongoDB")
+</code></pre>
+
+<p>and then just create a wrapper for PyMongo collection</p>
+
+<pre><code>class Model(object):
+    def __init__(self, table, db = app.config['DB_NAME']):
+        self._table = table
+        self._db = db
+
+    def find_one(self, spec_or_id=None, *args, **kwargs):
+        result = None
+        try:
+            result = conn[self._db][self._table].find_one(spec_or_id, *args, **kwargs)
+        except InvalidName:
+            app.logger.critical('invalid DB or Table name')
+        finally:
+            conn.end_request()
+
+        return result
+</code></pre>
+
+<p>Here <code>conn.end_request()</code> will cause connection to return to the pool and on each find_one() it will get the connection from pool. Don't worry, they are thread safe.</p>
+
+<p>now you can use the model something like </p>
+
+<pre><code>result = Model(COLLECTION).find_one({user:'joe'})
+</code></pre>

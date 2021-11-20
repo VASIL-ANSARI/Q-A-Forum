@@ -1,0 +1,54 @@
+<p>As @HankyPanky mentioned, you can use <code>curl_multi_exec()</code> to do many concurrent requests at the same time.</p>
+
+<p>Something like this should help:</p>
+
+<pre><code>function fetchAndProcessUrls(array $urls, callable $f) {
+
+    $multi = curl_multi_init();
+    $reqs  = [];
+
+    foreach ($urls as $url) {
+        $req = curl_init();
+        curl_setopt($req, CURLOPT_URL, $url);
+        curl_setopt($req, CURLOPT_HEADER, 0);
+        curl_multi_add_handle($multi, $req);
+        $reqs[] = $req;
+    }
+
+    // While we're still active, execute curl
+    $active = null;
+
+    // Execute the handles
+    do {
+        $mrc = curl_multi_exec($multi, $active);
+    } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+
+    while ($active &amp;&amp; $mrc == CURLM_OK) {
+        if (curl_multi_select($multi) != -1) {
+            do {
+                $mrc = curl_multi_exec($multi, $active);
+            } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+        }
+    }
+
+    // Close the handles
+    foreach ($reqs as $req) {
+        $f(curl_multi_getcontent($req));
+        curl_multi_remove_handle($multi, $req);
+    }
+    curl_multi_close($multi);
+}
+</code></pre>
+
+<p>You can use it like so:</p>
+
+<pre><code>$urlArray = [ 'http://www.example.com/' , 'http://www.example.com/', ... ];
+
+fetchAndProcessUrls($urlArray, function($requestData) { 
+
+    /* do stuff here */ 
+
+    // e.g.
+    $jsonData = json_decode($requestData, 1); //
+});
+</code></pre>

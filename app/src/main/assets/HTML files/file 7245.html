@@ -1,0 +1,16 @@
+<p>After reading the comments on <a href="http://php.net/pcntl-fork" rel="nofollow"><code>pcntl_fork()</code></a> and this <a href="http://stackoverflow.com/questions/3668615/pcntl-fork-and-the-mysql-connection-is-gone">SO question</a>, it was indeed the issue with children sharing the parent connection.  I have added this code to create a new MySQL connection after forking, and it seems to have fixed the problem:</p>
+
+<pre><code>// give this thread its own db connection
+$settings = Zend_Registry::get('settings');
+$db = Zend_Db::factory(
+    $settings-&gt;db_adapter,
+    array(
+        'host' =&gt; $settings-&gt;db_host,
+        'username' =&gt; $settings-&gt;db_user,
+        'password' =&gt; $settings-&gt;db_pass,
+        'dbname' =&gt; $settings-&gt;db_name,
+    )
+);
+$db-&gt;setFetchMode(Zend_Db::FETCH_OBJ);
+Zend_Db_Table::setDefaultAdapter($db);
+</code></pre>

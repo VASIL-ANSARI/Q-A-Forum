@@ -1,0 +1,264 @@
+<p>I'm not sure what do you really need, but I think you added a property <code>status</code> to you json object and according to its value you are giving a different circles color to the corresponding element.</p>
+
+<blockquote>
+  <ol>
+  <li>entertain a third condition (i.e. a negative number)</li>
+  </ol>
+</blockquote>
+
+<p>While appending your circles you can set each circle's style as following :</p>
+
+<p>If the item's status is greater than 1 than set <code>stroke</code> proprety to red else if it is equal to zero than to green else (if it is a negative number ) than to orange for example.</p>
+
+<pre><code>nodeEnter.append("circle")
+         .attr("r", 1e-6)
+         .style("stroke",
+              function(d) { 
+                 /*return color according to the current data's status value    */
+                 /*it is &gt; 1 than red else if &lt; 0 than orange else(if 0)than red */   
+                  return d.status &gt;= 1 ? 
+                         "red" 
+                         :( d.status &lt; 0 ? "orange" : "green")
+              }) ;
+</code></pre>
+
+<blockquote>
+  <ol start="2">
+  <li>direct me how to fill the colors on the ancestor nodes based off of the children nodes</li>
+  </ol>
+</blockquote>
+
+<p>I think you want to set the <code>fill</code> proprety of each circle having children to the same color as the <code>stroke</code> proprety.</p>
+
+<p>So while looping the created circles you have to check if the current item has children if it is the case, set <code>fill</code> proprety to same color of <code>stroke</code> proprety like this:</p>
+
+<pre><code>nodeUpdate.select("circle")
+          .attr("r", 4.5)
+          .style("fill",
+                 function(d) { 
+                     /*check if children proprety exists for the current if yes 
+                       get its stoke color and set fill proprety it this value */
+                    return d._children ? d3.select(this).style('stroke') : "" ;
+                 }) ;
+</code></pre>
+
+<h3>Complete code:</h3>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var margin = {top: 20, right: 120, bottom: 20, left: 120},
+    width = 960 - margin.right - margin.left,
+    height = 800 - margin.top - margin.bottom;
+
+var i = 0,
+    duration = 750,
+    root;
+
+var tree = d3.layout.tree()
+    .size([height, width]);
+
+var diagonal = d3.svg.diagonal()
+    .projection(function(d) { return [d.y, d.x]; });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.right + margin.left)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+   var flare ={
+              "name": "positive with children",
+              "status":3,
+              "children": [
+              {
+                "name": "zero with children",
+                "status":0,
+                 "children": [
+                   {
+                    "name": "positive with children",
+                    "status":1,
+                    "children": [
+                      {"name": "positive with no children", "size": 3938,"status":3},
+                      {"name": "negative with no children", "size": 3812,"status":-1},
+                      {"name": "positive with no children", "size": 6714,"status":1}
+                    ]
+                   },
+                   {
+                     "name": "negative with children",
+                     "status":-2,
+                     "children": [
+                       {"name": "positive with no children", "size": 3534,"status":1},
+                       {"name": "positive with no children", "size": 5731,"status":6}
+      
+                     ]
+                   }
+                  ]
+                },
+                {
+                  "name":"postive with children",
+                  "status":1,
+                   "children": [
+                   {"name": "negative with no children", "size": 599,"status":-3},
+                   {"name": "zero with no children", "size": 386,"status":0},
+                   {"name": "positive with no children", "size": 323,"status":3},
+                   {"name": "zero with no children", "size": 307,"status":0}
+                   ]
+                },
+                 {
+                  "name":"negative with children",
+                  "status":-3,
+                   "children": [
+                   {"name": "positive with no children", "size": 335,"status":1},
+    {"name": "negative with no children", "size": 383,"status":-1},
+    {"name": "zero with no children", "size": 874,"status":0},
+    {
+     "name": "positive with children",
+     "status":1,
+     "children": [
+      {"name": "positive with no children", "size": 3165,"status":1},
+      {"name": "zero with no children", "size": 2815,"status":0},
+      {"name": "negative with no children", "size": 3366,"status":-2}
+     ]
+    }
+                   ]
+                }
+            ]
+      };
+  root = flare;
+  root.x0 = height / 2;
+  root.y0 = 0;
+
+  function collapse(d) {
+    if (d.children) {
+      d._children = d.children;
+      d._children.forEach(collapse);
+      d.children = null;
+    }
+  }
+
+  root.children.forEach(collapse);
+  update(root);
+
+d3.select(self.frameElement).style("height", "800px");
+
+function update(source) {
+
+  // Compute the new tree layout.
+  var nodes = tree.nodes(root).reverse(),
+      links = tree.links(nodes);
+
+  // Normalize for fixed-depth.
+  nodes.forEach(function(d) { d.y = d.depth * 180; });
+
+  // Update the nodesâ¦
+  var node = svg.selectAll("g.node")
+      .data(nodes, function(d) { return d.id || (d.id = ++i); });
+
+  // Enter any new nodes at the parent's previous position.
+  var nodeEnter = node.enter().append("g")
+      .attr("class", "node")
+      .attr("transform", function(d) { return "translate(" + source.y0 + "," + source.x0 + ")"; })
+      .on("click", click);
+
+       nodeEnter.append("circle")
+              .attr("r", 1e-6)
+              .style("stroke", function(d) { return d.status &gt;= 1 ? "red" : ( d.status &lt; 0 ? "orange" : "green")  }) ;
+      //.style("fill", function(d) { return d._children ? "lightsteelblue" : "#fff"; });
+
+  nodeEnter.append("text")
+      .attr("x", function(d) { return d.children || d._children ? -10 : 10; })
+      .attr("dy", ".35em")
+      .attr("text-anchor", function(d) { return d.children || d._children ? "end" : "start"; })
+      .text(function(d) { return d.name; })
+      .style("fill-opacity", 1e-6);
+
+  // Transition nodes to their new position.
+  var nodeUpdate = node.transition()
+      .duration(duration)
+      .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; });
+
+  nodeUpdate.select("circle")
+      .attr("r", 4.5)
+      //.style("fill", function(d) { return d._children ? "lightsteelblue" : "#fff"; });
+       .style("fill", function(d) { return d._children ? d3.select(this).style('stroke') : "";}) ;
+  nodeUpdate.select("text")
+      .style("fill-opacity", 1);
+
+  // Transition exiting nodes to the parent's new position.
+  var nodeExit = node.exit().transition()
+      .duration(duration)
+      .attr("transform", function(d) { return "translate(" + source.y + "," + source.x + ")"; })
+      .remove();
+
+  nodeExit.select("circle")
+      .attr("r", 1e-6);
+
+  nodeExit.select("text")
+      .style("fill-opacity", 1e-6);
+
+  // Update the linksâ¦
+  var link = svg.selectAll("path.link")
+      .data(links, function(d) { return d.target.id; });
+
+  // Enter any new links at the parent's previous position.
+  link.enter().insert("path", "g")
+      .attr("class", "link")
+      .attr("d", function(d) {
+        var o = {x: source.x0, y: source.y0};
+        return diagonal({source: o, target: o});
+      });
+
+  // Transition links to their new position.
+  link.transition()
+      .duration(duration)
+      .attr("d", diagonal);
+
+  // Transition exiting nodes to the parent's new position.
+  link.exit().transition()
+      .duration(duration)
+      .attr("d", function(d) {
+        var o = {x: source.x, y: source.y};
+        return diagonal({source: o, target: o});
+      })
+      .remove();
+
+  // Stash the old positions for transition.
+  nodes.forEach(function(d) {
+    d.x0 = d.x;
+    d.y0 = d.y;
+  });
+}
+
+// Toggle children on click.
+function click(d) {
+  if (d.children) {
+    d._children = d.children;
+    d.children = null;
+  } else {
+    d.children = d._children;
+    d._children = null;
+  }
+  update(d);
+}</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>.node {
+  cursor: pointer;
+}
+
+.node circle {
+  fill: #fff;
+  stroke-width: 1.5px;
+}
+
+.node text {
+  font: 10px sans-serif;
+}
+
+.link {
+  fill: none;
+  stroke: #ccc;
+  stroke-width: 1.5px;
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.3.0/d3.min.js"&gt;&lt;/script&gt;</code></pre>
+</div>
+</div>
+</p>

@@ -1,0 +1,54 @@
+<p>You fundamentally misunderstood the concept of polymorphism and inheritance. The derived class must have an <em>is-a</em> relationship to the base class: <code>MachineLearningSVM</code> <strong>is a</strong> <code>MachineLearning</code>, in particular the <code>virtual</code> functions declared in the base (but defined or overridden in the derived class) will be callable from a pointer to base.</p>
+
+<p>In your example, this makes no sense:</p>
+
+<pre><code>MachineLearning*ptr = get_machine_learning(); // can be either derived class
+ptr-&gt;Train();           // we don't know which derived class so what do you
+                        // want to pass as arguments???
+</code></pre>
+
+<p>You could define a more flexible interface, but then you still have the same problem (as obvious by the exceptions):</p>
+
+<pre><code>struct MachineLearning
+{
+  void Train(std::vector&lt;Feature&gt; const&amp;features)
+  {
+    if(need_labels()) throw std::runtime_error("need labels to train");
+    train(features);
+  }
+  void Train(std::vector&lt;Feature&gt; const&amp;features,
+             std::vector&lt;Label&gt; const&amp;labels)
+  {
+    if(!need_labels()) std::cerr&lt;&lt;"WARNING: ignoring labels for training\n";
+    train(features,labels);
+  }
+  virtual~MachineLearning() {}
+protected:
+  virtual void train(std::vector&lt;Feature&gt; const&amp;) = 0;
+  virtual void train(std::vector&lt;Feature&gt; const&amp;,
+                     std::vector&lt;Label&gt; const&amp;) = 0;
+  virtual bool need_labels() const = 0;
+};
+
+struct MachineLearningSVM : MachineLearning
+{
+protected:
+  bool need_labels() const { return false; }
+  void train(std::vector&lt;Feature&gt; const&amp;features) override;
+  void train(std::vector&lt;Feature&gt; const&amp;features,
+             std::vector&lt;Label&gt; const&amp;) override
+  { train(features); }
+};
+
+struct MachineLearningAdaboost : public MachineLearning
+{
+protected:
+  bool need_labels() const { return true; }
+  void train(std::vector&lt;Feature&gt; const&amp;) override
+  { throw std::runtime_error("need labels for training"); }
+  void train(std::vector&lt;Feature&gt; const&amp;features,
+             std::vector&lt;Label&gt; const&amp;labels) override;
+};
+</code></pre>
+
+<p>These errors and warnings are the hallmark of a poor code design ...</p>

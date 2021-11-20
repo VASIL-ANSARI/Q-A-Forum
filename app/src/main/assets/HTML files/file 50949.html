@@ -1,0 +1,119 @@
+<p>Just create a <code>Timeline</code> and decrease the value once per second every time a new row is added to the table:</p>
+
+<pre><code>public void start(Stage primaryStage) throws Exception {
+
+    // existing code...
+
+    // this just needs to be executed before any rows are added to the table:
+
+    table.getItems().addListener((Change&lt;? extends Product&gt; c) -&gt; {
+        while (c.next()) {
+            if (c.wasAdded()) {
+                for (Product p : c.getAddedSubList()) {
+                    int startValue = p.getSeconden();
+                    Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), 
+                        e -&gt; p.setSeconden(p.getSeconden() - 1)));
+                    countdown.setCycleCount(startValue);
+                    countdown.play();
+                }
+            }
+        }
+    });
+
+}
+</code></pre>
+
+<p>This assumes your <code>Product</code> class follows the JavaFX properties pattern, i.e. it has a <code>public IntegerProperty secondenProperty() { ... }</code> method.</p>
+
+<p>Here is a SSCCE:</p>
+
+<pre><code>import java.util.regex.Pattern;
+
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.application.Application;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.collections.ListChangeListener.Change;
+import javafx.scene.Scene;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
+import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage;
+import javafx.util.Duration;
+
+public class CountdownTable extends Application {
+
+    @Override
+    public void start(Stage primaryStage) throws Exception {
+        TableView&lt;Item&gt; table = new TableView&lt;&gt;();
+        TableColumn&lt;Item, Integer&gt; secondsCol = new TableColumn&lt;&gt;("Seconds");
+        table.getColumns().add(secondsCol);
+
+        secondsCol.setCellValueFactory(cellData -&gt; cellData.getValue().secondsProperty().asObject());
+
+        table.getItems().addListener((Change&lt;? extends Item&gt; c) -&gt; {
+            while (c.next()) {
+                if (c.wasAdded()) {
+                    for (Item item : c.getAddedSubList()) {
+                        int startValue = item.getSeconds() ;
+                        Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), e -&gt; 
+                            item.setSeconds(item.getSeconds() - 1)
+                        ));
+                        countdown.setCycleCount(startValue);
+                        countdown.play();
+                    }
+                }
+            }
+        });
+
+        TextField textField = new TextField();
+        textField.setPromptText("Type a time in seconds and press enter");
+        Pattern integerPattern = Pattern.compile("\\d*");
+        TextFormatter&lt;Integer&gt; formatter = new TextFormatter&lt;Integer&gt;( (TextFormatter.Change c) -&gt; {
+            String newText = c.getControlNewText();
+            if (integerPattern.matcher(newText).matches()) {
+                return c ;
+            } else {
+                return null ;
+            }
+        });
+        textField.setTextFormatter(formatter);
+
+        textField.setOnAction(e -&gt; {
+            if (! textField.getText().isEmpty())
+            table.getItems().add(new Item(Integer.parseInt(textField.getText())));
+            textField.clear();
+        });
+
+        BorderPane root = new BorderPane(table, null, null, textField, null);
+        primaryStage.setScene(new Scene(root, 600, 600));
+        primaryStage.show();
+    }
+
+    public static class Item {
+
+        private final IntegerProperty seconds = new SimpleIntegerProperty() ;
+
+        public Item(int seconds) {
+            setSeconds(seconds);
+        }
+
+        public IntegerProperty secondsProperty() {
+            return seconds ;
+        }
+
+        public final int getSeconds() {
+            return secondsProperty().get();
+        }
+
+        public final void setSeconds(int seconds) {
+            secondsProperty().set(seconds);
+        }
+    }
+
+    public static void main(String[] args) { launch(args); }
+}
+</code></pre>

@@ -1,0 +1,18 @@
+<p>From my experience, this is not necessary as long as both contexts implement either the <code>NSMainQueueConcurrencyType</code> or the <code>NSPrivateQueueConcurrencyType</code>. The important thing to remember is that when interacting with managed object contexts across multiple threads, all messages sent to the context must be sent via either <code>-performBlock:</code> or <code>performBlockAndWait:</code>. </p>
+
+<p>In a recent project, I had a parent <code>NSManagedObjectContext</code> that backed an <code>NSFetchedResultsController</code> that was created with the <code>NSMainQueueConcurrencyType</code>. From there I created an <code>NSManagedObjectContext</code> with the <code>NSPrivateQueueConcurrencyType</code> and set the context with the <code>NSMainQueueConcurrencyType</code> as the parent. Now my child context could contain discardable edits when adding a new object that would eventually end up in the table view backed by the <code>NSFetchedResultsController</code> which is backed by the parent context. When I was ready to save my edits and bubble them up to the parent context, the code looked like this.</p>
+
+<pre><code>// Save the child context first
+[childContext performBlock:^{
+    NSError *error = nil;
+    [childContext save:&amp;error];
+
+    // Save the changes on the main context
+    [parentContext performBlock:^{
+        NSError *parentError = nil;
+        [parentContext save:&amp;parentError];
+    }];
+}];
+</code></pre>
+
+<p>Now I can't say with certainty that this is the correct way to do this because the documentation on this is pretty sparse at the moment. It might be helpful if you could show some code that you believe is causing deadlocks. If you're in the developer program, you may want to check out the WWDC session videos regarding Core Data from this year. I believe there are two, one for Mac OS X and one for iOS, that basically touch on the same ideas but each contain unique information as well.</p>

@@ -1,0 +1,55 @@
+<p>A couple of observations:</p>
+
+<ol>
+<li><p>A swipe gesture is a discrete gesture that is only recognized when you move a required distance, and it results in a single call to the <code>action</code> selector. Thus, if the image is small enough, that required distance might be such that your finger is no longer over the image view being moved before the gesture is recognized.</p>
+
+<p>You might want to consider using a continuous gesture, instead, such as a <code>UIPanGestureRecognizer</code>, rather than a discrete gesture. That way, you can drag the image along with the user's finger as they move it across the screen. It yields a far more responsive UI. So you could something like:</p>
+
+<pre><code>UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+[viewToAnimate addGestureRecognizer:pan];
+</code></pre>
+
+<p>and </p>
+
+<pre><code>- (void)handlePan:(UIPanGestureRecognizer *)gesture
+{
+    static CGPoint originalCenter;
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        originalCenter = gesture.view.center;
+    } else if (gesture.state == UIGestureRecognizerStateChanged) {
+        CGPoint translate = [gesture translationInView:gesture.view];
+        gesture.view.center = CGPointMake(originalCenter.x + translate.x, originalCenter.y + translate.y); // or, if only moving horizontally, use CGPointMake(originalCenter.x + translate.x, originalCenter.y)
+    } else if (gesture.state == UIGestureRecognizerStateEnded || gesture.state == UIGestureRecognizerStateCancelled) {
+        // do whatever you want here when the user lets go, e.g. animate the rest of the way to some location
+        [UIView animateWithDuration:0.5 animations:^{
+            gesture.view.center = ... // perhaps animate to some new location
+        }];
+    }
+}
+</code></pre>
+
+<p>The only question is what you want to do when they let go. You might want to leave it where they let go. Or you may want to conclude that they've moved far enough to want to animate it to some new destination when they let go, or alternatively move it back to the original location if they haven't moved it far enough. It all depends upon your desired UX.</p></li>
+<li><p>You're animating with a timer, but if you want to do some "completion" animation once the user lets go, it's much easier to use <code>animateWithDuration</code>, e.g.:</p>
+
+<pre><code>[UIView animateWithDuration:0.5 animations:^{
+    viewToAnimate.frame = ... // set the destination of where you want it to animate to
+}];
+</code></pre>
+
+<p>or perhaps:</p>
+
+<pre><code>[UIView animateWithDuration:0.5 animations:^{
+    viewToAnimate.frame = ... // set the destination of where you want it to animate to
+} completion:^(BOOL finished) {
+    // do here whatever you want to do when the animation is done 
+}];
+</code></pre></li>
+</ol>
+
+<p>Unfortunately, the details here will vary greatly upon your desired UX. For example, if you drag your finger half way, do you want it to drag half way and stop, or animate the rest of the way, or go back. </p>
+
+<p>Likewise you allude to there being other gestures: So what's the interaction you want between these? Let's say the user starts dragging to the right and with their finger still down, stop and start going to the left. If you want that sort of behavior, you might want a single pan gesture for all four directions. If you want separate gestures, then you might want to delve into the world of subclassing gesture recognizers. It all depends upon what you need.</p>
+
+<p>But the short answer is that if you want the gesture to result in UI changes more quickly, you might have to graduate from the simple discrete gestures (like the swipe gesture) to the more sophisticated continuous gesture recognizers (such as pan gestures or your own custom gesture subclasses).</p>
+
+<p>For more information, see the <a href="https://developer.apple.com/library/ios/documentation/EventHandling/Conceptual/EventHandlingiPhoneOS/GestureRecognizer_basics/GestureRecognizer_basics.html#//apple_ref/doc/uid/TP40009541-CH2-SW2" rel="nofollow">Gesture Recognizers</a> section of the <em>Event Handling Guide for iOS.</em> Or perhaps see WWDC 2012 video <a href="https://developer.apple.com/videos/wwdc/2012/index.php?id=233" rel="nofollow">Building Advanced Gesture Recognizers</a>.</p>

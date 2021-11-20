@@ -1,0 +1,50 @@
+<p>You should generate your controls on the PageInit event instead. Controls generated on PageInit are automatically managed by the asp.net framework (you'll get viewstate persistance, raised events, etc...)</p>
+
+<p>Just a side note: On your PageInit, you have to <strong>always</strong> regenerate the dynamic controls or the framework won't be able to manage them. </p>
+
+<p>Try generating your controls on PageInit, and then changing their properties on the postback event like so:</p>
+
+<pre><code>List&lt;LiteralControl&gt; list = new List&lt;LiteralControl&gt;();
+
+protected void Page_Init(object sender, EventArgs e)
+{
+    generateTable(); // When pass just here, it works well
+}
+
+private void generateTable()
+{
+    Table tbl = new Table();
+    // Here I create my table with controls
+
+    int rows = 3;
+    int cols = 2;
+    for (int j = 0; j &lt; rows; j++)
+    {
+        TableRow r = new TableRow();
+        for (int i = 0; i &lt; cols; i++)
+        {
+            TableCell c = new TableCell();
+            LiteralControl l = new LiteralControl("row " + j.ToString() + ", cell " + i.ToString());
+
+            // save a reference to the control for editing
+            list.Add(l);
+
+            c.Controls.Add(l);
+            r.Cells.Add(c);
+        }
+        tbl.Rows.Add(r);
+    }
+
+    tableContainer.Controls.Clear(); // tableContainer is a Panel fixed in aspx page
+    tableContainer.Controls.Add(tbl);
+}
+
+protected void txt_TextChanged(object sender, EventArgs e)
+{
+    // edit controls here
+    foreach (LiteralControl ctrl in list)
+    {
+        ctrl.Text = "TextChanged";
+    }
+}
+</code></pre>

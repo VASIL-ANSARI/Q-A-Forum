@@ -1,0 +1,66 @@
+<p>As far as I can see, the <code>User</code> relation in the Post model is causing the exception. So, when you call:</p>
+
+<pre><code>{{ $blog_post-&gt;user-&gt;name }}
+</code></pre>
+
+<p>it can't  find the user associated with that post. I am guessing that the foreign key for <code>User</code> table is not the same as <a href="https://laravel.com/docs/5.3/eloquent-relationships#one-to-many-inverse" rel="nofollow" title="guessed">guessed</a> by Laravel:</p>
+
+<blockquote>
+  <p>Eloquent determines the default foreign key name by examining the name of the relationship method and suffixing the method name with _id. However, if the foreign key on the Comment model is not post_id, you may pass a custom key name as the second argument to the belongsTo method:</p>
+</blockquote>
+
+<pre><code>public function post()
+{
+    return $this-&gt;belongsTo('App\Post', 'foreign_key');
+}
+</code></pre>
+
+<p>So in your case, it would be something like this:</p>
+
+<pre><code>public function user()
+{
+    return $this-&gt;belongsTo('App\User', 'post_user_id'); //Replace post_user_id with the id convention you are using.
+}
+</code></pre>
+
+<p><s><strong>Update:</strong></s></p>
+
+<p><s>Thanks for the dd on your $blog_posts. I can see that the user is being fetched but it's not being called correctly. It's a function so you need to treat it as a function. Modify your blade file to retrieve the user like this:</p>
+
+<pre><code>{{ $blog_post-&gt;user()-&gt;name }}
+</code></pre>
+
+<p>This should get the valid user collection.</s></p>
+
+<p><s><strong>Update 2:</strong></p>
+
+<p>As I can see from the dump, the user relation from the second <code>Post</code> is null. Make sure it's not null when you are creating the post and to deal with it in the blade, wrap it in a null check:</p>
+
+<pre><code>@foreach ($blog_posts as $blog_post)
+&lt;div class="post item"&gt;
+    {{ $blog_post-&gt;post_title }}
+    {{ $blog_post-&gt;post_content }}
+    @if($blog_post-&gt;user()!=null)
+        {{ $blog_post-&gt;user()-&gt;name }}
+    @endif
+&lt;/div&gt;
+@endforeach
+</code></pre>
+
+<p></s>
+<strong>Update 3:</strong></p>
+
+<p>It actually is supposed to be called as an attribute rather than a function since it returns 'BelongsTo' when called as a function. Try the following now:</p>
+
+<pre><code>@foreach ($blog_posts as $blog_post)
+&lt;div class="post item"&gt;
+    {{ $blog_post-&gt;post_title }}
+    {{ $blog_post-&gt;post_content }}
+    @if($blog_post-&gt;user!=null)
+        {{ $blog_post-&gt;user-&gt;name }}
+    @endif
+&lt;/div&gt;
+@endforeach
+</code></pre>
+
+<p>I've reproduced the same issue here and this fixes it. Let me know if it works for you.</p>

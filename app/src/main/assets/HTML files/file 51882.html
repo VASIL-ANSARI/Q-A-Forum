@@ -1,0 +1,45 @@
+<p>a simplistic way to do it is</p>
+
+<ul>
+<li>set a variable to <code>length</code></li>
+<li>every time the callback is called, decrease this variable by 1</li>
+<li>when it reaches zero, you've processed the final callback</li>
+<li>WITHIN the callback, call <code>res.status...</code> </li>
+</ul>
+
+<p>Like this:</p>
+
+<pre><code>router.get('/friends', function(req, res, array) {
+    var friendsList = [];
+    var remaining = length;
+    for(var counter=0;counter&lt;length;counter++){
+        Model.findById(array[counter].Id, function(err, record) {
+            if (record){
+                friendsList.push(record);
+            }
+            remaining -= 1;
+            if (remaining == 0) {
+                res.status(200).json(friendsList);
+            }
+        });
+    }
+});
+</code></pre>
+
+<p>for completeness ... since you're using nodejs ... use (native) Promise and <code>arrow function</code> syntax</p>
+
+<pre><code>router.get('/friends', (req, res, array) =&gt;
+    Promise.all(array.map(item =&gt; 
+        new Promise((resolve, reject) =&gt; 
+            Model.findById(item.Id, (err, record) =&gt; 
+                resolve(record || undefined)
+            )
+        )
+    ))
+    .then(friendsList =&gt; 
+        res.status(200).json(friendsList.filter(item =&gt; 
+            item !== undefined
+        ))
+    )
+);
+</code></pre>

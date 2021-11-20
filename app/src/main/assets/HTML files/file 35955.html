@@ -1,0 +1,103 @@
+<blockquote>
+  <p>How to change the id attribute of a DomNode and save changes to the original XML File using XMLWriter again?</p>
+</blockquote>
+
+<p>This does not work that way. If you use <a href="http://php.net/class.xmlreader" rel="nofollow">XMLReader</a> and <a href="http://php.net/class.xmlwriter" rel="nofollow">XMLWriter</a> to operate on the <em>same</em> file simultaneously, the file will be truncated by the writer and the reader will spit errors and stop working.</p>
+
+<p>However, you can operate on <em>different</em> files.</p>
+
+<p>So what you can do is to use an <strong>XMLReader</strong> to read the document and while you operate on it use <strong>XMLWriter</strong> to write to another document based on what you've read and occasionally modified. After you're done, you can then rename the newly written file to the old filename.</p>
+
+<h2>Example</h2>
+
+<p>For an XML document (shortened for the example, <strong>XMLReader</strong> and <strong>XMLWriter</strong> make naturally sense with really huge documents) like this one modeled a bit after your question:</p>
+
+<pre><code>&lt;DBOS&gt;
+    &lt;ITEMS&gt;
+        &lt;ITEM&gt;item #1&lt;/ITEM&gt;
+        &lt;ITEM&gt;item #2&lt;/ITEM&gt;
+        &lt;ITEM&gt;item #3&lt;/ITEM&gt;
+    &lt;/ITEMS&gt;
+    &lt;ITEMS&gt;
+        &lt;ITEM&gt;item #4&lt;/ITEM&gt;
+        &lt;ITEM&gt;item #5&lt;/ITEM&gt;
+    &lt;/ITEMS&gt;
+&lt;/DBOS&gt;
+</code></pre>
+
+<p>A working code-example is:</p>
+
+<pre><code>&lt;?php
+/*
+ * This file is part of the XMLReaderIterator package.
+ *
+ * Copyright (C) 2012, 2014 hakre &lt;http://hakre.wordpress.com&gt;
+ *
+ * Example: Write XML with XMLWriter while reading from XMLReader with XMLWriterIteration
+ */
+
+require('xmlreader-iterators.php'); // require XMLReaderIterator library
+
+$xmlInputFile  = 'data/dobs-items.xml';
+$xmlOutputFile = 'php://output';
+
+$reader = new XMLReader();
+$reader-&gt;open($xmlInputFile);
+
+$writer = new XMLWriter();
+$writer-&gt;openUri($xmlOutputFile);
+
+$iterator = new XMLWritingIteration($writer, $reader);
+
+$writer-&gt;startDocument();
+
+$itemsCount = 0;
+$itemCount  = 0;
+foreach ($iterator as $node) {
+    $isElement = $node-&gt;nodeType === XMLReader::ELEMENT;
+
+
+    if ($isElement &amp;&amp; $node-&gt;name === 'ITEMS') {
+        // increase counter for &lt;ITEMS&gt; elements and reset &lt;ITEM&gt; counter
+        $itemsCount++;
+        $itemCount = 0;
+    }
+
+    if ($isElement &amp;&amp; $node-&gt;name === 'ITEM') {
+        // increase &lt;ITEM&gt; counter and insert "id" attribute
+        $itemCount++;
+        $writer-&gt;startElement($node-&gt;name);
+        $writer-&gt;writeAttribute('id', $itemsCount . "-" . $itemCount);
+        if ($node-&gt;isEmptyElement) {
+            $writer-&gt;endElement();
+        }
+    } else {
+        // handle everything else
+        $iterator-&gt;write();
+    }
+}
+
+$writer-&gt;endDocument();
+</code></pre>
+
+<p>The output then is (exemplary to standard output, any valid PHP file-name can be used):</p>
+
+<pre><code>&lt;?xml version="1.0"?&gt;
+&lt;DBOS&gt;
+    &lt;ITEMS&gt;
+        &lt;ITEM id="1-1"&gt;item #1&lt;/ITEM&gt;
+        &lt;ITEM id="1-2"&gt;item #2&lt;/ITEM&gt;
+        &lt;ITEM id="1-3"&gt;item #3&lt;/ITEM&gt;
+    &lt;/ITEMS&gt;
+    &lt;ITEMS&gt;
+        &lt;ITEM id="2-1"&gt;item #4&lt;/ITEM&gt;
+        &lt;ITEM id="2-2"&gt;item #5&lt;/ITEM&gt;
+    &lt;/ITEMS&gt;
+&lt;/DBOS&gt;
+</code></pre>
+
+<p>As this example shows, the id attributes are added based on the numbering by the different counter variables.</p>
+
+<p>The <strong>XMLWritingIteration</strong> makes this easy as it deals with all other nodes and cases thanks to <code>$iterator-&gt;write()</code>.</p>
+
+<p>The example and code is part of <a href="https://github.com/hakre/XMLReaderIterator" rel="nofollow">the XMLReaderIterator package</a>. There is also another example that is creating a <strong>DOMDocument</strong> based on <strong>XMLReader</strong>, it is part of <a href="http://stackoverflow.com/a/24109776/367456">an answer to <em>"How to distinguish between empty element and null-size string in DOMDocument?"</em></a>.</p>

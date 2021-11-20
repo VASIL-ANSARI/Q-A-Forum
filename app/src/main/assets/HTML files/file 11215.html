@@ -1,0 +1,34 @@
+<p>I would not encode the ownership/permissions model into the <code>TaskList</code> domain object.  That sort of business logic should be external.  I also don't like the idea of a proxy object.  Although it would certainly work, it would confuse debugging and is, in this case at least, unnecessarily complex.  I would also not check it in the controller.</p>
+
+<p>Instead I would create a business logic object which oversees the permissions for <code>TaskList</code>.  So the <code>TaskList</code> would have an owner field but you would have something like:</p>
+
+<pre><code>public class TaskListAccessor {
+    private TaskList taskList;
+    private User reader;
+
+    public void updateStatus(Status status) {
+        // everyone can do this
+        taskList.updateStatus(status);
+    }
+
+    /** Return true if delete operation is allowed else false */
+    public boolean isDeleteAllowed() {
+        return taskList.getOwner().equals(reader);
+    }
+
+    /** Delete the task.  Only owners can do this.  Returns true if worked else false */
+    public boolean delete() {
+        if (isDeleteAllowed()) {
+           taskList.delete();
+           return true;
+        } else {
+           return false;
+        }
+    }
+    // ... other accessors with other is*Allowed methods
+}
+</code></pre>
+
+<p>If you need to require that all operations on <code>TaskList</code> objects go through accessors then you could create a factory class which is the only one who creates <code>TaskList</code> using package constructors or something.  Maybe the factory is the only one who would use the DAO to look up the <code>TaskList</code> from the data store.</p>
+
+<p>However, if there are too many methods to control in this fashion then a proxy might be easier.  In both cases having <code>TaskList</code> be an interface would be recommended, with the implementation class hidden by the proxy or the accessor.</p>

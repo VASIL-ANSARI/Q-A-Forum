@@ -1,0 +1,32 @@
+<p>The documentation of the <a href="https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingWorker.html#done--" rel="nofollow">SwingWorker.done()</a> method seems to be a bit wrong. It says that done() is called "after the doInBackground method is finished". But, firstly, done() is also apparently called when you cancel the SwingWorker, even if you never started it. Secondly, if you cancel the SwingWorker then done() is called immediately, even if the doInBackground() method hasn't returned yet. That's what's happening here.</p>
+
+<p>When done() is called, your infinite loop is still running. I confirmed that using the following code which dumps all thread stack traces to the console:</p>
+
+<pre><code>static void dumpThreads() {
+    for (java.util.Map.Entry&lt;Thread,StackTraceElement[]&gt; t : Thread.getAllStackTraces().entrySet()) {
+        System.out.println(t.getKey() + ":");
+        for (StackTraceElement e : t.getValue()) {
+            System.out.println("    " + e);
+        }
+    }
+}
+</code></pre>
+
+<p>I inserted a call to that method inside done(). One of the thread stack traces showed that the infinite loop was still alive and well at that time:</p>
+
+<pre><code>Thread[SwingWorker-pool-1-thread-1,5,main]:
+    AWorker.doStuff(AWorker.java:8)
+    AWorker.doInBackground(AWorker.java:14)
+    javax.swing.SwingWorker$1.call(SwingWorker.java:295)
+    java.util.concurrent.FutureTask.run(FutureTask.java:266)
+    javax.swing.SwingWorker.run(SwingWorker.java:334)
+    java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+    java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+    java.lang.Thread.run(Thread.java:744)
+</code></pre>
+
+<p>However, the infinite loop does get forcibly stopped shortly afterwards, not by the SwingWorker, but by the end of the program, because when there are no non-daemon threads running (SwingWorker threads are daemon threads) and no windows created, the program exits. The combination of those two things (dodgy documentation and automatic exit) gives the appearance that cancelling the SwingWorker is magically stopping the task, but it isn't.</p>
+
+<p>If you open a window from your main method, that will prevent the program from automatically exiting. Then you'll see from your system task manager that the program stays running (and stays hogging the CPU in that infinite loop) until you terminate it.</p>
+
+<p>In short, yes, SwingWorker cancellation <strong>is</strong> cooperative.</p>

@@ -1,0 +1,39 @@
+<p>One thing I have found useful is a little function that takes a NSString, a UIFont and a CGSize, returning a CGFloat representing the largest font size for that string that will fit in the CGSize passed - it uses <code>sizeWithFont</code> on successively smaller point sizes until the size returned fits within the CGSize argument. You can pass <code>CGFLOAT_MAX</code> as either x or y if you don't care about one dimension, like when you are checking width of a line and will check height later on the whole string. You define max and min font sizes of course.</p>
+
+<p>I would begin by separating the string into an array of words using <code>componentsSeparatedByString</code>. Possibly you want to define a word that may be hyphenated as a word that is some multiple of the next largest word when all words are rendered at the same font size, so you create that array for some arbitrary font size and you have a matching array of relative widths (or maybe a dictionary where the word is the key and the width the value). You need to scan for and separate any such word(s) into two words (one containing the hyphen) before proceeding. Next you need to find the font size at which all the words fit into your size constraint, in the example you have shown that is width, using the function mentioned above. </p>
+
+<p>When the candidate font size is known you check for your other constraints such as widows - probably you define these in terms of the positions they may not occur (the start for one) and the proportion of line width that makes a widow. If you find a problem you combine  words in the array to remove the widow and recalculate a new candidate font size - doing this might cause you to end up with hyphenation on the first line or a smaller font overall but if your text is "a disproportionally long start to a group of small words" then you may have no choice.</p>
+
+<p>The problem of "nicely" disappearing isn't so hard, you just need to double-check the height of the rendered text - probably you could use <code>sizeWithFont:constrainedToSize</code> once you have completed the procedures above as your final check. If it fails, reduce maximum candidate font size and start over. </p>
+
+<p>So:</p>
+
+<pre><code>candidateFontSize = CGFLOAT_MAX;
+while(stillRendering)
+
+  break string into array of words
+  make array of word widths
+  check for and divide hyphenation candidates
+
+  for each word
+    if max font size returned for rendered word in size constraint &lt; canddiateFontSize
+      candidateFontSize = max font size returned
+
+  for each word
+    measure each word and record rendered size in candidateFontSize
+
+  stillRendering = NO;
+
+  for each word 
+    check each word for problems such as widows and solve
+    if problem found
+      stillRendering = YES;
+
+  check entire string using sizeWithFont:constrainedToSize using width, CGFLOAT_MAX
+
+  if height is too large
+    stillRendering = YES;
+    candidateFontSize--;
+</code></pre>
+
+<p>It's only a start but it should be workable from there.</p>

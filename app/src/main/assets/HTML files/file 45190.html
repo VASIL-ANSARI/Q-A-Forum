@@ -1,0 +1,44 @@
+<blockquote>
+  <p>How to find records with duplicate values in any column?</p>
+</blockquote>
+
+<pre><code>SELECT l.id, l.name, l.email, l.created_at, array_agg(l2.id) AS ids
+FROM   leads l
+WHERE EXISTS (
+   SELECT 1
+   FROM   leads 
+   WHERE  id &lt;&gt; l.id 
+   AND   (
+          name = l.name    
+   OR     cpf_cnpj = l.cpf_cnpj
+   OR     email = l.email
+   OR     phone-&gt;'cellphone'  = l.phone-&gt;'cellphone'
+   OR     phone-&gt;'residence'  = l.phone-&gt;'residence'
+   OR     phone-&gt;'commercial' = l.phone-&gt;'commercial'
+         )
+   );
+</code></pre>
+
+<p>But it seems like you want something different:</p>
+
+<blockquote>
+  <p>How to get an array of IDs for each row from rows that have the same value in at least one of several given columns, youngest entry first?</p>
+</blockquote>
+
+<pre><code>SELECT l.id, l.name, l.email, l.created_at
+     , array_agg(l2.id  ORDER BY l2.created_at DESC NULL LAST) AS dupe_ids
+FROM   leads l
+JOIN   leads l2 ON l2.id &lt;&gt; l.id 
+      AND   (
+              l2.name = l.name    
+       OR     l2.cpf_cnpj = l.cpf_cnpj
+       OR     l2.email = l.email
+       OR     l2.phone-&gt;'cellphone'  = l.phone-&gt;'cellphone'
+       OR     l2.phone-&gt;'residence'  = l.phone-&gt;'residence'
+       OR     l2.phone-&gt;'commercial' = l.phone-&gt;'commercial'
+             )
+GROUP   BY l.id
+ORDER   BY l.created_at DESC NULL LAST;
+</code></pre>
+
+<p>Assuming <code>id</code> is the primary key.</p>

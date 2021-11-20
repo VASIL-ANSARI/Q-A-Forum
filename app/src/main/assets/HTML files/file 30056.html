@@ -1,0 +1,77 @@
+<p>I can reproduce what you described</p>
+
+<pre><code>http_proxy=http://127.0.0.1 ruby -e "require 'open-uri'; open('http://google.com', proxy: nil)"
+~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:878:in `initialize': Connection refused - connect(2) (Errno::ECONNREFUSED)
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:878:in `open'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:878:in `block in connect'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/timeout.rb:52:in `timeout'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:877:in `connect'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:862:in `do_start'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/net/http.rb:851:in `start'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:313:in `open_http'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:708:in `buffer_open'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:210:in `block in open_loop'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:208:in `catch'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:208:in `open_loop'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:149:in `open_uri'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:688:in `open'
+    from ~/.rvm/rubies/ruby-2.0.0-p247/lib/ruby/2.0.0/open-uri.rb:34:in `open'
+    from -e:1:in `&lt;main&gt;'
+</code></pre>
+
+<p>I've digged the <a href="https://github.com/ruby/ruby/blob/trunk/lib/open-uri.rb" rel="nofollow">code</a>, and I think I've found the problem.</p>
+
+<p>So far <code>open-uri</code> manage correctly the proxy. For instance, in <code>OpenURI.open_loop</code>, it correctly considers that the <code>proxy</code> is set to <code>nil</code> (see <a href="https://github.com/ruby/ruby/blob/trunk/lib/open-uri.rb#L195" rel="nofollow">open-uri.rb#195</a></p>
+
+<pre><code>case opt_proxy
+when true
+  find_proxy = lambda {|u| pxy = u.find_proxy; pxy ? [pxy, nil, nil] : nil}
+when nil, false
+  find_proxy = lambda {|u| nil} # &lt;-- THIS LINE
+</code></pre>
+
+<p>But when it <a href="https://github.com/ruby/ruby/blob/trunk/lib/open-uri.rb#L291" rel="nofollow">creates</a> a <code>Net::HTTP</code> instance into <code>OpenURI.open_http</code></p>
+
+<pre><code>http = klass.new(target_host, target_port)
+</code></pre>
+
+<p>it doesn't pass <code>p_addr = nil</code>. According the <a href="https://github.com/ruby/ruby/blob/trunk/lib/net/http.rb#L609" rel="nofollow">source code and doc</a> for <code>HTTP.new</code></p>
+
+<pre><code>def HTTP.new(address, port = nil, p_addr = :ENV, p_port = nil, p_user = nil, p_pass = nil)
+  http = super address, port
+
+  if proxy_class? then # from Net::HTTP::Proxy()
+    http.proxy_from_env = @proxy_from_env
+    http.proxy_address = @proxy_address
+    http.proxy_port = @proxy_port
+    http.proxy_user = @proxy_user
+    http.proxy_pass = @proxy_pass
+  elsif p_addr == :ENV then # &lt;---- THIS LINE
+    http.proxy_from_env = true
+  else
+    http.proxy_address = p_addr
+    http.proxy_port = p_port || default_port
+    http.proxy_user = p_user
+    http.proxy_pass = p_pass
+  end
+
+  http
+end
+</code></pre>
+
+<p>Above the doc says</p>
+
+<blockquote>
+  <p>To disable proxy detection set +p_addr+ to nil.</p>
+</blockquote>
+
+<p>I've patched <code>open-uri.rb</code> by replacing the <a href="https://github.com/ruby/ruby/blob/trunk/lib/open-uri.rb#L291" rel="nofollow">line 291</a> by</p>
+
+<pre><code>http = proxy ? klass.new(target_host, target_port) : klass.new(target_host, target_port, nil)
+</code></pre>
+
+<p>Now, it behaves as expected.</p>
+
+<hr>
+
+<p>just filled an <a href="https://bugs.ruby-lang.org/issues/9385" rel="nofollow">issue in Ruby bug tracker</a> about that.</p>

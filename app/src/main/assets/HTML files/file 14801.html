@@ -1,0 +1,25 @@
+<p>You should not use <code>imageNamed:</code> for the loading of your large images, because that method caches the images and should only be used for small images that you use multiple times in your App (like images for buttons etc.). That method is notorious for causing memory problems when used with many large images. </p>
+
+<p>Switch to <code>imageWithContentsOfFile:</code> instead. Loading your images with that methods secures that the images are not cached and the memory is freed after you do not use that images any more.</p>
+
+<p>If the scrolling seems to be sluggish you can move the loading of the image to a background thread using <code>performSelectorInBackground</code>:</p>
+
+<pre><code>[self performSelectorInBackground:@selector(retrieveImageData:) withObject:imagePath];
+</code></pre>
+
+<p>the loading of the UIImage happens in this method:</p>
+
+<pre><code>- (void)retrieveImageData:(NSString *)imagePath {
+  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+  UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
+  [self performSelectorOnMainThread:@selector(imageDataRetrieved:) withObject:image waitUntilDone:NO];
+  [pool release];
+}
+</code></pre>
+
+<p>and the attachment of the image to the UIImageView on the main thread (UI manipulations must not happen on a background Thread):</p>
+
+<pre><code>- (void)imageDataRetrieved:(UIImage)*image {
+  yourImageView.image = image;
+}
+</code></pre>

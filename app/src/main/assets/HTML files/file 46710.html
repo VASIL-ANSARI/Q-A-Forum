@@ -1,0 +1,168 @@
+<blockquote>
+  <p>Do I have to set a Layout or is it possible without one</p>
+</blockquote>
+
+<p>As a general rule of thumb, yes, you should make use of a layout manager where ever it's possible, it will save you a lot of work in the long run.</p>
+
+<p>Based on you code and what I presume you want to do, I would suggest having a look at:</p>
+
+<ul>
+<li><a href="http://docs.oracle.com/javase/tutorial/uiswing/layout/index.html" rel="nofollow">Laying Out Components Within a Container</a></li>
+<li><a href="http://docs.oracle.com/javase/tutorial/uiswing/layout/gridbag.html" rel="nofollow">How to Use GridBagLayout</a></li>
+<li><a href="http://docs.oracle.com/javase/tutorial/uiswing/layout/card.html" rel="nofollow">How to Use CardLayout</a></li>
+</ul>
+
+<p>As additional advice:</p>
+
+<ul>
+<li>Don't use <code>null</code> layouts, pixel perfect layouts are an illusion within modern ui design.  There are too many factors which affect the individual size of components, none of which you can control. Swing was designed to work with layout managers at the core, discarding these will lead to no end of issues and problems that you will spend more and more time trying to rectify</li>
+<li>Don't reference <code>src</code> ever, it will no exist once the program is exported.  Try and avoid absolute paths as well, as different computers will place your program in different locations (and not all OS's have a concept of drive letters).  Instead, in your case, you should be using something like <code>getClass().getResource("/Testumgebung/background/battleship_main.jpg")</code></li>
+<li>You should be calling <code>super.paintComponent</code> before performing any custom painting as a general rule.</li>
+<li>In order for your background to show up, all components which are added to it should be made transparent (<code>setOpaque(false)</code>) so the background can show through.</li>
+<li>Separate your classes into areas of responsibility.  For example <code>Panel</code> should do nothing but manage the background image and should not be managing anything else, this would mean having the <code>Gui</code> added to the <code>Panel</code> as a separate step and not part of the <code>Panel</code>s initialisation</li>
+</ul>
+
+<p>As a conceptual example...</p>
+
+<p><img src="http://i.stack.imgur.com/MXGrL.png" alt="Be free"></p>
+
+<pre><code>import java.awt.AlphaComposite;
+import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Composite;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import javax.imageio.ImageIO;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class Frame {
+
+    public static void main(String[] args) {
+
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                    ex.printStackTrace();
+                }
+
+                Panel background = new Panel();
+
+                JFrame frame = new JFrame("Testing");
+                frame.setContentPane(background);
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.add(new Gui());
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+        });
+    }
+
+    public static class Panel extends JPanel {
+
+        BufferedImage image;
+
+        public Panel() {
+            setLayout(new BorderLayout());
+            try {
+                image = ImageIO.read(getClass().getResource("/Testumgebung/background/battleship_main.png"));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
+
+        @Override
+        public Dimension getPreferredSize() {
+            return image == null ? super.getPreferredSize() : new Dimension(image.getWidth(), image.getHeight());
+        }
+
+        @Override
+        public void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            g.drawImage(image, 0, 0, this);
+        }
+
+    }
+
+    public static class Gui extends JPanel {
+
+        private MainMenuPane mainMenuPane;
+        private CardLayout cardLayout;
+
+        public Gui() {
+
+            setOpaque(false);
+
+            setVisible(true);
+            cardLayout = new CardLayout();
+            setLayout(cardLayout);
+
+            mainMenuPane = new MainMenuPane();
+            // Other views
+
+            add(mainMenuPane, "MainMenu");
+
+            cardLayout.show(this, "MainMenu");
+
+        }
+
+    }
+
+    public static class MainMenuPane extends JPanel {
+
+        JButton singlePlayerButton;
+        JButton multiPlayerButton;
+
+        JLabel text;
+
+        public MainMenuPane() {
+
+            setLayout(new GridBagLayout());
+            setOpaque(false);
+            setBackground(Color.BLUE);
+
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.ipadx = 20;
+            gbc.ipady = 20;
+
+            singlePlayerButton = new JButton("Single Player");
+
+            add(singlePlayerButton, gbc);
+
+            multiPlayerButton = new JButton("Multi Player");
+
+            add(multiPlayerButton, gbc);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            // This is faking transparency, so the background color
+            // will be see through
+            Graphics2D g2d = (Graphics2D) g.create();
+            Composite old = g2d.getComposite();
+            g2d.setComposite(AlphaComposite.SrcOver.derive(0.5f));
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+            g2d.setComposite(old);
+        }
+
+    }
+
+}
+</code></pre>

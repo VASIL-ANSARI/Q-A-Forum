@@ -1,0 +1,19 @@
+<p>I think I got it. I modified the code to remove all kills but added PID prints. Here is the sequence for t=0:</p>
+
+<pre><code>I am 12684
+pgid=12684  // I printed the PGID to be sure
+[12685] sending SIGUSR1 to 12684
+[12685] sending SIGUSR1 to 11451
+(â¦) // same line repeated, from the for loop
+</code></pre>
+
+<p>With t=1 it is directly 11451. You were right, because on my session process with PID 11451 is:</p>
+
+<pre><code>init --user
+</code></pre>
+
+<p>started as my user. So I'm allowed to send signals to it. And so yes, after father dies the child is attached to init, here "my" init, and so <code>getppid()</code> points to it and the code kills init!</p>
+
+<p>If you re-activate the <code>wait()</code> loop the output is different as I only see the father PID (of course without real kill the father is still alive).</p>
+
+<p>Not sure about why this "private" init is used (don't followed recent changes in Ubuntu). Knowing that, and to prevent such behavior, I would suggest to store the PID at process starting (before any forks) and to use this stored value after that in children. This way you are sure to "kill" the right target, or to kill nobody if the father dies for any reason.</p>

@@ -1,0 +1,53 @@
+<p>When you start engines with MPI in IPython parallel, it ultimately boils down to a single call of:</p>
+
+<pre><code>mpiexec [-n N] ipengine
+</code></pre>
+
+<p>It does no configuration of MPI. If you start multiple groups of engines on different hosts, each group will be in its own MPI universe, which is what you are seeing. The first thing to do is to make sure that everything's working as you expect with a single call to <code>mpiexec</code> before you bring IPython parallel into it.</p>
+
+<p>As mentioned in <a href="http://stackoverflow.com/questions/30768872/ipython-mpi-with-a-machinefile">IPython parallel with a machine file</a>, to use multi-host MPI, you typically need a machinefile to specify launching multiple engines on multiple hosts. For example:</p>
+
+<pre><code># ~/mpi_hosts
+machine1 slots=4
+machine2 slots=4
+</code></pre>
+
+<p>You can use a simple test script for diagnostics:</p>
+
+<pre><code># test_mpi.py
+import os
+import socket
+from mpi4py import MPI
+
+MPI = MPI.COMM_WORLD
+
+print("{host}[{pid}]: {rank}/{size}".format(
+    host=socket.gethostname(),
+    pid=os.getpid(),
+    rank=MPI.rank,
+    size=MPI.size,
+))
+</code></pre>
+
+<p>And run it:</p>
+
+<pre><code>$ mpiexec -machinefile ~/mpi_hosts -n 8 python test_mpi.py 
+machine1[32292]: 0/8
+machine1[32293]: 1/8
+machine1[32294]: 2/8
+machine1[32295]: 3/8
+machine2[32296]: 4/8
+machine2[32297]: 5/8
+machine2[32298]: 6/8
+machine2[32299]: 7/8
+</code></pre>
+
+<p>Once that's working as expected, you can add</p>
+
+<pre><code>c.MPILauncher.mpi_args = ["-machinefile", "~/mpi_hosts"]
+</code></pre>
+
+<p>to your <code>~/.ipython/profile_default/ipcluster_config.py</code> and start your engines with</p>
+
+<pre><code>ipcluster start -n 8
+</code></pre>

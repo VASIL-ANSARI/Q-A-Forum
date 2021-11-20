@@ -1,0 +1,27 @@
+<p>Your query does look correct, so I'm assuming the issue is as you describe in your edit (the join is happening through the wrong ID). Rails decides how to join two tables based on the relations that you've set up, so if the join isn't as you'd expect then you need to make sure your relations are correct. In your case, you would want something like:</p>
+
+<pre><code>class Micropost &lt; ActiveRecord::Base
+  has_many :activities
+  has_many :action_activities, class_name: 'Activity', foreign_key: :action_id
+end
+
+class Activity &lt; ActiveRecord::Base
+  belongs_to :micropost
+  belongs_to :action, class_name: 'Micropost'
+end
+</code></pre>
+
+<p>Since Micropost is related to Activity in two different ways, it needs to be told that explicitly. I used the <code>foreign_key</code> option to make sure it knows which is which. With that code, you can see that this generates the expected SQL:</p>
+
+<pre><code>irb&gt; Micropost.joins(:action_activities)
+  Micropost Load (2.8ms)  SELECT "microposts".* FROM "microposts" INNER JOIN "activities" ON "activities"."action_id" = "microposts"."id"
+</code></pre>
+
+<p>The other option is to be explicit in your join, like so:</p>
+
+<pre><code>Micropost.joins("JOIN activities ON activities.action_id = microposts.id")
+  .where('activities.user_id=?',id)
+  .order('activities.created_at DESC')
+</code></pre>
+
+<p>Which is useful in situations when you want a more complicated join, mostly. In your case, I think your relations are the real issue.</p>

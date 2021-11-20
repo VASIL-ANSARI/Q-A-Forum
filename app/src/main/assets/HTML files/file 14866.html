@@ -1,0 +1,31 @@
+<p>The reason that <code>IFNULL</code> doesn't work is that it only has an effect on values. A result set with no rows has no values, so it does nothing.</p>
+
+<p>First, it's probably better to do this on the client than on the server. But if you have to do it on the server, there's a couple of approaches I can think of.</p>
+
+<p>Try this:</p>
+
+<pre><code>SELECT IFNULL(SUM(score), 0) AS score
+FROM score
+WHERE processID=? and operationID=? and type=?
+ORDER BY processid
+</code></pre>
+
+<p>The <code>SUM</code> ensures that exactly one row will be returned.</p>
+
+<p>If you need to return multiple rows when the table contains multiple matching rows then you can use this (omitting the ORDER BY for simplicity):</p>
+
+<pre><code>SELECT score
+FROM score
+WHERE processID = ? and operationID = ? and type = ?
+
+UNION ALL
+
+SELECT 0
+FROM (SELECT 0) T1
+WHERE NOT EXISTS
+(
+    SELECT *
+    FROM score
+    WHERE processID = ? and operationID = ? and type = ?
+)
+</code></pre>

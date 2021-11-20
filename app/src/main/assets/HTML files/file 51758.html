@@ -1,0 +1,44 @@
+<p>Using <code>BufferedReader</code> is a mistake for 2 reasons:</p>
+
+<ol>
+<li>It converts bytes to a <code>String</code> which you then convert back into bytes to send it into the output stream. The conversions may (and probably will) lead to loss of data;</li>
+<li>It parses too many bytes and you have no control over it.</li>
+</ol>
+
+<p>You need to approach this surgically, creating a buffer of bytes of the size you want and using an <code>InputStream</code> to read the stream byte-by-byte on your own terms. Also, since you know that the HTTP header ending is "\r\n\r\n" (or 13 10 13 10 in bytes), you can scan your own buffer for this pattern and act accordingly.</p>
+
+<p>Your best bet is to download the image to a file and then use the ImageIO to read it from the local file.</p>
+
+<h1>Here's the code that will allow you to download an Image file (or any other file) by cutting out the header:</h1>
+
+<pre><code>    // Initialize the streams.
+    final FileOutputStream fileOutputStream = new FileOutputStream(file);
+    final InputStream inputStream = socket.getInputStream();
+
+    // Header end flag.
+    boolean headerEnded = false;
+
+    byte[] bytes = new byte[2048];
+    int length;
+    while ((length = inputStream.read(bytes)) != -1) {
+        // If the end of the header had already been reached, write the bytes to the file as normal.
+        if (headerEnded)
+            fileOutputStream.write(bytes, 0, length);
+
+        // This locates the end of the header by comparing the current byte as well as the next 3 bytes
+        // with the HTTP header end "\r\n\r\n" (which in integer representation would be 13 10 13 10).
+        // If the end of the header is reached, the flag is set to true and the remaining data in the
+        // currently buffered byte array is written into the file.
+        else {
+            for (int i = 0; i &lt; 2045; i++) {
+                if (bytes[i] == 13 &amp;&amp; bytes[i + 1] == 10 &amp;&amp; bytes[i + 2] == 13 &amp;&amp; bytes[i + 3] == 10) {
+                    headerEnded = true;
+                    fileOutputStream.write(bytes, i+4 , 2048-i-4);
+                    break;
+                }
+            }
+        }
+    }
+    inputStream.close();
+    fileOutputStream.close();
+</code></pre>

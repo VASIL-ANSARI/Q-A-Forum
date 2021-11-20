@@ -1,0 +1,49 @@
+<p>OK, after thinking about Diego's comment and getting a good nights sleep I figured out the correct way to implement this and get the result I want. Diego is right that I should be using <code>Reference</code> and not <code>Join</code>. My original reasoning for wanting to implement this as a join was a desire to avoid adding another level to my object graph. <code>AccountRegistrationField</code> is already a property on the <code>Account</code> object and I didn't want to have to make a call like <code>Account.AccountRegistrationField.RegistrationField.FieldType</code>. I instead wanted the call to be <code>Account.AccountRegistrationField.FieldType</code> since the object I'll really be operating on is the <code>AccountRegistrationField</code> object.</p>
+
+<p>I was able to get this behavior by designing my <code>AccountRegistrationField</code> class a little better. I made the <code>RegistrationField</code> property private and added public properties on the <code>AccountRegistrationField</code> class to expose the fields that I needed. And then used Fluent NHibernate's <a href="http://wiki.fluentnhibernate.org/Fluent_mapping_private_properties" rel="nofollow">Reveal</a> class to expose the private property to my mapping.</p>
+
+<p>My <code>AccountRegistrationField</code> class ended up looking like this:</p>
+
+<pre><code>public class AccountRegistrationField
+{
+    public virtual int ID { get; set; }
+    public virtual int AccountID { get; set; }
+    public virtual string DefaultValue { get; set; }
+    public virtual int FieldID { get; set; }
+    public virtual string HtmlID 
+    { 
+        get { return RegistrationField.HtmlID; } 
+    }
+    public virtual bool IsRequired { get; set; }
+    public virtual string Label { get; set; }
+    public virtual int Priority { get; set; }
+    public virtual string FieldType 
+    { 
+        get { return RegistrationField.FieldType; } 
+    }
+
+    private RegistrationField RegistrationField { get; set; }
+}
+</code></pre>
+
+<p>And my mapping for <code>AccountRegistrationField</code> looks like:</p>
+
+<pre><code>public class AccountRegistrationFieldMap : ClassMap&lt;AccountRegistrationField&gt;
+{
+    public AccountRegistrationFieldMap()
+    {
+        Table("AccountRegistrationField");
+
+        Id(r =&gt; r.ID).Column("RegistrationID");
+        Map(r =&gt; r.AccountID);
+        Map(r =&gt; r.DefaultValue);
+        Map(r =&gt; r.IsRequired);
+        Map(r =&gt; r.Label);
+        Map(r =&gt; r.Priority);
+        References&lt;RegistrationField&gt;(
+                 Reveal.Member&lt;AccountRegistrationField&gt;("RegistrationField"))
+            .Column("FieldID");
+
+    }
+}
+</code></pre>

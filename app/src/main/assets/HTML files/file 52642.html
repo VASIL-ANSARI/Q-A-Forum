@@ -1,0 +1,107 @@
+<h1>How to test if credentials are okay via Command Line</h1>
+
+<ol>
+<li>Open up your server terminal and type <code>echo -n "YOUR SMTP USERNAME" | base64</code></li>
+<li>Copy paste the output somewhere. You will need it. The output should end with <code>=</code></li>
+<li>Repeat step 1 and 2 for <code>YOUR SMTP PASSWORD</code></li>
+<li>Copy paste the following into a text file but replace <code>&lt;whatever&gt;</code> as you deem fit.</li>
+</ol>
+
+<p>Like this:</p>
+
+<pre><code>AFTER 220 .... PASTE THE LINE BELOW:
+EHLO &lt;example.com&gt;
+
+AFTER 250 Ok PASTE THE LINE BELOW:
+AUTH LOGIN
+
+AFTER 334 VXNlcm5hbWU6:
+&lt;YOUR SMTP USERNAME encoded as base64 from step 1&gt;
+
+AFTER 334 UGFzc3dvcmQ6:
+&lt;YOUR SMTP PASSWORD encoded as base64 from step 3&gt;
+
+AFTER 235 Authentication successful.
+MAIL FROM:&lt;yourverifiedemail@example.com&gt;
+
+AFTER 250 Ok
+RCPT TO:&lt;yourverifiedemail@example.com&gt;
+
+AFTER 250 Ok
+DATA
+
+AFTER 354 End data with &lt;CR&gt;&lt;LF&gt;.&lt;CR&gt;&lt;LF&gt;    
+Subject:Hello from Amazon SES!
+
+This email was sent using the Amazon SES SMTP interface.
+.
+</code></pre>
+
+<ol start="5">
+<li><p>Type <code>openssl s_client -crlf -quiet -connect email-smtp.us-west-2.amazonaws.com:465</code> into your terminal</p></li>
+<li><p>Follow the instructions in the text file.</p></li>
+</ol>
+
+<p>Once ascertained that credentials are good, now configure your cakephp 3.x</p>
+
+<h1>Configure Cake 3.x</h1>
+
+<ul>
+<li><p>Open up your <code>config/app.php</code></p></li>
+<li><p>Find <code>EmailTransport</code> and add a new transport below default</p></li>
+</ul>
+
+<p>Like this:</p>
+
+<pre><code>'EmailTransport' =&gt; [
+    'default' =&gt; [
+        'className' =&gt; 'Mail',
+        // The following keys are used in SMTP transports
+        'host' =&gt; 'localhost',
+        'port' =&gt; 25,
+        'timeout' =&gt; 30,
+        'username' =&gt; 'user',
+        'password' =&gt; 'secret',
+        'client' =&gt; null,
+        'tls' =&gt; null,
+    ],
+    // START of what you need to add!!
+    'AWS_SES' =&gt;[
+        'className' =&gt; 'Smtp', 
+        'host' =&gt; 'email-smtp.us-west-2.amazonaws.com', 
+        'port' =&gt; 587, // this is very important to be 587!! 
+        'timeout' =&gt; 30,
+        'username' =&gt; 'YOUR SMTP USERNAME',
+        'password' =&gt; 'YOUR SMTP PASSWORD',
+        'tls' =&gt; true, // this is also very important!!
+    ]
+    // END of what you need to add!!
+],
+</code></pre>
+
+<ul>
+<li>Now look for <code>Email</code> in <code>app.php</code> and add a new profile below default</li>
+</ul>
+
+<p>Like this:</p>
+
+<pre><code>'Email' =&gt; [
+    'default' =&gt; [
+        'transport' =&gt; 'default',
+        'from' =&gt; 'you@localhost',
+        //'charset' =&gt; 'utf-8',
+        //'headerCharset' =&gt; 'utf-8',
+    ],
+// START of what you need to add!
+    'production' =&gt; [
+        'transport' =&gt; 'AWS_SES',
+        //'log' =&gt; true,
+    ]
+// END of what you need to add!
+],
+</code></pre>
+
+<ul>
+<li>That's all for configuration!</li>
+<li>Just call <code>$email = new Email('production');</code> at the appropriate place that you want.</li>
+</ul>

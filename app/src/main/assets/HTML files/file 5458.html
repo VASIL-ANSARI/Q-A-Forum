@@ -1,0 +1,58 @@
+<blockquote>
+  <p>And when I insert that field as '1'
+  the letter 'a' shows up in the
+  database (I guess because it's the
+  first letter in the enum array?</p>
+</blockquote>
+
+<p>Yes.</p>
+
+<blockquote>
+  <p>If i pass gibberish like 'ahjkh' the
+  field appears to be null in the db
+  even though I added 'notnull'=>true to
+  the hastable line.</p>
+</blockquote>
+
+<p>Are you sure you have it in the correct place?  It should look something like the following, I think:</p>
+
+<pre><code>$this-&gt;hasColumn(
+  'category', 
+  'enum', 
+  null,
+  array(
+    'values' =&gt; array('a', 'b', 'c', 'd'),
+    'notnull' =&gt; true,
+    'default' =&gt; 'a'
+  )
+);
+</code></pre>
+
+<blockquote>
+  <p>So to use the validation hook, like
+  prevalidate - is there way a way to
+  get the enum array from the table
+  definition, or do i need to create the
+  array again in that function and just
+  use in_array?</p>
+</blockquote>
+
+<p>Column definitions are stored on the table so you can do something like this from within a model instance:</p>
+
+<pre><code>$enums = $this-&gt;getTable()-&gt;getEnumValues('yourEnumFieldName');
+
+if(!in_array($value, $enums)){
+   // push error to stack
+}
+</code></pre>
+
+<p>Just for reference sake a <code>fieldName</code> is the name of the property on the model and the <code>columnName</code> is the actual name of the column. The two are not always the same so always make sure your passing the expected one when trying to get info from the <code>Doctrine_Table</code>.</p>
+
+<hr>
+
+<p>This could have something to do with emulated versus native <code>enum</code> types, although I'm not sure because I always use native, and it works out. You might try setting native as well:</p>
+
+<pre><code>Doctrine_Manager::getInstance()-&gt;setAttribute(Doctrine_Core::ATTR_USE_NATIVE_ENUM, true);
+</code></pre>
+
+<p>And if that doesn't do it, you can use one of the <a href="http://www.doctrine-project.org/projects/orm/1.2/docs/manual/event-listeners/en#record-hooks" rel="nofollow">validation hooks</a> to ensure it's in the enumeration.</p>

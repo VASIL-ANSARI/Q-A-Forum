@@ -1,0 +1,279 @@
+<p>I imagine you can't use Screen.PrimaryScreen.Bounds.Height because it doesn't include the size of the task bar.</p>
+
+<p>Ok so prepare for this answer cause it's a bit long. This will however give you a true maximize based on the available size of your desktop(ie the maximize button will work to produce this effect).</p>
+
+<p>Essentially what's going on here is when windows wants to resize the window (or min/max) it asks the window for some information about the windows size constraints. What we're doing here is giving it the constraints you want(maximize on the Y, keep the same X, and don't change the width).</p>
+
+<pre><code>&lt;Window x:Class="BindingTest.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="350" Width="525" x:Name="self" DataContext="{Binding ElementName=self}"&gt;
+    &lt;Grid&gt;
+        &lt;Button Click="ButtonClick"&gt;
+            &lt;Button.Style&gt;
+                &lt;Style TargetType="Button"&gt;
+                    &lt;Style.Triggers&gt;
+                        &lt;DataTrigger Binding="{Binding EnableSkinnyMode}" Value="True"&gt;
+                            &lt;Setter Property="Content" Value="Disable Skinny Mode "&gt;&lt;/Setter&gt;
+                        &lt;/DataTrigger&gt;
+                        &lt;DataTrigger Binding="{Binding EnableSkinnyMode}" Value="False"&gt;
+                            &lt;Setter Property="Content" Value="Enable Skinny Mode "&gt;&lt;/Setter&gt;
+                        &lt;/DataTrigger&gt;
+                    &lt;/Style.Triggers&gt;
+                &lt;/Style&gt;
+            &lt;/Button.Style&gt;
+        &lt;/Button&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+
+
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Windows;
+
+namespace BindingTest
+{
+    public partial class MainWindow : IDisposable, INotifyPropertyChanged
+    {
+        public bool EnableSkinnyMode
+        {
+            get { return enableSkinnyMode; }
+            set
+            {
+                if (value == enableSkinnyMode) return;
+                enableSkinnyMode = value;
+                OnPropertyChanged("EnableSkinnyMode");
+            }
+        }
+
+        private bool enableSkinnyMode;
+        public MainWindow()
+        {
+            InitializeComponent();
+            this.SourceInitialized += win_SourceInitialized;
+        }
+
+        private void ButtonClick(object sender, RoutedEventArgs e)
+        {
+            EnableSkinnyMode = EnableSkinnyMode == false;
+        }
+
+        private void win_SourceInitialized(object sender, EventArgs e)
+        {
+            System.IntPtr handle = (new System.Windows.Interop.WindowInteropHelper(this)).Handle;
+            System.Windows.Interop.HwndSource.FromHwnd(handle).AddHook(WindowProc);
+        }
+
+        private System.IntPtr WindowProc(System.IntPtr hwnd, int msg, System.IntPtr wParam, System.IntPtr lParam, ref bool handled)
+        {
+            switch (msg)
+            {
+                case 0x0024:/* WM_GETMINMAXINFO */
+                    if (EnableSkinnyMode)
+                    {
+                        WindowInteropHelper.WmGetMinMaxInfo(this, hwnd, lParam);
+                        handled = true;
+                    }
+                    break;
+            }
+
+            return (System.IntPtr)0;
+        }
+
+        public void Dispose()
+        {
+            this.SourceInitialized -= win_SourceInitialized;
+            System.IntPtr handle = (new System.Windows.Interop.WindowInteropHelper(this)).Handle;
+            System.Windows.Interop.HwndSource.FromHwnd(handle).RemoveHook(WindowProc);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChangedEventHandler handler = PropertyChanged;
+            if (handler != null) handler(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class WindowInteropHelper
+    {
+        [DllImport("user32")]
+        internal static extern bool GetMonitorInfo(IntPtr hMonitor, MONITORINFO lpmi);
+        [DllImport("User32")]
+        internal static extern IntPtr MonitorFromWindow(IntPtr handle, int flags);
+
+        public static void WmGetMinMaxInfo(Window window, System.IntPtr hwnd, System.IntPtr lParam)
+        {
+
+            MINMAXINFO mmi = (MINMAXINFO)Marshal.PtrToStructure(lParam, typeof(MINMAXINFO));
+
+            // Adjust the maximized size and position to fit the work area of the correct monitor
+            int MONITOR_DEFAULTTONEAREST = 0x00000002;
+            System.IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+
+            if (monitor != System.IntPtr.Zero)
+            {
+
+                MONITORINFO monitorInfo = new MONITORINFO();
+                GetMonitorInfo(monitor, monitorInfo);
+                RECT rcWorkArea = monitorInfo.rcWork;
+                RECT rcMonitorArea = monitorInfo.rcMonitor;
+                mmi.ptMaxPosition.x = (int)window.Left;
+                //mmi.ptMaxPosition.x = Math.Abs(rcWorkArea.left - rcMonitorArea.left);
+                mmi.ptMaxPosition.y = Math.Abs(rcWorkArea.top - rcMonitorArea.top);
+                mmi.ptMaxSize.x = (int)window.Width;
+                //mmi.ptMaxSize.x = Math.Abs(rcWorkArea.right - rcWorkArea.left);
+                mmi.ptMaxSize.y = Math.Abs(rcWorkArea.bottom - rcWorkArea.top);
+                mmi.ptMinTrackSize.x = (int)window.MinWidth;
+                mmi.ptMinTrackSize.y = (int)window.MinHeight;
+            }
+
+            Marshal.StructureToPtr(mmi, lParam, true);
+        }
+
+        #region InteropStructs
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MINMAXINFO
+        {
+            public POINT ptReserved;
+            public POINT ptMaxSize;
+            public POINT ptMaxPosition;
+            public POINT ptMinTrackSize;
+            public POINT ptMaxTrackSize;
+        };
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            /// &lt;summary&gt;
+            /// x coordinate of point.
+            /// &lt;/summary&gt;
+            public int x;
+            /// &lt;summary&gt;
+            /// y coordinate of point.
+            /// &lt;/summary&gt;
+            public int y;
+
+            /// &lt;summary&gt;
+            /// Construct a point of coordinates (x,y).
+            /// &lt;/summary&gt;
+            public POINT(int x, int y)
+            {
+                this.x = x;
+                this.y = y;
+            }
+        }
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        public class MONITORINFO
+        {
+            /// &lt;summary&gt;
+            /// &lt;/summary&gt;            
+            public int cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+
+            /// &lt;summary&gt;
+            /// &lt;/summary&gt;            
+            public RECT rcMonitor = new RECT();
+
+            /// &lt;summary&gt;
+            /// &lt;/summary&gt;            
+            public RECT rcWork = new RECT();
+
+            /// &lt;summary&gt;
+            /// &lt;/summary&gt;            
+            public int dwFlags = 0;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 0)]
+        public struct RECT
+        {
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int left;
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int top;
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int right;
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int bottom;
+
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public static readonly RECT Empty = new RECT();
+
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int Width
+            {
+                get { return Math.Abs(right - left); }  // Abs needed for BIDI OS
+            }
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public int Height
+            {
+                get { return bottom - top; }
+            }
+
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public RECT(int left, int top, int right, int bottom)
+            {
+                this.left = left;
+                this.top = top;
+                this.right = right;
+                this.bottom = bottom;
+            }
+
+
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public RECT(RECT rcSrc)
+            {
+                this.left = rcSrc.left;
+                this.top = rcSrc.top;
+                this.right = rcSrc.right;
+                this.bottom = rcSrc.bottom;
+            }
+
+            /// &lt;summary&gt; Win32 &lt;/summary&gt;
+            public bool IsEmpty
+            {
+                get
+                {
+                    // BUGBUG : On Bidi OS (hebrew arabic) left &gt; right
+                    return left &gt;= right || top &gt;= bottom;
+                }
+            }
+            /// &lt;summary&gt; Return a user friendly representation of this struct &lt;/summary&gt;
+            public override string ToString()
+            {
+                if (this == RECT.Empty) { return "RECT {Empty}"; }
+                return "RECT { left : " + left + " / top : " + top + " / right : " + right + " / bottom : " + bottom + " }";
+            }
+
+            /// &lt;summary&gt; Determine if 2 RECT are equal (deep compare) &lt;/summary&gt;
+            public override bool Equals(object obj)
+            {
+                if (!(obj is Rect)) { return false; }
+                return (this == (RECT)obj);
+            }
+
+            /// &lt;summary&gt;Return the HashCode for this struct (not garanteed to be unique)&lt;/summary&gt;
+            public override int GetHashCode()
+            {
+                return left.GetHashCode() + top.GetHashCode() + right.GetHashCode() + bottom.GetHashCode();
+            }
+
+
+            /// &lt;summary&gt; Determine if 2 RECT are equal (deep compare)&lt;/summary&gt;
+            public static bool operator ==(RECT rect1, RECT rect2)
+            {
+                return (rect1.left == rect2.left &amp;&amp; rect1.top == rect2.top &amp;&amp; rect1.right == rect2.right &amp;&amp; rect1.bottom == rect2.bottom);
+            }
+
+            /// &lt;summary&gt; Determine if 2 RECT are different(deep compare)&lt;/summary&gt;
+            public static bool operator !=(RECT rect1, RECT rect2)
+            {
+                return !(rect1 == rect2);
+            }
+        }
+
+        #endregion
+    }
+}
+</code></pre>

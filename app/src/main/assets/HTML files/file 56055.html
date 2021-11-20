@@ -1,0 +1,35 @@
+<p>From the <code>print</code> syntax and the imports, I assume that you use a Python3 version, since it can matter for unicode.</p>
+
+<p>So, we can expect that <code>href</code>, <code>title</code> and <code>title2</code> are all unicode strings (or Python 3 strings). But the print function will try to convert the strings to an encoding acceptable by the output system - for a reason I cannot know, you system uses by default ASCII, so the error.</p>
+
+<p>How to fix:</p>
+
+<ul>
+<li>the best way would be to make your system accept unicode. On Linux or other unixes, you can declare an UTF8 charset in LANG environment variable (<code>export LANG=en_US.UTF-8</code>), on Windows you can try <code>chcp 65001</code> but this latter if far from being sure</li>
+<li>if it does not work, or does not meet your needs, you can force an explicit encoding, or more exactly filter out offending characters, because Python3 natively uses unicode strings.</li>
+</ul>
+
+<p>I would use:</p>
+
+<pre><code>import sys
+
+def u_filter(s, encoding = sys.stdout.encoding):
+    return (s.encode(encoding, errors='replace').decode(encoding)
+        if isinstance(s, str) else s)
+</code></pre>
+
+<p>That means: if <code>s</code> is a unicode string encode it in the encoding used for stdout, replacing any non convertible character by a replacement char, and decode it back into a now clean string</p>
+
+<p>and next:</p>
+
+<pre><code>def fprint(*args, **kwargs):
+    fargs = [ u_filter(arg) for arg in args ]
+    print(*fargs, **kwargs)
+</code></pre>
+
+<p>means: filter out any offending character from unicode strings and print the remaining unchanged.</p>
+
+<p>With that you can safely replace your print throwing the exception with:</p>
+
+<pre><code>fprint(href, title, title2)
+</code></pre>

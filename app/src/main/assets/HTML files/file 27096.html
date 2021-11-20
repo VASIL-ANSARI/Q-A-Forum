@@ -1,0 +1,16 @@
+<p>This is how RRDtool works. RRDtool works with rates, exclusively. You can input gauge data (discrete values in time) but RRDtool will always treat them internally as rates.</p>
+
+<p>When you created your RRD file (tempo.rrd), internally RRDtool created buckets with a starting timestamp at creation time and each subsequent bucket +10s from that timestamp. For example</p>
+
+<pre><code>bucket 1    - 1379713706
+bucket 2    - 1379713716
+bucket 3    - 1379713726
+...
+bucket 100  - 1379714706
+bucket 101  - 1379714716
+bucket 102  - 1379714726
+</code></pre>
+
+<p>If you were to insert your integer values at exactly the timestamps matching the buckets, you'd be ok but you're not. Your script is inserting values using the <em>current</em> timestamp which is almost certainly not going to be equal to a bucket value. Hypothetically, lets say current timestamp is 1379714708 and you want to insert a value of 2. When you insert your value, RRDtool needs to choose which bucket to put it in. In this case 1379714706 is the nearest so it will choose that one (there's a bit more logic here but that's the gist). You might think it would insert '2' into the bucket, but to RRDtool, that would be a lie. It might be 2 now, but it probably wasn't 2 a few seconds ago. Bearing in mind that it sees all these values as rates, it tries to figure out how much it should subtract from that value to make it right by looking at the rate of change of previous values That's why you see values such as 1.8 and 2.8 and not the integer values you expect. Things get more complicate if you insert multiple values between buckets or skip buckets. </p>
+
+<p>There's an excellent tutorial at <a href="http://oss.oetiker.ch/rrdtool/tut/rrdtutorial.en.html" rel="nofollow">http://oss.oetiker.ch/rrdtool/tut/rrdtutorial.en.html</a> that goes into more detail.</p>

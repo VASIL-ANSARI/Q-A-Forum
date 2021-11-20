@@ -1,0 +1,96 @@
+<p>Just stuck with same problem yesterday, here are my results. Hope it's not too late :)</p>
+
+<p>First, i set lexer to this one, and internal lexer as you do: </p>
+
+<pre><code>self.SetLexer(stc.STC_LEX_CONTAINER)
+self.custlex = SCT_LEX_ERLANG_IDNOISE(self)
+</code></pre>
+
+<p>Bind to event and OnStyle method are same.</p>
+
+<p>And also i changed id of styles from <code>wx.newId()</code> to just numbers starting from 1.
+Without it i didn't see any styling at all. Also <code>stc.STC_STYLE_DEFAULT</code> started to work too.</p>
+
+<p>Full listing:</p>
+
+<pre><code>class SCT_LEX_ERLANG_IDNOISE(BaseLexer):
+    STC_ERLANG_IDNOISE_DEFAULT = 1
+    STC_ERLANG_IDNOISE_VARIABLE = 2
+    STC_ERLANG_IDNOISE_ATOM = 3
+    STC_ERLANG_IDNOISE_MODULE = 4
+    STC_ERLANG_IDNOISE_KEYWORD = 5
+    STC_ERLANG_IDNOISE_COMMENT = 6
+    STC_ERLANG_IDNOISE_MACROS = 7
+    STC_ERLANG_IDNOISE_NUMBER = 8
+
+    def __init__(self, control):
+        super(SCT_LEX_ERLANG_IDNOISE, self).__init__(control)
+        self.typeFormatDict = {}
+        self.typeFormatDict["other"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_DEFAULT
+        self.typeFormatDict["variable"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_VARIABLE
+        self.typeFormatDict["atom"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_ATOM
+        self.typeFormatDict["module"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_MODULE
+        self.typeFormatDict["keyword"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_KEYWORD
+        self.typeFormatDict["comment"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_COMMENT
+        self.typeFormatDict["macros"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_MACROS
+        self.typeFormatDict["number"] = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_NUMBER
+
+    def StyleText(self, event):
+        start = self.control.GetEndStyled()
+        end = event.GetPosition()
+        line = self.control.LineFromPosition(start)
+        start = self.control.PositionFromLine(line)
+        text = self.control.GetTextRange(start, end)
+
+        self.control.StartStyling(start, 0x1f)
+        lastEnd = 0
+        for type, start, end, value in getHighlightRules(text):
+            style = SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_DEFAULT
+            if start &gt; lastEnd:
+                self.control.SetStyling(start - lastEnd, style)
+            if type in self.typeFormatDict:
+                style = self.typeFormatDict[type]
+            self.control.SetStyling(len(value), style)
+            lastEnd = end
+
+
+class CustomSTC(stc.StyledTextCtrl):
+    def __init__(self, parent):
+        super(CustomSTC, self).__init__(parent)
+        self.custlex = SCT_LEX_ERLANG_IDNOISE(self)
+
+        #self.SetKeyWords(0, kwlist)
+
+        self.SetLexer(stc.STC_LEX_CONTAINER)
+        self.EnableLineNumbers()
+
+        self.StyleSetSpec(stc.STC_STYLE_DEFAULT, ColorSchema.formats["other"])
+        self.StyleClearAll()
+        self.StyleSetSpec(stc.STC_STYLE_LINENUMBER, ColorSchema.lineFont)
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_DEFAULT, ColorSchema.formats["other"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_VARIABLE, ColorSchema.formats["variable"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_ATOM, ColorSchema.formats["atom"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_MODULE, ColorSchema.formats["module"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_KEYWORD, ColorSchema.formats["keyword"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_COMMENT, ColorSchema.formats["comment"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_MACROS, ColorSchema.formats["macros"])
+        self.StyleSetSpec(SCT_LEX_ERLANG_IDNOISE.STC_ERLANG_IDNOISE_NUMBER, ColorSchema.formats["number"])
+
+        # Event Handlers
+        self.Bind(stc.EVT_STC_STYLENEEDED, self.OnStyle)
+
+    def EnableLineNumbers(self, enable=True):
+        """Enable/Disable line number margin"""
+        if enable:
+            self.SetMarginType(1, stc.STC_MARGIN_NUMBER)
+            self.SetMarginMask(1, 0)
+            self.SetMarginWidth(1, 35)
+        else:
+            self.SetMarginWidth(1, 0)
+
+    def OnStyle(self, event):
+        if self.custlex:
+            self.custlex.StyleText(event)
+        else:
+            event.Skip()
+</code></pre>

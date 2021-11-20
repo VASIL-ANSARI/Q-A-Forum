@@ -1,0 +1,8 @@
+<p>A <code>SELECT</code> statement can only use one index per table.</p>
+
+<p>Presumably the query before just did a scan using the sole index <code>class_id</code> for your condition <code>class_id=1</code>. Which will probably filter your result set nicely before checking the other conditions.</p>
+
+<p>The optimiser is 'incorrectly' choosing an index merge on <code>class_id</code> and <code>status</code> for the second query and checking 26811 rows which is probably not optimal. You could hint at the <code>class_id</code> index by adding <code>USING INDEX (class_id)</code> to the end of the <code>FROM</code> clause.
+You may get some joy with a composite index on <code>(class_id,status,grade)</code> which may run the query faster as it can match the first two and then range scan the <code>grade</code>. I'm not sure how this works with <code>null</code> though.</p>
+
+<p>I'm guessing the <code>ORDER BY</code> pushed the optimiser to choose the <code>class_id</code> index again and returned your query to it's original speed. </p>

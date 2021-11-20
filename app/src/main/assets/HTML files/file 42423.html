@@ -1,0 +1,23 @@
+<p>You need to take the SOAP body as OMElement from response for mapping against object. You may try like this:(Assuming your class to which you are mapping your response(xml file) is <code>ValidationErrors</code></p>
+
+<pre><code>FileReader fr = new FileReader("file.xml");
+XMLStreamReader xmlStreamReader = XMLInputFactory.newInstance().createXMLStreamReader(fr);
+    StAXSOAPModelBuilder smb = new StAXSOAPModelBuilder(xmlStreamReader);
+    SOAPEnvelope senv = smb.getSOAPEnvelope();
+    OMElement omelement = senv.getBody().getFirstElement();
+    try{
+        Iterator&lt;OMElement&gt; childIterator = omelement.getChildElements();
+        while(childIterator.hasNext()){
+        OMElement childEle = childIterator.next();
+        String childName = childEle.getLocalName();
+        if("validationErrors".equalsIgnoreCase(childName)){
+            XStream stream = new XStream(new StaxDriver());
+            stream.setClassLoader(ValidationErrors.class.getClassLoader());
+            stream.alias("validationErrors", ValidationErrors.class);
+            ValidationErrors response = (ValidationErrors)stream.fromXML(childEle.toString());
+           }
+        }
+        catch(XStreamException e){
+           e.printStack();
+      }
+</code></pre>

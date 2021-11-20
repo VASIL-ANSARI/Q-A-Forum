@@ -1,0 +1,67 @@
+<p>You're not passing in the correct parameters to @Html.DropDownList.  From the MSDN documentation here: <a href="http://msdn.microsoft.com/en-us/library/dd470380(v=vs.100).aspx" rel="nofollow">http://msdn.microsoft.com/en-us/library/dd470380(v=vs.100).aspx</a></p>
+
+<p>It looks like you want to use the following overload:</p>
+
+<pre><code>public static MvcHtmlString DropDownList(
+    this HtmlHelper htmlHelper,
+    string name,
+    IEnumerable&lt;SelectListItem&gt; selectList,
+    Object htmlAttributes
+)
+</code></pre>
+
+<p>So, your first parameter is the name string which you have correct, but then you need the SelectList as your second parameter and your HtmlAttributes as your third.  Try it like this:</p>
+
+<pre><code>&lt;div class="editor-field"&gt;
+     @Html.DropDownList("StandID", ViewBag.StandID, new {style = "width:150px"})
+&lt;/div&gt; 
+</code></pre>
+
+<p>UPDATE:</p>
+
+<p>Not sure your are passing the correct thing into your ViewBag either.  You're setting it equal to a new SelectList object and the DropDownList needs a collection of SelectListItems.</p>
+
+<p>Try this in your controller:</p>
+
+<pre><code>var stands = db.Stands.ToList().Where(s =&gt; s.ExhibitorID == null)                  
+    .Select(s =&gt; new SelectListItem                  
+    {                      
+        Value = s.StandID.ToString(),                      
+        Text = s.Description + "-- Â£" + s.Rate.ToString()
+    });                    
+
+
+ViewBag.StandID = stands;
+</code></pre>
+
+<p>UPDATE:</p>
+
+<p>Here is how I accomplish this same thing.  I have a static method that returns an IEnumerable and then I reference that method in my view.
+(Sorry for VB syntax)</p>
+
+<pre><code>Namespace Extensions
+
+
+    Public Module Utilities
+
+        Public Function SalutationSelectList(Optional ByVal Salutation As String = "") As IEnumerable(Of SelectListItem)
+
+
+            Dim ddl As New List(Of SelectListItem)
+
+            ddl.Add(New SelectListItem With {.Text = "", .Value = "", .Selected = If(Salutation = "", True, False)})
+            ddl.Add(New SelectListItem With {.Text = "Mr.", .Value = "Mr.", .Selected = If(Salutation = "Mr.", True, False)})
+            ddl.Add(New SelectListItem With {.Text = "Ms.", .Value = "Ms.", .Selected = If(Salutation = "Ms.", True, False)})
+            ddl.Add(New SelectListItem With {.Text = "Mrs.", .Value = "Mrs.", .Selected = If(Salutation = "Mrs.", True, False)})
+            ddl.Add(New SelectListItem With {.Text = "Dr.", .Value = "Dr.", .Selected = If(Salutation = "Dr.", True, False)})
+
+            Return ddl
+
+        End Function
+    End Module
+End Namespace
+
+
+
+@Html.DropDownListFor(Function(org) org.Salutation, SalutationSelectList())
+</code></pre>

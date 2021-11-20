@@ -1,0 +1,189 @@
+<p>On the client side:</p>
+
+<ol>
+<li>do not call <code>WSACleanup()</code> before calling <code>connect()</code>.</li>
+<li>You are not doing any error handling on <code>getaddrinfo()</code>.</li>
+<li>you are not setting the <code>ai_flags</code> to match your input values (like <code>AI_NUMERICHOST</code>).</li>
+<li>you are not freeing the memory that <code>getaddrinfo()</code> returns.</li>
+<li>you are not taking into account that you are specifying <code>AF_UNSPEC</code> to <code>getaddrinfo()</code> so it may return multiple addresses. You should try to connect to all of them until one succeeds.</li>
+</ol>
+
+<p>Try this instead:</p>
+
+<pre><code>void Base::Connect(string ip, string port)
+{
+    int status, error;
+    SOCKET ConnectSocket = INVALID_SOCKET;
+    struct addrinfo hints = {0};
+    struct addrinfo *servinfo;  // will point to the results
+
+    hints.ai_family = AF_UNSPEC;     // don't care IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
+    hints.ai_flags = AI_NUMERICHOST; // parse an IP address
+    //hints.ai_flags |= AI_NUMERICSERV; // parse a port number (not supported on Windows)
+
+    // get ready to connect
+    status = getaddrinfo(ip.c_str(), port.c_str(), &amp;hints, &amp;servinfo);
+    if (status != 0)
+    {
+        printf("getaddrinfo error: (%d) %s\n", status, gai_strerror(status));
+        return;
+    }
+
+    addrinfo *addr = servinfo;
+    do
+    {
+        // Socket Setup
+        ConnectSocket = socket(addr-&gt;ai_family, addr-&gt;ai_socktype, addr-&gt;ai_protocol);
+        if (ConnectSocket == INVALID_SOCKET)
+        {
+            printf("socket error: %d\n", WSAGetLastError());
+        }
+        else
+        {
+            // Connect
+            if (connect(ConnectSocket, addr-&gt;ai_addr, addr-&gt;ai_addrlen) != SOCKET_ERROR)
+            {
+                printf("connected to server\n");
+                break;
+            }
+
+            printf("connect error: %d\n", WSAGetLastError());
+
+            closesocket(ConnectSocket);
+            ConnectSocket = INVALID_SOCKET;
+        }
+
+        addr = addr-&gt;ai_next;
+    }
+    while (addr != NULL);
+
+    freeaddrinfo(servinfo);
+
+    if (ConnectSocket == INVALID_SOCKET)
+        printf("unable to connect to server\n");
+}
+</code></pre>
+
+<p>On the server side:</p>
+
+<ol>
+<li>you are not doing any error handling on <code>socket()</code>, <code>bind()</code> or <code>listen()</code>.</li>
+<li><code>SO_REUSEADDR</code> has to be enabled before calling <code>bind()</code>, not after. And you are not even enabling it correctly, either.</li>
+<li>you are not freeing the memory that <code>getaddrinfo()</code> returns.</li>
+</ol>
+
+<p>Try this instead:</p>
+
+<pre><code>int _tmain(int argc, _TCHAR* argv[])
+{
+    // WINDOWS SETUP
+    WSAData wsaData;
+    if (WSAStartup(MAKEWORD(2, 0), &amp;wsaData) != 0) 
+    {
+        fprintf(stderr, "WSAStartup failed.\n");
+        exit(1);
+    }
+
+    // PREPARE TO LAUNCH
+    int status;
+    struct sockaddr_storage their_addr;
+    socklen_t addr_size;
+    SOCKET client;
+
+    struct addrinfo hints = {0};
+    struct addrinfo *servinfo;  // will point to the results
+
+    hints.ai_family = AF_UNSPEC;     // don't care IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
+    hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+    //hints.ai_flags |= AI_NUMERICSERV; // parse a port number (not supported on Windows)
+
+    status = getaddrinfo(NULL, "80", &amp;hints, &amp;servinfo);
+    if (status != 0) 
+    {
+        fprintf(stderr, "getaddrinfo error: (%d) %s\n", status, gai_strerror(status));
+        getchar();
+        exit(1);
+    }
+
+    // optional, loop through servinfo creating a separate
+    // listening socket for each address reported...
+
+    // GET THE FILE DESCRIPTOR  
+    SOCKET mSocket = socket(servinfo-&gt;ai_family, servinfo-&gt;ai_socktype, servinfo-&gt;ai_protocol);
+    if (mSocket == INVALID_SOCKET)
+    {
+        fprintf(stderr, "socket error: %d\n", WSAGetLastError());
+        freeaddrinfo(servinfo);
+        closesocket(mSocket);
+        getchar();
+        exit(1);
+    }
+
+    // lose the pesky "Address already in use" error message
+    BOOL yes = TRUE;
+    if (setsockopt(mSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&amp;yes, sizeof(yes)) == SOCKET_ERROR)
+    {
+        fprintf(stderr, "setsockopt error: %d\n", WSAGetLastError());
+        freeaddrinfo(servinfo);
+        closesocket(mSocket);
+        getchar();
+        exit(1);
+    }
+
+    // WHAT PORT AM I ON
+    if (bind(mSocket, servinfo-&gt;ai_addr, servinfo-&gt;ai_addrlen) == SOCKET_ERROR)
+    {
+        fprintf(stderr, "bind error: %d\n", WSAGetLastError());
+        freeaddrinfo(servinfo);
+        closesocket(mSocket);
+        getchar();
+        exit(1);
+    }
+
+    freeaddrinfo(servinfo);
+
+    int backlog = 2;
+    if (listen(mSocket, backlog) == SOCKET_ERROR)
+    {
+        fprintf(stderr, "listen error: %d\n", WSAGetLastError());
+        closesocket(mSocket);
+        getchar();
+        exit(1);
+    }
+
+    // SERVER STARTED LISTENING SUCCESFULLY
+    printf("Server is listening...\n");
+
+    // ACCEPT
+    addr_size = sizeof their_addr;
+    client = accept(mSocket, (struct sockaddr*)&amp;their_addr, &amp;addr_size);
+    if (client == INVALID_SOCKET)
+    {
+        fprintf(stderr, "accept error: %d\n", WSAGetLastError());
+    }
+    else
+    {
+        char ip[NI_MAXHOST] = {0};
+        char port[NI_MAXSERV] = {0};
+
+        status = getnameinfo((struct sockaddr*)&amp;their_addr, addr_size, ip, NI_MAXHOST, port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
+        if (status == 0)
+            printf("Client connected from %s:%s\n", ip, port);
+        else
+            printf("Client connected. getnameinfo error: (%d) %s\n", status, gai_strerror(status));
+
+        //...
+
+        closesocket(client);
+    }        
+
+    closesocket(mSocket);
+    printf("Server ended");
+
+    getchar();
+
+    return 0;
+}
+</code></pre>

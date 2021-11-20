@@ -1,0 +1,30 @@
+<p>This sort of process (precompiling locally and pushing assets to the server independent of the code coming from your VCS) is common. I use a custom implementation of this strategy as part of my deploys through Capistrano.</p>
+
+<p>There is a separate rake task to run after the assets have been synced.</p>
+
+<pre><code>rake assets:clean
+</code></pre>
+
+<p>This will flush the assets from <code>public/assets</code> locally, allowing you to continue development with assets being pulled from <code>app/assets/</code>, <code>lib/assets/</code>, <code>vendor/assets/</code>, etc...</p>
+
+<p>I'm pretty certain what you're asking for can't be doen with Pow itself. There is an interesting <strong><a href="https://github.com/rails/rails/issues/6421" rel="nofollow">Rails Issue</a></strong> about this, specifically, <strong><a href="https://github.com/rails/rails/issues/6421#issuecomment-11129538" rel="nofollow">this comment</a></strong></p>
+
+<p><strong>config/environments/development.rb</strong></p>
+
+<pre><code>config.serve_static_assets = false
+</code></pre>
+
+<p><strong>config/routes.rb</strong> <em>(at the very end)</em></p>
+
+<pre><code>if Rails.env.development?
+  app = ActionDispatch::Static.new(
+    lambda{ |env| [404, { 'X-Cascade' =&gt; 'pass'}, []] },
+    Rails.application.config.paths['public'].first,
+    Rails.application.config.static_cache_control
+  )
+
+  mount app, :at =&gt; '/', :as =&gt; :public
+end
+</code></pre>
+
+<p>I've not tested this myself.</p>

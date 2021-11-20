@@ -1,0 +1,23 @@
+<p>If the column is defined in a table/view, you can use it in <code>ORDER BY</code> and omit it from results. But in your case, you are using <em>calculated columns</em> in <code>ORDER BY</code>, so if you want to omit these columns, you have to replace them in <code>ORDER BY</code> with corresponding formula, e.g. </p>
+
+<pre><code>ORDER BY
+    CASE WHEN (`name` = "John Smith") = 1 THEN (`name` = "John Smith") END DESC
+    -- etc...
+</code></pre>
+
+<p>I think this is not a good solution. Instead, It's better to use subquery:</p>
+
+<pre><code>INSERT INTO relational (class_id, teacher_id, student_id)
+SELECT id,1,1 FROM
+    (SELECT `id`,
+        (`name` = "John Smith") as exact_score,
+        (`name` RLIKE "[[:&lt;:]]John Smith[[:&gt;:]]") as reg_score,
+        (MATCH (`name`) AGAINST ("John Smith")) as match_score
+    FROM `teachers`
+    WHERE (`title` RLIKE "[[:&lt;:]]John Smith[[:&gt;:]]" || MATCH (`title`) AGAINST ("John Smith"))
+    ORDER BY
+        CASE WHEN exact_score = 1 THEN exact_score END DESC,
+        CASE WHEN reg_score &gt; 1 THEN reg_score END DESC,
+        CASE WHEN reg_score = 0 AND exact_score = 0 THEN match_score END DESC)
+    AS t1;
+</code></pre>

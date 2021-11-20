@@ -1,0 +1,57 @@
+<p>You need to explicitly close it as soon as <code>StopIteration</code> is raised. In this case, simply call <code>.close()</code> when you raise <code>StopIteration</code> yourself.</p>
+
+<pre><code>def next(self):
+    #This block ignores comments.
+    line = self.file.readline()
+    while line and self.__is_comment(line):
+        line = self.file.readline()
+
+    if line:
+        working = line.rstrip().split(" ")
+        trad, simp = working[0], working[1]
+        working = " ".join(working[2:]).split("]")
+        pinyin = working[0][1:]
+        english = working[1][1:]
+        return trad, simp, pinyin, english
+
+    else:
+        self.file.close()
+        raise StopIteration()  
+</code></pre>
+
+<p>Since no other code in your <code>.next()</code> method could trigger a <code>StopIteration</code> this suffices.</p>
+
+<p>If you <em>did</em> use <code>next()</code> on another iterator inside your own <code>.next()</code> you'd have to catch <code>StopIteration</code> with an <code>except StopIteration:</code> handler and reraise the exception.</p>
+
+<p>This <em>only</em> handles the <code>StopIteration</code> case. If you want to handle other situations (not exhausting the iterator) you'll need to handle that situation separately. Making your class a <a href="http://docs.python.org/2/reference/datamodel.html#with-statement-context-managers" rel="nofollow">Context Manager</a> <em>as well</em> could help with that. Users of your iterator would then use the object in a <code>with</code> statement before iterating over it, and when the <code>with</code> suite is exited the file could be closed regardless. You may want to mark your iterator as 'done' as well in that case:</p>
+
+<pre><code>_closed = False
+
+def next(self):
+    if self._closed:
+        raise StopIteration
+
+    line = self.file.readline()
+    while line and self.__is_comment(line):
+        line = self.file.readline()
+
+    if line:
+        working = line.rstrip().split(" ")
+        trad, simp = working[0], working[1]
+        working = " ".join(working[2:]).split("]")
+        pinyin = working[0][1:]
+        english = working[1][1:]
+        return trad, simp, pinyin, english
+
+    else:
+        self.file.close()
+        self._closed = True
+        raise StopIteration()  
+
+def __enter__(self):
+    return self
+
+def __exit__(self, type_, value, tb):
+    self.file.close()  # multiple calls to .close() are fine
+    self._closed = True
+</code></pre>

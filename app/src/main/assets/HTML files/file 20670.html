@@ -1,0 +1,40 @@
+<p>You're really close to the mark - the problem lies here:</p>
+
+<pre><code>        var query = rally.sdk.util.Query.and(['Iteration.Name != ""', 'Iteration.State = "Committed"']);
+
+        if (ownerDropdown) {
+            var ownerQuery = ownerDropdown.getValue();
+            if (ownerQuery != 'ALL') {
+                query = '(' + query + ' AND Owner.Name = "' + ownerQuery + '")';
+            }
+        }
+</code></pre>
+
+<p>Rally's query syntax requires another nested set of parentheses when adding another AND condition. So when you concatenate on your third condition, you are ending up with a query clause that looks like this:</p>
+
+<p><code>((Iteration.Name != "") AND (Iteration.State = "Committed")) AND (Owner.Name = "user@company.com")</code></p>
+
+<p>When it needs to look like this:</p>
+
+<p><code>(((Iteration.Name != "") AND (Iteration.State = "Committed")) AND (Owner.Name = "user@company.com"))</code></p>
+
+<p>I slightly modified your refreshCardboard() function's query logic as follows, and your code seems to work now for me.</p>
+
+<pre><code>    ....        
+    var queryArray = new Array('Iteration.Name != ""', 'Iteration.State = "Committed"');                                       
+    var query;
+
+    var selectedOwner = ownerDropdown.getValue();
+
+    if (ownerDropdown) {
+       if (selectedOwner != 'ALL') {
+          var ownerClause = 'Owner.Name = "' + selectedOwner + '"';
+          queryArray.push(ownerClause);
+       }
+    }
+
+    query = rally.sdk.util.Query.and(queryArray);
+
+    cardboardConfig.query = query;
+    ....
+</code></pre>

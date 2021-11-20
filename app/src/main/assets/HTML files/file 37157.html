@@ -1,0 +1,47 @@
+<p>No, because </p>
+
+<ul>
+<li>there is no one-to-one mapping of hash code to object (<a href="http://en.wikipedia.org/wiki/Pigeonhole_principle" rel="nofollow">pigeon principle</a>)</li>
+<li>.Net <code>HashSet</code> / <code>Dictionary</code> don't expose this implementaion details</li>
+</ul>
+
+<p>If you really need to find object by hash code you can</p>
+
+<ul>
+<li>iterate all items and compare hash code</li>
+<li>if this is main functionality - consider if custom  comparer that will let you have special object that will match any other object with the same hash code will work... </li>
+</ul>
+
+<p>Approximate code for special comparer</p>
+
+<pre><code> class ObjectsToStore
+ {
+     ....
+     public int? HashCodeOverwrite; 
+ }
+
+ class ComparerByHashCode : IEqualityComparer&lt;ObjectsToStore&gt;
+ {
+
+   public bool Equals(ObjectsToStore b1, ObjectsToStore b2)
+   {
+       if (b1.HashCodeOverwrite.HasValue || b2.HashCodeOverwrite.HasValue)
+       {
+           return b1.GetHashCode() == b2.GetHashCode());
+       }
+       // add all null checks here too.
+       return b1.Equals(b2);
+   }
+
+   public int GetHashCode(ObjectsToStore b)
+   {
+     return b.HashCodeOverwrite.HasValue? b.HashCodeOverwrite.Value:b.GetHashCode();
+   }
+ }
+</code></pre>
+
+<p>Approximate usage: </p>
+
+<pre><code>var myHashSet = new HashSet&lt;ObjectsToStore&gt;(new ComparerByHashCode());
+var itemByHashCode = myHashSet[new ObjectsToStore{HasCodeOverwrite= 1234}];
+</code></pre>

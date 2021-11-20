@@ -1,0 +1,66 @@
+<p>This is the text of the query from the first revision of the question.
+In later revisions you removed the last closing bracket <code>)</code> and the query became syntactically incorrect. You'd better check and fix the text of the question <strong>and format the text of the query, so it is readable</strong>.</p>
+
+<pre><code>SELECT TOP 1
+    SUM(mla.total_current_attribute_value)
+FROM
+    partstrack_machine_location_attributes mla (NOLOCK)
+    INNER JOIN #tmpInstallParts_Temp installpartdetails 
+        ON mla.machine_sequence_id = installpartdetails.InstallKitToMachineSequenceId 
+        AND (CASE WHEN mla.machine_side_id IS NULL THEN 1
+            WHEN mla.machine_side_id = installpartdetails.InstallKitToMachineSideId THEN 1 END) = 1
+    INNER JOIN partstrack_mes_attribute_mapping mam (NOLOCK) ON mla.mes_attribute = mam.mes_attribute_name
+    INNER JOIN partstrack_attribute_type at (NOLOCK) ON mam.pt_attribute_id = at.pt_attribute_id
+    INNER JOIN partstrack_ipp_mes_attributes ima(NOLOCK) ON at.pt_attribute_id = ima.pt_attribute_id
+WHERE
+    mla.active_ind = 'Y' 
+    AND ima.ipp_ID IN 
+    (
+        Select
+            ipp.ipp_id
+        FROM
+            partstrack_individual_physical_part ipp
+            INNER JOIN #tmpInstallParts_Temp tmp 
+                ON (ipp.ipp_id = tmp.InstallingPartIPPId 
+                OR (CASE WHEN tmp.InstallingPartIPKId = '-1' THEN 1 END) = 1)
+        GROUP BY
+            ima.ipp_id
+    )
+</code></pre>
+
+<p>With this formatting it is clear now that there is a subquery with <code>GROUP BY</code>.</p>
+
+<p>Most likely it is just a typo: you meant to write <code>GROUP BY ipp.ipp_id</code> instead of <code>GROUP BY ima.ipp_id</code>.</p>
+
+<hr>
+
+<p>If you really wanted to have the <code>GROUP BY</code> not in a subquery, but in the main <code>SELECT</code>, then you misplaced the closing bracket <code>)</code> and the query should look like this:</p>
+
+<pre><code>SELECT TOP 1
+    SUM(mla.total_current_attribute_value)
+FROM
+    partstrack_machine_location_attributes mla (NOLOCK)
+    INNER JOIN #tmpInstallParts_Temp installpartdetails 
+        ON mla.machine_sequence_id = installpartdetails.InstallKitToMachineSequenceId 
+        AND (CASE WHEN mla.machine_side_id IS NULL THEN 1
+            WHEN mla.machine_side_id = installpartdetails.InstallKitToMachineSideId THEN 1 END) = 1
+    INNER JOIN partstrack_mes_attribute_mapping mam (NOLOCK) ON mla.mes_attribute = mam.mes_attribute_name
+    INNER JOIN partstrack_attribute_type at (NOLOCK) ON mam.pt_attribute_id = at.pt_attribute_id
+    INNER JOIN partstrack_ipp_mes_attributes ima(NOLOCK) ON at.pt_attribute_id = ima.pt_attribute_id
+WHERE
+    mla.active_ind = 'Y' 
+    AND ima.ipp_ID IN 
+    (
+        Select
+            ipp.ipp_id
+        FROM
+            partstrack_individual_physical_part ipp
+            INNER JOIN #tmpInstallParts_Temp tmp 
+                ON (ipp.ipp_id = tmp.InstallingPartIPPId 
+                OR (CASE WHEN tmp.InstallingPartIPKId = '-1' THEN 1 END) = 1)
+    )
+GROUP BY
+    ima.ipp_id
+</code></pre>
+
+<p>In any case, proper formatting of the source code can really help.</p>

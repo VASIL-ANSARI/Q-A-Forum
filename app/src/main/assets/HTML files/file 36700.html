@@ -1,0 +1,76 @@
+<h1>Short Answer</h1>
+
+<p>You're putting things in a queue and retrieving them, but if you're going to join a queue, you need to mark tasks as done as you pull them out of the queue and process them. <a href="https://docs.python.org/2/library/queue.html#Queue.Queue.task_done" rel="nofollow">According to the docs</a>, every time you enqueue an item, a counter is incremented, and you need to call <code>q.task_done()</code> to decrement that counter. <code>q.join()</code> will block until that counter reaches zero. Add this immediately after your <code>q.get()</code> call to prevent main from being blocked:</p>
+
+<pre><code>q.task_done()
+</code></pre>
+
+<p>Also, I find it odd that you're checking <code>q</code> for emptiness <em>after</em> you've retrieved something from it. I'm not sure exactly what you're trying to achieve with that so I don't have any recommendations for you, but I would suggest reconsidering your design in that area.</p>
+
+<h1>Other Thoughts</h1>
+
+<p>Once you get this code working you should take it over to <a href="http://codereview.stackexchange.com/">Code Review</a> because it is a bit of a mess. Here are a few thoughts for you:</p>
+
+<h2>Exception Handling</h2>
+
+<p>You're not actually "handling" the exception in <code>threadfuncqueue(q)</code>. All the <code>finally</code> statement does is allow you to execute cleanup code in the event of an exception. It does not actually catch and handle the exception. The exception will still travel up the call stack. Consider this example, test.py:</p>
+
+<pre><code>try:
+    raise Exception
+finally:
+    print("Yup!")
+print("Nope!")
+</code></pre>
+
+<p>Output:</p>
+
+<blockquote>
+  <p>Yup!<br>
+  Traceback (most recent call last):<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;File "test.py", line 2, in <br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise Exception<br>
+  Exception  </p>
+</blockquote>
+
+<p>Notice that "Yup!" got printed while "Nope!" didn't. The code in the <code>finally</code> block was executed, but that didn't stop the exception from propagating up the stack and halting the interpreter. You need the <code>except</code> statement for that:</p>
+
+<pre><code>try:
+    raise Exception
+except Exception: # only catch the exceptions you expect
+    print("Yup!")
+print("Nope!")
+</code></pre>
+
+<p>Output:</p>
+
+<blockquote>
+  <p>Yup!<br>
+  Nope!</p>
+</blockquote>
+
+<p>This time both are printed, because we caught and handled the exception.</p>
+
+<h2>Exception Raising</h2>
+
+<p>Your current method of raising the exception in your thread is needlessly complicated. Instead of creating the whole <code>ImRaiseError</code> class, just raise the exception you want with a string:</p>
+
+<pre><code>raise Exception('Whatever error message I want')
+</code></pre>
+
+<p>If you find yourself manually manipulating <a href="http://stackoverflow.com/questions/12537904/python-private-name-mangling-and-instance-vs-class-attributes">mangled names</a> (like <code>self.__class__.__name__</code>), you're usually doing something wrong.</p>
+
+<h2>Extra Parentheses</h2>
+
+<p>Using parentheses around conditional expressions is generally frowned upon in Python:</p>
+
+<pre><code>if(1 == i): # unnecessary extra characters 
+</code></pre>
+
+<p>Try to break the C/C++/Java habit and get rid of them:</p>
+
+<pre><code>if 1 == i:
+</code></pre>
+
+<h2>Other</h2>
+
+<p>I've already gone beyond the scope of this question, so I'm going to cut this off now, but there are a few other things you could clean up and make more idiomatic. Head over to Code Review when you're done here and see what else can be improved.</p>

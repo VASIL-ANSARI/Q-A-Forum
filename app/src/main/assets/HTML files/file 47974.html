@@ -1,0 +1,138 @@
+<p>Here is what I have observed and fix it for you.</p>
+
+<p>Follow the steps and it should works:</p>
+
+<p><strong>Step A</strong></p>
+
+<pre><code>if ($result = $conn-&gt;query("SELECT * FROM persons WHERE Username='$Name'", MYSQLI_USE_RESULT))
+</code></pre>
+
+<p>To</p>
+
+<pre><code>if ($result = $conn-&gt;query("SELECT * FROM persons WHERE Username = '$Name'"))
+</code></pre>
+
+<p><strong>Step B</strong></p>
+
+<p>The code presented in the question, the function LOGIN need to end with <code>}</code></p>
+
+<pre><code>function LOGIN($Name, $Password)
+</code></pre>
+
+<p><strong>Step C (Optional)</strong></p>
+
+<p>When I test I have changed password to plain text to be sure every thing is working, but it is up to you.</p>
+
+<pre><code>$password = $_POST['password'];
+</code></pre>
+
+<p><strong>Step D</strong></p>
+
+<p>At the beginning of the code I will put <code>if statement</code></p>
+
+<pre><code>if (isset($_POST['username']))
+{
+    $name = $_POST['username'];
+    // disable for testing
+    //$password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+    $password = $_POST['password'];
+}
+</code></pre>
+
+<p><strong>Step E (Optional)</strong></p>
+
+<p>I suggest you change all variables like <code>$USERNAME</code> to <code>$username</code></p>
+
+<p><strong>Step F</strong></p>
+
+<p>Try to protect your inputs from SQL injection by adding <code>mysql_real_escape_string</code>:</p>
+
+<pre><code>$name = mysql_real_escape_string($name);
+$password = mysql_real_escape_string($password);
+</code></pre>
+
+<ul>
+<li>thank to user @ibu for noticing that</li>
+</ul>
+
+<p><strong>Finally</strong>
+<strong>Here is the full workable code with my modification:</strong></p>
+
+<pre><code>&lt;?php
+if (isset($_POST['username']))
+{
+    $name = $_POST['username'];
+    //$password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+    $password = $_POST['password'];
+    $name = mysql_real_escape_string($name);
+    $password = mysql_real_escape_string($password);
+}
+function LOGIN($Name, $Password)
+{
+    $conn = new mysqli("localhost", "root", "", "test");
+
+    if ($conn-&gt;connect_errno)
+    {
+        echo "Failed to connect to MySQL: (" . $conn-&gt;connect_errno . ") " . $conn-&gt;connect_error;
+    }
+
+    if ($result = $conn-&gt;query("SELECT * FROM persons WHERE Username = '$Name'"))
+    {
+        $row = $result-&gt;fetch_assoc();
+        printf("Select returned %d rows.\n", $result-&gt;num_rows);
+        echo "&lt;br /&gt;";
+        echo "This is what I have typed in username field: " . $Name;
+        echo "&lt;br /&gt;";
+        echo "&lt;b&gt;Name from DB: &lt;/b&gt;" . $row['Username'] . "&lt;br /&gt;";
+        echo "&lt;b&gt;Password from DB: &lt;/b&gt;" . $row['Password'] . "&lt;br /&gt;";
+        echo "&lt;br /&gt;";
+        var_dump($result);
+        $result-&gt;close();
+    } else
+    {
+        echo "no details returned &lt;br&gt;";
+        var_dump($result);
+        $result-&gt;close();
+    }
+}
+
+?&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1"/&gt;
+    &lt;title&gt;Login&lt;/title&gt;
+    &lt;link type="text/css" href="css.css" rel="stylesheet"/&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;form action="login.php" method="post" name="login-form"&gt;
+    Email: &lt;input type="text" name="username"/&gt;&lt;br&gt;
+    Password: &lt;input type="password" name="password"/&gt;
+    &lt;input type="submit" value="Login"/&gt;
+&lt;/form&gt;
+
+&lt;?php
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST')
+{
+    LOGIN($name, $password);
+}
+
+?&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p><strong>Here is a test shot from my screen:</strong>
+<a href="http://i.stack.imgur.com/MhUA9.jpg" rel="nofollow"><img src="http://i.stack.imgur.com/MhUA9.jpg" alt="enter image description here"></a></p>
+
+<p><strong>Note:</strong> When all this mentioned, this does not mean the code or what is presented is a good or perfect solution. There is a lot you have to think about when building a login mechanism. The code is also vulnerable for SQL injection you need and have to do a lot work. I encourage you to look at:</p>
+
+<p>Link1: <a href="http://www.wikihow.com/Create-a-Secure-Login-Script-in-PHP-and-MySQL" rel="nofollow">http://www.wikihow.com/Create-a-Secure-Login-Script-in-PHP-and-MySQL</a></p>
+
+<p>Link2: <a href="https://www.owasp.org/index.php/Category:OWASP_Top_Ten_Project" rel="nofollow">https://www.owasp.org/index.php/Category:OWASP_Top_Ten_Project</a></p>
+
+<p>Link3: <a href="http://php.net/manual/en/mysqli.quickstart.statements.php" rel="nofollow">http://php.net/manual/en/mysqli.quickstart.statements.php</a></p>

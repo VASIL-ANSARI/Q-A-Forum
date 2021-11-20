@@ -1,0 +1,56 @@
+<p>If you don't want to get your data deleted, then you should use KeyChain to store values. A good way to get started: <a href="http://maniacdev.com/2011/07/tutorial-how-to-use-the-ios-keychain-to-store-names-and-passwords" rel="nofollow">Using KeyChain</a></p>
+
+<p>Below I am providing an example code how to store and get data back from the KeyChain</p>
+
+<h1>Importing required frameworks</h1>
+
+<p><code>#import &lt;Security/Security.h&gt;</code></p>
+
+<h1>Storing values to KeyChain</h1>
+
+<pre><code>NSString *key = @"Full Name";
+NSString *value = @"Steve Jobs";
+NSData *valueData = [value dataUsingEncoding:NSUTF8StringEncoding];
+NSString *service = [[NSBundle mainBundle] bundleIdentifier];
+NSDictionary *secItem = @{
+                              (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword, (__bridge id)kSecAttrService : service,
+                              (__bridge id)kSecAttrAccount : key,
+                              (__bridge id)kSecValueData : valueData,
+                              };
+    CFTypeRef result = NULL;
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)secItem, &amp;result);
+if (status == errSecSuccess)
+{
+     NSLog(@"Successfully stored the value");
+}
+else{
+     NSLog(@"Failed to store the value with code: %ld", (long)status);
+}
+</code></pre>
+
+<h1>Getting values back from KeyChain</h1>
+
+<pre><code>NSString *keyToSearchFor = @"Full Name";
+NSString *service = [[NSBundle mainBundle] bundleIdentifier];
+NSDictionary *query = @{
+                        (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword, (__bridge id)kSecAttrService : service,(__bridge id)kSecAttrAccount : keyToSearchFor,
+                        (__bridge id)kSecReturnAttributes : (__bridge id)kCFBooleanTrue, };
+CFDictionaryRef valueAttributes = NULL;
+OSStatus results = SecItemCopyMatching((__bridge CFDictionaryRef)query,
+                                       (CFTypeRef *)&amp;valueAttributes);
+NSDictionary *attributes =
+(__bridge_transfer NSDictionary *)valueAttributes;
+if (results == errSecSuccess){
+    NSString *key, *accessGroup, *creationDate, *modifiedDate, *service;
+    key = attributes[(__bridge id)kSecAttrAccount];
+    accessGroup = attributes[(__bridge id)kSecAttrAccessGroup]; creationDate = attributes[(__bridge id)kSecAttrCreationDate]; modifiedDate = attributes[(__bridge id)kSecAttrModificationDate]; service = attributes[(__bridge id)kSecAttrService];
+    NSLog(@"Key = %@\n \ Access Group = %@\n \
+          Creation Date = %@\n \
+          Modification Date = %@\n \
+          Service = %@", key, accessGroup, creationDate, modifiedDate, service);
+}
+else
+{
+    NSLog(@"Error happened with code: %ld", (long)results);
+}
+</code></pre>

@@ -1,0 +1,61 @@
+<pre><code>StringBuilder sb = new StringBuilder();
+
+for( int i = 0; i &lt; length; i++ )
+{
+    int num1 = Number();
+    Int32 ASCII = num1;
+    num = (char)num1;
+
+    sb.Append( num );
+}
+
+Console.WriteLine( sb.ToString() );
+</code></pre>
+
+<p>This isn't how I would build a password nor how I would generate random text, but this will give you a string and answer the original question.</p>
+
+<p>As to how I <strong>would</strong> do this task:</p>
+
+<pre><code>System.Security.Cryptography.RNGCryptoServiceProvider _crypto = new System.Security.Cryptography.RNGCryptoServiceProvider();
+
+byte[] bytes = new byte[8]; // this array can be larger if desired
+_crypto.GetBytes( bytes );
+
+ulong randomNumber = (ulong)BitConverter.ToInt64( bytes, 0 );
+
+// convert to a string with the encoding of your choice; I prefer Base 62
+</code></pre>
+
+<p>For completeness sake, here's a Base62 algorithm which I use. Base62 has the advantage over the more commonly-used Base64 in that it does not include any special characters so it is easy to use in query strings, HTML, and JavaScript (with a few minor caveats). Of course, passwords shouldn't be used in any of those places, and you may <strong>want</strong> to include special characters to make a password more complex.</p>
+
+<p>Regardless, here is how I convert random numbers to Base62.</p>
+
+<pre><code>private static readonly char[] _base62Characters = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+
+public static string ToBase62String( long value )
+{
+    if( value &lt; 0L )
+    {
+        throw new ArgumentException( "Number must be zero or greater." );
+    }
+
+    if( value == 0 )
+    {
+        return "0";
+    }
+
+    string retVal = "";
+
+    while( value &gt; 0 )
+    {
+        retVal = _base62Characters[value % 62] + retVal;
+        value = value / 62;
+    }
+
+    return retVal;
+}
+</code></pre>
+
+<p>Lastly, I want to point out that passwords should very rarely be generated for any purpose, because that means they are being distributed in some form. Passwords should be hashed and salted; password resets should rely on random, expiring security tokens allowing the user a one-time reset. Passwords should never be emailed to a user; passwords should never be stored in plaintext or any reversible format.</p>
+
+<p>For password reset token generation, the code I provided could work nicely because it produces a large, cryptographically random number encoded with a web-safe format. But even a hashed GUID would do the trick in that case.</p>

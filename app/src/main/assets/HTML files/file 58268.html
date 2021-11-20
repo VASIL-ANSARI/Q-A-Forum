@@ -1,0 +1,33 @@
+<p>First thing to remember is that when parsing nodes, we essentially run backwards:</p>
+
+<pre><code>entity =&gt; new ProfileModel
+{
+    SomethingElses = entity.SomethingElses.AsQueryable().ToViewModels()
+}
+</code></pre>
+
+<p>Here, we process <code>ToViewModels()</code>, then <code>AsQueryable()</code>, then <code>SomethingElses</code>, and finally <code>entity</code>. Since we're finding that <code>entity</code> is never parsed (<code>VisitParameter</code>), it means something in our chain stopped the traversal of the tree. </p>
+
+<p>We have two culprits here:</p>
+
+<p><code>VisitMethodCall()</code> (AsQueryable and ToViewModels) and <code>VisitMemberAccess()</code> (SomethingElses)</p>
+
+<p>We're not overriding <code>VisitMemberAccess</code>, so the problem must lie within <code>VisitMethodCall</code></p>
+
+<p>We have three exit points for that method:</p>
+
+<pre><code>return ((IQueryable)node.Method.Invoke(null, args)).Expression;
+
+return Visit((replaceWith as LambdaExpression).Body);
+
+return base.VisitMethodCall(node);
+</code></pre>
+
+<p>The first line returns an expression verbatim, and stops further traversal of the tree. This means descendant nodes will never be visited - as we're saying the work is essentially done. Whether or not this is correct behavior really depends on what you're wanting to achieve with the visitor.</p>
+
+<p>Changing the code to </p>
+
+<pre><code>return Visit(((IQueryable)node.Method.Invoke(null, args)).Expression);
+</code></pre>
+
+<p>Means we traverse this (potentially new!) expression. This doesn't guarantee we'll visit the correct nodes (for example, this expression may be completely independent of the original) - but it <em>does</em> mean that if this new expression contained a parameter expression, that the parameter expression would be visited properly.</p>

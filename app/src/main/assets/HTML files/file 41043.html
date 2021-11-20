@@ -1,0 +1,30 @@
+<p>Do you really need it to be implemented this way? It's not what <code>Iterables.transform()</code> is designed for.</p>
+
+<p>First, <code>Iterables.transform()</code> does not accept arrays as its first parameter. You must wrap your <code>states</code> into any <code>Iterable</code>. The easiest and the best way is <code>Arrays.asList(states)</code>. Second, the idea of the <code>Iterables.transform()</code> method is to create a transformed sequence using a mapping function, not just to iterate over. I wouldn't recommend the following, but you can make your <code>Function</code> to be parameterized as <code>&lt;State, Void&gt;</code> and return <code>null</code> to simulate plain for-each semantics. Third, you must iterate of the result of the <code>Iterables.transform</code> because this function is lazy and does nothing until you start the iteration with an eager <code>for</code> or something else eager. Fourth, as long as your newly created iterable is not copied to any collection (by semantics; i.e. copied to a <code>List&lt;T&gt;</code> instance), any re-iteration over that iterable will cause one more transformation each time you implicitly invoke <code>iterator.next()</code> for that iterable (i.e. from the for-each). Thus:</p>
+
+<pre><code>final JSONObject jsonObject = ...
+// ...
+final Iterable&lt;Void&gt; voids = Iterables.transform(Arrays.asList(states), new Function&lt;State, Void&gt;() {
+    @Override
+    public Void apply(State currentState) {
+        jsonObject.put(String.valueOf(currentState.getId()), currentState.getName());
+        return null;
+    }
+});
+for ( final Void v : voids ) {
+    // do nothing
+}
+</code></pre>
+
+<p>It's really a bad and ugly idea. You really need an aggregation function that creates/supplies your JSON object, a sequence of <code>State</code> elements to be iterated, and a bi-function that accepts the accumulated JSON object and a single <code>state</code> object and return the updated JSON object. Something like in its generic form (your can create your own functions and decorators):</p>
+
+<pre><code>public static &lt;T, R&gt; R reduce(Supplier&lt;R&gt; init, Iterable&lt;T&gt; sequence, BiFunction&lt;R, T, R&gt; function) {
+    R accumulator = init.get();
+    for ( final T item : sequence ) {
+        accumulator = function.apply(accumulator, item);
+    }
+    return accumulator;
+}
+</code></pre>
+
+<p>Guava does not provide any aggregation functions infrastructure and higher-arity functions (see the <a href="https://code.google.com/p/guava-libraries/wiki/IdeaGraveyard" rel="nofollow">idea graveyard</a>, <a href="https://github.com/google/guava/issues/546" rel="nofollow">Aggregator Functions</a> in the issue tracker).</p>

@@ -1,0 +1,24 @@
+<p>Answering my own question here, but after poking into the source code for NumPy 1.3.0, I believe the answer is: <strong>Yes, <code>PyArray_DATA</code> is thread-safe.</strong></p>
+
+<ol>
+<li><p><code>PyArray_DATA</code> is defined in
+ndarrayobject.h:</p>
+
+<pre><code>#define PyArray_DATA(obj) ((void *)(((PyArrayObject *)(obj))-&gt;data))
+</code></pre></li>
+<li><p>The PyArrayObject struct type is
+defined in the same file; the field
+of interest is:</p>
+
+<pre><code>char *data;
+</code></pre>
+
+<p>So now, the question is whether accessing <code>data</code> from multiple threads is safe or not.</p></li>
+<li><p>Creating a new NumPy array from scratch (i.e., not deriving it from an existing data structure) passes a <code>NULL</code> data pointer to <code>PyArray_NewFromDescr</code>, defined in arrayobject.c.</p></li>
+<li><p>This causes <code>PyArray_NewFromDescr</code> to invoke <code>PyDataMem_NEW</code> in order to allocate memory for the PyArrayObject's <code>data</code> field. This is simply a macro for malloc:</p>
+
+<pre><code>#define PyDataMem_NEW(size) ((char *)malloc(size))
+</code></pre></li>
+</ol>
+
+<p>In summary, <code>PyArray_DATA</code> is thread-safe and as long as the NumPy arrays are created separately, it is safe to write to them from different threads.</p>

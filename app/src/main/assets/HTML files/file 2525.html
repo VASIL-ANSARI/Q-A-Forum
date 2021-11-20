@@ -1,0 +1,51 @@
+<p>What you're looking for is a <a href="http://api.rubyonrails.org/classes/ActiveRecord/NamedScope/ClassMethods.html" rel="nofollow">named scope</a> in the Forum model.</p>
+
+<p>The join can be greatly simplified by adding  has_many :through relationships for your Comment and Reply models in the Forum model. But I can never remember how nested joins work out, so I've posted a solution that will work with what you've got.</p>
+
+<pre><code>class Forum &lt; ActiveRecord::Base
+  has_many :topics, :dependent =&gt; :destroy, :order =&gt; 'created_at desc'
+  named_scope :user_posted, lambda {|user|
+    { :joins =&gt; "JOIN topics t ON t.forum_id = forums.id " +
+        "JOIN comments c ON c.topic_id = t.id " +
+        "JOIN replies r ON r.comment_id = c.id", 
+      :conditions =&gt; ["t.user_id = ? OR c.user_id = ? OR r.user_id = ?", 
+        user, user, user], 
+      :group =&gt; "forums.id"
+    }
+  }
+end
+</code></pre>
+
+<p>Now...</p>
+
+<pre><code>Forum.user_posted(@user)
+</code></pre>
+
+<p>Will return an array of forums where a user has posted a topic, reply or comment.</p>
+
+<p>For a list of forums a particular user has posted in:</p>
+
+<pre><code>class User &lt; ActiveRecord::Base
+  has_many :topics, :dependent =&gt; :destroy
+  has_many :comments, :dependent =&gt; :destroy
+  has_many :replies, :dependent =&gt; :destroy    
+  named_scope :posted_in_forum, lambda {|forum|
+    { :joins =&gt; "JOIN replies r ON r.user_id = users.id "+
+        "JOIN comments c ON c.user_id = users.id OR c.id = r.comment_id " +
+        "JOIN topics t ON t.user_id = users.id OR t.id = c.topic_id " +
+        "JOIN forums f ON t.forum_id = forums.id ",
+      :conditions =&gt; ["f.id = ?", forum], 
+      :group =&gt; "users.id"
+    }
+  }
+end
+</code></pre>
+
+<p>Assuming I got that right, this statement:</p>
+
+<pre><code>User.posted_in_forum(@forum)
+</code></pre>
+
+<p>will return a list of users that have posted in forum either by topic, comment or reply.</p>
+
+<p>P.S. it's probably not a good idea to allow destruction of users in this model. The way you've laid things out, if a user is destroyed, any topics, replies or comments they posted will also be removed. Instead your users should be deactivated.</p>

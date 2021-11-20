@@ -1,0 +1,52 @@
+<p>As there are always the two types per ticket you are interested in, you can simply select the according records, so as to get requester and assignee per ticket.</p>
+
+<pre><code>select 
+  t.id as ticket, 
+  t.name as subject, 
+  requester.name as requester, 
+  assignee.name as assignee,
+  e.name as entity,
+  date_format(tt.date,'%y%-%m%-%d') as date,
+  date_format(tt.date,'%T') as hour,
+  case t.priority 
+    when 6 then 'Mayor' 
+    when 5 then 'Muy urgente' 
+    when 4 then 'Urgente'
+    when 3 then 'Mediana' 
+    when 2 then 'Baja' 
+    when 1 then 'Muy baja'
+  end as priority,
+  uc.name as category,
+  ic.name as department
+from glpi_tickets t
+join glpi_entities e on e.id = t.entities_id
+join 
+(
+  select tu.tickets_id, u.name, u.usercategories_id 
+  from glpi_tickets_users tu
+  join glpi_users u on u.id = users_id
+  where tu.type = 1
+) requester on requester.tickets_id = t.id
+join 
+(
+  select tu.tickets_id, u.name 
+  from glpi_tickets_users tu
+  join glpi_users u on u.id = users_id
+  where tu.type = 2
+) assignee on assignee.tickets_id = t.id
+left join glpi_itilcategories ic on ic.id = t.itilcategories_id
+left join glpi_usercategories uc on uc.id = requester.usercategories_id;
+left outer join glpi_tickettasks tt on tt.tickets_id = t.id
+</code></pre>
+
+<p>The only thing I wonder is: There can be several ticket tasks per ticket. So what do you want to do then? Have one line per ticket task in your results? This is what the query does. Only, it looks queer that your result rows don't contain any information on the tasks except for the dates, so you may have many, many lines with the same data, only with different dates. So maybe, you'd rather want the first or last date per ticket. To get the last date per ticket, you'd replace the last line in the query with:</p>
+
+<pre><code>left outer join
+(
+  select tickets_id, max(date) as date
+  from glpi_tickettasks
+  group by tickets_id
+) tt on tt.tickets_id = t.id
+</code></pre>
+
+<p>And you probably want to add an <code>ORDER BY</code> clause.</p>

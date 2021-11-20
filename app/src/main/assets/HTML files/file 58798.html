@@ -1,0 +1,38 @@
+<p>I think you can try to use ActionBuilder + implicit parameters on view to achieve your requirement. (My answer is based on the link on my comment).</p>
+
+<p>First you need to define an ActionBuild that extract the current user from database or from session object field on request and add it to a subtype of WrappedRequest. </p>
+
+<pre><code>//The subtype of WrapperRequest which now contains the username. 
+class UserRequest[A](val username: Option[String], request: Request[A]) extends WrappedRequest[A](request)
+
+object UserAction extends
+  ActionBuilder[UserRequest] with ActionTransformer[Request, UserRequest] {
+  def transform[A](request: Request[A]) = Future.successful {
+    //request.session.get("username") in this example is the code to get the current user
+    //you can do db access here or other means. 
+    new UserRequest(request.session.get("username"), request)
+  }
+}
+</code></pre>
+
+<p>On you view you will define an implicit parameter of type UserRequest:</p>
+
+<pre><code>(message: String)(implicit h: UserRequest[AnyContent])
+
+@main("Welcome to Play") {
+   //DISPLAY h.username
+   @h.username
+}
+</code></pre>
+
+<p>Lastly, on your Controller define a requestHandler that uses UserAction which implicify it's request object.</p>
+
+<pre><code>// implicit user: UserRequest does the magic
+def index = UserAction { implicit user: UserRequest[AnyContent] =&gt;
+    Ok(views.html.index("Not Yet Implemented."))
+}
+</code></pre>
+
+<p>Hope that's help. </p>
+
+<p>More on ActionBuilder: <a href="https://www.playframework.com/documentation/2.5.x/ScalaActionsComposition" rel="nofollow">https://www.playframework.com/documentation/2.5.x/ScalaActionsComposition</a></p>

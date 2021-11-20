@@ -1,0 +1,102 @@
+<p>I would start with the fact the <code>Graphics g=null;</code> and since you've never assigned it anything, it's likely to remain <code>null</code>.</p>
+
+<p>Then I'd move onto the point where <code>init</code> is never called, but your <code>init</code> method scares me...</p>
+
+<pre><code>public void init(){
+    Transparenttxom panel=new Transparenttxom();
+    panel.addMouseListener(this);
+}//end init
+</code></pre>
+
+<p>Why are you creating a new instance of <code>Transparenttxom</code>?  Simple call <code>addMouseListener(this)</code>...</p>
+
+<p>But even then, this...</p>
+
+<pre><code>public void paint(Graphics g){
+}
+</code></pre>
+
+<p>Means nothing will ever get painting...</p>
+
+<p>Start by taking a look at <a href="http://docs.oracle.com/javase/tutorial/uiswing/painting/" rel="nofollow">Performing Custom Painting</a> for more details</p>
+
+<p>Instead overriding <code>paint</code>, you should override <code>paintComponent</code>, making sure you call <code>super.paintComponent</code> before you do any painting of your own.</p>
+
+<p>In your <code>mouseClicked</code> event you should define what you want painted and simply call <code>repaint</code> which will trigger a paint event which will, eventually, call your <code>paintComponent</code> where in which you paint stuff.</p>
+
+<p><strong>Updated with a basic example</strong></p>
+
+<pre><code>import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Graphics;
+import java.awt.Point;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+public class Transparenttxom extends JPanel implements MouseListener {
+
+    private Point mousePoint;
+
+    public Transparenttxom() {
+        addMouseListener(this);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (mousePoint != null) {
+            g.drawRect(20, 20, mousePoint.x - 20, mousePoint.y - 20);
+        }
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        return new Dimension(200, 200);
+    }
+
+
+
+    public void mouseClicked(MouseEvent e) {
+        mousePoint = e.getPoint();
+        repaint();
+    }//end mouseclicked method
+
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    public void mouseExited(MouseEvent e) {
+    }
+
+    public void mousePressed(MouseEvent e) {
+    }
+
+    public void mouseReleased(MouseEvent e) {
+    }
+//********************************************************************
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+                }
+
+                JFrame frame = new JFrame("Testing");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setLayout(new BorderLayout());
+                frame.add(new Transparenttxom());
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setVisible(true);
+            }
+        });
+    }
+}
+</code></pre>

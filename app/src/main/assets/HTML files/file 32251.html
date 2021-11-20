@@ -1,0 +1,17 @@
+<p>You are corrupting your image:</p>
+
+<pre><code>    echo "Image converted to greyscale!";  &lt;---this line
+    header('Content-Type: image/jpeg');
+    imagejpeg($img);
+</code></pre>
+
+<p>You can <strong>NOT</strong> have <strong>ANY</strong> output of any sort before a header() call. The header call is therefore being ignored utterly. The echo's output also becomes <strong>PART</strong> of the jpg data output by imagejpeg(). You're probably loading this output into an <code>&lt;img&gt;</code> tag in a browser, which is expecting to see an image. e.g. a JPEG starts with two hex digits, <code>0xFF 0xD8</code>, but since you're dumping out some plain text, your jpeg image actually starts with</p>
+
+<pre><code>Image converted to greyscale!0xFF0xD8
+</code></pre>
+
+<p>and cannot be interpreted by the browser as a valid image, because the image data is NOT where it should be - it's got garbage before it.</p>
+
+<p>As for your second code, you're simply ASSUMING that <code>imagecreatefromjpeg</code> actually succeeded - you're loading a remote resource. If it's not present, you don't get a jpeg and are trying to create a GD handle from an invalid source. You then blindly use this non-handle in further operations, which cannot possibly succeed because everything was broken from the start.</p>
+
+<p>Never EVER assume success when dealing with remote resources: database calls, HTTP requests, etc... Always assume failure, check for failure, and treat success as a pleasant surprise</p>

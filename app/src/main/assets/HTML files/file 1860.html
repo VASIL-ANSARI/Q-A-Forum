@@ -1,0 +1,66 @@
+<p>You can either write a custom loader, or use the signals.</p>
+
+<p>Loaders have the <code>on_task_init</code> method, which is called when a task is about to be executed,
+and <code>on_worker_init</code> which is called by the celery+celerybeat main process.</p>
+
+<p>Using signals is probably the easiest, the signals available are:</p>
+
+<p>0.8.x:</p>
+
+<ul>
+<li><p><code>task_prerun(task_id, task, args, kwargs)</code></p>
+
+<p>Dispatched when a task is about to be executed by the worker (or locally
+if using <code>apply</code>/or if <code>CELERY_ALWAYS_EAGER</code> has been set). </p></li>
+<li><p><code>task_postrun(task_id, task, args, kwargs, retval)</code>
+Dispatched after a task has been executed in the same conditions as above.</p></li>
+<li><p><code>task_sent(task_id, task, args, kwargs, eta, taskset)</code></p>
+
+<p>Called when a task is applied (not good for long-running operations)</p></li>
+</ul>
+
+<p>Additional signals available in 0.9.x (current master branch on github):</p>
+
+<ul>
+<li><p><code>worker_init()</code></p>
+
+<p>Called when celeryd has started (before the task is initialized, so if on a
+system supporting <code>fork</code>, any memory changes would be copied to the child
+worker processes).</p></li>
+<li><p><code>worker_ready()</code></p>
+
+<p>Called when celeryd is able to receive tasks.</p></li>
+<li><p><code>worker_shutdown()</code></p>
+
+<p>Called when celeryd is shutting down.</p></li>
+</ul>
+
+<p>Here's an example precalculating something the first time a task is run in the process:</p>
+
+<pre><code>from celery.task import Task
+from celery.registry import tasks
+from celery.signals import task_prerun
+
+_precalc_table = {}
+
+class PowersOfTwo(Task):
+
+    def run(self, x):
+        if x in _precalc_table:
+            return _precalc_table[x]
+        else:
+            return x ** 2
+tasks.register(PowersOfTwo)
+
+
+def _precalc_numbers(**kwargs):
+    if not _precalc_table: # it's empty, so haven't been generated yet
+        for i in range(1024):
+            _precalc_table[i] = i ** 2
+
+
+# need to use registered instance for sender argument.
+task_prerun.connect(_precalc_numbers, sender=tasks[PowerOfTwo.name])
+</code></pre>
+
+<p>If you want the function to be run for all tasks, just skip the <code>sender</code> argument.</p>

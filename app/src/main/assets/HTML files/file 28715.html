@@ -1,0 +1,32 @@
+<p>You can adjust the order of the fields in a dynamic pivot query by adding an <code>ORDER BY</code> when you set your <code>@cols</code> string:</p>
+
+<pre><code>select @cols = STUFF((SELECT distinct ',' + QUOTENAME('Month'+cast(DATEPART(m, [Inv Date]) as varchar(2))) 
+                    from #TempTable
+                    ORDER BY ....
+            FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)') ,1,1,'')
+</code></pre>
+
+<p>Update:  Missed the <code>DISTINCT</code> at first, when using <code>DISTINCT</code> you'll have to use a subquery and then <code>ORDER BY</code>:</p>
+
+<pre><code>SELECT @cols = STUFF((SELECT ',' +   QUOTENAME(ColName) 
+                    FROM (SELECT DISTINCT 'Month'+cast(DATEPART(m, [Inv Date]) as varchar(2)) ColName
+                          FROM #TempTable
+                          )sub
+                    ORDER BY ColName
+                    FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)') ,1,1,'')
+</code></pre>
+
+<p>You may need to add a 'sort' field into your subquery if you can't simply use the column name, and you can add any fields to the subquery so long as they don't disrupt the <code>DISTINCT</code> list.  For example:</p>
+
+<pre><code>SELECT @cols = STUFF((SELECT ',' +   QUOTENAME(ColName) 
+                    FROM (SELECT DISTINCT 'Month'+cast(DATEPART(m, [Inv Date]) as varchar(2)) ColName
+                                          ,CASE WHEN field = 'something' THEN 1
+                                                WHEN field = 'something else' THEN 2
+                                                ELSE 3
+                                           END as Sort
+                                          ,Cust_ID
+                          FROM #TempTable
+                          )sub
+                    ORDER BY Sort,Cust_ID
+                    FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)') ,1,1,'')
+</code></pre>

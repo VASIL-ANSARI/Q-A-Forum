@@ -1,0 +1,82 @@
+<h3>Enforce valid <code>card_id</code> at all times</h3>
+
+<p>First of all, <strong><em>if</em></strong> you need the table <code>card_allowed</code>, use a plain <code>varchar</code> or <code>text</code> column (with multiple entries), not an array:</p>
+
+<pre><code>CREATE TABLE card_allowed (
+  card_id varchar(10) NOT NULL PRIMARY KEY
+);
+
+INSERT INTO card_allowed VALUES ('DD3234'), ('FF2342');
+</code></pre>
+
+<p>Next, to <strong><em>enforce</em></strong> valid cards, you could now just use a <a href="http://www.postgresql.org/docs/current/interactive/ddl-constraints.html#DDL-CONSTRAINTS-FK" rel="nofollow"><strong>FK constraint</strong></a>:</p>
+
+<pre><code>CREATE TABLE client_1 (
+  client_1_id  bigint NOT NULL PRIMARY KEY,
+  tstz         timestamptz DEFAULT now(),
+  -- card_valid   boolean,
+  card_id      varchar(10),
+  CONSTRAINT client_1_card_id_fk FOREIGN KEY (card_id) REFERENCES card_allowed
+);
+</code></pre>
+
+<p>Since the column can be NULL, you can always leave it empty if you don't have a valid <code>card_id</code>.</p>
+
+<p>You don't need an additional column (you named it <code>status</code>, I renamed it <code>card_valid</code>).</p>
+
+<p>I also changed some column names to make it more useful. Among other things, I am using the column name <code>tstz</code> instead of <strike><code>time</code></strike>, which is a reserved word in standard SQL and also very misleading for an actual <code>timestamptz</code> column.</p>
+
+<p><br/></p>
+
+<p><em>If you need to allow invalid values in <code>card_id</code> (really?), an FK constraint is not possible. There are other options:</em></p>
+
+<h3>Only check new entries</h3>
+
+<p>You can "fake" an <code>IMMUTABLE</code> function that runs the check:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION f_card_allowed(text)
+  RETURNS bool AS
+$func$
+SELECT EXISTS (SELECT 1 FROM card_allowed WHERE card_allowed = $1);
+$func$
+  LANGUAGE sql STABLE;  -- not actually IMMUTABLE
+</code></pre>
+
+<p>The function is not <em>really</em> immutable, because it depends on values from another table. So it is actually only <code>STABLE</code>. The result of the same call can change between transactions. By definition <a href="http://www.postgresql.org/docs/current/interactive/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS" rel="nofollow"><strong><code>CHECK</code> constraints</strong></a> expect <code>IMMUTABLE</code> functions, but to allow some leeway (especially with temporal functions) <code>STABLE</code> is tolerated. You should mark the <code>CHECK</code> constraint as <code>NOT VALID</code> to document this, though:</p>
+
+<pre><code>ALTER TABLE client_1 ADD CONSTRAINT client_1_card_allowed
+CHECK (f_card_allowed(card_id)) NOT VALID;
+</code></pre>
+
+<p>The difference: <strong>Referential integrity is not enforced</strong> at all times like with the FK constraint. Rows are only checked when inserted / updated and must be valid at this time. No promises are made as to the status of existing rows: you might have changed values in <code>card_allowed</code> by now. Details:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/27107034/constraint-to-check-values-from-a-remotely-related-table-via-join-etc/27107470#27107470">CONSTRAINT to check values from a remotely related table (via join etc.)</a></li>
+</ul>
+
+<h3>Set the status <em>once</em></h3>
+
+<p>Now you need the <strong>additional flag <code>card_valid</code></strong> I commented out in the table definition above. You have <strong><em>no</em></strong> FK constraint:</p>
+
+<pre><code>UPDATE client_1 c
+SET    card_valid = EXISTS (SELECT 1 FROM card_allowed WHERE card_id = c.card_id);
+</code></pre>
+
+<h3>Set the status after every change</h3>
+
+<p>You could do the same in a trigger function for every inserted / updated row:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION trg_client_1_insupbef()
+  RETURNS trigger AS
+$BODY$
+BEGIN
+   NEW.card_valid := EXISTS (SELECT 1 FROM card_allowed WHERE card_id = NEW.card_id);
+   RETURN NEW;
+END
+$BODY$
+  LANGUAGE plpgsql;
+
+CREATE TRIGGER insupbef
+BEFORE INSERT OR UPDATE ON client_1
+FOR EACH ROW EXECUTE PROCEDURE trg_client_1_insupbef();
+</code></pre>

@@ -1,0 +1,152 @@
+<p>I abandoned that vocaro.com solution for other reasons (that solution would crash when used with atypical image formats, e.g. CMYK). </p>
+
+<p>Anyway, I now use the <code>imageByScalingAspectFillSize</code> method of the following <code>UIImage</code> category to make my square thumbnails. </p>
+
+<p>By the way, on Retina devices, if you're creating an image for a <code>UIButton</code> button that is is 60 x 60 points, you may want to use a 120 x 120 pixels image.</p>
+
+<pre><code>//  UIImage+SimpleResize.m
+//
+//  Created by Robert Ryan on 5/19/11.
+
+#import "UIImage+SimpleResize.h"
+
+@implementation UIImage (SimpleResize)
+
+- (UIImage*)imageByScalingToSize:(CGSize)newSize contentMode:(UIViewContentMode)contentMode
+{
+    if (contentMode == UIViewContentModeScaleToFill)
+    {
+        return [self imageByScalingToFillSize:newSize];
+    }
+    else if ((contentMode == UIViewContentModeScaleAspectFill) ||
+             (contentMode == UIViewContentModeScaleAspectFit))
+    {
+        CGFloat horizontalRatio   = self.size.width  / newSize.width;
+        CGFloat verticalRatio     = self.size.height / newSize.height;
+        CGFloat ratio;
+
+        if (contentMode == UIViewContentModeScaleAspectFill)
+            ratio = MIN(horizontalRatio, verticalRatio);
+        else
+            ratio = MAX(horizontalRatio, verticalRatio);
+
+        CGSize  sizeForAspectScale = CGSizeMake(self.size.width / ratio, self.size.height / ratio);
+
+        UIImage *image = [self imageByScalingToFillSize:sizeForAspectScale];
+
+        // if we're doing aspect fill, then the image still needs to be cropped
+
+        if (contentMode == UIViewContentModeScaleAspectFill)
+        {
+            CGRect  subRect = CGRectMake(floor((sizeForAspectScale.width - newSize.width) / 2.0),
+                                         floor((sizeForAspectScale.height - newSize.height) / 2.0),
+                                         newSize.width,
+                                         newSize.height);
+            image = [image imageByCroppingToBounds:subRect];
+        }
+
+        return image;
+    }
+
+    return nil;
+}
+
+- (UIImage *)imageByCroppingToBounds:(CGRect)bounds
+{
+    CGImageRef imageRef = CGImageCreateWithImageInRect([self CGImage], bounds);
+    UIImage *croppedImage = [UIImage imageWithCGImage:imageRef];
+    CGImageRelease(imageRef);
+    return croppedImage;
+}
+
+- (UIImage*)imageByScalingToFillSize:(CGSize)newSize
+{
+    UIGraphicsBeginImageContext(newSize);
+    [self drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    return image;
+}
+
+- (UIImage*)imageByScalingAspectFillSize:(CGSize)newSize
+{
+    return [self imageByScalingToSize:newSize contentMode:UIViewContentModeScaleAspectFill];
+}
+
+- (UIImage*)imageByScalingAspectFitSize:(CGSize)newSize
+{
+    return [self imageByScalingToSize:newSize contentMode:UIViewContentModeScaleAspectFit];
+}
+
+@end
+</code></pre>
+
+<p>And, the header:</p>
+
+<pre><code>//  UIImage+SimpleResize.h
+//
+//  Created by Robert Ryan on 5/19/11.
+
+#import &lt;Foundation/Foundation.h&gt;
+
+/** Image resizing category.
+ *
+ *  Modified by Robert Ryan on 5/19/11.
+ *
+ *  Inspired by http://ofcodeandmen.poltras.com/2008/10/30/undocumented-uiimage-resizing/
+ *  but adjusted to support AspectFill and AspectFit modes.
+ */
+
+@interface UIImage (SimpleResize)
+
+/** Resize the image to be the required size, stretching it as needed.
+ *
+ * @param newSize      The new size of the image.
+ * @param contentMode  The `UIViewContentMode` to be applied when resizing image.
+ *                     Either `UIViewContentModeScaleToFill`, `UIViewContentModeScaleAspectFill`, or
+ *                     `UIViewContentModeScaleAspectFit`.
+ *
+ * @return             Return `UIImage` of resized image.
+ */
+
+- (UIImage*)imageByScalingToSize:(CGSize)newSize contentMode:(UIViewContentMode)contentMode;
+
+/** Crop the image to be the required size.
+ *
+ * @param bounds       The bounds to which the new image should be cropped.
+ *
+ * @return             Cropped `UIImage`.
+ */
+
+- (UIImage *)imageByCroppingToBounds:(CGRect)bounds;
+
+/** Resize the image to be the required size, stretching it as needed.
+ *
+ * @param newSize The new size of the image.
+ *
+ * @return        Resized `UIImage` of resized image.
+ */
+
+- (UIImage*)imageByScalingToFillSize:(CGSize)newSize;
+
+/** Resize the image to fill the rectange of the specified size, preserving the aspect ratio, trimming if needed.
+ *
+ * @param newSize The new size of the image.
+ *
+ * @return        Return `UIImage` of resized image.
+ */
+
+- (UIImage*)imageByScalingAspectFillSize:(CGSize)newSize;
+
+/** Resize the image to fit within the required size, preserving the aspect ratio, with no trimming taking place.
+ *
+ * @param newSize The new size of the image.
+ *
+ * @return        Return `UIImage` of resized image.
+ */
+
+- (UIImage*)imageByScalingAspectFitSize:(CGSize)newSize;
+
+@end
+</code></pre>

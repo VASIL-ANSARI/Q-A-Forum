@@ -1,0 +1,21 @@
+<p>Ok, one thing first about the thread safety of your program. Because you are connecting a <code>QObject</code> to stdout, calls to <code>print</code> will interact with this <code>QObject</code>. But you should only interact with a <code>QObject</code> from the thread it was created in. The implementation you have is potentially thread <strong>unsafe</strong> if you call <code>print</code> from a thread other than the one the <code>QObject</code> resides in.</p>
+
+<p>In your case, you are calling <code>print</code> from a <code>QThread</code> while the <code>EmmittingStream(QObject)</code> resides in the main thread. I suggest you thus change your code to make it threadsafe, like so:</p>
+
+<pre><code>self.myLongTask = TaskThread()
+sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
+sys.stdout.moveToThread(self.myLongTask)
+self.myLongTask.start()
+</code></pre>
+
+<p><strong>Note that now calling <code>print</code> from the MainThread of your application will result in thread-unsafe behaviour. Since you aren't doing that at the moment, you are OK for now, but be warned!</strong></p>
+
+<p>I really suggest you read <a href="http://qt-project.org/doc/qt-4.8/threads-qobject.html" rel="nofollow">http://qt-project.org/doc/qt-4.8/threads-qobject.html</a> and get your head around everything it talks about. Understanding that document is the key to avoiding annoying crashes due to threads.</p>
+
+<p>--</p>
+
+<p>Now, The issue with the crash is apparently caused by your call to <code>processEvents()</code>. I haven't worked out <strong>why</strong> (I imagine it is related to threads somehow...), but I can tell you that you do not need that line! Because you are using signals/slots, once the <code>normalOutputWritten</code> method runs, control returns to the Qt Event Loop anyway, and it will continue to process events as normal. There is thus no need to force Qt to process events!</p>
+
+<p>Hope that helps!</p>
+
+<p><strong>EDIT:</strong> For an example of how to make your <code>EmittingStream</code>/<code>print</code> calls thread-safe, see here: <a href="http://stackoverflow.com/questions/21071448/redirecting-stdout-and-stderr-to-a-pyqt4-qtextedit-from-a-secondary-thread/21071865#21071865">Redirecting stdout and stderr to a PyQt4 QTextEdit from a secondary thread</a></p>

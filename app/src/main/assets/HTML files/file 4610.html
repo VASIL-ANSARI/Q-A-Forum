@@ -1,0 +1,55 @@
+<p>Subclass both entities off a common object with that method in the root object.</p>
+
+<p>The differential can be modified using ivars that you set up in the subclass init methods and a call out to a mutated method</p>
+
+<p>Like so...</p>
+
+<pre><code>@interface RootEntity : MyObject {
+
+    NSString *statementmech1;
+    NSString *statementmech2;
+    NSString *statementmech3;
+}
+
+@interface Entity1 : RootEntity {
+
+}
+
+@interface Entity2 : RootEntity {
+
+}
+</code></pre>
+
+<p>and </p>
+
+<pre><code>@implementation RootEntity
+
+-(void)variantMethod
+{
+  //varies in subclasses
+}
+
+    - (void) insertOrUpdateItem:(NSDictionary*)item {
+        sqlite3_stmt *exists_stmt;
+        if(sqlite3_prepare_v2(database, statementmech1 , -1, &amp;exists_stmt, NULL) == SQLITE_OK) {
+            [RMStoreDB bindPrimaryKey:exists_stmt data:item from:1];
+            if (sqlite3_step(exists_stmt) == SQLITE_ROW) {
+                int count = sqlite3_column_int(exists_stmt, 1);
+                sqlite3_stmt *update_stmt;
+                if (count) { // Update
+                    if (sqlite3_prepare_v2(database, statementmech2, -1, &amp;update_stmt, NULL) == SQLITE_OK) {
+                        int index = [RMStoreDB bindItem:update_stmt data:item from:1];
+                        [RMStoreDB bindPrimaryKey:update_stmt data:item from:index];
+                    }
+                } else { // Insert
+                    if (sqlite3_prepare_v2(database, statementmech3, -1, &amp;update_stmt, NULL) == SQLITE_OK) {
+                        [self variantMethod];
+                    }           
+                }
+                sqlite3_step(update_stmt);
+                sqlite3_finalize(update_stmt);
+            }           
+        }
+        sqlite3_finalize(exists_stmt);
+    }
+</code></pre>

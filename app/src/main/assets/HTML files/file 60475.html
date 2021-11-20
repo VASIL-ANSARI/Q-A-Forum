@@ -1,0 +1,30 @@
+<p>I think your error lies in the check you are making here:</p>
+
+<pre><code>if($this-&gt;data()-&gt;password === Hash::make($password, $this-&gt;data()-&gt;salt)) {
+        Session::put($this-&gt;_sessionName, $this-&gt;data()-&gt;id);
+</code></pre>
+
+<p>If I read this correctly you are taking the value that the user has entered and are then creating a brand new Hash of the password with a new random salt being fed in. This value will change every time the code is executed but is (very) unlikely to ever be identical to the input password.</p>
+
+<p>Initially this answer was based on the Laravel libraries:</p>
+
+<p>Instead of using <code>Hash:make</code> use <code>Hash::check</code> as the guard to entering that block:</p>
+
+<pre><code>if(Hash::check($this-&gt;data()-&gt;password, $password)){
+        Session::put($this-&gt;_sessionName, $this-&gt;data()-&gt;id);
+</code></pre>
+
+<p>This should give a pathway to let the <code>login()</code> function return <code>true</code>.</p>
+
+<p>However, as @becky indicated that they weren't using Laravel a more general answer was needed:</p>
+
+<p>The underlying problem that you have is that you're checking the plaintext password against the encrypted (hashed) password. In all good algorithms this won't be the same thing which is why it's never going to return true from the function.</p>
+
+<p>What you need to do is check the hashed version of what the user has entered: <code>Hash::make($password, $this-&gt;data()-&gt;salt)</code> with the value that you've stored (because you only store the hashed version). If you can change the code to compare those two values they should be the same and so the identity operator <code>===</code> will return a <code>true</code> value.</p>
+
+<p>Further discussions, and some debugging, indicated that what was coming back from the DB wasn't what was being created on the page by the </p>
+
+<pre><code>Hash::make($password, $this-&gt;data()-&gt;salt)
+</code></pre>
+
+<p>statement. On closer inspection it emerged that the length of the column on the db had been reduced from 64 characters to 50. As the <code>Hash::make()</code> function returned a 64-character hash the two could never equate. Remaking that DB column and regenerating the password hashes fixed the problem.</p>

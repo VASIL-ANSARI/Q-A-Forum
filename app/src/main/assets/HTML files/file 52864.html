@@ -1,0 +1,25 @@
+<p>Your method of getting rank is fine, but you can also use a subquery method:</p>
+
+<pre><code>select count(*)
+from ord cross join
+     (select ordid, getStatusDescription(o2.ord_status) as gsd
+      from ord o2
+      where o2.ordid = 1234
+     ) oo
+where getStatusDescription(ord_status) &lt; oo.gsd or
+      (getStatusDescription(ord_status) = oo.gsd and o.ordid &lt;= oo.ordid)
+</code></pre>
+
+<p>As for your situation, I don't know about the root cause.  However, sometimes <code>GROUP BY</code> is problematic with variables and an additional subquery fixes the probelm:</p>
+
+<pre><code>SELECT rank
+FROM (SELECT @rownum := @rownum+1 AS rank, ordid
+      FROM (SELECT ord.*
+            FROM ord 
+            ORDER BY getStatusDescription(ord_status), ordid
+           ) derived_table CROSS JOIN
+           (SELECT @rownum := 0) params
+     ) o
+WHERE ordid = 1234 
+LIMIT 1;
+</code></pre>

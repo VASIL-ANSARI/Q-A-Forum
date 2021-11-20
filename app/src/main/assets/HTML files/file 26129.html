@@ -1,0 +1,25 @@
+<p>So the problem you are running into is that the child objects don't pass validation, right?  When the child objects are created at the same time as the parent, the child objects could not possibly know the id of their parent in order to pass validation, it's true.</p>
+
+<p>Here is how you can solve that problem.  Change your models as follows:</p>
+
+<pre><code># app/models/survey.rb
+class Survey
+    belongs_to :user
+    has_many :questions, :inverse_of =&gt; :survey
+    accepts_nested_attributes_for :questions
+end
+
+# app/models/question.rb
+class Question
+    validates :survey, :presence =&gt; true
+    belongs_to :survey
+end
+</code></pre>
+
+<p>The differences here are the <code>:inverse_of</code> passed to the <code>has_many</code> association, and that the Question now validates on just <code>:survey</code> instead of <code>:survey_id</code>.</p>
+
+<p><code>:inverse_of</code> makes it so that when a child object is created or built using the association, it also receives a back-reference to the parent who created it.  This seems like something that should happen automagically, but it unfortunately does not unless you specify this option.</p>
+
+<p>Validating on <code>:survey</code> instead of on <code>:survey_id</code> is kind of a compromise.  The validation is no longer simply checking for the existence of something non-blank in the survey_id field; it now actually checks the association for the existence of a parent object.  In this case it is helpfully known due to <code>:inverse_of</code>, but in other cases it will actually have to load the association from the database using the id in order to validate.  This also means that ids not matching anything in the database will not pass validation.</p>
+
+<p>Hope that helps.</p>

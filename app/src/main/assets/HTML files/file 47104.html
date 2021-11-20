@@ -1,0 +1,23 @@
+<p>The worker thread is resetting the event immediately before testing it:</p>
+
+<pre><code>        while (!_shutdownEvent.WaitOne(0))
+        {
+            // ...
+            _shutdownEvent.Reset();
+        }
+</code></pre>
+
+<p>That means that unless the stop request comes in at exactly the right time, it will be ignored.</p>
+
+<p>Instead, the loop should look like this:</p>
+
+<pre><code>        while (!_shutdownEvent.WaitOne(0))
+        {
+            TestMessageQueueReader processQueue = new TestMessageQueueReader();
+            processQueue.ReadFromQueue();
+        }
+</code></pre>
+
+<p>You also shouldn't be closing the event from the worker thread, because the other threads may still need it.  (The event will be automatically closed when the process exits, so you don't need to worry about it.)</p>
+
+<p>As for the exception handling, you can't make the service stop simply by setting the event.  If there is more than one worker thread, setting the event will stop them, but not the service itself.  I'm not entirely sure how you make a .NET service stop itself, but try calling <a href="https://msdn.microsoft.com/en-us/library/system.serviceprocess.servicebase.stop(v=vs.110).aspx" rel="nofollow">ServiceBase.Stop</a>.</p>

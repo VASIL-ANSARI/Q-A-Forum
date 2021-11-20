@@ -1,0 +1,48 @@
+<p>I had a the same problem with at table containing 100M rows and contacted Microsoft Support. This is the reply i got:</p>
+
+<blockquote>
+  <p>The reason why you canât create the index on your table is that you
+  are facing a limitation on the platform that prevents to have
+  transactions larger than 2GB. </p>
+  
+  <p>The creation of an index is a transactional operation that relies on
+  the transaction log to execute the move of the table pages. More rows
+  in a table means more pages to put in the T-Log. Since your table
+  contains 100 million of records (which is quite a big number), it is
+  easy for you to hit this limit.</p>
+  
+  <p>In order to  create the index we need to change the approach.
+  Basically we are going to use a temporary(staging) table to store the
+  data while you create the index on the source table, that you would
+  have previously cleared from data.   </p>
+  
+  <p>Action Plan:</p>
+  
+  <ol>
+  <li>Create a staging table identical to the original table but without
+  any index (this makes the staging table a heap)</li>
+  <li>move the data from the original table to a staging table (the insert
+      is faster because the staging table is a heap)</li>
+  <li>empty the original table</li>
+  <li>create the index on the original table (this time the transaction should be almost empty)</li>
+  <li>move back data from staging table to original table (this would take some time, as the table contains indexes)</li>
+  <li>delete the staging table</li>
+  </ol>
+</blockquote>
+
+<p>They suggest using <a href="http://technet.microsoft.com/en-us/library/ms162802.aspx">BCP</a> to move data between the staging table and the original table.</p>
+
+<p>When looking in the event_log table...</p>
+
+<pre><code>select * from sys.event_log 
+where database_name ='&lt;DBName&gt;'
+and event_type &lt;&gt; 'connection_successful'
+order by start_time desc
+</code></pre>
+
+<p>.. I found this error message:</p>
+
+<blockquote>
+  <p>The session has been terminated because of excessive transaction log
+  space usage. Try modifying fewer rows in a single transaction.</p>
+</blockquote>

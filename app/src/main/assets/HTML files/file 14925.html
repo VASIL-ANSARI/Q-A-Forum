@@ -1,0 +1,33 @@
+<p>Your optimizations are breaking the strict aliasing rules, which leads (standardly speaking) to undefined behavior.</p>
+
+<p>The last optimization worries me the most since you are essentially reading memory you ought not to, which may provoke traps if this memory happened to be protected.</p>
+
+<p>Any reason you are not using <a href="http://www.boost.org/doc/libs/1_33_1/doc/html/hash_range.html" rel="nofollow"><code>boost::hash_range</code></a> ?</p>
+
+<hr>
+
+<p>Since <code>boost::hash_range</code> turns out not to be as fast as required, I would propose another solution, based on aliasing. Or rather, two solutions in one.</p>
+
+<p>The first idea is that aliasing can be subdued using <code>char*</code> as a temporary type.</p>
+
+<pre><code>size_t key = 0;
+char* k = &amp;reinterpret_cast&lt;char*&gt;(&amp;key);
+
+std::copy(mac.begin(), mac.end(), k);
+
+return key;
+</code></pre>
+
+<p>is therefore a valid implementation of the hash.</p>
+
+<p>However, we can go one step further. Because of alignment and padding, storing a <code>char[6]</code> and <code>char[8]</code> are likely to use the same amount of memory within a map node. Therefore, we could <em>enrich</em> the type, by using <code>union</code>:</p>
+
+<pre><code>union MacType {
+    unsigned char value[8];
+    size_t hash;
+};
+</code></pre>
+
+<p>Now, you can encapsulate this properly within a class (and make sure you always initialize the bytes <code>7</code> and <code>8</code> to <code>0</code>), and implement the interface of <code>std::array&lt;unsigned char, 6&gt;</code> that you actually need.</p>
+
+<p>I've used a similar trick for tiny strings (below 8 characters) for hashing and fast (non-alphabetic) comparisons and it's really sweet.</p>

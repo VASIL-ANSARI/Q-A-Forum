@@ -1,0 +1,51 @@
+<p>This is untested, but I believe it should get you on the right track:</p>
+
+<pre><code>[DllImport(Constants.CoreMediaLibrary)]
+int CMSampleBufferGetSampleTimingInfoArray (
+    IntPtr sbuf,
+    int timingArrayEntries,
+    CMSampleTimingInfo [] timingArrayOut,
+    out int timingArrayEntriesNeededOut
+);
+
+[DllImport(Constants.CoreMediaLibrary)]
+int CMSampleBufferCreateCopyWithNewTiming (
+    IntPtr allocator,
+    IntPtr originalSBuf,
+    int numSampleTimingEntries,
+    CMSampleTimingInfo []sampleTimingArray,
+    out IntPtr sBufCopyOut
+);
+
+CMSampleBuffer AdjustTime (CMSampleBuffer sample, CMTime offset)
+{
+    int count;
+    CMSampleBufferGetSampleTimingInfoArray (sample.Handle, 0, null, out count);
+    CMSampleTimingInfo [] pInfo = new CMSampleTimingInfo [count];
+    CMSampleBufferGetSampleTimingInfoArray (sample.Handle, count, pInfo, out count);
+    for (int i = 0; i &lt; count; i++) {
+        pInfo [i].DecodeTimeStamp = CMTime.Subtract (pInfo [i].DecodeTimeStamp, offset);
+        pInfo [i].PresentationTimeStamp = CMTime.Subtract (pInfo [i].PresentationTimeStamp, offset);
+    }
+    IntPtr sout;
+    CMSampleBufferCreateCopyWithTiming (IntPtr.Zero, sample, count, pInfo, out sout);
+    // Unfortunately the constructor we need is internal, but that can be fixed
+    // for a future version of Xamarin.iOS.
+    return (CMSampleBuffer) typeof (CMSampleBuffer).GetConstructor (BindingFlags.Instance | BindingFlags.NonPublic, null, new Type []Â { typeof (IntPtr), typeof (bool) }, null).Invoke (new object [] { sout, true });
+}
+</code></pre>
+
+<p><strong>Update</strong></p>
+
+<p>I have implemented some of the required API in Xamarin.iOS now, so in future versions you'll be able to do this:</p>
+
+<pre><code>CMSampleBuffer AdjustTime (CMSampleBuffer sample, CMTime offset)
+{
+    var info = sample.GetSampleTimingInfo ();
+    for (int i = 0; i &lt; info.Length; i++) {
+        info [i].DecodeTimeStamp = CMTime.Subtract (info [i].DecodeTimeStamp, offset);
+        info [i].PresentationTimeStamp = CMTime.Subtract (info [i].PresentationTimeStamp, offset);
+    }
+    return CMSampleBuffer.CreateWithNewTiming (sample, info)
+}
+</code></pre>

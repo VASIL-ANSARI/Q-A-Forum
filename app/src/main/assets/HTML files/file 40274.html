@@ -1,0 +1,54 @@
+<p>Issue one, how to make things unique, you have most of it down pat but if you do this:</p>
+
+<pre><code>&lt;cfset x = 0&gt;
+&lt;cfloop query="GET_ITEM"&gt;
+  &lt;cfset x++&gt;
+  &lt;input name="uniqueID_#x#" value="#x#" type="hidden"&gt;
+  &lt;tr&gt;
+    &lt;td align="left" nowrap&gt;
+       &lt;label&gt;#ITEM_NBR#&lt;/label&gt;
+    &lt;/td&gt;
+    &lt;input type="hidden" name="Item_number" id="Item_number" 
+            value="#GET_ITEM.ITEM_NBR#"&gt;
+    &lt;td&gt;
+        &lt;input type="text" name="on_hand#x#" id="on_hand" value="" size="20" 
+                                onKeyPress="javascript:CheckNumeric();" /&gt;
+    &lt;/td&gt;
+   etc...
+&lt;/cfloop&gt;
+</code></pre>
+
+<p>you'll notice that you don't need to keep referring to the query name while inside your query loop when referencing the columns.</p>
+
+<p><code>x</code> at this point is essentially an index, by adding it to the form field <code>name</code> part you can reference each individual form.</p>
+
+<p>So on receiving this entry, I would do something like this:</p>
+
+<pre><code>&lt;cfquery name = "insert_records"&gt;
+  &lt;cfloop collection=#form# item="field"&gt;
+    &lt;cfif left(field,9) eq 'uniqueID_'&gt;
+      &lt;cfset uniqueid = right(field,1)&gt;&lt;!--- you'll have to work out your own logic for where you have more than 10 forms to a page---&gt;
+      Insert into sometable
+        (VENDORCODE,
+         ITEM_NBR,
+         Item_desc,
+         Target_Level,
+         Target_Date_Active,
+         Target_Date_End,
+         Vendor_name,
+         Per_of_Actual
+        )         
+       Values (
+         &lt;cfqueryparam value = "#Form.Vendor_code##uniqueid#" cfsqltype = "CF_SQL_INTEGER"&gt;,     
+         &lt;cfqueryparam value = "#Item_number#" cfsqltype = "CF_SQL_VARCHAR"&gt; ,
+         &lt;cfqueryparam value = "#Trim(itemdesc.Item_desc)#" cfsqltype = "CF_SQL_VARCHAR"&gt;,
+         &lt;cfqueryparam value = "#Trim(FORM.On_hand)##uniqueid#" cfsqltype = "CF_SQL_INTEGER"&gt;,
+         '2014-12-02',
+         '2040-01-01',  
+         &lt;cfqueryparam value = "#Trim(itemdesc.Vendor_name)#" cfsqltype = "CF_SQL_VARCHAR"&gt;,                
+         100        
+        )
+       &lt;/cfif&gt;
+     &lt;/cfloop&gt;
+   &lt;/cfquery&gt;
+</code></pre>

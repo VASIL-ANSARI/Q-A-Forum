@@ -1,0 +1,83 @@
+<p>The issue here is that you are making a request to a route with no parameters.  I incorrectly assumed that you were seeing this error when you were submitting the form, you are seeing this error when the form is rendered.  I would suggest updating the route from <code>/invoices/new</code> to something along the lines of <code>/proposal/:proposal_id/invoices/new</code> and then using this for your controller method:</p>
+
+<pre><code>class InvoicesController &lt; ActionController
+  def new
+    @approved_items = Proposal.find(params.require(:proposal_id)).proposal_line_items.where(:approved =&gt; 1)
+  end
+end
+</code></pre>
+
+<p>You can then use your original view before I suggested modifications.</p>
+
+<p><strong>Everything below this line is wrong</strong></p>
+
+<p>The issue here is that you are trying to query a <code>Proposal</code>, but the item you are actually passing in to the controller from your form is a <code>ProposalLineItem</code></p>
+
+<p>On this line of your form:</p>
+
+<p><code>collection_select( :proposal_line_item, :proposal_line_item_id, Proposal_line_item.all, :id, :date, {}, {:multiple =&gt; false})</code></p>
+
+<p>You are generating a collection of <code>ProposalLineItem</code>s for your form, but there is also a typo in that line of <code>Proposal_line_item</code> instead of <code>ProposalLineItem</code></p>
+
+<p>In order to query a <code>Proposal</code> in your controller, you need to do one of two things.</p>
+
+<p><strong>Option 1</strong></p>
+
+<p>Update your controller to this:</p>
+
+<pre><code>class InvoicesController &lt; ActionController
+  def new
+    @approved_items = proposal ? proposal.proposal_line_items.where(approved: 1) : []
+  end
+
+  protected
+
+  def proposal_line_item
+    # The way you have your form configured, the params hash will look like this: {"proposal_line_item" =&gt; {"proposal_line_item_id" =&gt; "some_id"}}
+    @_proposal_line_item = ProposalLineItem.find(params.require(:proposal_line_item).require(:proposal_line_item_id))
+  end
+
+  def proposal
+    proposal_line_item.proposal
+  end
+end
+</code></pre>
+
+<p><strong>Option 2</strong></p>
+
+<p>However given the context of the form, and what your controller is trying to do, it might make more sense to render a collection of <code>Proposal</code>s instead of <code>ProposalLineItem</code>s.  Perhaps something like this:</p>
+
+<pre><code># in your form
+collection_select( :proposal, :proposal_id, Proposal.all, :id, :name, {}, {:multiple =&gt; false})
+</code></pre>
+
+<p>And then in your controller:</p>
+
+<pre><code>class InvoicesController &lt; ActionController
+  def new
+    @approved_items = proposal.proposal_line_items.where(approved: 1)
+  end
+
+  protected
+
+  def proposal
+    Proposal.find(params.require(:proposal).require(:proposal_id))
+  end
+end
+</code></pre>
+
+<p>Obviously the choice is yours here, but given what it looks like you are trying to do, I would lean towards option 2.</p>
+
+<p>Also FYI, if you want to test out the parameters stuff in a rails console, you will want to do this:</p>
+
+<pre><code>&gt; params = ActionController::Parameters.new
+=&gt; {}
+&gt; params[:proposal_line_item] = {}
+=&gt; {}
+&gt; params[:proposal_line_item][:proposal_line_item_id] = "asdf"
+=&gt; "asdf"
+&gt; params.require(:proposal_line_item)
+=&gt; {"proposal_line_item_id"=&gt;"asdf"}
+&gt; params.require(:proposal_line_item).require(:proposal_line_item_id)
+=&gt; "asdf"
+</code></pre>

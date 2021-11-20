@@ -1,0 +1,34 @@
+<p>I can't reproduce it too. But it's possible that some gem overrides <code>Kernel#require</code>:</p>
+
+<pre><code>module Kernel
+  alias_method :old_require, :require
+  def require(str)
+    old_modules = []
+    ObjectSpace.each_object(Module) {|m| old_modules &lt;&lt; m }
+
+    old_require(str)
+
+    new_modules = []
+    ObjectSpace.each_object(Module) {|m| new_modules &lt;&lt; m unless old_modules.include?(m) }
+    new_modules
+  end
+end
+</code></pre>
+
+<p>and when you try to require</p>
+
+<pre><code>module DataProviders
+  module Cached
+    class Foo
+    end
+  end
+  class Foo
+  end
+end
+</code></pre>
+
+<p>you will get</p>
+
+<pre><code>irb(main):012:0&gt; require 'data_provider'
+=&gt; [DataProviders::Cached::Foo, DataProviders::Foo, DataProviders::Cached, DataProviders]
+</code></pre>

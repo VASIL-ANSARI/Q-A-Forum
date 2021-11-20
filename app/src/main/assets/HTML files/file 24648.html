@@ -1,0 +1,25 @@
+<pre><code>SELECT AVG(IFNULL(ws.sums, 0))
+FROM 
+(
+  SELECT 1 i union all SELECT 2 union all SELECT 3 union all SELECT 4 union all SELECT 5 union all SELECT 6 union all SELECT 7 union all SELECT 8 union all SELECT 9 union all SELECT 10 union all SELECT 11 union all SELECT 12
+) windows
+LEFT JOIN
+(
+  SELECT SUM(speed) sums,
+         FLOOR(TIME_TO_SEC(TIMEDIFF(CURRENT_TIMESTAMP, time)) / 300) window
+  FROM workers_speeds
+  WHERE TIME_TO_SEC(TIMEDIFF(CURRENT_TIMESTAMP, time)) / 60 &lt; 65
+  AND TIME_TO_SEC(TIMEDIFF(CURRENT_TIMESTAMP, time)) / 60 &gt; 5
+  GROUP BY FLOOR(TIME_TO_SEC(TIMEDIFF(CURRENT_TIMESTAMP, time)) / 300)
+) ws on windows.i = ws.window
+</code></pre>
+
+<p><a href="http://sqlfiddle.com/#!2/8a68a/21" rel="nofollow"><strong>Click here to see it in action at SQL Fiddle</strong></a></p>
+
+<p><em>Explanation</em></p>
+
+<p>Looking at the bottom inner query first... we need a simple way of identifying each interval. To do this I have used the <a href="http://dev.mysql.com/doc/refman/5.6/en/date-and-time-functions.html#function_timediff" rel="nofollow"><code>TIMEDIFF()</code></a> function to get the difference between the <code>time</code> column and the current time. This is returned in h:m:s format, so I then pass this to the <a href="http://dev.mysql.com/doc/refman/5.6/en/date-and-time-functions.html#function_time-to-sec" rel="nofollow"><code>TIME_TO_SEC()</code></a> to convert to seconds. We can now divide by 300 (the number of seconds in 5 minutes) and use the <a href="http://dev.mysql.com/doc/refman/5.0/en/mathematical-functions.html#function_floor" rel="nofollow"><code>FLOOR()</code></a> function to round down to the nearest integer. This gives us a kind-of ID for each 5-minute interval ranging from 1 to 12 that we can use to <code>GROUP BY</code>. We then include this ID in the <code>SELECT</code> and give it the alias <code>window</code> and add the <code>WHERE</code> &amp; <code>AND</code> clauses to ensure we only include data for 1 hour, ignoring the latest 5 minutes. </p>
+
+<p>Now looking at the outer query... I generate a derived table <code>windows</code> which contains 12 rows of dummy data, simply the integers 1 to 12. We can then <code>LEFT OUTER JOIN</code> the inner query also as a derived table <code>ws</code> which allows us to ensure there are always 12 rows returned. <code>ws.sums</code> will be null where an interval contains no data, but we can use <a href="http://dev.mysql.com/doc/refman/5.0/en/control-flow-functions.html#function_ifnull" rel="nofollow"><code>IFNULL()</code></a> to translate that to 0.</p>
+
+<p>I'm not totally sure it will behave exactly as you require, so if you use it, you should make sure you do the necessary testing, especially on the boundaries of the intervals.</p>

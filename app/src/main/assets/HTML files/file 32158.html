@@ -1,0 +1,78 @@
+<p>For most of my answer I will assume a very simple table:</p>
+
+<pre><code>CREATE TABLE MyTable (
+   ID BIGINT PRIMARY KEY,
+   SomeValue VARCHAR(255),
+   posid INTEGER
+)
+</code></pre>
+
+<h2>Auto-increment identifier</h2>
+
+<p>Firebird (up to version 2.5) does not have an identity column type (this will be added in Firebird 3), instead you need to use a sequence (aka generator) and a trigger to get this.</p>
+
+<h3>Sequence</h3>
+
+<p>First you need to create a sequence using <a href="http://www.firebirdsql.org/file/documentation/reference_manuals/reference_material/html/langrefupd25-ddl-sequence.html#langrefupd25-create-seq" rel="nofollow"><code>CREATE SEQUENCE</code></a>:</p>
+
+<pre><code>CREATE SEQUENCE seqMyTable
+</code></pre>
+
+<p>A sequence is atomic which means interleaving transactions/connections will not get duplicate values, it is also outside transaction control, which means that a <code>ROLLBACK</code> will not revert to the previous value. In most uses a sequences should always increase, so the value reset you do at the start of your question is wrong for almost all purposes; for example another connection could reset the sequence as well midway in your execution leaving you with unintended duplicates of <code>POSID</code>.</p>
+
+<h3>Trigger</h3>
+
+<p>To generate a value for an auto-increment identifier, you need to use a <code>BEFORE INSERT TRIGGER</code> that assigns a generated value to the - in this example - <code>ID</code> column.</p>
+
+<pre><code>CREATE TRIGGER trgMyTableAutoIncrement FOR MyTable
+ACTIVE BEFORE INSERT POSITION 0
+AS 
+BEGIN 
+    NEW.ID = NEXT VALUE FOR seqMyTable;
+END
+</code></pre>
+
+<p>In this example I <strong>always</strong> assign a generated value, <a href="http://www.firebirdfaq.org/faq29/" rel="nofollow">other examples</a> assign a generated value only when the <code>ID</code> is <code>NULL</code>.</p>
+
+<h3>Getting the value</h3>
+
+<p>To get the generated value you can use the <a href="http://www.firebirdsql.org/file/documentation/reference_manuals/reference_material/html/langrefupd25-insert.html#langrefupd25-insert-returning" rel="nofollow"><code>RETURNING</code>-clause</a> of the <code>INSERT</code>-statement:</p>
+
+<pre><code>INSERT INTO MyTable (SomeValue) VALUES ('abc') RETURNING ID
+</code></pre>
+
+<h2>INSERT INTO ... SELECT</h2>
+
+<p>Using <code>INSERT INTO ... SELECT</code> you can select rows from one table and insert them into others. The reason it doesn't work for you is because you are trying to assign the string value <code>':pos'</code> to a column of type <code>INTEGER</code>, and that is not allowed.</p>
+
+<p>Assuming I have another table <code>MyOtherTable</code> with a similar structure as <code>MyTable</code> I can transfer values using:</p>
+
+<pre><code>INSERT INTO MyTable (SomeValue)
+  SELECT SomeOtherValue
+  FROM MyOtherTable
+</code></pre>
+
+<p>Using <code>INSERT INTO ... SELECT</code> it is not possible to obtain the generated values unless only a single row was inserted.</p>
+
+<h2>Guesswork with regard to <code>POSID</code></h2>
+
+<p>It is not clear to me what <code>POSID</code> is supposed to be, and what values it should have. It looks like you want to have an increasing value starting at 1 for a single <code>INSERT INTO ... SELECT</code>. In versions of Firebird up to 2.5 that is not possible in this way (in Firebird 3 you would be able to use <code>ROW_NUMBER()</code> for this).</p>
+
+<p>If my guess is right, then you will need to use an <a href="http://www.firebirdsql.org/file/documentation/reference_manuals/reference_material/html/langrefupd25-execblock.html" rel="nofollow"><code>EXECUTE BLOCK</code></a> (or a stored procedure) to assign and increase the value for every row to be inserted.</p>
+
+<p>The execute block would be something like:</p>
+
+<pre><code>EXECUTE BLOCK
+AS
+  DECLARE posid INTEGER = 1;
+  DECLARE someothervalue VARCHAR(255);
+BEGIN
+  FOR SELECT SomeOtherValue FROM MyOtherTable INTO :someothervalue DO
+  BEGIN
+    INSERT INTO MyTable (SomeValue, posid) VALUES (:someothervalue, :posid);
+    posid = posid + 1;
+  END
+END
+</code></pre>
+
+<p>Without an <code>ORDER BY</code> with the <code>SELECT</code> the value of posid is essentially meaningless, because there is no guaranteed order.</p>

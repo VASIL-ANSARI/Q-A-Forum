@@ -1,0 +1,34 @@
+<p>I found the reason for this. The <code>HTTPServer</code> class source code in Python 2.7.8 is the following:</p>
+
+<pre><code>class HTTPServer(SocketServer.TCPServer):
+
+    allow_reuse_address = 1    # Seems to make sense in testing environment
+
+    def server_bind(self):
+        """Override server_bind to store the server name."""
+        import pdb; pdb.set_trace()
+        SocketServer.TCPServer.server_bind(self)
+        host, port = self.socket.getsockname()[:2]
+        self.server_name = socket.getfqdn(host)
+        self.server_port = port
+</code></pre>
+
+<p>And <code>allow_reuse_address</code> is used in <code>SocketServer.TCPServer.server_bind()</code> like this:</p>
+
+<pre><code>class TCPServer(BaseServer):
+
+    # ...
+
+    def server_bind(self):
+        """Called by constructor to bind the socket.
+
+        May be overridden.
+
+        """
+        if self.allow_reuse_address:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+        self.server_address = self.socket.getsockname()
+</code></pre>
+
+<p>Setting <code>allow_reuse_address</code> to <code>False</code> will cause <code>self.socket.bind(self.server_address)</code> to raise an exception. I wonder if this line in the <code>HTTPServer</code> class is intentional, since the comment says it's "makes sense in testing environments".</p>

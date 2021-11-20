@@ -1,0 +1,39 @@
+<p>The problem was caused by two things:</p>
+
+<p><strong>First</strong>, if you're using gulp-typescript to compile your code first and then bundle it only with browserify (without using tsify), you have several options on how to configure the compiler. If you choose to configure it with tsconfig.json, you first need to create a TypeScript Project object with gulp-typescript like so:</p>
+
+<pre><code>var typescriptCompiler = require('gulp-typescript');
+var typescriptProject = typescriptCompiler.createProject(project['tsconfig'], { typescript: typescript });
+</code></pre>
+
+<p>And then feed the sources retrieved from the <em>project</em> to the compiler in your gulp task:</p>
+
+<pre><code>gulp.task(
+    'compile-ts',
+    function () {
+            return typescriptProject
+                .src()
+                .pipe(typescriptCompiler(typescriptProject))
+                .js
+                .pipe(gulp.dest(output['js']));
+    }
+);
+</code></pre>
+
+<p>Conversely, I was feeding the raw sources by hand from gulp like so (<strong>wrong</strong>):</p>
+
+<pre><code>gulp.task(
+    'compile-ts',
+    function () {
+            return gulp
+                .src()
+                .pipe(typescriptCompiler(typescriptProject))
+                .js
+                .pipe(gulp.dest(output['js']));
+    }
+);
+</code></pre>
+
+<p>The <strong>second</strong> problem was me including "typings/main.d.ts" in the sources. This caused a whole bunch of "TS2300: Duplicate identifier" errors: solving that was just a matter of moving "typings/main.d.ts" to the "exclude" section to avoid duplication.</p>
+
+<p><strong>NOTE:</strong> The typings version was indeed outdated; if you're running into this problem, update it.</p>

@@ -1,0 +1,57 @@
+<p>First of all it looks like <code>SQL Server</code> (<code>GO</code>, quoting with <code>[]</code>) not <code>MySQL</code>.</p>
+
+<p>Your code does not work because you cannot compare <code>DATE</code> with invalid date literal.</p>
+
+<pre><code>WHEN @p_day IN (N'Monday') THEN 1   
+-- here you compares some date with 'Monday'
+-- DATETIME has higher precedence than string so SQL Server tries to
+-- implicitly cast to DATETIME
+
+&lt;=&gt;
+SELECT @p_day = CAST('Monday' AS DATETIME)
+-- Conversion failed when converting date and/or time from character string.
+</code></pre>
+
+<p>To get day of the week you could use built-in <a href="https://msdn.microsoft.com/en-us/library/ms174420.aspx" rel="nofollow"><code>DATEPART</code></a>:</p>
+
+<pre><code>SET DATEFIRST 1;      -- set first day of week to `Monday` default for US is Sunday
+-- this could be set as global or connection based
+DECLARE @p_day [datetime] = GETDATE();
+
+SELECT DATEPART(dw, @p_day);
+</code></pre>
+
+<p><kbd><strong><a href="https://data.stackexchange.com/stackoverflow/query/443870" rel="nofollow"><code>LiveDemo</code></a></strong></kbd></p>
+
+<p><hr>
+If you are using <code>MySQL</code> you could use <a href="http://dev.mysql.com/doc/refman/5.5/en/date-and-time-functions.html#function_dayofweek" rel="nofollow"><code>DAYOFWEEK</code></a>:</p>
+
+<blockquote>
+  <p>Returns the weekday index for date (1 = Sunday, 2 = Monday, â¦, 7 = Saturday). These index values correspond to the ODBC standard. </p>
+</blockquote>
+
+<pre><code>SELECT IF(DAYOFWEEK(NOW())-1=0, 7,DAYOFWEEK(NOW())-1);
+</code></pre>
+
+<p><kbd><strong><a href="http://sqlfiddle.com/#!9/9eecb7d/47311/0" rel="nofollow"><code>SqlFiddleDemo</code></a></strong></kbd></p>
+
+<h1>Addendum</h1>
+
+<p>One more thing comparing directly with weekday name won't work when language is different that <code>en</code>.</p>
+
+<p><a href="https://msdn.microsoft.com/en-us/library/ms174395.aspx" rel="nofollow">DATENAME</a>:</p>
+
+<blockquote>
+  <p><strong>The return value depends on the language environment</strong> set by using SET LANGUAGE and by the Configure the default language Server Configuration Option of the login</p>
+</blockquote>
+
+<p>Consider:</p>
+
+<pre><code>SET LANGUAGE russian;
+SELECT DATENAME(dw,GETDATE());
+-- ÑÑÐµÐ´Ð°
+</code></pre>
+
+<p><kbd><strong><a href="https://data.stackexchange.com/stackoverflow/query/444120" rel="nofollow"><code>LiveDemo2</code></a></strong></kbd></p>
+
+<p>Then using code as you proposed in <a href="http://stackoverflow.com/a/35735514/5070879">http://stackoverflow.com/a/35735514/5070879</a> will always return 7.</p>

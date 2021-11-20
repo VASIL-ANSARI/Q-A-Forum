@@ -1,0 +1,108 @@
+<p>Use <code>gson</code> and create a model class for the location.</p>
+
+<p>Add the following dependencies to your <code>build.gradle</code>.</p>
+
+<pre><code>compile 'com.squareup.retrofit2:converter-gson:2.0.0'
+compile 'com.google.code.gson:gson:2.5'
+</code></pre>
+
+<p>Create a model to represent the location.</p>
+
+<pre><code>public class Location {
+
+    double lat;
+    double lng;
+    String location;
+
+    public Location(double lat, double lon, String place) {
+        this.lat = lat;
+        this.lon = long;
+        this.place = place;
+    } 
+
+}
+</code></pre>
+
+<p>If the variable names for the payload fields don't match the actual required name for the endpoint you will need to add the annotation <code>@SerializedName([expected name])</code></p>
+
+<p>ex:</p>
+
+<pre><code>import com.google.gson.annotations.SerializedName;
+
+public class Location {
+
+    @SerializedName("lat")
+    double latitude;
+    @SerializedName("lng")
+    double longitude;
+    @SerializedName("place")
+    String location;
+
+    public Location(double lat, double lon, String place) {
+        latitude = lat;
+        longitude = long;
+        location = place;
+    } 
+
+}
+</code></pre>
+
+<p>Define the api interface.</p>
+
+<pre><code>public interface Api {
+
+    @POST("upload/")
+    @Multipart
+    Call&lt;ResponseBody&gt; uploadFile(@Part("title") RequestBody title,
+                                  @Part MultipartBody.Part imageFile,
+                                  @Part("location") Location location
+    );
+
+}
+</code></pre>
+
+<p>Create a <code>Retrofit</code> instance and call the api.</p>
+
+<pre><code>File file;
+// create retrofit instance
+Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl("https://baseurl.com/api/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build();
+// create api instance
+Api api = retrofit.create(Api.class);
+// create call object
+Call&lt;ResponseBody&gt; uploadFileCall = api.uploadFile(
+        RequestBody.create(MediaType.parse("text/plain"), "title"),
+        MultipartBody.Part.createFormData(
+            "file",
+            file.getName(),
+            RequestBody.create(MediaType.parse("image"), file)),
+        new Location(48.8583, 2.29232, "Eiffel Tower"));
+// sync call
+try {
+    ResponseBody responseBody = uploadFileCall.execute().body();
+} catch (IOException e) {
+    e.printStackTrace();
+}
+// async call
+uploadFileCall.enqueue(new Callback&lt;ResponseBody&gt;() {
+    @Override
+    public void onResponse(Call&lt;ResponseBody&gt; call, Response&lt;ResponseBody&gt; response) {
+        if (response.isSuccessful()) {
+            // TODO
+        }
+    }
+
+    @Override
+    public void onFailure(Call&lt;ResponseBody&gt; call, Throwable t) {
+        // TODO
+    }
+});
+</code></pre>
+
+<p>You will need to change the <code>MediaType.parse()</code> call if you are not using an image file.</p>
+
+<p>You can similarly create a custom response type object and replace <code>ResponseBody</code> with it to receive a deserialized result object.</p>
+
+<p>Let me know if this works.  I didn't have a chance to test in your exact scenario obviously but I'm fairly confident this should work.  The only part I'm not 100% on is whether <code>@Part("location") Location location</code> should be <code>@Body("location") Location location</code></p>

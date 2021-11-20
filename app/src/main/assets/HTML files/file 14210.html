@@ -1,0 +1,122 @@
+<p>In general you'd want a way to represent your symbols (i.e. the expressions templates that encode e.g. <code>3 * x * x + 42</code>), and a meta-function that can compute a derivative. Hopefully you're familiar enough with metaprogramming in C++ to know what that means and entails but to give you an idea:</p>
+
+<pre><code>// This should come from the expression templates
+template&lt;typename Lhs, typename Rhs&gt;
+struct plus_node;
+
+// Metafunction that computes a derivative
+template&lt;typename T&gt;
+struct derivative;
+
+// derivative&lt;foo&gt;::type is the result of computing the derivative of foo
+
+// Derivative of lhs + rhs
+template&lt;typename Lhs, typename Rhs&gt;
+struct derivative&lt;plus_node&lt;Lhs, Rhs&gt; &gt; {
+    typedef plus_node&lt;
+        typename derivative&lt;Lhs&gt;::type
+        , typename derivative&lt;Rhs&gt;::type
+    &gt; type;
+};
+
+// and so on
+</code></pre>
+
+<p>You'd then tie up the two parts (representation and computation) such that it would be convenient to use. E.g. <code>derivative(3 * x * x + 42)(6)</code> could mean 'compute the derivative of <code>3 * x * x + 42</code> in x at 6'.</p>
+
+<p>However even if you do know what it takes to write expression templates and what it takes to write a metaprogram in C++ I wouldn't recommend going about it this way. Template metaprogramming requires a lot of boilerplate and can be tedious. Instead, I direct you to the genius <a href="http://www.boost.org/doc/libs/1_49_0/doc/html/proto.html">Boost.Proto</a> library, which is precisely designed to help write EDSLs (using expression templates) and operate on those expression templates. It it not necessarily easy to learn to use but I've found that learning how to achieve the same thing without using it is <em>harder</em>. Here's a sample program that can in fact understand and compute <code>derivative(3 * x * x + 42)(6)</code>:</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+#include &lt;boost/proto/proto.hpp&gt;
+
+using namespace boost::proto;
+
+// Assuming derivative of one variable, the 'unknown'
+struct unknown {};
+
+// Boost.Proto calls this the expression wrapper
+// elements of the EDSL will have this type
+template&lt;typename Expr&gt;
+struct expression;
+
+// Boost.Proto calls this the domain
+struct derived_domain
+: domain&lt;generator&lt;expression&gt;&gt; {};
+
+// We will use a context to evaluate expression templates
+struct evaluation_context: callable_context&lt;evaluation_context const&gt; {
+    double value;
+
+    explicit evaluation_context(double value)
+        : value(value)
+    {}
+
+    typedef double result_type;
+
+    double operator()(tag::terminal, unknown) const
+    { return value; }
+};
+// And now we can do:
+// evalutation_context context(42);
+// eval(expr, context);
+// to evaluate an expression as though the unknown had value 42
+
+template&lt;typename Expr&gt;
+struct expression: extends&lt;Expr, expression&lt;Expr&gt;, derived_domain&gt; {
+    typedef extends&lt;Expr, expression&lt;Expr&gt;, derived_domain&gt; base_type;
+
+    expression(Expr const&amp; expr = Expr())
+        : base_type(expr)
+    {}
+
+    typedef double result_type;
+
+    // We spare ourselves the need to write eval(expr, context)
+    // Instead, expr(42) is available
+    double operator()(double d) const
+    {
+        evaluation_context context(d);
+        return eval(*this, context);
+    }
+};
+
+// Boost.Proto calls this a transform -- we use this to operate
+// on the expression templates
+struct Derivative
+: or_&lt;
+    when&lt;
+        terminal&lt;unknown&gt;
+        , boost::mpl::int_&lt;1&gt;()
+    &gt;
+    , when&lt;
+        terminal&lt;_&gt;
+        , boost::mpl::int_&lt;0&gt;()
+    &gt;
+    , when&lt;
+        plus&lt;Derivative, Derivative&gt;
+        , _make_plus(Derivative(_left), Derivative(_right))
+    &gt;
+    , when&lt;
+        multiplies&lt;Derivative, Derivative&gt;
+        , _make_plus(
+            _make_multiplies(Derivative(_left), _right)
+            , _make_multiplies(_left, Derivative(_right))
+        )
+    &gt;
+    , otherwise&lt;_&gt;
+&gt; {};
+
+// x is the unknown
+expression&lt;terminal&lt;unknown&gt;::type&gt; const x;
+
+// A transform works as a functor
+Derivative const derivative;
+
+int
+main()
+{
+    double d = derivative(3 * x * x + 3)(6);
+    std::cout &lt;&lt; d &lt;&lt; '\n';
+}
+</code></pre>

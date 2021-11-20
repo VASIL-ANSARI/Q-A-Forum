@@ -1,0 +1,21 @@
+<p>In our Grails project (2.3.6) with Hibernate 4.3.1.Final, we never had that error but we encountered another error due to <strong>query buffer size</strong> restriction:</p>
+
+<p>Since you are using <code>in (?, ..., ?)</code> you write as much <code>?,</code> as you have items in your list, which means that for big list (says 50000) you may write a query of 100000 characters, and you may have this exception (here with pgSQL drivers):</p>
+
+<pre><code>Foobar.executeQuery("select f from Foobar f where f.id in (:ids)", 
+                 [ids: 1L..100000L]); // Groovy way of creating a list of 100000 items.
+</code></pre>
+
+<p>And the error:</p>
+
+<pre><code>SqlExceptionHelper:146 - An I/O error occured while sending to the backend. 
+SqlExceptionHelper:146 - This connection has been closed.
+</code></pre>
+
+<p>That why I think you might need to </p>
+
+<ol>
+<li><p>Either split your id list into smaller list (like 500 items or so) and coalesced the result by hand, which is more work to do than the default spring-data you are using.</p></li>
+<li><p>Either store the id list into a temporary table (which could prove to be a painful task using JPA). The temporary table would be a tuple of (key, sids). You would generate a temporary key (for the session), batch insert the ids into that table with the key, flush so that hibernate push the change onto the database, use that table using a subquery (<code>p.sidIds in (select sisIds from IdTable where key = ?1)</code>), delete data from that table. 
+While being a painful task, it may produce a boost in performance.</p></li>
+</ol>

@@ -1,0 +1,36 @@
+<blockquote>
+  <p>How should I allocate memory? As It is not known before calling this function</p>
+</blockquote>
+
+<p>Given you current code, the caller should allocate the memory:</p>
+
+<pre><code>unsigned char buffer[3];
+unsigned short len = sizeof buffer;
+my_test_object.encodeMsg(buffer, len);
+</code></pre>
+
+<blockquote>
+  <p>Is there a way to map class object memory which basically gives what I want.</p>
+</blockquote>
+
+<p>That's very vague.  If you use a (possibly compiler-specific) <code>#pragma</code> or <em>attribute</em> to ensure the character values occupy 3 contiguous bytes in memory, and as long as you don't add any virtual functions to the class, you can implement <code>encodeMsg()</code> using:</p>
+
+<pre><code>memcpy(buffer, (unsigned char*)this + offsetof(test, a), 3);
+</code></pre>
+
+<p>But, what's the point? At best, I can't imagine that <code>memcpy</code> ever being faster than the "nice" way to write it:</p>
+
+<pre><code>buffer[0] = a;
+buffer[1] = b;
+buffer[2] = c;
+</code></pre>
+
+<p>If you actually mean something more akin to:</p>
+
+<pre><code>test* p = reinterpret_cast&lt;test*&gt;(buffer);
+*p = *this;
+</code></pre>
+
+<p>That will have undefined behaviour, and may write up to <code>sizeof(test)</code> bytes into the buffer, which is quite likely to be 4 rather than 3, and that could cause some client code buffer overruns, remove an already-set NUL terminator etc..  Hackish and dangerous.</p>
+
+<p>Taking a step back, if you have to ask these sorts of questions you should be worrying about adopting <em>good</em> programming practice - only once you're a master of this kind of thing should you be worrying about what's optimal.  For developing good habits, you might want to look at the boost serialisation library and get comfortable with it first.</p>

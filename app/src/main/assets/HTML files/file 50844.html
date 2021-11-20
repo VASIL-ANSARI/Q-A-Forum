@@ -1,0 +1,40 @@
+<p>I would do it like this:</p>
+
+<p>HTML:</p>
+
+<pre><code>&lt;input type="checkbox" class="deletefunc" value="&lt;? echo $mid; ?&gt;"&gt;
+&lt;button id="delete-them"&gt;Delete Them&lt;/button&gt;
+</code></pre>
+
+<p>JS:</p>
+
+<pre><code>$(function() {
+    $('#delete-them').on('click', function() {
+        var data = $('.deletefunc').attr('name', 'delete[]').serialize();
+        $.ajax('delete-them.php', { 
+            method: 'POST',
+            data: data, 
+            success: function() {
+                alert('deleted!');
+            }
+         });
+     });
+});
+</code></pre>
+
+<p>PHP:</p>
+
+<pre><code>&lt;?php
+    $ids = $_POST['delete'];
+    $params = array_fill(0, count($ids), "?");
+    $sql = "DELETE FROM some_table WHERE id IN (" . implode(",", $params) . ")";
+    //DELETE FROM some_table WHERE id IN(?,?,?,?);
+    $pdo = new PDO('mysql:host=localhost;dbname=mydb', 'user', 'pass');
+    $stmt = $pdo-&gt;prepare($sql);
+    $stmt-&gt;execute($ids);
+?&gt;
+</code></pre>
+
+<p>So we basically listen for a click on our button, when it happens, we set the name (with <code>[]</code> at the end so it becomes an array) for all of the items with the class we care about, so that when we serialize those items we know how to reference it in our PHP.</p>
+
+<p>We then POST that data over to the server, where we read the array we just sent, see how many there are, and then create a query to delete those items.</p>

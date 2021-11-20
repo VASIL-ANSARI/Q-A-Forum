@@ -1,0 +1,90 @@
+<p>Here is a simple controller for the video element which tracks the timeupdate event fired by the video element to trigger callback functions at the specified timecodes.</p>
+
+<p>It allows you to attach multiple callbacks for the same timecode.</p>
+
+<p>The timeupdate event is fired at different rates on different devices, because of this there is a limitation in that cuepoints can only be attached at integer values so at 5 seconds not 5.5, you can potentially remove this but then there is a risk that the cuepoints will not be triggered</p>
+
+<pre><code>/**
+ * Function which allows you to register cuepoints to trigger callbacks
+ * at specific timecodes
+ * @param {HTMLElement} video_el The video element you want to track
+ */
+var VideoController = function(video_el){
+    /**
+     * The video element this controller is for
+     * @type {HTMLElement}
+     */
+    this.element = video_el; // 
+
+    /**
+     * Object containing all the cuepoints
+     * @type {Object}
+     */
+    this.cuepoints = {};
+
+    /**
+     * The last processed_timecode so we dont fire events more than once
+     * @type {Number}
+     */
+    this.processed_timecode = undefined;
+
+    /**
+     * Allows you to trigger a callback at a specific timecode
+     * @param {Number}   timecode The timecode you want to trigger your callback
+     * @param {Function} callback Your callback function
+     */
+    this.addCuepoint = function(timecode, callback){
+        // 
+        timecode = Math.floor(timecode);
+
+        //
+        if(this.cuepoints[timecode] === undefined){
+            this.cuepoints[timecode] = [];
+        }
+
+        this.cuepoints[timecode].push(callback);
+
+        return this;
+    }
+
+    /**
+     * Internal method to track the videos current timecode and to trigger
+     * the cuepoints when neccesary
+     * @param  {[type]} e A timeupdate event from the video
+     */
+    this.timeupdate = function(e){
+
+        var timecode = Math.floor(e.target.currentTime);
+
+        // check to see if there is a callback registered for this timecode
+        if(this.cuepoints.hasOwnProperty(timecode) &amp;&amp; this.cuepoints[timecode] !== undefined &amp;&amp; this.processed_timecode !== timecode){
+
+            //if there is it loops through the array of callbacks and triggers them
+            for(var i = 0,l=this.cuepoints[timecode].length;i&lt;l;i++){
+                this.cuepoints[timecode][i]();  
+            }
+
+        }
+
+        //updates the processed_timecode so we do not fire these callbacks again
+        this.processed_timecode = timecode;
+
+    }.bind(this);
+
+    // add addEventListener to the video element to track the video timecode
+    this.element.addEventListener('timeupdate', this.timeupdate);
+
+    return this;
+}
+
+var video = document.getElementById('myVideoElement');
+var video_controller = new VideoController(video);
+
+
+video_controller.addCuepoint(2,function(){
+    console.log('do something at 2 seconds');
+});
+video_controller.addCuepoint(2,function(){
+    console.log('do something else at 2 seconds');
+});
+</code></pre>

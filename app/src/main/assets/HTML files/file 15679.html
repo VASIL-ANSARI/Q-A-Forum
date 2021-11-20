@@ -1,0 +1,34 @@
+<p>Your code assumes that <code>$this-&gt;getProduct()</code> returns a <code>Mage_Catalog_Model_Product</code> object.</p>
+
+<p>The error <code>Fatal error: Call to a member function getId() on a non-object</code> tells us, that <code>$this-&gt;getProduct()</code> actually does <em>not</em> return any object (but probably <code>null</code> instead).</p>
+
+<p>The template</p>
+
+<pre><code>app/design/frontend/base/default/template/email/order/items/order/default.phtml
+</code></pre>
+
+<p>you're talking about, is included by <code>Mage_Sales_Block_Order_Email_Items_Order_Default</code>, but afaik this block does not have any <code>getProduct()</code> method by default.</p>
+
+<p>So either you are missing, that there's no such method, or you've defined your own method and it doesn't return an <code>Mage_Catalog_Model_Product</code> instance (for whatever reasons).</p>
+
+<p><strong>EDIT</strong>:</p>
+
+<p>One way to fix this would be to change the first lines of your template from</p>
+
+<pre><code>&lt;?php $_item = $this-&gt;getItem() ?&gt;
+&lt;?php $_order = $this-&gt;getItem()-&gt;getOrder() ?&gt;
+</code></pre>
+
+<p>to</p>
+
+<pre><code>&lt;?php $_item = $this-&gt;getItem() ?&gt;
+&lt;?php $_product = Mage::getModel('catalog/product')-&gt;load($_item-&gt;getProductId()) ?&gt;
+&lt;?php $_order = $this-&gt;getItem()-&gt;getOrder() ?&gt;
+</code></pre>
+
+<p>After this change, you can use</p>
+
+<pre><code>$_product-&gt;getSubtitle()
+</code></pre>
+
+<p>to get the value of your custom attribute.</p>

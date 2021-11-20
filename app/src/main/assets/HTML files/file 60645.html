@@ -1,0 +1,49 @@
+<p>The easiest solution is to use <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/dd373889.aspx" rel="nofollow">WinEvents</a>, by registering for <code>EVENT_OBJECT_DESTROY</code> events. The code is fairly straight forward:</p>
+
+<pre><code>#include &lt;windows.h&gt;
+
+namespace {
+    HWINEVENTHOOK g_WindowDestructionHook = NULL;
+}
+
+inline void CALLBACK WinEventProc( HWINEVENTHOOK hWinEventHook,
+                                   DWORD         event,
+                                   HWND          hwnd,
+                                   LONG          idObject,
+                                   LONG          idChild,
+                                   DWORD         dwEventThread,
+                                   DWORD         dwmsEventTime ) {
+    // Filter interesting events only:
+    if ( idObject == OBJID_WINDOW &amp;&amp; idChild == CHILDID_SELF ) {
+        wprintf( L"Window destroyed: HWND = %08X\n", hwnd );
+    }
+}
+
+inline void RegisterWindowDestructionHook() {
+    g_WindowDestructionHook = ::SetWinEventHook( EVENT_OBJECT_DESTROY,
+                                                 EVENT_OBJECT_DESTROY,
+                                                 NULL,
+                                                 WinEventProc,
+                                                 0, 0,
+                                                 WINEVENT_OUTOFCONTEXT );
+}
+
+inline void UnregisterHook() {
+    ::UnhookWinEvent( g_WindowDestructionHook );
+}
+</code></pre>
+
+<p>Using this is equally simple:</p>
+
+<pre><code>::CoInitialize( NULL );
+RegisterWindowDestructionHook();
+
+MSG msg = {};
+while ( ::GetMessageW( &amp;msg, nullptr, 0, 0 ) &gt; 0 ) {
+    ::TranslateMessage( &amp;msg );
+    ::DispatchMessageW( &amp;msg );
+}
+
+UnregisterHook();
+::CoUninitialize();
+</code></pre>

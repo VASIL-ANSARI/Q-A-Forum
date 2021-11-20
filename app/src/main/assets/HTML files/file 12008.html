@@ -1,0 +1,14 @@
+<p>I never heard about multithreaded CryptoStream in .NET, however, I think it depends on your encryption mode.
+If encryption mode is ECB, of course, you can easily make it multithreaded manually with Parallel.For or ForEach.
+With CBC or any other encryption mode with feedback, it is unlikely you can make it parallel, unless you'll use multiple initialization vectors.
+For ECB mode:</p>
+
+<ul>
+<li>Split your data in multiple bytes arrays (lets say you encrypt 1280 bytes with 10 threads, that split data to 10 byte arrays that contain 0..127 byte, 128..255 byte, etc, each array must contain integer number of blocks).</li>
+<li>Use Parallel.For or ForEach to cycle by all 10 byte arrays (for example, create List &lt;byte[]&gt; instance and supply it to Parallel.ForEach as argument).</li>
+<li>Create 10 Rijndael encryptor/decryptor instances with SymmetricAlgorithm.CreateEncryptor/SymmetricAlgorithm.CreateDecryptor</li>
+<li>Encrypt each part of data on separate thread.</li>
+<li>Combine data to 1000 bytes array again.</li>
+</ul>
+
+<p>So, my idea is not to use CryptoStream, instead you have to call encryption API and operate plain text bytes directly.</p>

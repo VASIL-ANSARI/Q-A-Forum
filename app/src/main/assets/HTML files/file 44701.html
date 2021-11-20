@@ -1,0 +1,149 @@
+<p>For your Server Class, I would change your ArrayList&lt; String > for waiting and playing to ArrayList&lt; EchoThread >.  This way your Server class is tracking each client object themselves instead of just their names.  When you instantiate your EchoThread objects, I would pass the local server object to each EchoThread that way each object knows about the server that instantiated them.</p>
+
+<p>Server Class</p>
+
+<pre><code>import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+
+public class Server {
+    public ArrayList&lt;EchoThread&gt; waiting = new ArrayList&lt;EchoThread&gt;();
+    public ArrayList&lt;EchoThread&gt; playing = new ArrayList&lt;EchoThread&gt;();
+    public ArrayList&lt;Integer&gt; score = new ArrayList&lt;Integer&gt;();
+
+    public static void main(String[] args) {
+        try {
+            // Instantiate a single server object that you can pass into your connected clients
+            Server myServer = new Server();
+            ServerSocket server = new ServerSocket(4321);
+            while (true) {
+                try {
+                    Socket socket = server.accept();
+                    // Pass myServer into Echo Thread 
+                    new EchoThread(myServer, socket).start();
+                } catch (Exception exc) {
+                    exc.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Have to synchronize this since multiple clients could be adding to this list at the same time
+    public synchronized void addClient(EchoThread client) {
+        waiting.add(client);
+    }
+
+    public int getNumClients() {
+        return waiting.size();
+    }
+
+    public String getClientName(int i) {
+        return waiting.get(i).getCName();
+    }
+
+    public void play() {
+        int scr = 0;
+        for (int i = 0; i &lt; 4; i++) {
+            EchoThread clientBeingMovedToPlaying = waiting.get(0);
+            playing.add(clientBeingMovedToPlaying);
+            score.add(scr);
+            waiting.remove(0);
+
+            // This will be a new method in your EchoThread class
+            clientBeingMovedToPlaying.SendServerPlayingMessage();
+        }
+    }
+
+    public boolean checkIfPlaying(String name) {
+        boolean isPlaying = false;
+        for(EchoThread client : playing) {
+            if (client.getName().contentEquals(name)) {
+                isPlaying = true;
+                break;
+            }
+        }
+        return isPlaying;
+    }
+}
+</code></pre>
+
+<p>For your Echo Thread class, I would make your variables in your run method class variables so they can be used throughout the class</p>
+
+<p>EchoThread Class</p>
+
+<pre><code>import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
+
+public class EchoThread extends Thread {
+    protected Socket socket;
+    protected Server s;
+    protected DataInputStream in;
+    protected DataOutputStream out;
+    protected String line;
+    protected String clientName;
+
+    // This way, each EchoThread object knows about the server
+    public EchoThread(Server theServer, Socket clientSocket) {
+        this.s = theServer;
+        this.socket = clientSocket;
+    }
+
+    public void run() {
+        try {
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
+        } catch (IOException e) {
+            return;
+        }
+
+        while (true) {
+            try {
+                line = in.readLine();
+                String[] prot = line.split(":");
+
+                if (prot[0].equals("/login")) {
+                    // Original code
+                    //s.addClient(prot[1]);
+
+                    // New code
+                    clientName = prot[1];
+                    s.addClient(this);
+                } else if (prot[0].equals("/waiting")) {
+                    if (s.checkIfPlaying(prot[1])) {
+                        out.writeBytes("Playing" + "\r\n");
+                    } else {
+                        // You don't want multiple clients firing the play method, so you need to synchronize your server object
+                        synchronized (s) {
+                            if (s.getNumClients() &gt;= 4) {
+                                s.play();
+                                out.writeBytes("Playing" + "\r\n");
+                            } else {
+                                out.writeBytes(s.getNumClients() + "\r\n");
+                            }
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+        }
+    }
+
+    public String getCName() {
+        return clientName;
+    }
+
+    public void SendServerPlayingMessage() {
+        if (out != null) {
+            // Send whatever message you want
+        }
+    }
+}
+</code></pre>
+
+<p>I think this'll get you what your wanting...  Forgive any syntax or logical errors, I don't have an IDE right in front of me at the moment.</p>

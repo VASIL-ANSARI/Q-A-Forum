@@ -1,0 +1,60 @@
+<p>It seems to be a gotcha issue. Try to use check_box_tag instead. Take a look at what <a href="http://apidock.com/rails/ActionView/Helpers/FormHelper/check_box" rel="nofollow">apidock.com</a> says about it:</p>
+
+<blockquote>
+  <p>Gotcha</p>
+  
+  <p>The HTML specification says unchecked
+  check boxes are not successful, and
+  thus web browsers do not send them.
+  Unfortunately this introduces a
+  gotcha: if an Invoice model has a paid
+  flag, and in the form that edits a
+  paid invoice the user unchecks its
+  check box, no paid parameter is sent.
+  So, any mass-assignment idiom like</p>
+
+<pre><code>@invoice.update_attributes(params[:invoice])
+</code></pre>
+  
+  <p>wouldnât update the flag.</p>
+  
+  <p>To prevent this the helper generates
+  an auxiliary hidden field before the
+  very check box. The hidden field has
+  the same name and its attributes mimic
+  an unchecked check box.</p>
+  
+  <p>This way, the client either sends only
+  the hidden field (representing the
+  check box is unchecked), or both
+  fields. Since the HTML specification
+  says key/value pairs have to be sent
+  in the same order they appear in the
+  form, and parameters extraction gets
+  the last occurrence of any repeated
+  key in the query string, that works
+  for ordinary forms.</p>
+  
+  <p>Unfortunately that workaround does not
+  work when the check box goes within an
+  array-like parameter, as in</p>
+
+<pre><code>&lt;%= fields_for "project[invoice_attributes][]",
+</code></pre>
+  
+  <p>invoice, :index => nil do |form| %>
+        &lt;%= form.check_box :paid %>
+        ...
+      &lt;% end %></p>
+  
+  <p>because parameter name repetition is
+  precisely what Rails seeks to
+  distinguish the elements of the array.
+  For each item with a checked check box
+  you get an extra ghost item with only
+  that attribute, assigned to "0".</p>
+  
+  <p>In that case it is preferable to
+  either use check_box_tag or to use
+  hashes instead of arrays.</p>
+</blockquote>

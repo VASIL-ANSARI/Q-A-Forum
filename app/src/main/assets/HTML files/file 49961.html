@@ -1,0 +1,224 @@
+<ol>
+<li><code>std::ostream &amp; operator&lt;&lt;(std::ostream &amp; out, const TSeries &amp; s)</code> doesn't return anything. Please add a <code>return out</code> at the end of the function</li>
+<li><code>operator()</code> and <code>operator+</code> should both end with <code>return *this</code></li>
+<li>As <em>Devolus</em> already pointed out: You don't have a copy constructor and no <code>operator=(const TSeries&amp;)</code> defined</li>
+<li>You can use <code>memcpy</code> to copy the arrays faster.#</li>
+<li>The <code>i</code> in the for-loop in <code>operator+(const TSeries&amp;)</code> isn't initialized.</li>
+<li>Your <code>operator(int, int)</code> does currently alter the original object. This doesn't seem right.</li>
+</ol>
+
+<p><strong>Code:</strong></p>
+
+<pre><code>#include &lt;iostream&gt;
+class TSeries {
+public:
+    TSeries()
+    {
+        _size = 0;
+        _capacity = 0;
+
+        _tab = NULL;
+    }
+
+
+    TSeries(float *tab, const int size)
+    {
+        _size = size;
+        _capacity = 0;
+
+        _tab = new float[size];
+        memcpy(_tab, tab, _size*sizeof(float));
+    }
+
+    TSeries(const TSeries&amp; other)
+    {
+        _size = other._size;
+        _capacity = other._capacity;
+
+        _tab = new float[_size];
+        memcpy(_tab, other._tab, _size*sizeof(float));
+    }
+
+    ~TSeries() 
+    { 
+        delete[] _tab;
+    }
+
+    TSeries &amp; operator+=(float value) { return insert(value); }
+    TSeries &amp; operator,(float value) { return insert(value); }
+    TSeries &amp; operator+(const TSeries &amp; other)
+    {
+        if (this-&gt;_size != other._size)
+        {
+            std::cout &lt;&lt; "Size doesn't match!" &lt;&lt; std::endl;
+        }
+        else
+        {
+            //std::cout &lt;&lt; "whee";
+            for (int i = 0; i &lt; this-&gt;_size; i++)
+            {
+                _tab[i] += other._tab[i];
+                //std::cout &lt;&lt; "nothing";
+            }
+        }
+        //std::cout&lt;&lt;"sth";
+        return *this;
+    }
+
+    TSeries&amp; operator=(const TSeries&amp; other)
+    {
+        _size = other._size;
+        _capacity = other._capacity;
+        //Create tmp in case of self-assignment
+        float *tmp = new float[_capacity];
+        memcpy(tmp, other._tab, _size*sizeof(float));
+        delete[] _tab;
+        _tab = tmp;
+        return *this;
+    }
+
+    TSeries operator()(int position1, int position2)
+    {
+        //TODO: Range-Check
+        return TSeries(_tab + position1, position2 - position1);
+    }
+
+    TSeries &amp; insert(float k)
+    {
+        if (_size &gt;= _capacity) Enlarge();
+        _tab[_size++] = k;
+        return *this;
+    }
+    friend std::ostream &amp; operator&lt;&lt;(std::ostream &amp; out, const TSeries &amp; s);
+
+
+private:
+    int _size, _capacity;
+    float *_tab, *_itr;
+    static int _nr;
+
+    void Enlarge()
+    {
+        _capacity = 2 * _capacity + 1;
+        float *tmp = new float[_capacity];
+        memcpy(tmp, _tab, _size*sizeof(float));
+        delete[] _tab;
+        _tab = tmp;
+    }
+};
+
+std::ostream &amp; operator&lt;&lt;(std::ostream &amp; out, const TSeries &amp; s)
+{
+    int przedostatni = s._size - 1;
+    out &lt;&lt; "(";
+    for (int i = 0; i &lt; s._size; i++)
+    {
+        out &lt;&lt; (int)s._tab[i];
+        if (i != przedostatni)
+            out &lt;&lt; ",";
+    }
+    out &lt;&lt; ")" &lt;&lt; std::endl;
+    return out;
+}
+
+using namespace std;
+int main(int argc, char **argv) {
+    TSeries series1;
+    series1 += 1., 2., 4., 2.;
+    cout &lt;&lt; "Series1: " &lt;&lt; series1 &lt;&lt; endl;
+
+    const int size = 7;
+    float tab[size] = { 3.,3.,3.,4.,5.,1.,0. };
+    const TSeries series2(tab, size);
+    cout &lt;&lt; "Series2: " &lt;&lt; series2 &lt;&lt; endl &lt;&lt; endl;
+
+
+    TSeries series3 = series1 + series2;
+    cout &lt;&lt; "Series3: " &lt;&lt; series3 &lt;&lt; endl &lt;&lt; endl;
+
+    series1 += 1., 0., 3.;
+    series3 = series1 + series2;
+    cout &lt;&lt; "           " &lt;&lt; series1 &lt;&lt; endl;
+    cout &lt;&lt; "          +" &lt;&lt; series2 &lt;&lt; endl;
+    cout &lt;&lt; "        ---------------------" &lt;&lt; endl;
+    cout &lt;&lt; "Series3:   " &lt;&lt; series3 &lt;&lt; endl &lt;&lt; endl;
+
+    TSeries series4 = series1(2, 4);
+    cout &lt;&lt; "Series4: " &lt;&lt; series4 &lt;&lt; endl;
+
+    return 0;
+}
+
+/* output required:
+Series1: (1,2,4,2)
+Series2: (3,3,3,4,5,1,0)
+
+Size doesn't match!
+Series3: ()
+
+(1,2,4,2,1,0,3)
++(3,3,3,4,5,1,0)
+---------------------
+Series3:   (4,5,7,6,6,1,3)
+
+Series4: (4,2)
+*/
+</code></pre>
+
+<p><strong>Output</strong></p>
+
+<pre><code>Series1: (1,2,4,2)
+
+Series2: (3,3,3,4,5,1,0)
+
+
+Size doesn't match!
+Series3: (1,2,4,2)
+
+
+           (4,5,7,6,6,1,3)
+
+          +(3,3,3,4,5,1,0)
+
+        ---------------------
+Series3:   (4,5,7,6,6,1,3)
+
+
+Series4: (7,6)
+</code></pre>
+
+<p><strong>UPDATE:</strong></p>
+
+<p>Your <code>operator+(const TSeries &amp;)</code> should look somewhat like this:</p>
+
+<pre><code>TSeries operator+(const TSeries &amp; other)
+{
+    if (this-&gt;_size != other._size)
+    {
+        std::cout &lt;&lt; "Size doesn't match!" &lt;&lt; std::endl;
+        return TSeries(); //Return empty object
+    }
+    TSeries tmp(*this); //Create copy
+    for (int i = 0; i &lt; tmp._size; i++)
+    {
+        tmp._tab[i] += other._tab[i];
+    }
+    return tmp;
+}
+</code></pre>
+
+<p>And your <code>operator()(int, int)</code> like this:</p>
+
+<pre><code>TSeries operator()(int position1, int position2)
+{
+    if (position1 &lt; 0) position1 = 0;
+    else if (position1 &gt;= _size) position1 = _size - 1;
+
+    if (position2 &lt; position1) position2 = position1;
+    else if (position2 &gt;= _size) position2 = _size - 1;
+
+    return TSeries(_tab + position1, position2 - position1);
+}
+</code></pre>
+
+<p>Maybe you want to throw exceptions in the error cases?</p>

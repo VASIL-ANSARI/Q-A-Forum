@@ -1,0 +1,91 @@
+<p>Since you haven't really said what your specific problem is (you should have, as mentioned in <a href="http://stackoverflow.com/help">http://stackoverflow.com/help</a>), I'll try to provide some help without actually solving the problem.</p>
+
+<p>There are a number of issues with your code, including (but likely not limited to)</p>
+
+<ul>
+<li>submitting a form for each answer - this <em>reloads</em> the page and
+erases any state/progress information you have.</li>
+<li>a huge amount of redundant/repeated code.</li>
+<li>variable names that save you far less time in typing now, than longer ones
+will save you when you (or someone else) reviews the code in the future.</li>
+<li>separating related info into 2 arrays - without reading the code, it's not
+immediately clear (though one <em>can</em> guess) that they're related.</li>
+<li>a timer handler that appears to rely on a non-existent variable (<code>pause</code>)</li>
+</ul>
+
+<p>Something else to consider, is your method of pausing the game - by setting a variable to true or false. This is perfectly fine and functional, however - it comes with the drawback of leaving the timer running, dutifully firing once per second. It also requires you to check the state of the flag each and every time the handler is called. If you keep the result of <code>SetInterval</code>, you can use it in a call to <code>ClearInterval</code> - this will stop the timer, pausing the game and reducing energy usage. Naturally, you'll have to add extra code to monkey-around with the timer, should you decide upon such an approach.</p>
+
+<p>Here's some code that aims to address each of the issues above in the bullet list (I don't bother with adding and implementing the ability to pause):</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var currentAnswerIndex;
+var currentScore=0;
+
+var answerObjs =
+[
+	{ answer: "nigel", file: "Nigel Uno.png"},
+	{ answer: "perry", file: "perry.jpg"},
+	{ answer: "boots", file: "boots.jpg"},
+	{ answer: "sponge", file: "spongebob.jpg"}
+];
+
+function byId(id){return document.getElementById(id);}
+
+window.addEventListener('load', onDocLoaded, false);
+
+function onDocLoaded(evt)
+{
+	randomizeQuestion();
+	//initTimer(10);
+}
+
+function initTimer(secondsBeforeTimeout)
+{
+	var secondsRemaining = secondsBeforeTimeout;
+	const msPerSecond = 1000;
+	var timerId = setInterval(intervalHandler, 1*msPerSecond);
+
+	function intervalHandler()
+	{
+		if (gameIsPaused == false)
+		{
+			document.getElementById("timer").innerHTML = secondsRemaining + " " + "Seconds" ;
+			secondsRemaining--;
+		}
+		if (secondsRemaining &lt; 0) 
+		{    
+			window.location.assign("Times_up_Easy1.html");
+		}
+	}
+}
+
+function randomizeQuestion()
+{
+	currentAnswerIndex = Math.floor( Math.random() * answerObjs.length );
+	byId('questionPic').src = answerObjs[currentAnswerIndex].file;
+	// for debugging purposes
+	console.log( "Current answer is: " + answerObjs[currentAnswerIndex].answer );
+}
+
+function checkAnswer()
+{
+	var usersAnswer = byId('questionAnswer').value;
+	if (answerObjs[currentAnswerIndex].answer == usersAnswer)
+	{
+		currentScore++;
+		byId('currentScore').textContent = currentScore;
+		randomizeQuestion();
+	}
+	else
+	{
+	}
+	byId('questionAnswer').value = '';
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;h1&gt;Which movie contains this location?&lt;/h1&gt;
+&lt;img id='questionPic'/&gt;&lt;br&gt;
+&lt;input type='text' id='questionAnswer'/&gt;
+&lt;button id='checkAnsBtn' onclick='checkAnswer();'&gt;Check Answer&lt;/button&gt;(&lt;span id='currentScore'&gt;0&lt;/span&gt;/5)</code></pre>
+</div>
+</div>
+</p>

@@ -1,0 +1,238 @@
+<p>use php frameworks. so that it is fast and easy. Here login controller ive used in codeigniter framework</p>
+
+<pre><code>&lt;?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+
+
+class Login extends CI_Controller {
+
+
+
+    public function __construct(){
+
+        parent::__construct();  
+
+        $this-&gt;load-&gt;model('login_model', 'lm');
+
+        $this-&gt;load-&gt;model('posts_model', 'pm');
+
+        date_default_timezone_set('Asia/Hong_Kong');
+
+    }
+
+
+
+  //check password in the database
+
+  public function check_database($password){
+
+   $username = $this-&gt;input-&gt;post('username');
+
+    $result = $this-&gt;lm-&gt;login($username, $password);
+
+    if($result){
+
+      $sess_array = array();
+
+      foreach($result as $row){
+
+        $sess_array = array(
+
+                      'id'=&gt;$row-&gt;user_id,
+
+                      'username'=&gt;$row-&gt;username,                      
+
+                      );
+
+        $this-&gt;session-&gt;set_userdata('loggedIn', $sess_array);
+
+      }
+
+      return true;
+
+    }else{
+
+      $this-&gt;form_validation-&gt;set_message('check_database', 'Invalid Username or Password.');
+
+      return false;
+
+    }
+
+  }
+
+
+
+    public function auth(){
+
+        $this-&gt;form_validation-&gt;set_rules('username', 'Username', 'trim|required|xss_clean');
+
+        $this-&gt;form_validation-&gt;set_rules('password', 'Password', 'trim|required|xss_clean|callback_check_database');
+
+        if($this-&gt;form_validation-&gt;run() == FALSE){
+
+            $this-&gt;index();
+
+        }else{
+
+            redirect('post');
+
+        }
+
+
+
+    }
+
+
+
+    public function index(){
+
+        $data['title'] = "Login here | OkDito.ph Cebu's # 1 Buy and Sell Website";
+
+        $data['great_deals'] = $this-&gt;pm-&gt;greatdeals();//get all items
+
+
+
+        $data['getAllPendingPosts'] = $this-&gt;pm-&gt;getAllPendingPosts();
+
+        $tmp_pending = array();
+
+        $tmp_pending = $data['getAllPendingPosts'];
+
+        if(!empty($tmp_pending )){
+
+            $pending = 1;
+
+        }
+
+        else{
+
+            $pending = 0;
+
+        }
+
+
+
+        $data['pending'] = $pending;
+
+
+
+        if($this-&gt;session-&gt;userdata('loggedIn')){
+
+            $login = $this-&gt;session-&gt;userdata('loggedIn');
+
+            if(!empty($login)){
+
+                redirect('post');
+
+            }
+
+        }
+
+        else{
+
+            $this-&gt;template_lib-&gt;set_view('index_view', 'login_view', $data,'',$data);
+
+        }
+
+    }
+
+
+
+
+
+}
+</code></pre>
+
+<p>model</p>
+
+<pre><code>&lt;?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+/*
+
+ * User library for the Model..all commonly used functions should be placed here
+
+ * @author: team gabayan
+
+ * @created: 7/1/11
+
+ */
+
+class Login_model extends CI_Model{
+
+
+
+    //check if email exist in the database
+
+    public function email($email){
+
+        $this-&gt;db-&gt;select(
+
+                'tbl_users.email'
+
+                )
+
+                -&gt;from('tbl_users')
+
+                -&gt;where('email', $email);
+
+        $q = $this-&gt;db-&gt;get();
+
+        if($q-&gt;num_rows() == 1){
+
+            return $q-&gt;result();
+
+        }else{
+
+            return false;
+
+        }
+
+    }
+</code></pre>
+
+<p>Here. Hope this helps</p>
+
+<pre><code>  public function login($username, $password){
+
+     $sha_password = sha1($password);
+
+     $this-&gt;db-&gt;select(
+
+                'tbl_users.user_id,
+
+                 tbl_users.username,
+
+                 tbl_users.password,
+
+                 tbl_users.status
+
+                '
+
+                )
+
+              -&gt;from('tbl_users')
+
+              -&gt;where('tbl_users.username', $username)
+
+              -&gt;where('tbl_users.password', $sha_password);
+
+      $query = $this-&gt;db-&gt;get();
+
+      if($query-&gt;num_rows() == 1){
+
+        return $query-&gt;result();
+
+      }else{
+
+        return false;
+
+      }
+
+  }
+</code></pre>
+
+<p>}//endclass</p>
+
+<p>/<em>End of File Login_model.php</em>/</p>
+
+<p>/<em>File Location: ./application/models/login_model.php</em>/</p>

@@ -1,0 +1,256 @@
+<p>I am a beginner in Computer Science World and SyntaxNet. I wrote a simple SyntaxNet-Python algorithm which used SyntaxNet to analyze a text command a user inserts,"open the file book which I have written with laboratory writer with LibreOffice writer", and then analyzes SyntaxNet output with a python algorithm  in order to turn it to an executive command, in this case open a file, with any supported format, with LibreOffice in Linux, Ubuntu 14.04) environment. you can  see <a href="https://help.libreoffice.org/Common/Starting_the_Software_With_Parameters">here</a> the different command lines defined by LibreOffice in order to use different application in this package. </p>
+
+<ol>
+<li><p>After installing and running SyntaxNet (the installation process in explained <a href="https://github.com/JoshData/models/blob/b72274d38f169f77e6a15e54834f463f627dc82a/syntaxnet/build/ubuntu-14.04_x64.sh">here</a>),the shell script is opened <a href="https://github.com/tensorflow/models/blob/master/syntaxnet/syntaxnet/demo.sh">demo.sh</a> in <code>~/models/syntaxnet/suntaxnet/</code> directory and the <code>conl2tree</code> function (<code>line 54 to 56</code>) is erased in order to get a <code>tab delimited</code> output from SyntaxNet instead of a tree format output.</p></li>
+<li><p>This command is typed in the terminal window:</p>
+
+<p>echo 'open the file book which I have writtern with the laboratory writer with libreOffice writer' | syntaxnet/demo.sh > output.txt</p></li>
+</ol>
+
+<p>the <code>output.txt</code> document is saved in the directory where <code>demo.sh</code> exists and it will be somehow like the below figure: </p>
+
+<p><a href="http://i.stack.imgur.com/KrzfB.png"><img src="http://i.stack.imgur.com/KrzfB.png" alt="enter image description here"></a></p>
+
+<ol start="3">
+<li>The <code>output.txt</code> as the input file and use the below python algorithm to analyze SyntaxNet output and identifies the name of the file you want the target application from LibreOffice package and the command the user wants to use.</li>
+</ol>
+
+<p><code>#!/bin/sh</code></p>
+
+<pre><code>import csv
+
+import subprocess
+
+import sys
+
+import os
+
+#get SyntaxNet output as the Python algorithm input file
+filename='/home/username/models/syntaxnet/work/output.txt'
+
+#all possible executive commands for opening any file with any format with Libreoffice file
+commands={
+('open',  'libreoffice',  'writer'):  ('libreoffice', '--writer'),
+('open',  'libreoffice',  'calculator'):  ('libreoffice' ,'--calc'),
+('open',  'libreoffice',  'draw'):  ('libreoffice' ,'--draw'),
+('open',  'libreoffice',  'impress'): ('libreoffice' ,'--impress'),
+('open',  'libreoffice',  'math'):  ('libreoffice' ,'--math'),
+('open',  'libreoffice',  'global'):  ('libreoffice' ,'--global'),
+('open',  'libreoffice',  'web'): ('libreoffice' ,'--web'),
+('open',  'libreoffice',  'show'):  ('libreoffice', '--show'),
+}
+#all of the possible synonyms of the application from Libreoffice 
+comments={
+ 'writer': ['word','text','writer'],
+ 'calculator': ['excel','calc','calculator'],
+ 'draw': ['paint','draw','drawing'],
+ 'impress': ['powerpoint','impress'],
+ 'math': ['mathematic','calculator','math'],
+ 'global': ['global'],
+ 'web': ['html','web'],
+ 'show':['presentation','show']
+ }
+
+root ='ROOT'            #ROOT of the senctence
+noun='NOUN'             #noun tagger
+verb='VERB'             #verb tagger
+adjmod='amod'           #adjective modifier
+dirobj='dobj'           #direct objective
+apposmod='appos'        # appositional modifier
+prepos_obj='pobj'       # prepositional objective
+app='libreoffice'       # name of the package
+preposition='prep'      # preposition
+noun_modi='nn'          # noun modifier 
+
+#read from Syntaxnet output tab delimited textfile
+def readata(filename):
+    file=open(filename,'r')
+    lines=file.readlines()
+    lines=lines[:-1]
+    data=csv.reader(lines,delimiter='\t')
+    lol=list(data)
+    return  lol
+
+# identifies the action, the name of the file and whether the user mentioned the name of the application implicitely  
+def exe(root,noun,verb,adjmod,dirobj,apposmod,commands,noun_modi):
+    interprete='null'
+    lists=readata(filename)
+    for sublist in lists:
+        if sublist[7]==root and sublist[3]==verb: # when the ROOT is verb the dobj is probably the name of the file you want to have
+                action=sublist[1]
+                dep_num=sublist[0]
+                for sublist in lists:
+                    if sublist[6]==dep_num and sublist[7]==dirobj:
+                        direct_object=sublist[1]
+                        dep_num=sublist[0]
+                        dep_num_obj=sublist[0]
+                        for sublist in lists:
+                            if direct_object=='file' and sublist[6]==dep_num_obj and sublist[7]==apposmod:
+                                direct_object=sublist[1]
+                            elif  direct_object=='file' and sublist[6]==dep_num_obj and sublist[7]==adjmod:
+                                direct_object=sublist[1]
+                for sublist in lists:
+                    if sublist[6]==dep_num_obj and sublist[7]==adjmod:
+                            for key, v in  comments.iteritems():
+                                if sublist[1] in v:
+                                    interprete=key
+                for sublist in lists:
+                    if sublist[6]==dep_num_obj and sublist[7]==noun_modi:
+                        dep_num_nn=sublist[0]
+                        for key, v in  comments.iteritems():
+                            if sublist[1] in v:
+                                interprete=key
+                                print interprete
+                        if interprete=='null':
+                            for sublist in lists:
+                                if sublist[6]==dep_num_nn and sublist[7]==noun_modi:
+                                    for key, v in  comments.iteritems():
+                                        if sublist[1] in v:
+                                            interprete=key
+        elif  sublist[7]==root and sublist[3]==noun: # you have to find the word which is in a adjective form and depends on the root
+            dep_num=sublist[0]
+            dep_num_obj=sublist[0]
+            direct_object=sublist[1]
+            for sublist in lists:
+                if sublist[6]==dep_num and sublist[7]==adjmod:
+                    actionis=any(t1==sublist[1] for (t1, t2, t3) in commands)
+                    if actionis==True:
+                        action=sublist[1]
+                elif sublist[6]==dep_num and sublist[7]==noun_modi:
+                    dep_num=sublist[0]
+                    for sublist in lists:
+                        if sublist[6]==dep_num and sublist[7]==adjmod:
+                            if any(t1==sublist[1] for (t1, t2, t3) in commands):
+                                action=sublist[1]
+            for sublist in lists:
+                if direct_object=='file' and sublist[6]==dep_num_obj and sublist[7]==apposmod and sublist[1]!=action:
+                    direct_object=sublist[1]
+                if  direct_object=='file' and sublist[6]==dep_num_obj and sublist[7]==adjmod and sublist[1]!=action:
+                    direct_object=sublist[1]
+            for sublist in lists:
+                if sublist[6]==dep_num_obj and sublist[7]==noun_modi:
+                    dep_num_obj=sublist[0]
+                    for key, v in  comments.iteritems():
+                        if sublist[1] in v:
+                            interprete=key
+                        else:
+                            for sublist in lists:
+                                if sublist[6]==dep_num_obj and sublist[7]==noun_modi:
+                                    for key, v in  comments.iteritems():
+                                        if sublist[1] in v:
+                                            interprete=key
+    return action, direct_object, interprete
+
+action, direct_object, interprete = exe(root,noun,verb,adjmod,dirobj,apposmod,commands,noun_modi)
+
+# find the application (we assume we know user want to use libreoffice but we donot know what subapplication should be used)
+def application(app,prepos_obj,preposition,noun_modi):
+    lists=readata(filename)
+    subapp='not mentioned'
+    for sublist in lists:
+        if sublist[1]==app:
+            dep_num=sublist[6]
+            for sublist in lists:
+                if sublist[0]==dep_num and sublist[7]==prepos_obj:
+                    actioni=any(t3==sublist[1] for (t1, t2, t3) in commands)
+                        if actioni==True:
+                            subapp=sublist[1]
+                        else:
+                            for sublist in lists:
+                                if sublist[6]==dep_num and sublist[7]==noun_modi:
+                                    actioni=any(t3==sublist[1] for (t1, t2, t3) in commands)
+                                    if actioni==True:
+                                        subapp=sublist[1]
+                        elif sublist[0]==dep_num and sublist[7]==preposition:
+                            sublist[6]=dep_num
+                            for subline in lists:
+                                if subline[0]==dep_num and subline[7]==prepos_obj:
+                                    if any(t3==sublist[1] for (t1, t2, t3) in commands):
+                                        subapp=sublist[1]
+                                    else:
+                                        for subline in lists:
+                                            if subline[0]==dep_num and subline[7]==noun_modi:
+                                                if any(t3==sublist[1] for (t1, t2, t3) in commands):
+                                                    subapp=sublist[1]
+    return subapp
+
+sub_application=application(app,prepos_obj,preposition,noun_modi)
+
+if sub_application=='not mentioned' and interprete!='null':
+    sub_application=interprete
+elif sub_application=='not mentioned' and interprete=='null':
+    sub_application=interprete
+
+# the format of file
+def format_function(sub_application):
+    subapp=sub_application
+    Dobj=exe(root,noun,verb,adjmod,dirobj,apposmod,commands,noun_modi)[1]
+    if subapp!='null':
+        if subapp=='writer':
+            a='.odt'
+            Dobj=Dobj+a
+        elif subapp=='calculator':
+            a='.ods'
+            Dobj=Dobj+a
+        elif subapp=='impress':
+            a='.odp'
+            Dobj=Dobj+a
+        elif subapp=='draw':
+            a='.odg'
+            Dobj=Dobj+a
+        elif subapp=='math':
+            a='.odf'
+            Dobj=Dobj+a
+        elif subapp=='math':
+            a='.odf'
+            Dobj=Dobj+a
+        elif subapp=='web':
+            a='.html'
+            Dobj=Dobj+a
+    else:
+        Dobj='null'
+    return Dobj
+
+def get_filepaths(directory):
+    myfile=format_function(sub_application)
+    file_paths = []  # List which will store all of the full filepaths.
+    # Walk the tree.
+    for root, directories, files in os.walk(directory):
+        for filename in files:
+        # Join the two strings in order to form the full filepath.
+            if filename==myfile:
+                filepath = os.path.join(root, filename)
+                file_paths.append(filepath)  # Add it to the list.
+    return file_paths  # Self-explanatory.
+
+# Run the above function and store its results in a variable.
+full_file_paths = get_filepaths("/home/ubuntu/")
+
+if full_file_paths==[]:
+    print 'No file with name %s is found' % format_function(sub_application)
+if full_file_paths!=[]:
+    path=full_file_paths
+    prompt='&gt; '
+    if len(full_file_paths) &gt;1:
+        print full_file_paths
+        print 'which %s do you mean?'% subapp
+        inputname=raw_input(prompt)
+        if inputname in full_file_paths:
+            path=inputname
+        #the main code structure
+    if sub_application!='null':
+        command= commands[action,app,sub_application]
+        subprocess.call([command[0],command[1],path[0]])
+    else:
+        print "The sub application is not mentioned clearly"
+</code></pre>
+
+<p>I again say I am a beginner and the code might not seems so tidied up or professional but I just tried to use all my knowledge about this fascinating 
+<code>SyntaxNet</code> to a practical algorithm.
+<strong>This simple algorithm can open the file:</strong></p>
+
+<ol>
+<li><p>with any format which is supported by <code>LibreOffice</code> e.g. <code>.odt,.odf,.ods,.html,.odp</code>.</p></li>
+<li><p>it can understand implicit reference of different application in <code>LibreOffice</code>, for example: " open the text file book with libreoffice" instead of "open the file book with libreoffice writer"</p></li>
+<li><p>can overcome the problem of SyntaxNet interpreting the name of the files which are referred as an adjective.</p></li>
+</ol>

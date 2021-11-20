@@ -1,0 +1,124 @@
+<p>You can investigate how WooCommerce is adding items to the cart via ajax directly in the code.... the callback is located in <code>includes/class-wc-ajax.php</code>. WooCommerce already does this on product "loops" (product archives), so I don't think you need to reinvent the wheel and if their existing code doesn't work for what you are trying to do, then you should be able to borrow heavily from it. </p>
+
+<p>The beginning of that file has a loop with all the WooCommerce Ajax actions, but we can track down that the add to cart is basically this:</p>
+
+<pre><code>add_action( 'wp_ajax_nopriv_woocommerce_add_to_cart', array( 'WC_AJAX', 'add_to_cart' ) );
+</code></pre>
+
+<p>And it's callback is a little further down the file:</p>
+
+<pre><code>/**
+ * AJAX add to cart
+ */
+public static function add_to_cart() {
+    ob_start();
+
+    $product_id        = apply_filters( 'woocommerce_add_to_cart_product_id', absint( $_POST['product_id'] ) );
+    $quantity          = empty( $_POST['quantity'] ) ? 1 : wc_stock_amount( $_POST['quantity'] );
+    $passed_validation = apply_filters( 'woocommerce_add_to_cart_validation', true, $product_id, $quantity, $variation_id, $variations, $cart_item_data );
+
+    if ( $passed_validation &amp;&amp; WC()-&gt;cart-&gt;add_to_cart( $product_id, $quantity ) ) {
+
+        do_action( 'woocommerce_ajax_added_to_cart', $product_id );
+
+        if ( get_option( 'woocommerce_cart_redirect_after_add' ) == 'yes' ) {
+            wc_add_to_cart_message( $product_id );
+        }
+
+        // Return fragments
+        self::get_refreshed_fragments();
+
+    } else {
+
+        // If there was an error adding to the cart, redirect to the product page to show any errors
+        $data = array(
+            'error' =&gt; true,
+            'product_url' =&gt; apply_filters( 'woocommerce_cart_redirect_after_error', get_permalink( $product_id ), $product_id )
+        );
+
+        wp_send_json( $data );
+
+    }
+
+    die();
+}
+</code></pre>
+
+<p>If you want to view their add to cart ajax call, the JS for that is located in <code>assest/js/frontend/add-to-cart.js</code>.</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>Now that I know you are looking to add a variation, <em>maybe</em> we can tweak the above. </p>
+
+<p>First, I think you'll need to pass the AJAX url to your script:</p>
+
+<pre><code>wp_enqueue_script( 'wc-variation-add-to-cart', 'source-to-script/your-script.js' );
+
+$vars = array( 'ajax_url' =&gt; admin_url( 'admin-ajax.php' ) );
+wp_localize_script( 'wc-variation-add-to-cart', 'WC_VARIATION_ADD_TO_CART', $vars );
+</code></pre>
+
+<p>Then your AJAX call would look something like this:</p>
+
+<pre><code>jQuery.ajax({
+    url: WC_VARIATION_ADD_TO_CART.ajax_url,
+    data: {
+        "action" : "woocommerce_add_variation_to_cart",
+        "product_id" : "124",
+        "variation_id" : "125",
+        "quantity" : 1,
+        "variation" : {
+            "size" : "xl",
+            "color": "pink"
+        },
+    type: "POST"
+    }   
+});
+</code></pre>
+
+<p>Basically to add a specific variation you need the variation's ID in addition to all it's specific options. </p>
+
+<p>And finally the new callback for the <code>woocommerce_add_variation_to_cart</code> ajax action would be along the lines of the following:</p>
+
+<pre><code>add_action( 'wp_ajax_nopriv_woocommerce_add_variation_to_cart', 'so_27270880_add_variation_to_cart' );
+
+function so_27270880_add_variation_to_cart() {
+
+    ob_start();
+
+    $product_id        = apply_filters( 'woocommerce_add_to_cart_product_id', absint( $_POST['product_id'] ) );
+    $quantity          = empty( $_POST['quantity'] ) ? 1 : wc_stock_amount( $_POST['quantity'] );
+
+    $variation_id      = isset( $_POST['variation_id'] ) ? absint( $_POST['variation_id'] ) : '';
+    $variations         = ! empty( $_POST['variation'] ) ? (array) $_POST['variation'] : '';
+
+    $passed_validation = apply_filters( 'woocommerce_add_to_cart_validation', true, $product_id, $quantity, $variation_id, $variations, $cart_item_data );
+
+    if ( $passed_validation &amp;&amp; WC()-&gt;cart-&gt;add_to_cart( $product_id, $quantity, $variation_id, $variations ) ) {
+
+        do_action( 'woocommerce_ajax_added_to_cart', $product_id );
+
+        if ( get_option( 'woocommerce_cart_redirect_after_add' ) == 'yes' ) {
+            wc_add_to_cart_message( $product_id );
+        }
+
+        // Return fragments
+        WC_AJAX::get_refreshed_fragments();
+
+    } else {
+
+        // If there was an error adding to the cart, redirect to the product page to show any errors
+        $data = array(
+            'error' =&gt; true,
+            'product_url' =&gt; apply_filters( 'woocommerce_cart_redirect_after_error', get_permalink( $product_id ), $product_id )
+        );
+
+        wp_send_json( $data );
+
+    }
+
+    die();
+}
+</code></pre>
+
+<p>Mostly, I'm just copying WooCommerce's approach and adding in the 2 variables needed for adding variations. Totally untested, but I hope it helps.</p>

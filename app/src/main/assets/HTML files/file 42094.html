@@ -1,0 +1,36 @@
+<p>First, you'll need to use <code>UnorderedBulkOperation</code> for the entire batch to execute. You will need to use a try/catch around your <code>BulkWriteOperation.execute()</code>, catching <a href="http://api.mongodb.org/java/current/com/mongodb/BulkWriteException.html" rel="nofollow">BulkWriteException</a> which will give you access to a list of <a href="http://api.mongodb.org/java/current/com/mongodb/BulkWriteError.html" rel="nofollow">BulkWriteError</a> as well as the <a href="http://api.mongodb.org/java/current/com/mongodb/BulkWriteResult.html" rel="nofollow">BulkWriteResult</a>.</p>
+
+<p>Here's a quick and dirty example:</p>
+
+<pre><code>MongoClient m = new MongoClient("localhost");
+DB db = m.getDB( "test" );
+DBCollection coll = db.getCollection( "bulk" );
+coll.drop();
+coll.createIndex(new BasicDBObject("i", 1), new BasicDBObject("unique", true));
+
+BulkWriteOperation bulkWrite = coll.initializeUnorderedBulkOperation();
+
+for (int i = 0; i &lt; 100; i++) {
+    bulkWrite.insert(new BasicDBObject("i", i));
+}
+// Now add 10 documents to the batch that will generate a unique index error
+for (int i = 0; i &lt; 10; i++) {
+    bulkWrite.insert(new BasicDBObject("i", i));
+}
+
+BulkWriteResult result = null;
+List&lt;BulkWriteError&gt; errors = null;
+try {
+    result = bulkWrite.execute();
+} catch (BulkWriteException bwe) {
+    bwe.printStackTrace();
+    errors = bwe.getWriteErrors();
+    result = bwe.getWriteResult();
+}
+
+for (BulkWriteError e : errors) {
+    System.out.println(e.getIndex() + " failed");
+}
+
+System.out.println(result);
+</code></pre>

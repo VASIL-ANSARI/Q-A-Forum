@@ -1,0 +1,22 @@
+<p>Since you said that only the <em>Interactor</em> "knows" about the Realm framework I would say not to even return a managed Realm object, instead return an unmanaged copy of the results using <code>copyFromRealm</code>. That way you don't have to care about the Realm instance being open or closed in the <em>Presenter</em>.</p>
+
+<p>At the same time I would let the <em>Presenter</em> chose wether the call should be done asynchronous or not since <code>RxJava</code> does that pretty cool and easy and you won't have issues calling the <em>Interactor</em> load method within another thread(which can be avoided using Loopers but why overcomplicate the situation if you can make it simpler :P ).</p>
+
+<p>So I would go for:</p>
+
+<pre><code>Override
+public Observable&lt;City&gt; getHomeTown() {
+    final Realm realm = Realm.getDefaultInstance();
+    City city = realm.where(City.class).equalTo("name", "Cluj-Napoca").findFirst();
+
+    // make sure we don't send back Realm stuff, this is a deep copy that will copy all referenced objects (as the method doc says)
+    City cityUnmanaged = realm.copyFromRealm(city);
+
+    // safe to close the realm instance now
+    realm.close();
+
+    return Observable.just(cityUnmanaged);
+}
+</code></pre>
+
+<p>I am curious to see more options :).</p>

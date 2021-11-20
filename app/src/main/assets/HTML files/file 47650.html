@@ -1,0 +1,52 @@
+<p>Here's the template you can use to group by weeks:</p>
+
+<pre><code>DECLARE 
+  @Year int = 2015,
+  @Month int = 7
+
+DECLARE @StartDate DATE = dateadd(mm, (@Year - 1900) * 12 + @Month - 1, 0)
+DECLARE @EndDate DATE = dateadd(mm, (@Year - 1900) * 12 + @Month, -1)
+
+;WITH tally AS (
+    SELECT (row_number() OVER(ORDER BY (SELECT 0))) - 1 AS N
+    FROM master.dbo.syscolumns sc1)
+SELECT 
+    --d,
+    wknr
+FROM 
+    tally
+    CROSS APPLY(
+        SELECT 
+            d = DATEADD(DAY, N, @StartDate),
+            wknr = DATEPART(wk, DATEADD(DAY, N, @StartDate))) dates
+WHERE d &lt; @EndDate
+GROUP BY wknr
+ORDER BY wknr
+</code></pre>
+
+<p><strong>Edit</strong></p>
+
+<p>I suggest you to tailor the provided query template according to your need. I see in your PHP code you need fields <code>name, timestamp, number, comment</code>, so the query should probably return them.</p>
+
+<p>Next step would be to replace your old query with the new one. Pass date parameters accordingly.</p>
+
+<p>I guess you can use something like:</p>
+
+<pre><code>;WITH tally AS (
+    SELECT (row_number() OVER(ORDER BY (SELECT 0))) - 1 AS N
+    FROM master.dbo.syscolumns sc1)
+SELECT 
+    wknr,
+    number = SUM(t.number)
+FROM 
+    tally
+    CROSS APPLY(
+        SELECT 
+            d = DATEADD(DAY, N, @StartDate),
+            wknr = DATEPART(wk, DATEADD(DAY, N, @StartDate))) dates
+    JOIN table t
+        ON t.timestamp = d
+WHERE d &lt; @EndDate
+GROUP BY wknr
+ORDER BY wknr
+</code></pre>

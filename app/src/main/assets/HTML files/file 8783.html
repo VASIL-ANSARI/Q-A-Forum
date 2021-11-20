@@ -1,0 +1,31 @@
+<h2>Update:</h2>
+
+<p>At least the error message about <code>char16_t</code> is likely due to the fact that you are using Visual Studio 2010 with MATLAB R2009b.  That compiler is too new for this version of MATLAB. See the<a href="http://www.mathworks.com/support/compilers/R2009b/" rel="nofollow">Supported Compilers list for R2009b</a>.</p>
+
+<p>Not too clear about the other errors, but:</p>
+
+<pre><code> Vector&amp; r_sat(3);
+</code></pre>
+
+<p>Seems to me to be pretty questionable C++: Since it is a reference to a vector, what you are doing is creating a temporary Vector with size 3, then initializing the reference to refer to that temporary.
+Better to just declare <code>r_sat</code> as <code>Vector</code>. </p>
+
+<p>Then later you have:</p>
+
+<pre><code>r_sat = mxGetPr(prhs[0]);
+</code></pre>
+
+<p>The <code>mxGetPr()</code> function returns a pointer to a double array, but the Vector class does not have an <code>operator=</code> that takes a <code>double*</code> as an argument.</p>
+
+<p>Maybe something like this:</p>
+
+<pre><code>r_sat = Vector(mxGetPr(prhs[0]), 3); // use the Vector(double*, int N) constructor
+</code></pre>
+
+<h2>Previous answer:</h2>
+
+<ol>
+<li>Your <code>Vector</code> class is C++, not C.</li>
+<li>Since you are on Windows, the <code>lcc</code> compiler that ships with MATLAB is a C compiler, it does not understand C++.  If you are going to be compiling C++ MEX files, you will need to run <code>mex -setup</code> and pick a supported C++ compiler (typically, Visual Studio).</li>
+<li>The way <code>mex</code> decides whether you're building a C or C++ MEX file (which influences whether it invokes the C or C++ compiler to do the actual compiling and linking) is based on the file extension.  So rename <code>AccelSolrad.c</code> to <code>AccelSolrad.cpp</code> and you should be good to go.</li>
+</ol>

@@ -1,0 +1,93 @@
+<p>You can use <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.concat.html" rel="nofollow"><code>concat</code></a> for concating all <code>DataFrames</code> and then <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.stack.html" rel="nofollow"><code>stack</code></a> with <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.Series.str.get_dummies.html" rel="nofollow"><code>str.get_dummies</code></a>. Last need <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.groupby.html" rel="nofollow"><code>groupby</code></a> by index (<code>level=0</code>) with aggregating <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.core.groupby.GroupBy.sum.html" rel="nofollow"><code>sum</code></a>:</p>
+
+<pre><code>import pandas as pd
+import numpy as np
+import io
+
+temp=u"""CAT;BALL
+"""
+#after testing replace io.StringIO(temp) to filename
+df1 = pd.read_csv(io.StringIO(temp), sep=";", index_col=None, header=None)
+
+print (df1)
+
+temp=u"""DOG;BALL;APPLE
+"""
+#after testing replace io.StringIO(temp) to filename
+df2 = pd.read_csv(io.StringIO(temp), sep=";", index_col=None, header=None)
+
+print (df2)
+
+
+temp=u"""DOG;BALL;APPLE;CAT
+"""
+#after testing replace io.StringIO(temp) to filename
+df3 = pd.read_csv(io.StringIO(temp), sep=";", index_col=None, header=None)
+
+print (df3)
+
+df = pd.concat([df1,df2,df3], keys=['A','B','C'])
+df.reset_index(1, drop=True, inplace=True)
+print (df)
+     0     1      2    3
+A  CAT  BALL    NaN  NaN
+B  DOG  BALL  APPLE  NaN
+C  DOG  BALL  APPLE  CAT
+</code></pre>
+
+
+
+<pre><code>print (df.stack().reset_index(1, drop=True).str.get_dummies())
+   APPLE  BALL  CAT  DOG
+A      0     0    1    0
+A      0     1    0    0
+B      0     0    0    1
+B      0     1    0    0
+B      1     0    0    0
+C      0     0    0    1
+C      0     1    0    0
+C      1     0    0    0
+C      0     0    1    0
+
+print (df.stack().reset_index(1, drop=True).str.get_dummies().groupby(level=0).sum())
+   APPLE  BALL  CAT  DOG
+A      0     1    1    0
+B      1     1    0    1
+C      1     1    1    1
+</code></pre>
+
+<hr>
+
+<p>Another solution with <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.get_dummies.html" rel="nofollow"><code>pandas.get_dummies</code></a> and <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.groupby.html" rel="nofollow"><code>groupby</code></a> by columns (<code>level=0</code>, axis=1) with aggregating <a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.core.groupby.GroupBy.sum.html" rel="nofollow"><code>sum</code></a>:</p>
+
+<pre><code>print (pd.get_dummies(df, dummy_na=False, prefix='', prefix_sep='')
+         .groupby(level=0, axis=1).sum())
+
+   APPLE  BALL  CAT  DOG
+A      0     1    1    0
+B      1     1    0    1
+C      1     1    1    1
+</code></pre>
+
+<p>EDIT by comment:</p>
+
+<p>Another approach is get <code>dummies</code> from each dataframe separately and then <code>concat</code> output:</p>
+
+<pre><code>df11 = pd.get_dummies(df1, dummy_na=False, prefix='', prefix_sep='')
+         .groupby(level=0, axis=1).sum()
+#print (df11)
+df21 = pd.get_dummies(df2, dummy_na=False, prefix='', prefix_sep='')
+         .groupby(level=0, axis=1).sum()
+#print (df21)
+df31 = pd.get_dummies(df3, dummy_na=False, prefix='', prefix_sep='')
+         .groupby(level=0, axis=1).sum()
+#print (df31)
+
+df = pd.concat([df11,df21,df31], keys=['A','B','C']).fillna(0).astype(int)
+df.reset_index(1, drop=True, inplace=True)
+print (df)
+   APPLE  BALL  CAT  DOG
+A      0     1    1    0
+B      1     1    0    1
+C      1     1    1    1
+</code></pre>

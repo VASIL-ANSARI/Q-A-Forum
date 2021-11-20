@@ -1,0 +1,58 @@
+<p>You could write a custom helper method to generate those menu items and which checks the current action and controller and applies the correct CSS class. You could take a look at the  <a href="http://stackoverflow.com/a/7066862/29407">following example</a> and adapt it to your requirements.</p>
+
+<p>Just like that:</p>
+
+<pre><code>public static class MenuExtensions
+{
+    public static IHtmlString MenuItem(
+        this HtmlHelper htmlHelper,
+        string text,
+        string action,
+        string controller
+    )
+    {
+        var li = new TagBuilder("li");
+        var routeData = htmlHelper.ViewContext.RouteData;
+        var currentAction = routeData.GetRequiredString("action");
+        var currentController = routeData.GetRequiredString("controller");
+        if (string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase) &amp;&amp;
+            string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase))
+        {
+            li.AddCssClass("activeLink");
+        }
+
+        li.InnerHtml = htmlHelper.ActionLink(text, action, controller, null, null).ToHtmlString();
+        return new HtmlString(li.ToString());
+    }
+}
+</code></pre>
+
+<p>and then in your view:</p>
+
+<pre><code>&lt;table id="myTable"&gt;
+    &lt;tr&gt;
+        &lt;td&gt;
+            &lt;ul&gt;
+                @Html.MenuItem("Home", "Index", "Home")
+                @Html.MenuItem("About", "About", "Home")
+                @Html.MenuItem("Another", "Index", "Another")
+            &lt;/ul&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+</code></pre>
+
+<p>Now, if the user is currently browsing the <code>About</code> action of <code>Home</code> controller (<code>/Home/About</code>), the following markup will be generated:</p>
+
+<pre><code>&lt;table id="myTable"&gt;
+    &lt;tr&gt;
+        &lt;td&gt;
+            &lt;ul&gt;
+                &lt;li&gt;&lt;a href="/"&gt;Home&lt;/a&gt;&lt;/li&gt;
+                &lt;li class="activeLink"&gt;&lt;a href="/Home/About"&gt;About&lt;/a&gt;&lt;/li&gt;
+                &lt;li&gt;&lt;a href="/Another"&gt;Another&lt;/a&gt;&lt;/li&gt;
+            &lt;/ul&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+</code></pre>

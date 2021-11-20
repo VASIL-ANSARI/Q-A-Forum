@@ -1,0 +1,60 @@
+<p>Here's a simple generic interpretation of what you are asking for:</p>
+
+<pre><code>// concrete controller implementation
+public class Down_Time_CaptureController: ControllerBase&lt;Down_Time_Capture, VM_Down_Time_Capture, Down_Time_CaptureRepository&gt;
+{
+}
+
+// generic controller base
+public abstract class ControllerBase&lt;TModel, TViewModel, TRepository&gt;: Controller
+        where TModel : Base_Model, new()
+        where TViewModel : Base_ViewModel, new()
+        where TRepository : Base_Repository, new()
+{
+    protected virtual TModel CreateNewModel()
+    {
+           return (TModel)Activator.CreateInstance&lt;TModel&gt;();
+
+    }
+
+    protected virtual TRepository CreateNewRepository()
+    {
+           return (TRepository)Activator.CreateInstance&lt;TRepository&gt;();
+    }
+
+    protected virtual TViewModel CreateNewViewModel()
+    {
+            return (TViewModel)Activator.CreateInstance&lt;TViewModel&gt;();
+    }
+
+    //I'm assuming my generified add method would go in here  
+    public virtual ActionResult Add(TViewModel viewModel)
+    {
+       using (var repository = CreateRepository())
+       {
+               if (!ModelState.IsValid)
+                   return ReturnValidationFailure(ViewData.ModelState.Values);
+
+               var model = CreateNewModel();
+               model.InjectFrom(viewModel);
+
+               string mserMsg = repository.Add(model, User.Identity.Name);
+
+               if (!string.IsNullOrEmpty(mserMsg))
+                   return ReturnCustomValidationFailure(Server.HtmlEncode(mserMsg));
+
+               repository.Save();
+
+               return Json("Added successfully.", JsonRequestBehavior.AllowGet);
+        }       
+    }
+}
+</code></pre>
+
+<p>A few notes:</p>
+
+<ol>
+<li>You will probably want to create interfaces for the three types (Model, ViewModel, Repository) and use those as the generic constraints.</li>
+<li>You will probably want a generic Repository interface and base implementation (so you don't have to code each repository independently, and copy similar logic from one to the other).</li>
+<li>Consider using an <a href="http://martinfowler.com/articles/injection.html" rel="nofollow">Inversion of Control container and dependency injection</a>. Rather than have the controller, for example, handle creating an instance of a repository, make it a property and set it from the constructor. You can then use an IoC of your choice (like Ninject or Autofac) and register concrete implementations, and it will manage creating and the lifetime of both the dependencies and the controller itself.</li>
+</ol>

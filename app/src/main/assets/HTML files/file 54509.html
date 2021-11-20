@@ -1,0 +1,39 @@
+<p>Try this; </p>
+
+<pre><code>_context.Tags.Where(tag =&gt; tag.Source.Contains("dzieÅ.txt")) 
+</code></pre>
+
+<p>This should add <code>N'</code> to the SQL query. Run SQL Server Profiler as you execute the LINQ and see how it translates LINQ to SQL. </p>
+
+<p>The other option is <code>Equals</code> operator. This is equivalent to SQL <code>=</code> operator. If you think there is a chance of having mixed case names, you can use <code>CurrentCultureIgnoreCase</code></p>
+
+<pre><code>_context.Tags.Where(tag =&gt; tag.Source.Equals("dzieÅ.txt", StringComparison.CurrentCulture)) 
+</code></pre>
+
+<p>Note the <code>StringComparison.CurrentCulture</code>.</p>
+
+<p>Make sure you have an Index on <code>Source</code> field. It will improve performance significantly.</p>
+
+<p><strong>Updated to show how to query for a collection of items</strong></p>
+
+<p>This is one of the draw backs in EF. You cannot use LINQ to SQL for non-sql type collections. Basically any collection of items that does not exists in your SQL Server is considered as unknown to EF.</p>
+
+<p>So here is an option;</p>
+
+<pre><code>public IENumerable&lt;Tag&gt; SearchTags(IENumerable&lt;string&gt; toBeSearchedTags)
+{
+    List&lt;Tag&gt; availableTags = new List&lt;Tag&gt;();
+
+    foreach(var stag in toBeSearchedTags)
+    {
+       var availableTag = _context.Tags.FirstOrdefault(tag =&gt; tag.Source.Equals(stag, StringComparison.CurrentCulture)) 
+
+       if(availableTag != null)
+       {
+          availableTags.Add(availableTag);
+       }
+    }
+
+    return availableTags;
+}
+</code></pre>

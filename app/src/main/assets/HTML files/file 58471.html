@@ -1,0 +1,39 @@
+<p>An example using <code>std::mutex</code>, <code>std::lock_guard</code>, <code>std::unique_lock</code>(reader) and <code>std::condition_variable</code>. 
+_mutexLockCondition, _mutexObject, and _dataContainer are shared between ReaderClass and WriterClass.</p>
+
+<p>Tried to be a bit vague on the actual data container, so <code>getDataContainer()</code> and <code>addDataToContainer()</code> are up to you.</p>
+
+<pre><code>std::shared_ptr&lt; Data &gt; ReaderClass::read()
+{
+    std::unique_lock&lt; std::mutex &gt; lock( _mutexObject );
+
+    // handle spurious wakeup from waitForMessageNotification
+    while( _dataContainer.empty() )
+    {
+        if( waitForMessageNotification( lock ) )
+        {
+            // timeout occurred, return nullptr to prevent blocking
+            return nullptr;
+        }
+    }
+
+    return getDataFromContainer();
+}
+
+bool ReaderClass::waitForNotification( unique_lock&lt; mutex &gt; &amp; lock )
+{
+    //_mutexLockCondition is a std::condition_variable
+    return _mutexLockCondition.wait_for( lock, std::chrono::milliseconds( 100 ) )
+                                            == std::cv_status::timeout;
+}
+
+
+void WriterClass::write( std::shared_ptr&lt; Data &gt; dataPtr )
+{
+    std::lock_guard&lt; mutex &gt; lock( _mutexObject );
+
+    addDataToContainer( dataPtr );
+
+    _mutexLockCondition.notify_one();
+}
+</code></pre>

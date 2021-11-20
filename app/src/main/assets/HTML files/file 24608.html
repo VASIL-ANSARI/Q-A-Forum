@@ -1,0 +1,52 @@
+<p>If you would like to memcpy two structs then the memory in both of them must be continuous. But you would have to determine <code>num</code> beforehand.</p>
+
+<pre><code>struct test_struct {
+    int num;
+    char ** values;
+} * TestStruct;
+
+int _num = 0;
+
+// find _num
+
+TestStruct = malloc (sizeof (struct test_struct) + (sizeof(char*) * _num) + (LENGTH * _num));
+
+TestStruct-&gt;num = _num;
+TestStruct-&gt;values = &amp;TestStruct + sizeof (struct test_struct);
+
+for (int i = 0; i &lt; _num; i++){
+    TestStruct-&gt;values[i] = &amp;TestStruct + sizeof (struct test_struct) + (i * LENGTH);
+}
+</code></pre>
+
+<p>The reason I changed char * to char ** is because using char * it becomes harder to access the strings after the first (I'm assuming they're null terminated). Also, after calling memcpy, you must update all the string pointers in the new struct. </p>
+
+<p>To memcpy you would do this:</p>
+
+<pre><code>memcpy (buf, TestStruct-&gt;values[0], LENGTH * TestStruct-&gt;num);
+</code></pre>
+
+<p>But in buf, however, you would only see the first string (unless your strings are not null-terminated). You would have to increment the pointer after every null terminated character until you know, with <code>num</code>, that you've reached the end of the buffer.</p>
+
+<hr>
+
+<p>Now that I understand more of the context of your request, consider the following.</p>
+
+<p>If you're using UDP packets, you should send the data in one packet so that it arrives in the order you expect. When more than one packet is sent, it may arrive out of order. <strike>Because of this, you need to make sure the size of the data is &lt;= 512 bytes - which is the maximum size of a UDP packet.</strike> Also, you need to make sure all the data is in contiguous memory. I'm going to assume you have your data already in the struct you've provided in this example:</p>
+
+<pre><code>// this function puts the struct in contiguous memory
+
+int PrepareBuffer (struct test_struct TestStruct, char ** buffer){
+
+    char * cast = (char *) &amp;TestStruct-&gt;num;
+
+    * buffer = malloc ((TestStruct-&gt;num * LENGTH) + sizeof (int));
+
+    for (int i = 0; i &lt; sizeof (int); i++) *buffer[i] = cast[i];
+
+    for (int i = 0; i &lt; (TestStruct-&gt;num * LENGTH); i++) *buffer[i + sizeof (int)] = TestStruct-&gt;values[i];
+    return 0;
+}
+</code></pre>
+
+<p>You will have to implement another function on the receiving end that maps the buffer to <code>struct test_struct</code>. Also, I have omitted error checking for clarity. You should check for how big the packet is going to be before to allocate memory <strike>(it has to be &lt;= 512)</strike>. You should also check to make sure malloc returns a none-null pointer. </p>

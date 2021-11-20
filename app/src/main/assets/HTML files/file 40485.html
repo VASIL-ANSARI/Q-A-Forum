@@ -1,0 +1,62 @@
+<p>without seeing all the relevant code its hard to pinpoint the problem.</p>
+
+<p>but im pretty sure you are trying to find an ASP.net control by its <strong>serverside ID</strong> from <strong>clientside</strong>.
+<code>dvFrontPageHtml</code> is the Controls ID by which asp.net identifies it, and unless you explicitly tell ASP.Net otherwise, it will generate a different ID for the control to be used by scripts at <strong>clientside</strong></p>
+
+<p>you need to retrieve the panel's <strong>clientside ID</strong> thats being generated for it by asp.net</p>
+
+<p>you do it by a preprocessor directive <code>&lt;%=dvFrontPageHtml.ClientID%&gt;</code>:</p>
+
+<pre><code>$('[id*=&lt;%=dvFrontPageHtml.ClientID%&gt;]').html(sHTML);
+</code></pre>
+
+<p>alternatively, if you want the <strong>clientside ID</strong> to be same as the <strong>serverside ID</strong>, you can set the control's attribute <code>ClientIDMode="Static"</code>.</p>
+
+<p><strong>UPDATE:</strong> </p>
+
+<p>from your comment it seems the problem is elsewhere. what comes to mind, is that <code>RenderControl()</code> takes the control as it was when sent to the client in the Response. but the control is not being submitted to the server in next Request, so you will not be able to retrieve its altered html.</p>
+
+<p>what you can do as a workaround, is hook into ASP.NET's build in postback mechanism, and submit the panel's html as a custom event argument:</p>
+
+<p><strong>for the example, lets assume this is our html:</strong></p>
+
+<pre><code>&lt;asp:Panel ID="dvFrontPageHtml" runat="server" ClientIDMode="Static"&gt;test&lt;/asp:Panel&gt;
+&lt;asp:Button ID="BT_Test" runat="server" Text="Button"&gt;&lt;/asp:Button&gt;
+</code></pre>
+
+<p><strong>this will be our javascript:</strong></p>
+
+<pre><code>$(function(){
+    // add custom event handler for the submit button
+    $("#&lt;%=BT_Test.ClientID%&gt;").click(function (ev) {
+        //prevent the default behavior and stop it from submitting the form
+        ev.preventDefault();
+
+        //alter the panels html as you require
+        var sHTML = $('#summernote_1').code();
+        $('[id*=dvFrontPageHtml]').html(sHTML);
+
+        //cause a postback manually, with target = BTCLICK and argument = panel's html
+        __doPostBack('BTCLICK', $('[id*=dvFrontPageHtml]').outerHTML());
+    });
+});
+</code></pre>
+
+<p><strong>and here we capture the postback on serverside:</strong></p>
+
+<pre><code>//we monitor page load 
+protected void Page_Load(object sender, EventArgs e)
+{
+    string Message;
+    //check if its a postback
+    if (IsPostBack)
+    {
+        //monitor for our custom target "BTCLICK"
+        if (Request.Form["__EVENTTARGET"].CompareTo("BTCLICK") == 0)
+        {
+            // retrieve the panels html from the event argument
+            Message = Request.Form["__EVENTARGUMENT"];
+        }
+    }
+}
+</code></pre>

@@ -1,0 +1,45 @@
+<p>In order to get both file stream (in memory) and additional json data in web api controller you can define custom <code>MultipartStreamProvider</code>:</p>
+
+<pre><code>class MultipartFormDataInMemoryStreamProvider : MultipartFormDataRemoteStreamProvider
+{
+    public override RemoteStreamInfo GetRemoteStream(HttpContent parent, HttpContentHeaders headers)
+    {
+        return new RemoteStreamInfo(new MemoryStream(), string.Empty, string.Empty);
+    }
+}
+</code></pre>
+
+<p>Then use it in controller:</p>
+
+<pre><code>public async Task&lt;IHttpActionResult&gt; UploadBridgeImage()
+{
+    var provider = await Request.Content.ReadAsMultipartAsync(new MultipartFormDataInMemoryStreamProvider());
+    foreach (var httpContent in provider.Contents)
+    {
+        if (!string.IsNullOrEmpty(httpContent.Headers.ContentDisposition?.FileName))
+        {
+            var byteArray = await httpContent.ReadAsByteArrayAsync();
+            //do whatever you need with byteArray
+        }
+    }
+
+    var bridgeId = provider.FormData["bridgeId"];
+
+    return Ok();
+}
+</code></pre>
+
+<p>And on client side:</p>
+
+<pre><code>var request = {
+    url: '/api/Bridge/UploadBridgeImage',
+    data: {
+        file:file,
+        bridgeId:$scope.selectedBridge.BridgeID
+    }
+};
+
+Upload.upload(request).then(function (response) {
+
+});
+</code></pre>

@@ -1,0 +1,25 @@
+<blockquote>
+  <p>After spending some time commenting out various parts of the processing I am running inside my loop I found that if I remove the following code:</p>
+</blockquote>
+
+<pre><code>$sort_fn = array("cMyClass", "static_cmp_fn");
+usort($this-&gt;m_dictToSort, $sort_fn); 
+</code></pre>
+
+<blockquote>
+  <p>php never eats all of the system memory. It seems to me that the usort is leaking memory, I don't know why.</p>
+</blockquote>
+
+<p>Apparently it is. See the manual:</p>
+
+<p><a href="http://php.net/manual/en/function.usort.php" rel="nofollow">http://php.net/manual/en/function.usort.php</a></p>
+
+<p>"A couple examples here advocate the use of 'create_function' for sorting, which is tempting to use because of the limitations of usort. But beware this method -- <strong>the function created will NOT be freed at the end of the sorting routine</strong>, which creates a memory leak. For this reason, this method should probably never be used."</p>
+
+<p>The <code>array()</code> method seems to do something similar. You could declare a wrapper function which calls your method externally, perhaps?</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Tried to build a small test case to see what happens. As yet I cannot reproduce the leak; maybe with more data about what <code>static_cmp_fn()</code> does and how <code>m_dictToSort</code> is structured. A simple compare doesn't trigger anything strange. Nor does allocating strings, arrays, or objects inside the loop. The garbage collector kills them off and memory stays low.</p>
+
+<p>I'd further restrict the problem by calling <em>another</em> function which doesn't sort at all, or does a very basic sort, to see whether the problem is in <code>usort</code> doing something funny with its callable, as I thought (it appears it doesn't, and I was wrong) or if something funny is happening inside the compare function.</p>

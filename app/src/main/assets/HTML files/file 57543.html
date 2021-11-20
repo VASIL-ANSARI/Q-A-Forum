@@ -1,0 +1,26 @@
+<pre><code>-It is possible to use in mobile/web application library dlib in order that it works in real time ? I am not familar with optimization settings and so on, that is why it is interesting how much restrictions there are.
+
+-It is possible to use in my computer without optimisation SSE4 in order that it works in real time ?
+</code></pre>
+
+<p>Face landmark detection has two steps: face detection and face landmark detection on this face. And the most CPU-consuming part is first step - detect face (running simple_object_detector), and only this part has any profit from usage AVX/SSE</p>
+
+<p>Why is it slow - face detection is drained for face size from 80x80 pixels and larger, and if you will put some high-resolution image into detector, it will spend much time on sliding window in different scales. Most situations need to have 1-3 faces on the same frame, while resolution of modern mobile cameras are quite high.</p>
+
+<p>So I recommend you to reduce the image size used for face detection - downscale it and crop it by some region of interest. This will make you largest possible performance optimization.</p>
+
+<p>The next possible step is to make face detector not to run in different scales, but may be on 1-2 iterations. Take a look at this question - it has this problem described (<a href="http://stackoverflow.com/questions/37529251/dlibs-scan-fhog-pyramid-set-max-pyramid-levels">dlib&#39;s scan_fhog_pyramid : set max_pyramid_levels</a>)</p>
+
+<pre><code>-This file shape_predictor_68_face_landmarks.dat weights 95 Mb. I need just face+landmark detection, does this file contain redundant information according to my needs?
+</code></pre>
+
+<p>This file has only data model for 68 face landmarks trained on iBug dataset. It does not have face detection model inside. Face detection model ships in dlib/image_processing/frontal_face_detector.h file</p>
+
+<p>Yes, this file is quite big, but this is the price of its quality. You can train some new face landmark detection model (described in <a href="http://dlib.net/train_shape_predictor_ex.cpp.html" rel="nofollow">http://dlib.net/train_shape_predictor_ex.cpp.html</a> example) witl less landmark points or with less quality - this can make you much smaller file</p>
+
+<pre><code>-One algorithm question...
+</code></pre>
+
+<p>To answer it - please consider reading original (<a href="http://www.cv-foundation.org/openaccess/content_cvpr_2014/papers/Kazemi_One_Millisecond_Face_2014_CVPR_paper.pdf" rel="nofollow">http://www.cv-foundation.org/openaccess/content_cvpr_2014/papers/Kazemi_One_Millisecond_Face_2014_CVPR_paper.pdf</a>) and dlib/image_processing/shape_predictor.h source code</p>
+
+<p>Shortely - after face is detected (bounding box found), shape predictor searches some features (image pixels values) at pre-trained positions relatively for face bounding box. Depending on feature values shape_predictor changes <em>mean face shape</em> into new face shape (prediceted one), and this process is made iteratively for each trained regression tree inside shape predictor model</p>

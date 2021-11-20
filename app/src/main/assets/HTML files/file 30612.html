@@ -1,0 +1,45 @@
+<p><a href="http://man7.org/linux/man-pages/man3/errno.3.html" rel="nofollow">errno(3)</a> is set to <code>EIO</code> only for </p>
+
+<blockquote>
+<pre><code>   EIO    Input/output error (POSIX.1)
+</code></pre>
+</blockquote>
+
+<p>also, according to <a href="http://man7.org/linux/man-pages/man2/read.2.html" rel="nofollow">read(2)</a> for:</p>
+
+<blockquote>
+<pre><code>   EIO    I/O error.  This will happen for example when the process is
+          in a background process group, tries to read from its
+          controlling terminal, and either it is ignoring or blocking
+          SIGTTIN or its process group is orphaned.  It may also occur
+          when there is a low-level I/O error while reading from a 
+          disk or tape.
+</code></pre>
+</blockquote>
+
+<p>and according to <a href="http://man7.org/linux/man-pages/man2/write.2.html" rel="nofollow">write(2)</a> for:</p>
+
+<blockquote>
+<pre><code>   EIO    A low-level I/O error occurred while modifying the inode.
+</code></pre>
+</blockquote>
+
+<p>So simulating that particular error code could be difficult; notice that there are other syscalls for I/O, notably <a href="http://man7.org/linux/man-pages/man2/writev.2.html" rel="nofollow">writev(2)</a> and (indirectly) <a href="http://man7.org/linux/man-pages/man2/mmap.2.html" rel="nofollow">mmap(2)</a>, but <code>read(2)</code> and <code>write(2)</code> are the most common ones.</p>
+
+<p>Notice also that <a href="http://en.wikipedia.org/wiki/File_system" rel="nofollow">file systems</a> and the <a href="http://en.wikipedia.org/wiki/Linux_kernel" rel="nofollow">Linux kernel</a> (e.g. its <a href="http://en.wikipedia.org/wiki/Virtual_file_system" rel="nofollow">VFS</a> layer) are <a href="http://en.wikipedia.org/wiki/Cache_%28computing%29" rel="nofollow">caching</a> data. You could get <code>EIO</code> much later or never. See <a href="http://man7.org/linux/man-pages/man2/sync.2.html" rel="nofollow">sync(2)</a> and <a href="http://man7.org/linux/man-pages/man2/fsync.2.html" rel="nofollow">fsync(2)</a></p>
+
+<p>However, generally, most software does not handle <code>EIO</code> specially w.r.t. other error codes; you probably are testing enough by getting another error code, like e.g. </p>
+
+<blockquote>
+<pre><code>  EDQUOT The user's quota of disk blocks on the filesystem containing
+          the file referred to by fd has been exhausted.
+</code></pre>
+</blockquote>
+
+<p>So you'll probably test enough by limiting <a href="http://en.wikipedia.org/wiki/Disk_quota" rel="nofollow">disk quotas</a> (see <a href="http://man7.org/linux/man-pages/man2/quotactl.2.html" rel="nofollow">quotactl(2)</a>, <a href="http://man7.org/linux/man-pages/man8/setquota.8.html" rel="nofollow">setquota(8)</a> etc...) and file space (see <a href="http://man7.org/linux/man-pages/man2/setrlimit.2.html" rel="nofollow">setrlimit(2)</a> with <code>RLIMIT_FSIZE</code>, <a href="http://man7.org/linux/man-pages/man1/prlimit.1.html" rel="nofollow">prlimit(1)</a>, <code>ulimit</code> builtin of <a href="http://man7.org/linux/man-pages/man1/bash.1.html" rel="nofollow">bash(1)</a> etc...)</p>
+
+<p>If you really want to fake specifically <code>EIO</code>  you could physically damage a device (or perhaps just unplug an USB disk at the wrong moment) or write your own <a href="http://en.wikipedia.org/wiki/Filesystem_in_Userspace" rel="nofollow">Filesystem in User Space</a> (FUSE) simulating it. I don't think it is worth the effort (because when something gets <code>EIO</code>  the entire computer becomes very quickly unusable, and the user will notice that anyway.... and because most software handle all error codes likewise -except for <code>EINTR</code>)</p>
+
+<p>In the C part of your code you may want to use <a href="http://man7.org/linux/man-pages/man3/strerror.3.html" rel="nofollow">strerror(3)</a> (with <a href="http://man7.org/linux/man-pages/man3/syslog.3.html" rel="nofollow">syslog(3)</a> perhaps) and/or <a href="http://man7.org/linux/man-pages/man3/perror.3.html" rel="nofollow">perror(3)</a>. I am not sure it is worth the effort to handle <code>EIO</code> very differently of most other errors.</p>
+
+<p>NB: many critical domains have standards defining how errors should be handled and code should be developed and tested, e.g. <a href="http://en.wikipedia.org/wiki/ISO_26262" rel="nofollow">ISO26262</a> in automotive or <a href="http://en.wikipedia.org/wiki/DO-178B" rel="nofollow">DO-178B</a> in avionics. Follow the standards of your domain.</p>

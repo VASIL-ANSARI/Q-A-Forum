@@ -1,0 +1,11 @@
+<p>"Just try the I/O and handle failures" is still the best approach, for multiple reasons (in roughly descending order of the rate you'll run into them in the real world):</p>
+
+<ol>
+<li><p>Predicting failure requires reproducing the OS's entire access control logic, which may very well be version-dependent.  Don't reinvent the wheel.</p></li>
+<li><p>Predicting failure even if done perfectly only tells you about <em>now</em>, not what will happen when the I/O operation actually is attempted.  The filesystem is a shared resource and permissions can change.  This race condition is so common it has its own name: TOCTOU (Time of Check - Time of Use)</p></li>
+<li><p>The I/O can still fail for a multitude of other reasons not related to permission (drive was disconnected by user, network went down, another process used up all the free space).</p></li>
+</ol>
+
+<p>Ultimately you can't avoid the failure handling, and doing both permission evaluation and failure handling is adding complexity without any benefit.</p>
+
+<p>I don't know why you brought exceptions into the mix -- simply open the file in the usual way (either <code>fstream</code> or <code>fopen</code>) and check the result.  <code>fstream</code> would give an object with <code>failbit</code> set, <code>fopen</code> would give <code>NULL</code>, and in both cases <code>errno</code> may help diagnose the cause.</p>

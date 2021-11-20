@@ -1,0 +1,31 @@
+<p>Your query selects the right rows.  I think the only issue is the ordering:</p>
+
+<pre><code>SELECT genre.genre, movies.movie, movies.year
+FROM `genre` JOIN
+     `movies`
+     ON genre.id = movies.genre_id
+WHERE genre.display = 1 AND movies.display = 1
+order by genre.genre, movies.year desc;
+</code></pre>
+
+<p>If you don't want the genre to duplicate, you can use a funky trick.  That is, <code>union</code> the genres in with <code>NULL</code> movies, then order them correctly and remember to remove the names after that:</p>
+
+<pre><code>select (case when movie is NULL then genre else NULL end) as genre,
+       movie, year
+from ((select genre, NULL as movie, NULL as year
+       from genre
+       where display = 1
+      ) union all
+      (SELECT genre.genre, movies.movie, movies.year
+       FROM `genre` JOIN
+            `movies`
+            ON genre.id = movies.genre_id
+       WHERE genre.display = 1 AND movies.display = 1
+      )
+     ) t
+order by genre,
+         movie is null desc,
+         year desc
+</code></pre>
+
+<p>Normally, I would say to do this in the app layer, but it can be fun to put together the SQL for something like this.</p>

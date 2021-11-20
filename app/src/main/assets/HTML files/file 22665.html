@@ -1,0 +1,22 @@
+<p>When iText manipulates a document using a<code>PdfStamper</code>in normal mode, it can (and often does) re-arrange the existing PDF objects. This obviously breaks the hash value of any existing integrated signature. Furthermore the byte ranges which would have to be signed, change. This most likely is your problem.</p>
+
+<p>When iText manipulates a document using a<code>PdfStamper</code>in append mode, it leaves the PDF as is and only appends its additions and changes. While this in general is the way to go to keep integrated signatures from breaking, you cannot change the content of a signature this way because there are stricter rules concerning embedding signatures than for PDFs in general. Switching to append mode, therefore, would not fix your problem.</p>
+
+<p>Thus, iText has an explicit method doing a signature insertion without otherwise changing the PDF:</p>
+
+<pre><code>MakeSignature.signDeferred(PdfReader reader,
+    String fieldName,
+    OutputStream outs,
+    ExternalSignatureContainer externalSignatureContainer)
+throws DocumentException, IOException, GeneralSecurityException
+</code></pre>
+
+<p>Its name is due to the fact that this method originally is intended for the use case of deferred signing, i.e. first preparing the PDF for signing (i.e. adding all dictionaries and other necessary structures required to hash the byte ranges, including leaving a gap into which a signature container eventually shall be injected), calculating the hash value, and sending it to some other service while storing the prepared PDF locally. As soon as that other service returns the signature, the prepared PDF is located and the retrieved signature is inserted into it using this method.</p>
+
+<p>The only difference to your use case is that there already is a signature in the gap. That signature, though, will be overwritten by your updated one when using <code>signDeferred</code>.</p>
+
+<p>Having said all this, you may be in for a surprise if you expect that after you <em>add an ocsp response to unsigned attributes,</em> Adobe Reader uses these information for verification. In the context of integrated PDF signatures according to <a href="http://www.adobe.com/content/dam/Adobe/en/devnet/acrobat/pdfs/PDF32000_2008.pdf" rel="nofollow">ISO-32000-1</a>, section 12.8.3.3 <em>PKCS#7 Signatures as used in ISO 32000</em>,</p>
+
+<blockquote>
+  <p>the PKCS#7 object should contain [...] Revocation information as an <strong>signed attribute</strong> (PDF 1.6): This attribute may include all the revocation information that is necessary to carry out revocation checks for the signer's certificate and its issuer certificates. Since revocation information is a signed attribute, <strong>it must be obtained before the computation of the digital signature.</strong> This means that the software used by the signer must be able to construct the certification path and the associated revocation information. If one of the elements cannot be obtained (e.g. no connection is possible), a signature with this attribute will not be possible. </p>
+</blockquote>

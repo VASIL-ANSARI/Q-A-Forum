@@ -1,0 +1,51 @@
+<p>I had this too, and tracked it down as follows:</p>
+
+<p>As you know, Caliburn.Micro uses convention-over-configuration to locate Views for ViewModels, and vice-versa, which means we need to follow the conventions. My mistake was to have the <code>namespace</code>'s inconsistent for the View and ViewModel</p>
+
+<p>In my case, I had</p>
+
+<p><code>MyWP7App.DetailsViewModel</code>, and</p>
+
+<p><code>MyWP7App.Views.DetailsView</code></p>
+
+<p>--> I renamed the VM's namespace to be <code>MyWP7App.ViewModels.DetailsViewModel</code>, and it worked out fine. I <em>think</em> I could have moved the view into <code>MyWP7App.DetailsView</code> for a good result, too...</p>
+
+<hr>
+
+<h3>Under the covers</h3>
+
+<p>the call to <code>Navigate()</code> invokes <code>DeterminePageName()</code> which, in turn, invokes <code>ViewLocator.LocateTypeForModelType</code></p>
+
+<p>This, like the rest of CM is overridable, but the default implementation looks like this:</p>
+
+<pre><code>public static Func&lt;Type, DependencyObject, object, Type&gt; LocateTypeForModelType = (modelType, displayLocation, context) =&gt; {
+    var viewTypeName = modelType.FullName.Substring(
+        0,
+        modelType.FullName.IndexOf("`") &lt; 0
+            ? modelType.FullName.Length
+            : modelType.FullName.IndexOf("`")
+        );
+
+    Func&lt;string, string&gt; getReplaceString;
+    if (context == null) {
+        getReplaceString = r =&gt; { return r; };
+    }
+    else {
+        getReplaceString = r =&gt; {
+            return Regex.Replace(r, Regex.IsMatch(r, "Page$") ? "Page$" : "View$", ContextSeparator + context);
+        };
+    }
+
+    var viewTypeList = NameTransformer.Transform(viewTypeName, getReplaceString);
+    var viewType = (from assembly in AssemblySource.Instance
+                    from type in assembly.GetExportedTypes()
+                    where viewTypeList.Contains(type.FullName)
+                    select type).FirstOrDefault();
+
+    return viewType;
+};
+</code></pre>
+
+<p>If you follow the debugger through, you end up with a collection <code>viewTypeList</code> that contains <code>MyWP7App.DetailsView</code>, and a type whose full name is <code>MyWP7App.Views.DetailsView</code>, and the <code>viewType</code> returned is therefore null... this is the cause of the NullReferenceException.</p>
+
+<p>I'm 99% sure the <code>NameTransformer.Transform</code> call will perform a pattern-match and transform the <code>ViewModels</code> in the namespace of the VM to <code>Views</code> in the namespace of the View it's trying to locate...</p>

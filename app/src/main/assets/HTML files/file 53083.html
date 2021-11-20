@@ -1,0 +1,89 @@
+<p>There are several ways to achieve this, for example:</p>
+
+<ul>
+<li><strong>Configure your IDE</strong> to export resources outside the JAR: usually I don't consider this option since the specific solution depends by the developer's IDE</li>
+<li>Use a generic <strong>build tool</strong>, for example Ant, and specify in the <code>build.xml</code> file which properties files should be packaged outside the jar</li>
+<li>Integrate your project with <strong>Maven</strong> and customize the package goal in order to copy some specific properties file outside jar</li>
+</ul>
+
+<p>From your question I guess you are exporting the JAR from your IDE, but as I stated above the solution depends by the IDE. For this reason, in order to adopt an IDE independent solution, I would suggest to use Ant. This would allow you to solve this and many similar issues that could arise in the future.</p>
+
+<p>You can get Ant <a href="https://ant.apache.org/bindownload.cgi" rel="nofollow">here</a>: just download and unpackage it in any folder, it takes a couple of minutes. Then add a reference to Ant <code>bin</code> directory in your PATH variable (not strictly necessary but suggested) and create a sample <code>build.xml</code> file. Here it is a template example:</p>
+
+<pre><code>    &lt;project name="template" default="compile" basedir="."&gt;
+
+  &lt;description&gt;Build file template&lt;/description&gt;
+
+  &lt;property name="project.name"     value="myProject"/&gt;  
+  &lt;property name="driver.log"       value="log4j-1.2.15.jar"/&gt;  
+  &lt;property name="driver.database"  value="ojdbc6.jar"/&gt; 
+  &lt;property name="library.home"     value="lib"/&gt; 
+  &lt;property name="env.type"         value="dev"/&gt;  
+  &lt;property name="src.version"      value="Demo" /&gt;
+  &lt;property name="src.folder"       value="root/folder/template"/&gt;  
+  &lt;property name="src.package"      value="root.folder.template"/&gt;
+  &lt;property name="src.home"         value="${basedir}/src/${src.folder}"/&gt;
+  &lt;property name="dist.home"        value="${basedir}/dist"/&gt;
+  &lt;property name="build.home"       value="${basedir}/build"/&gt;
+  &lt;property name="docs.home"        value="${basedir}/docs"/&gt;  
+
+  &lt;!-- Setting the classpath necessary to compile --&gt;
+  &lt;path id="compile.classpath"&gt;
+    &lt;pathelement location="${library.home}/${driver.log}"/&gt;
+    &lt;pathelement location="${library.home}/${driver.database}"/&gt;
+  &lt;/path&gt;
+
+  &lt;!-- DELETE the class files from the ${build.home} directory tree --&gt;
+  &lt;target name="clean" description="Clean up the build folder"&gt;
+    &lt;delete dir="${build.home}"/&gt;
+    &lt;delete dir="${dist.home}"/&gt;
+  &lt;/target&gt;
+
+  &lt;!-- CREATE the build directory structure used by compile --&gt;
+  &lt;target name="init" description="Creates the necessary directories"&gt;
+    &lt;mkdir dir="${dist.home}"/&gt;
+    &lt;mkdir dir="${build.home}"/&gt;
+  &lt;/target&gt;
+
+  &lt;!-- COMPILE the project and copy all necessary resources --&gt;
+  &lt;!-- Options: &lt;compilerarg value="-Xlint"/&gt;               --&gt;
+  &lt;target name="compile" depends="init" description="Compile the sources"&gt;
+    &lt;javac srcdir="${src.home}" destdir="${build.home}" includeantruntime="false"&gt;
+      &lt;classpath refid="compile.classpath"/&gt;
+    &lt;/javac&gt;
+    &lt;copy todir="${build.home}/${src.folder}/resources"&gt;
+      &lt;fileset dir="${src.home}/resources"&gt;
+        &lt;include name="messages_list.properties"/&gt;
+        &lt;include name="messages_list_en.properties"/&gt;
+      &lt;/fileset&gt;
+    &lt;/copy&gt;
+    &lt;copy file="${src.home}/resources/log4j_${env.type}.properties"             tofile="${build.home}/${src.folder}/resources/log4j_${project.name}.properties"/&gt;
+    &lt;copy file="${src.home}/resources/configuration_${env.type}.properties"     tofile="${build.home}/${src.folder}/resources/${project.name}_config.properties"/&gt;
+  &lt;/target&gt;
+
+  &lt;!-- Creates the DISTRIBUTABLE JAR package and add 3d part libraries --&gt;
+  &lt;target name="dist" description="Create the distributable JAR archive"&gt;
+      &lt;jar destfile="${dist.home}/${project.name}.jar"&gt;
+      &lt;fileset dir="${build.home}"&gt;
+        &lt;exclude name="place_holder\"/&gt;
+      &lt;/fileset&gt;
+      &lt;!-- Setting MANIFEST properties --&gt;
+      &lt;manifest&gt;
+        &lt;section name="${ant.project.name} - ver. ${src.version}"&gt;
+          &lt;attribute name="Built_By"    value="${user.name}"/&gt;
+          &lt;attribute name="Created"     value="${ts}"/&gt;
+        &lt;/section&gt;
+        &lt;attribute name="Main-Class" value="package.mine.MainClass"/&gt;
+        &lt;attribute name="Class-Path" value=". lib/${driver.log} lib/${driver.database}"/&gt;
+      &lt;/manifest&gt;
+    &lt;/jar&gt;
+    &lt;!-- Adding third part libraries --&gt;
+    &lt;mkdir dir="${dist.home}/lib"/&gt;
+    &lt;copy file="${library.home}/${driver.database}"     todir="${dist.home}/lib"/&gt;
+    &lt;copy file="${library.home}/${driver.log}"          todir="${dist.home}/lib"/&gt;
+  &lt;/target&gt;
+  &lt;tstamp&gt;&lt;format property="ts" pattern="dd/MM/yyyy HH:mm:ss" /&gt;&lt;/tstamp&gt;
+  &lt;/project&gt;
+</code></pre>
+
+<p><strong>Remark</strong>: in the template above you should replace the sample JARS (log4j and the OJDBC driver) with the actual JARS needed by your project. Then you can customize the <strong>copy</strong> task in order to place the properties files where you wish. You can copy those file in any directory you like, as long as such path appears in the application's classpath.</p>

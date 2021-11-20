@@ -1,0 +1,42 @@
+<p>The purpose of the constructor is to establish the class invariants, that is, to bring the newly created object into a state that then allows clients to use them. In general, it is bad practice for an object to be relying on extra initialisation <strong>after</strong> it's constructed. What you want to avoid is to write such things into the documentation as: </p>
+
+<blockquote>
+  <p>...after creating an instance of class <code>X</code>, remember to ALWAYS call
+  <code>initX()</code>, or bad things will happen!</p>
+</blockquote>
+
+<p>Though in certain cases it's difficult to avoid it and the constructor can become quite messy. For example loading external files in a constructor is problematic. </p>
+
+<p>In these cases there are two things you can do:</p>
+
+<ol>
+<li>Rewrite your constructor so it requires the contents of the file instead of the name. Let the caller do the loading. The main difference is that you require the caller to do something <strong>before</strong> the object is created, and you can express it with the signature of your constructor: <code>public RoadInfo(String cityName, Document cityDatabase, double lat, double lng) {...}</code> Of course you can go even further and require the value of <code>s</code> straight away and let the caller do the XPath search. Note that all these steps move the class towards having a single responsibility, which is considered a good thing.</li>
+<li>But now you require the caller to perform many steps before they can build your <code>RoadInfo</code>. This is where you can use factories, which perform this extra initialisation too and return fully built <code>RoadInfo</code> objects.</li>
+</ol>
+
+<hr>
+
+<p>The most important thing though is that <strong>the constructor must not call any method of the object under construction that can be overridden</strong>. Calling private methods is fine, calling public methods on <code>this</code> is not a good idea unless the methods or the class itself is marked as <code>final</code>.</p>
+
+<p>If you call such a method, there's always a chance that the class overriding the method does something that breaks your functionality, like exposing <code>this</code> to the outside world before the construction is completed. Here's an example:</p>
+
+<pre><code>public abstract class Foo {
+    public Foo(String param) {
+       if (this.processParam(param) == null)
+          throw new IllegalArgumentException( "Can't process param.");
+    }
+
+    protected abstract processParam(String param);
+}
+
+public class Bar extends Foo {
+    public Bar(String param) {super(param);}
+
+    protected processParam(String param) {
+        SomeOtherClass.registerListener(this); // Things go horribly wrong here
+        return null; 
+    }
+}
+</code></pre>
+
+<p>If you now call <code>new Bar("x")</code>, the constructor of <code>Foo</code> will throw an exception because it considers the parameter invalid. But <code>Bar.processParam()</code> leaked a reference of <code>this</code> to <code>SomeOtherClass</code>, potentially allowing <code>SomeOtherClass</code> to use the <code>Bar</code> instance that shouldn't even exist.</p>

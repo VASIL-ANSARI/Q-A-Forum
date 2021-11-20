@@ -1,0 +1,39 @@
+<p>I'm answering my own question, because I figured out what was wrong. I should have included the whole test (duh), which looked more like this:</p>
+
+<pre><code>context 'one' do
+  before :all do
+    # make a directory to work in
+    @dir = Dir.mktmpdir('foo')
+  end
+
+  after :all do
+    FileUtils.rm_rf(@dir)
+  end
+
+  it 'should not blow up' do
+    1.should == 1
+  end
+end   # end context 'one'
+
+context 'two' do
+  before :each do
+    # make a directory to work in
+    @olddir = Dir.pwd()
+    @dir = Dir.mktmpdir('bar')
+    Dir.chdir(@dir)
+  end
+
+  after :each do
+    Dir.chdir(@olddir)
+    FileUtils.rm_rf(@dir)
+  end
+
+  it "should not blow up" do
+    1.should == 1
+  end
+end   # end context 'two'
+</code></pre>
+
+<p>The problem (now of course, it is obvious) was that I was removing the <code>pwd</code>, and getting an <code>ENOENT</code> because the current directory had been unlinked. This isn't documented in Ruby, because it's a filesystem error and not an error in the Ruby code.</p>
+
+<p>The lesson, I suppose, is that rspec doesn't create a new running environment from scratch in each new test (as I assumed it did). Lesson(s) learned.</p>

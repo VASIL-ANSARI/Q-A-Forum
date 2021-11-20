@@ -1,0 +1,81 @@
+<p>In another SO question I helped the questioner use a scipy nearest neigbhor interpolator. </p>
+
+<p><a href="http://stackoverflow.com/questions/29987168/repeating-scipys-griddata/29991385#29991385">Repeating Scipy&#39;s griddata</a></p>
+
+<p>Working from that I figured out a solution to your problem.  In <code>scipy.interpolate</code> I find a <code>NearestNDInterpolator</code>.  From that I find that <code>scipy.spatial</code> has a method for finding nearest neighbors:</p>
+
+<pre><code>In [936]: from scipy import interpolate
+In [937]: interpolate.NearestNDInterpolator?
+...
+Docstring:
+NearestNDInterpolator(points, values)
+
+Nearest-neighbour interpolation in N dimensions.
+...
+Uses ``scipy.spatial.cKDTree``
+
+In [938]: from scipy import spatial
+In [939]: spatial.cKDTree?
+</code></pre>
+
+<p><code>cKDTree</code> is used in 2 steps; create a tree from the grid, and query the nearest neighbors.</p>
+
+<p>From your meshgrid I can create a <code>(n,2)</code> array of points</p>
+
+<pre><code>In [940]: xx, yy = np.meshgrid(x, y)
+In [941]: xygrid=np.array([xx,yy])
+In [942]: xygrid=xygrid.reshape(2,-1).T  # clumsy
+</code></pre>
+
+<p>create a search tree:</p>
+
+<pre><code>In [943]: tree=spatial.cKDTree(xygrid)
+</code></pre>
+
+<p>test set of points, (10,2):</p>
+
+<pre><code>In [944]: a=np.random.multivariate_normal([0,0], [[l/2,0],[0,l/2]],10)
+</code></pre>
+
+<p>Query of the search tree gives 2 arrays, one of distances from nearest neighbor, and one with the indexes:</p>
+
+<pre><code>In [945]: I=tree.query(a)
+
+In [946]: I
+Out[946]: 
+(array([ 0.70739099,  0.9894934 ,  0.44489157,  0.3930144 ,  0.273121  ,
+        0.3537348 ,  0.32661876,  0.55540787,  0.58433421,  0.538722  ]),
+ array([61, 72, 85, 72, 82, 39, 38, 62, 25, 59]))
+</code></pre>
+
+<p>Comparing the <code>a</code> points, with the <code>xygrid</code> nearest neighbor grid points, shows that they indeed appear to be close.  A scatter point plot would be better.</p>
+
+<pre><code>In [947]: a
+Out[947]: 
+array([[ 1.44861113, -0.69100176],
+       [ 1.00827575,  0.80693026],
+       [ 4.37200745,  3.07854676],
+       [ 1.2193471 ,  1.50220587],
+       [ 0.12668563,  2.95803754],
+       [ 1.4758331 , -3.53122635],
+       [ 0.28425494, -3.03913067],
+       [ 2.8203361 ,  0.40538034],
+       [-3.67726571, -4.46285921],
+       [-1.07228578, -0.10834709]])
+
+In [948]: xygrid[I[1],:]
+Out[948]: 
+array([[ 1.6,  0. ],
+       [ 1.6,  1.6],
+       [ 4.8,  3.2],
+       [ 1.6,  1.6],
+       [ 0. ,  3.2],
+       [ 1.6, -3.2],
+       [ 0. , -3.2],
+       [ 3.2,  0. ],
+       [-3.2, -4.8],
+       [-1.6,  0. ]])
+</code></pre>
+
+<p>A solution in <code>rth</code>'s link also uses <code>cKDTree</code>.  I'm just filling in the details on how to work from your griddata.
+<a href="https://stackoverflow.com/questions/10818546/finding-index-of-nearest-point-in-numpy-arrays-of-x-and-y-coordinates">Finding index of nearest point in numpy arrays of x and y coordinates</a></p>

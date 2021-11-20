@@ -1,0 +1,106 @@
+<p><strong>Finding</strong></p>
+
+<p>To sort results you need to find them all first. You can produce any partial sorted list if you don't know all the results beforehand. So you'll have something like:</p>
+
+<pre><code>List&lt;Integer&gt; results = new ArrayList&lt;Integer&gt;();
+while (there are more results) { // here you ask the regex if it found some more item
+   // add integer to results
+   String found = ... // here you grab the string you've just found
+   results.add(Integer.parseInt(found)); // convert the string to integer and add to list
+}
+</code></pre>
+
+<p>Note that I'm converting the found string directly to Integer because it has more meaning as an Integer. If by any reason you want to have a string, ok, have a <code>List&lt;String&gt;</code> and don't convert.</p>
+
+<p><strong>Sorting</strong></p>
+
+<p>After you have a non-sorted list, you need to sort it. There are several methods and Java implements one very easy method. It can do sorting of any type because it doesn't do the compare between two items. This is the only part that needs to be implemented to define HOW to sort. And you'll do:</p>
+
+<pre><code>Collections.sort(results, comparator);
+</code></pre>
+
+<p>This method will implement mergesort (if I'm not mistaken) and ask the comparator you provide each time it needs to compare two elements. This comparator should implement interface <code>Comparator&lt;T&gt;</code> where <code>T</code> is the type of elements in result.</p>
+
+<p>If they are integers, you don't need a comparator because it has already a "natural" order:</p>
+
+<pre><code>Collections.sort(results);
+</code></pre>
+
+<p>But if you want some special ordering (like ordering strings according to its integer represented value) then you can use your own comparator:</p>
+
+<pre><code>Collections.sort(results, new Comparator&lt;String&gt;() {
+   public int compare(String a, String b) {
+      int valueA = Integer.parseInt(a);
+      int valueB = Integer.parseInt(b);
+      return valueA - valueB;
+   }
+});
+</code></pre>
+
+<p>compare must return:</p>
+
+<ul>
+<li>negative if a &lt; b</li>
+<li>0 if a == b</li>
+<li>and positive if a > b.</li>
+</ul>
+
+<p>As we want to compare strings as if they are numbers, that's what I did: convert them to numbers and compare their numerical value.</p>
+
+<p><strong>Sorting your strigs: xxx-nnnn-nnnn</strong></p>
+
+<p>In your case you are collecting strings with that format (abc-1234-5678) and you need to sort them according to the first number. So let's assume you've already collected your strings in:</p>
+
+<pre><code>List&lt;String&gt; results
+</code></pre>
+
+<p>Then you need to sort that strings according to some arbitrary criteria. As usual you'll need to call <code>Collections.sort</code> providing a special comparator.</p>
+
+<p>That comparator will need to compare not the whole string, but the first number from each string. By example: <code>abc-1234-5678</code> and <code>def-3456-1988</code>. You have to compare <code>1234</code> with <code>3456</code>.</p>
+
+<p>Then the code will look something like:</p>
+
+<pre><code>Collections.sort(results, new Comparator&lt;String&gt;() {
+  public int compare(String str1, String str2) {
+     // obtain the number you'll use to compare
+     int value1 = getImportantNumber(str1);
+     int value2 = getImportantNumber(str2);
+     // return comparator (remember, the sign of the results says if it's &lt;, =, &gt;)
+     return value1 - value2;
+  }
+
+  // this method will extract the number, maybe you'll need a regex or substring, dunno
+  private int getImportantNumber(String str) {
+     // by example
+     Matcher m = PATTERN.matcher(str);
+     if (!m.find())
+        return -1; // or throw an exception, depends on you're requirements
+     String numberPart = m.group(...); // the number of the group catching the part you need
+     return Integer.parseInt(numberPart);
+  }
+
+  private static Pattern PATTERN = Pattern.compile("...."); 
+});
+</code></pre>
+
+<p><strong>Which regex</strong></p>
+
+<p>I should use:</p>
+
+<pre><code>(\w+)-(\d+)(-(\d+))*
+</code></pre>
+
+<p>That finds:</p>
+
+<pre><code>letters-numbers[-numbers[-numbers...]]
+</code></pre>
+
+<p>But if you'r not sure of finding the numbers on the second place I should go for:</p>
+
+<pre><code>String[] parts = str.split("-");
+for (String part: parts)
+   if (this part has only numbers)
+      return Integer.parseInt(part);
+// if there are no only number parts
+throw new RuntimeException("Not valid number part found!");
+</code></pre>

@@ -1,0 +1,75 @@
+<p>I'm not going to try and sort out your complex matrix allocation scheme.  The purpose of my suggestion was so that you can simplify things to simple 1-line allocations.</p>
+
+<p>Furthermore, I don't think you really grasped the example I gave.  It was a 3D example, and the typedefs had 2 subscripts.  A 2D version would have typedefs with a single subscript.</p>
+
+<p>Really none of this has to do with CUDA.  It revolves around understanding of C arrays and pointers.</p>
+
+<p>Those were the major changes I made to get your code working:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#define hsize 256
+#define vsize 256
+
+#define IMAGE_TYPE unsigned char
+
+
+__global__ void kernel(IMAGE_TYPE matrixin[][hsize], IMAGE_TYPE matrixout[][hsize]) {
+  int tid=threadIdx.x;
+  int bid=blockIdx.x;
+
+  matrixout[bid][tid]=matrixin[bid][tid];
+}
+
+int fatal(char* s) {
+  fprintf(stderr,"%s\n",s);
+  return 1;
+}
+
+
+int main() {
+  typedef IMAGE_TYPE IMarray[hsize];
+  IMarray *hin_image,*hout_image;
+
+  IMarray *din_image,*dout_image;
+
+
+//allocate host memory
+  hin_image = (IMarray *)malloc(hsize*vsize*sizeof(IMAGE_TYPE));
+  hout_image = (IMarray *)malloc(hsize*vsize*sizeof(IMAGE_TYPE));
+
+  for(int i=0;i&lt;vsize;i++)
+    for(int j=0;j&lt;hsize;j++)
+        hin_image[i][j]='a';
+
+
+//allocate device memory
+
+  cudaMalloc((void**)&amp;din_image,(vsize*hsize)*sizeof(IMAGE_TYPE));
+  cudaMalloc((void**)&amp;dout_image,(vsize*hsize)*sizeof(IMAGE_TYPE));
+  cudaMemset(dout_image, 0, (vsize*hsize)*sizeof(IMAGE_TYPE));
+  cudaMemcpy(din_image,hin_image, (vsize*hsize)*sizeof(IMAGE_TYPE),cudaMemcpyHostToDevice);
+
+  dim3 threads(hsize,1,1);
+  dim3 blocks(vsize,1,1);
+
+  kernel&lt;&lt;&lt;blocks,threads&gt;&gt;&gt;(din_image,dout_image);
+
+  cudaMemcpy(hout_image,dout_image,(vsize*hsize)*sizeof(IMAGE_TYPE),cudaMemcpyDeviceToHost);
+
+  for(int i=0;i&lt;10;i++) {
+    printf("\n");
+    for(int j=0;j&lt;10;j++)
+        printf("%c\t",hout_image[i][j]);
+  }
+  printf("\n");
+
+  cudaFree(din_image);
+  cudaFree(dout_image);
+
+  free(hin_image);
+  free(hout_image);
+
+  return 0;
+}
+</code></pre>

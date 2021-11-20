@@ -1,0 +1,88 @@
+<p>I use the following code to count objects:</p>
+
+<pre><code>def output_memory():
+    d = defaultdict(int) 
+    for o in gc.get_objects():
+        name = type(o).__name__  
+        d[name] += 1
+
+    items = d.items()
+    items.sort(key=lambda x:x[1])
+    for key, value in items:
+        print key, value
+</code></pre>
+
+<p>and found that your program will increase 1000 tuples every time event. So when you call <code>props[key].SetValue()</code> the prev value has not been collected by gc. This may be a bug of wxpg, we can walk around this bug by using <code>([x],[y],[z])</code> to save the values, so you can update the value without call the SetValue():</p>
+
+<pre><code>for name, prop in props.iteritems():
+    value = prop.GetValue()
+    value[0][0] = random()
+    value[1][0] = random()
+    value[2][0] = random()
+pg.Refresh()
+</code></pre>
+
+<p>Here is the full code:</p>
+
+<pre><code>import wx
+import wx.propgrid as wxpg
+from random import random
+import gc
+
+from collections import defaultdict
+
+def output_memory():
+    d = defaultdict(int) 
+    for o in gc.get_objects():
+        name = type(o).__name__  
+        d[name] += 1
+
+    items = d.items()
+    items.sort(key=lambda x:x[1])
+    for key, value in items:
+        print key, value
+
+class CoordProperty(wxpg.PyProperty):
+    def __init__(self, label, name):
+        wxpg.PyProperty.__init__(self, label, name)
+        self.SetValue(([0],[0],[0]))
+
+    def GetClassName(self):
+        return "CoordProperty"
+
+    def GetEditor(self):
+        return "TextCtrl"
+
+    def GetValueAsString(self, flags):
+        x,y,z = self.GetValue()   
+        return "%f,%f,%f"%(x[0],y[0],z[0])   
+
+app = wx.App(False)
+frame = wx.Frame(None, -1, "Test")
+pg = wxpg.PropertyGridManager(frame)
+props = {}
+
+for i in range(1000):
+    prop_name = "prop_%d"%i
+    prop = CoordProperty("Coord", prop_name)
+    pg.Append(prop)
+    props[prop_name] = prop
+
+def OnTimer(event):
+    for name, prop in props.iteritems():
+        value = prop.GetValue()
+        value[0][0] = random()
+        value[1][0] = random()
+        value[2][0] = random()
+    pg.Refresh()
+    #output_memory()
+
+timer = wx.Timer(frame, 1)
+frame.Bind(wx.EVT_TIMER, OnTimer)
+timer.Start(10) 
+
+frame.Show()
+
+app.MainLoop()
+timer.Stop()
+</code></pre>

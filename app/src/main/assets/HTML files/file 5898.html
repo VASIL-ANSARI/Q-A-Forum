@@ -1,0 +1,28 @@
+<p>Since CRT in the DLL and in the executable could be different you should supply <code>Construction</code> with a <code>release</code> method that will delete allocated object. In this way you will guarantee that the deallocation function will be called from the appropriate CRT. Also you need to return <code>Construction</code> by pointer to exclude copying operations. The following code illustrates the method how it could be implemented:</p>
+
+<pre><code>// DLL export header
+struct IConstruction {
+protected:
+  virtual ~IConstruction() {}
+public:
+  virtual void release() =0;
+  virtual SomeType&amp; get_array() =0;
+};
+
+__declspec(dllexport) IConstruction* obj();
+</code></pre>
+
+<p>-</p>
+
+<pre><code>// DLL implementation
+struct Construction : public IConstruction {
+  SomeType sTArray[100];
+
+  Construction() { /* do initialization */ }
+  virtual void release() { delete this; }
+  virtual SomeType&amp; get_array() { return sTArray; }
+  virtual ~Construction() { /* do clean up */ }    
+};
+
+IConstruction* obj() { return new Construction; }
+</code></pre>

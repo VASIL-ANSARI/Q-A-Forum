@@ -1,0 +1,124 @@
+<p>To those of you who were having the same problem as I did. Here's the findings and the solution I have.</p>
+
+<p>1.) Based on  my XML configuration, I have already configured the DataSource(In this case, The C3P0ComboPooledDataSource).</p>
+
+<p>2.) On my MultiTenantIdentifier, I was again, configuring I have hard a coded Dependency, The C3P0ConnectionProvider.  The configurations overrides the one I've specified on my clientDataSource bean. The configuration of the C3P0ConnectionProvider at is configured at this line.</p>
+
+<pre><code>&lt;property name="jpaProperties"&gt;
+            &lt;props&gt;
+.....&lt;/props&gt;
+&lt;/property&gt;
+</code></pre>
+
+<p>Which in this case, does not have jdbcUrl,Driver, and etc.</p>
+
+<p>Conclusion, My bean configuration at clientDataSource is being overriden by the hard coded dependency.</p>
+
+<p>Solution. </p>
+
+<p>Instead of creating a new DataSource in my MultitenantConnectionProvider. Just use the only that exists/being created by my bean. like this</p>
+
+<pre><code>public class MultitenantConnectionProvider implements MultiTenantConnectionProvider, ServiceRegistryAwareService {
+
+    private static final long serialVersionUID = 4368575201221677384L;
+
+    private org.slf4j.Logger logger = LoggerFactory.getLogger(MultitenantConnectionProvider.class);
+
+    private DataSource lazyDatasource = null;
+
+    @Override
+    public boolean supportsAggressiveRelease() {
+        return false;
+    }
+
+    /**
+     * The DataSource/ConnectionPool we are using is the one configured by the environment
+     * Which by default, in our case, is configured at client-persistence-cfg.xml
+     * (named Client Data Source)
+     */
+    @Override
+    public void injectServices(ServiceRegistryImplementor serviceRegistry) {
+        Map lSettings = serviceRegistry.getService(ConfigurationService.class).getSettings();
+        lazyDatasource = (DataSource) lSettings.get(Environment.DATASOURCE);
+    }
+
+    @Override
+    public boolean isUnwrappableAs(Class clazz) {
+        return false;
+    }
+
+    @Override
+    public &lt;T&gt; T unwrap(Class&lt;T&gt; clazz) {
+        return null;
+    }
+
+    /**
+     * Retrieve any connection from the Connection Pool
+     */
+    @Override
+    public Connection getAnyConnection() throws SQLException {
+        return lazyDatasource.getConnection();
+    }
+
+    @Override
+    public Connection getConnection(String tenantIdentifier) throws SQLException {
+        final Connection connection = getAnyConnection();
+        try {
+            connection.createStatement().execute("SET SCHEMA '" + tenantIdentifier + "'");
+        }
+        catch (SQLException e) {
+            throw new HibernateException("Could not alter JDBC connection to specified schema [" + tenantIdentifier + "]", e);
+        }
+        return connection;
+    }
+
+    @Override
+    public void releaseAnyConnection(Connection connection) throws SQLException {
+        try {
+            connection.createStatement().execute("SET SCHEMA 'public'");
+        }
+        catch (SQLException e) {
+            throw new HibernateException("Could not alter JDBC connection to specified schema [public]", e);
+        }
+        connection.close();
+    }
+
+    @Override
+    public void releaseConnection(String tenantIdentifier, Connection connection) throws SQLException {
+        releaseAnyConnection(connection);
+    }
+}
+</code></pre>
+
+<p>Next, configuration files.</p>
+
+<pre><code>&lt;bean id="clientDataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close"&gt;
+    &lt;property name="driverClassName" value="${driver.className}"/&gt;
+    &lt;property name="jdbcUrl" value="${db.url}"/&gt;
+    &lt;property name="username" value="${db.username}"/&gt;
+    &lt;property name="password" value="${db.password}"/&gt;
+    &lt;property name="maximumPoolSize" value="30" /&gt;
+    &lt;property name="connectionTestQuery" value="SELECT 1" /&gt;
+&lt;/bean&gt;
+
+&lt;bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean"&gt;
+    &lt;property name="dataSource" ref="clientDataSource"/&gt;
+    &lt;property name="packagesToScan"  value = "org.brightworks.genesis.commons.model"/&gt;
+    &lt;property name="jpaVendorAdapter"&gt;
+        &lt;bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter"&gt;
+            &lt;property name="databasePlatform" value="${hibernate.sql.dialect}" /&gt;
+            &lt;property name="showSql" value="true" /&gt;
+        &lt;/bean&gt;
+    &lt;/property&gt;
+    &lt;property name="jpaProperties"&gt;
+        &lt;props&gt;
+            &lt;prop key="hibernate.format_sql"&gt;true&lt;/prop&gt;
+            &lt;prop key="hibernate.multiTenancy"&gt;SCHEMA&lt;/prop&gt;
+            &lt;prop key="hibernate.tenant_identifier_resolver"&gt;com.myprojec.SchemaResolver&lt;/prop&gt;
+            &lt;prop key="hibernate.multi_tenant_connection_provider"&gt;com.myproj.hibernate.MultitenantConnectionProvider&lt;/prop&gt;
+        &lt;/props&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p>Conclusion: Just retrieve the current/available DataSource that's configured by Spring.</p>

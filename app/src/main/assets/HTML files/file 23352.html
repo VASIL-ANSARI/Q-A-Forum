@@ -1,0 +1,83 @@
+<p>Of course it is possible.
+You can create scopes like:</p>
+
+<pre><code>public function scopes()
+{
+   return array(
+       'enabled' =&gt; array(
+          'condition' =&gt; 'status=0',
+       ),
+       'banned' =&gt; array(
+          'condition' =&gt; 'status=1',
+       ),
+   );
+}
+</code></pre>
+
+<p>Then in your query you'd have something like:</p>
+
+<pre><code>$activeUsers = User::model()-&gt;enabled()-&gt;findAll();
+$bannedUsers = User::model()-&gt;banned()-&gt;findAll();
+</code></pre>
+
+<p>Also, you can have named scopes:</p>
+
+<pre><code>public function statusIs($status)
+{
+    // you can accept a status string here and translate it in an integer, your choice.
+    return $this-&gt;getDbCriteria()-&gt;mergeWith(array(
+       'condition' =&gt; 'status = '.(int)$status
+    ));
+}
+</code></pre>
+
+<p>And use it in your query like: </p>
+
+<pre><code>User::model()-&gt;statusIs(0)-&gt;findAll();// get all enabled
+</code></pre>
+
+<p>Also, using scopes you can query your related models as well, something like:</p>
+
+<pre><code>Posts::model()-&gt;with('users:enabled')-&gt;findAll();
+</code></pre>
+
+<p>should work too.</p>
+
+<p>Just take a look at <a href="http://www.yiiframework.com/doc/guide/1.1/en/database.ar#named-scopes" rel="nofollow">http://www.yiiframework.com/doc/guide/1.1/en/database.ar#named-scopes</a> and see more.</p>
+
+<p>L.E:</p>
+
+<pre><code>public function getStatuses()
+{
+   return array(
+      '0' =&gt; Yii::t("status", 'Enabled'),
+      '1' =&gt; Yii::t("status", 'Banned'),
+      '2' =&gt; Yii::t("status", 'Disabled'),
+   );
+}
+
+public function getStatusesDropDown(array $htmlOpts = array())
+{
+   return CHtml::activeDropDownList($this, 'status', $this-&gt;getStatuses(),$htmlOpts);
+}
+</code></pre>
+
+<p>Now that you have the drop down code, in your CActiveForm, or any other form you show this status drop down like:</p>
+
+<pre><code>echo $model-&gt;getStatusesDropDown();
+</code></pre>
+
+<p>When you select a status from the drop down and you submit the form, the input named <code>YourModel[status]</code> will be submitted. This will have a value of 0 or 1 or 2. Next, in you <code>search()</code> method, you have to:</p>
+
+<pre><code>public function search()
+{
+    $criteria = new CDbCriteria;
+    [...]
+    if ($this-&gt;status !== null &amp;&amp; (int)$this-&gt;status &gt;= 0) {
+       $criteria-&gt;compare('status', (int)$this-&gt;status);
+    }
+    [...]
+}
+</code></pre>
+
+<p>And that's pretty much it.</p>

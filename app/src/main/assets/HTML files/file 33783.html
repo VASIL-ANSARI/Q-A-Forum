@@ -1,0 +1,53 @@
+<p>It looks ok as far as I can tell from what you posted. The only thing fishy is the <code>line</code> and <code>lineX</code> variables. They don't seem to be used. Also if you want to iterate through the first dimension of the 2D array, you will likely have to use nested for loops.</p>
+
+<p>The rest of the post is a code review, rather than an answer:</p>
+
+<p>The code posted is not a lookup table. Consider doing it like this instead:</p>
+
+<pre><code>const uint16_t COLOR_TABLE [COLORS_N] = 
+{
+  RGBBlack,      // 0x0
+  RGBBlue,       // 0x1
+  RGBRed,        // 0x2
+  RGBGreen,      // 0x3
+  RGBCyan,       // 0x4
+  undefined,     // 0x5
+  RGBYellow,     // 0x6
+  RGBKaneGreen,  // 0x7
+  undefined,     // 0x8
+  undefined,     // 0x9
+  undefined,     // 0xA
+  undefined,     // 0xB
+  undefined,     // 0xC
+  undefined,     // 0xD
+  undefined,     // 0xE
+  RGBWhite,      // 0xF
+};
+
+...
+
+uint8_t line_iterator=0;
+
+for(uint8_t i=0; i&lt;LINE_LENGTH/2; i++)
+{
+  uint8_t nibble;
+
+  nibble = (uint8_t) ((GraphicsFrame[line][i]) &gt;&gt; 4) &amp; 0x0F);
+  lineBuffer[line_iterator] =  COLOR_TABLE[nibble];
+
+  nibble = (uint8_t) (GraphicsFrame[line][i] &amp; 0x0F);
+  lineBuffer[line_iterator + 1] =  COLOR_TABLE[nibble];
+
+  line_iterator += 2;
+}
+</code></pre>
+
+<p>Comments on the above:</p>
+
+<ul>
+<li>This lookup table will significantly improve both readability and program speed. If this is for an ISR you definitely must use a table like this.</li>
+<li>Since it is an embedded system, you should use the integer types from stdint.h.</li>
+<li>Beware of implicit integer promotions.</li>
+<li>Keep for loops simple and avoid obfuscating them. Use self-explaining variable names for the iterators if you need more than one.</li>
+<li>Don't use "magic numbers" like 30.</li>
+</ul>

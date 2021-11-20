@@ -1,0 +1,64 @@
+<p>Here is one solution:</p>
+
+<pre><code>var isNewObject = function(newObject) {
+    return !currentArrayObjects.some(function(currentObject) {
+        return newObject.registration == currentObject.registration;
+    });
+};
+var onlyNewObjects = newDownloadedArray.filter(isNewObject);
+</code></pre>
+
+<p>We're basically saying "For every object in <code>newDownloadedArray</code>, look at every object in <code>currentArrayObjects</code> until you find one that has a matching <code>registration</code>. If you do, that object is included in <code>onlyNewObjects</code>. If you don't, it isn't.</p>
+
+<p>Note that <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter" rel="nofollow"><code>Array.prototype.filter</code></a> and <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/some" rel="nofollow"><code>Array.prototype.some</code></a> are only available in IE 9+, so you might want to use an equivalent helper method or utility library (like <a href="http://underscorejs.org/" rel="nofollow">underscore</a>) if you want to support older browsers.</p>
+
+<p>This isn't very efficient. For arrays of 30 items, we're doing work a worst-case of 900 times (if the new array was completely unique, because it has to search through all 30 of the <code>currentArrayObjects</code> for each one of the <code>newDownloadedArray</code>).</p>
+
+<p>But that's not really a lot in browser terms. And you can do a lot to speed it up. For example, instead of searching through the <code>currentArrayObjects</code> in the predicate, we could build an object with all the registrations:</p>
+
+<pre><code>// We want a set of registrations, but JavaScript doesn't
+// have a native set class, so we're going to use the keys 
+// of an object to simulate sets, because object keys are
+// basically sets of strings. Note that this won't work if
+// registration isn't a string.
+var currentRegistrations = {};
+currentArrayObjects.forEach(function(currentObject) {
+    // AKA currentRegistrationSet.add(currentObject.registration) if we
+    // had an actual set class. I chose 'true' somewhat at random
+    // because it felt right; we'll never actually be accessing
+    // the value.
+    currentRegistrations[currentObject.registration] = true;
+});
+var isNewObject = function(newObject) {
+    // AKA !currentRegistrationSet.contains(newObject.registration) if we
+    // had an actual set class.
+    return !currentRegistrations.hasOwnProperty(newObject.registration);
+}
+var onlyNewObjects = newDownloadedArray.filter(isNewObject);
+</code></pre>
+
+<p>(Same caveat about <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach" rel="nofollow"><code>Array.prototype.forEach</code></a>)</p>
+
+<p>Now we only have to do about 60 operations -- 30 to build the object ahead of time, and 30 more to check each one.</p>
+
+<hr>
+
+<p>Your solution wasn't far off from the first one I posted. But you switched the <code>for</code> loops. It could be:</p>
+
+<pre><code>newDownloadedArray = JSON.parse(newDownloadedArray);
+
+var onlyNewObjects = []
+for (var i = 0; i &lt; newDownloadedArray.length; i++) {
+    var isNewObject = true;
+    for (var j = 0; j &lt; currentArrayObjects.length; j++) {
+        if (newDownloadedArray[i].registration == currentArrayObjects[j].registration) {
+            isNewObject = false;
+
+            break; // no reason to keep looking; we know it isn't new
+        }
+    }
+    if (isNewObject) {
+        onlyNewObjects.push(newDownloadedArray[i]);
+    }
+}
+</code></pre>

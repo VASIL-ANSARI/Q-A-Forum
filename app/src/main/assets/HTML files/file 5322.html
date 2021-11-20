@@ -1,0 +1,13 @@
+<p>Probably a possible solution is to take your second example, and modify it in a way that would permit efficient queries on larger sets.  One way that springs to mind is to use multiple database entities for a single tag, and group them in such a way as you would seldom need to get more than a few groups.  If the default sort order (well lets just call it the only permitted) is by post-date, then fill the tag group entities in that order.  </p>
+
+<pre><code>class Tag(db.Model):
+    name = db.StringProperty(name="key")
+    posts = db.ListProperty(db.Key) # List of posts that marked with tag
+    firstpost = db.DateTimeProperty()
+</code></pre>
+
+<p>When adding or removing tags to a group, check to see how many posts are in that group, if the post you are adding would make the post have more than, say 100 posts, split it into two tag groups.  If you are removing a post so that the group would have fewer than 50 posts, steal some posts from a previous or next group.  If one of the adjacent groups has 50 posts also, just merge them together.  When listing posts by tag (in post-date order), you need only get a handful of groups.</p>
+
+<p>That doesn't really resolve the high-demand tag problem.  </p>
+
+<p>Thinking about it, it might be okay for inserts to be a bit more speculative.  Get the latest tag group entries, merge them and place a new tag group.  The lag in the transactions might actually not be a real problem.</p>

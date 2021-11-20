@@ -1,0 +1,83 @@
+<p><code>EventWaitHandle</code> is a way to go in your case. </p>
+
+<pre><code>namespace A
+{
+   class Program
+    {
+       static void Main(string[] args)
+        {
+           var evh = new EventWaitHandle(false, EventResetMode.AutoReset,"fromA");
+           Console.WriteLine("Anykey to send signal");
+           Console.ReadKey();
+            evh.Set();
+        }
+    }
+}
+
+namespace B
+{
+   class Program
+    {
+       static void Main(string[] args)
+        {
+           Console.WriteLine("Waiting for a signal");
+           var evh = EventWaitHandle.OpenExisting("fromA");
+            evh.WaitOne();
+           Console.WriteLine("Signal!");
+           Console.ReadKey();
+        }
+    }
+}
+</code></pre>
+
+<p>But keep in mind you will need to wait for child process to register its <code>EventWaitHandle</code>. So you either do wait for some time (ugly). Or create another <code>EventWaitHandle</code> in parent process, so child process notifies when its handler is registered</p>
+
+<p><strong>Edit:</strong> Complete solution</p>
+
+<pre><code>namespace Parent
+{
+   class Program
+    {
+       static void Main(string[] args)
+        {
+           using (var childReadyEh =new EventWaitHandle(false, EventResetMode.AutoReset,"childIsReady"))
+            {
+               Process.Start("child.exe");
+                childReadyEh.WaitOne();
+            }
+
+           using (var childSignalEh =EventWaitHandle.OpenExisting("childSignal"))
+            {
+                childSignalEh.WaitOne();
+            }
+
+           Console.WriteLine("Signal is recieved");
+           Console.ReadKey();
+        }
+    }
+}
+
+namespace Child
+{
+   class Program
+    {
+       static void Main(string[] args)
+        {
+           EventWaitHandle childSignalEh =null;
+           using (var childReadyEh =EventWaitHandle.OpenExisting("childIsReady"))
+            {
+                childSignalEh =new EventWaitHandle(false, EventResetMode.AutoReset,"childSignal");
+                childReadyEh.Set();
+            }
+           Console.WriteLine("Anykey to send a signal to parent");
+            Console.ReadKey();
+
+            childSignalEh.Set();
+            childSignalEh.Dispose();
+
+           Console.WriteLine("Signal is sent");
+           Console.ReadKey();
+        }
+    }
+}
+</code></pre>

@@ -1,0 +1,58 @@
+<p>The problem here is that, as Austin Phillips pointed out, <a href="http://docs.python.org/2/library/urllib2.html#urllib2.Request" rel="nofollow"><code>urllib2.Request</code></a>'s constructor's <code>data</code> parameter:</p>
+
+<blockquote>
+  <p>may be a string specifying additional data to send to the serverâ¦ <code>data</code> should be a buffer in the standard <em>application/x-www-form-urlencoded</em> format. The urllib.urlencode() function takes a mapping or sequence of 2-tuples and returns a string in this format.</p>
+</blockquote>
+
+<p>By passing it JSON-encoded data instead of urlencoded data, you're confusing it somewhere.</p>
+
+<p>However, <code>Request</code> has a method <a href="http://docs.python.org/2/library/urllib2.html#urllib2.Request.add_data" rel="nofollow"><code>add_data</code></a>:</p>
+
+<blockquote>
+  <p>Set the Request data to data. This is ignored by all handlers except HTTP handlers â and there it should be a byte string, and will change the request to be POST rather than GET.</p>
+</blockquote>
+
+<p>If you use this, you should probably also use <code>add_header</code> rather than passing it in the constructor, although that doesn't seem to be mentioned specifically anywhere in the documentation.</p>
+
+<p>So, this should work:</p>
+
+<pre><code>req = urllib2.Request(url)
+req.add_data("{'some':'data'}")
+req.add_header('Content-Type', 'application/json; charset=utf-8')
+res = urllib2.urlopen(req)
+</code></pre>
+
+<hr>
+
+<p>In a comment, you said:</p>
+
+<blockquote>
+  <p>The reason I don't want to just switch over to requests without finding out why I'm seeing this problem is that there may be some deeper underlying issue that this points to that could come back and cause harder-to-detect problems later on.</p>
+</blockquote>
+
+<p>If you want to find deep underlying issues, you're not going to do that by just looking at your client-side source. The first step to figuring out "Why does X work but Y fails?" with network code is to figure out exactly what bytes X and Y each send. Then you can try to narrow down what the relevant difference is, and then figure out what part of your code is causing Y to send the wrong data in the relevant place.</p>
+
+<p>You can do this by logging things at the service (if you control it), running Wireshark, etc., but the easiest way, for simple cases, is netcat. You'll need to read <code>man nc</code> for your system (and, on Windows, you'll need to get and install netcat before you can run it), because the syntax is different for each version, but it's always something simple like <code>nc -kl 12345</code>.</p>
+
+<p>Then, in your client, change the URL to use <code>localhost:12345</code> in place of the hostname, and it'll connect up to netcat and send its HTTP request, which will be dumped to the terminal. You can then copy that and use <code>nc HOST 80</code> and paste it to see how the real server responds, and use that to narrow down where the problem is. Or, if you get stuck, at least you can copy and paste the data to your SO question.</p>
+
+<hr>
+
+<p>One last thing: This is almost certainly not relevant to your problem (because you're sending the exact same data with <code>requests</code> and it's working), but your data is not actually valid JSON, because it uses single quotes instead of double quotes. According to <a href="http://www.json.org/" rel="nofollow">the docs</a>, <code>string</code> is defined as:</p>
+
+<pre><code>string
+    ""
+    " chars "
+</code></pre>
+
+<p>(The docs have a nice graphical representation as well.)</p>
+
+<p>In general, except for really simple test cases, you don't want to write JSON by hand. In many cases (including yours), all you have to do is replace the <code>"â¦"</code> with <code>json.dumps(â¦)</code>, so this isn't a serious hardship. So:</p>
+
+<pre><code>req = urllib2.Request(url)
+req.add_data(json.dumps({'some':'data'}))
+req.add_header('Content-Type', 'application/json; charset=utf-8')
+res = urllib2.urlopen(req)
+</code></pre>
+
+<p>So, why is it working? Well, in JavaScript, single-quoted strings are legal, as well as other things like backslash escapes that aren't valid in JSON, and any JS code that uses restricted-eval (or, worse, raw eval) for parsing will accept it. And, because so many people got used to writing bad JSON because of this, many browsers' native JSON parsers and many JSON libraries in other languages have workarounds to allow common errors. But you shouldn't rely on that.</p>

@@ -1,0 +1,70 @@
+<p>After spending the day on it and having a think while running on my treadmill I believe I have the answer. I'm posting it here for the benefit of others. I moved the join with tbl_member into a sub query, and for the sake of completeness include another subquery to get the actual title of the position from a third table, tbl_position, shown below. <em>(Can't see a way to replace the sub queries with joins but that doesn't matter.)</em> </p>
+
+<pre><code>TABLE tbl_positions
+   (
+   position_id INT AUTO_INCREMENT, -- pk
+   position VARCHAR(100), -- title of position
+   &lt;other stuff&gt;
+   )
+</code></pre>
+
+<p>The code I came up with is below which appears to work correctly and shows all the overlaps with details of who is overlapped with whom, when and why.</p>
+
+<p>The oly niggle  is that if, for example, Fred is shown to overlap as President with Jim's existing record with the reason that Fred's tenure completely encloses Jim's tenure, then Jim's position as President is also shown to overlap with Fred's existing tenure record with the reason given that Fred's is completely enclosed by Jim's. ie I get both sides of the overlap. </p>
+
+<p>If there is a quick way to get just a 'one way' overlap then by all means post a better answer.</p>
+
+<p>My answer</p>
+
+<pre><code>SELECT
+   base_tenure.position_id     AS base_tenure_id,
+   base_tenure.member_id     AS base_member_id,
+   (SELECT member_sn FROM tbl_member WHERE tbl_member.member_id = base_tenure.member_id)     AS base_sn,
+   (SELECT tbl_positions.position FROM tbl_positions WHERE tbl_positions.position_id = base_tenure.position_id ) AS POSITION,
+   base_tenure.date_started  AS base_date_started,
+   base_tenure.date_ended    AS base_date_ended,
+
+   overlap_tenure.position_id  AS overlap_tenure_id,
+   overlap_tenure.member_id AS overlap_member_id,
+   (SELECT member_sn FROM tbl_member WHERE tbl_member.member_id = overlap_tenure.member_id)     AS overlap_sn,
+   overlap_tenure.date_started AS overlap_date_started,
+   overlap_tenure.date_ended   AS overlap_date_ended,  
+
+   CASE
+      WHEN base_tenure.date_ended &lt;= IFNULL(overlap_tenure.date_ended, CURDATE())-- test end date &lt;= existing end date
+      AND base_tenure.date_started &gt;= overlap_tenure.date_started  -- test start date &gt;= existing start date
+      THEN 'tbl_member dates fall completely inside an existing tenue'
+
+      WHEN base_tenure.date_ended &gt;= IFNULL(overlap_tenure.date_ended, CURDATE()) -- test end date &gt;= existing end date
+      AND base_tenure.date_started &lt;=  overlap_tenure.date_started -- test start date &lt;= existing start date
+      THEN 'An existing tenue falls completely inside tbl_member dates'
+
+      WHEN base_tenure.date_started &gt;= overlap_tenure.date_started  -- test start date &gt;= existing start date
+      AND base_tenure.date_started &lt;= IFNULL( overlap_tenure.date_ended , CURDATE()) -- test start date &lt;= existing end date
+      THEN 'tbl_member start date overlaps with an existing tenue'
+
+      WHEN base_tenure.date_ended &gt;= overlap_tenure.date_started  -- test end date &gt;= existing start date
+      AND base_tenure.date_ended &lt;= IFNULL( overlap_tenure.date_ended , CURDATE())-- test end date &lt;= existing end date
+      THEN 'tbl_member end date overlaps with an existing tenue'
+   END AS reason
+
+FROM -- a self join on tbl_tenure
+   tbl_tenure AS base_tenure,
+   tbl_tenure AS overlap_tenure
+
+WHERE (-- there is an overlap (see qry 2.2 http://salman-w.blogspot.co.uk/2012/06/sql-query-overlapping-date-ranges.html
+           base_tenure.date_ended  &gt;= overlap_tenure.date_started -- test end date &gt;= existing start date
+          AND 
+          IFNULL(overlap_tenure.date_ended, CURDATE()) &gt;= base_tenure.date_started 
+          )
+
+   AND 
+      base_tenure.club_function_id = overlap_tenure.club_function_id -- positions are the same for both members
+
+   AND  
+      base_tenure.position_id &lt;&gt; overlap_tenure.position_id --  don't compare the base record with itself as they are identical and will always overlap 
+
+ ORDER BY
+       (SELECT member_sn FROM tbl_member WHERE tbl_member.member_id = base_tenure.member_id) ,
+       base_tenure.date_started ;  
+</code></pre>

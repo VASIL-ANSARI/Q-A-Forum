@@ -1,0 +1,16 @@
+<p>Resque workers fork new processes to do the work. It's possible that the classes for your models are not loaded in the forked child process. It's also possible that there is a namespace collision because of the order that classes are loaded.</p>
+
+<p>If you are changing class files in development without restarting your resque workers, I suspect it's not reloading your classes correctly.</p>
+
+<p>To make sure that your classes are loaded pre-fork, reference the classes in the resque setup task. The classes that are loaded pre-fork will be copied to the child process. Below, I put them in an array to force them to load. This is also faster, since each child process will already have the classes loaded. Also you should re-establish your ActiveRecord connection in an after_fork block if you're using AR.</p>
+
+<p><strong>lib/tasks/resque.rake:</strong></p>
+
+<pre><code>namespace :resque do
+  task :setup =&gt; :environment do
+    [User, Monkey, Banana] # force these classes to load
+
+    Resque.after_fork { ActiveRecord::Base.establish_connection }
+  end
+end
+</code></pre>

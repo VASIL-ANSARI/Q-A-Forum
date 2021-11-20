@@ -1,0 +1,26 @@
+<p>I suspect the problem is that the values are converted to strings for the comparison.</p>
+
+<p>I would just change the formats to be bona fide YYYY-MM-DD:</p>
+
+<pre><code>set @startdate = '2015-01-10';
+-----------------------^
+set @enddate = '2015-12-12';
+</code></pre>
+
+<p>However, the <code>date</code> function might also work:</p>
+
+<pre><code>where a.Date between date(@startdate) and date(@enddate)
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>I think you have two problems.  First, your arithmetic is off, you are mixing <code>+</code> and <code>-</code>.  Second, you are doing everything relative to the current date.  You should use the start date.  So:</p>
+
+<pre><code>select a.Date
+from (select date_add(date(startdate), INTERVAL (a.a + (10 * b.a) + (100 * c.a)) DAY) as Date
+      from (select 0 as a union all select 1 union all select 2 union all select 3 union all select 4 union all select 5 union all select 6 union all select 7 union all select 8 union all select 9) as a
+cross join (select 0 as a union all select 1 union all select 2 union all select 3 union all select 4 union all select 5 union all select 6 union all select 7 union all select 8 union all select 9) as b
+cross join (select 0 as a union all select 1 union all select 2 union all select 3 union all select 4 union all select 5 union all select 6 union all select 7 union all select 8 union all select 9) as c
+           ) a
+where a.Date between @startdate and @enddate;
+</code></pre>

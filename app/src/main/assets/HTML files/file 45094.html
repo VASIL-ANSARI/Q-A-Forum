@@ -1,0 +1,90 @@
+<p>To serialize an unserializable property it is best to use a helper property that is serializable and do a conversion between the two. You have to write the code to sync both properties together so they are updated by the time of serialization. This can be done through the setter. Remember to add the NonSerialized attribute to the Brush and any property that is not serializable.</p>
+
+<pre><code>using System;
+using System.Runtime.Serialization;
+using WindowsMedia = System.Windows.Media;
+
+namespace Something.Something.DarkSide
+{
+    [NonSerialized]
+    private readonly WindowsMedia.BrushConverter _colorConverter = new WindowsMedia.BrushConverter();
+
+    [Serializable]
+    [DataContract]
+    public class ClassName: SerializeableBase&lt;ClassName&gt;
+    {
+        [DataMember(Name = "ColorString")]
+        private string _colorString;
+        public string ColorString
+        {
+            get { return _colorString; }
+            set
+            {
+                _colorString = value;
+                _color = (WindowsMedia.Brush)_colorConverter.ConvertFrom(value);
+                OnPropertyChanged();
+            }
+        }
+
+        // Color
+        [NonSerialized]
+        private WindowsMedia.Brush _color = WindowsMedia.Brushes.Yellow;
+        public WindowsMedia.Brush Color
+        {
+            get { return _color; }
+            set
+            {
+                _color = value;
+                _colorString = _colorConverter.ConvertToString(value);
+                OnPropertyChanged();
+            }
+        }
+
+        // This triggered when deserializing.
+        // When deserializing we will have the _color property as null since
+        // nothing is setting it. 
+        // This ensures we initialize the _color when deserializing from the ColorString property.
+        [OnDeserialized]
+        private void SetValuesOnDeserialized(StreamingContext context)
+        {
+            _colorConverter = new WindowsMedia.BrushConverter();
+            _color = (WindowsMedia.Brush)_colorConverter.ConvertFrom(ColorString);
+        }
+
+        public Annotation(string colorHexValue = null)
+        {
+            var colorBrush = (WindowsMedia.Brush)_colorConverter.ConvertFrom(colorHexValue);
+            Color = colorBrush ?? WindowsMedia.Brushes.Yellow;
+        }
+
+        public Annotation(WindowsMedia.Brush colorBrush = null)
+        {
+            Color = colorBrush ?? WindowsMedia.Brushes.Yellow;
+        }
+    }
+}
+</code></pre>
+
+<p><strong>*NOTE</strong>: When loading the serialized file the Color will be null and the constructor will not be called. You must then make a new instance of the object and re-construct it using the loaded properties so that it will set the Color from the ColorString. You may also create a helper method in the class and call it on the property to trigger this change, but do remember that it does <strong>NOT</strong> happen on serialization load time.</p>
+
+<pre><code>var className = ClassName.LoadFromXmlFile(filePath);
+// We use the ColorString property because that's what we get after loading
+// the serialized file. The Color will be null at this point.
+className = new ClassName(className.ColorString);
+</code></pre>
+
+<p>I've had a little problem trying to load it back so I used this:</p>
+
+<pre><code>public static SerializableType LoadFromXmlFile(string filename)
+{
+    using (var stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, 1024))
+    {
+        using (var reader = XmlDictionaryReader.Create(stream))
+        {
+            var serializer = new DataContractSerializer(typeof(SerializableType));
+
+            return (SerializableType)serializer.ReadObject(reader);
+        }
+    }
+}
+</code></pre>

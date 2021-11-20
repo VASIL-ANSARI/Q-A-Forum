@@ -1,0 +1,24 @@
+<p>It's good Objective C programming practice to always check the result of a function that returns a BOOL value (such as <code>ABGroupAddMember</code> or <code>ABAddressBookSave</code> or the <code>NSArray</code> or <code>NSDictionary</code> <code>writeToFile</code> methods) <strong><em>before</em></strong> checking to see if there is an error returned as one of the parameters.</p>
+
+<p>Try something like this instead:</p>
+
+<pre><code>ABAddressBookRef ab = ABAddressBookCreate();
+ABRecordRef abGroupRef = ABAddressBookGetGroupWithRecordID(ab, 1);
+ABRecordRef pRef = ABAddressBookGetPersonWithRecordID(ab, 1);
+CFErrorRef anError = NULL;
+NSError * anErrorAsObjectiveCObject; // for use with toll free bridged object magic
+
+if(ABGroupAddMember(abGroupRef, pRef, &amp;anError))
+{
+    if(ABAddressBookSave(ab, &amp;anError))
+    {
+        NSLog(@"successfully saved");
+    } else {
+        anErrorAsObjectiveCObject = (__bridge_transfer NSError *) anError;
+        NSLog( @"error in ABAddressBookSave - %@ %@", [anErrorAsObjectiveCObject domain], [anErrorAsObjectiveCObject localizedDescription] );
+    }
+} else {
+    anErrorAsObjectiveCObject = (__bridge_transfer NSError *) anError;
+    NSLog( @"error in ABGroupAddMember - %@ %@", [anErrorAsObjectiveCObject domain], [anErrorAsObjectiveCObject localizedDescription] );
+}
+</code></pre>

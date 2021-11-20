@@ -1,0 +1,27 @@
+<pre><code>template &lt;class T&gt; void UndoArray&lt;T&gt;::set(size_type i, const T&amp; v) {
+    counts_[i]++;
+    if(!initialized(i)) {
+        // memory leak vvv`
+</code></pre>
+
+<p>this is a leak because values_[i] is never deleted.</p>
+
+<pre><code>    values_[i] = new T[1];
+    values_[i][0] = v;
+} else {
+    // memory leak vvv
+</code></pre>
+
+<p>same problem here.  there is no delete temp; statement.</p>
+
+<pre><code>    T* temp = new T[counts_[i]];
+    for(int j = 0; j &lt; counts_[i] - 1; j++) {
+        temp[j] = values_[i][j];
+    }
+    temp[counts_[i] - 1] = v;
+    delete [] values_[i];
+    values_[i] = temp;
+}
+</code></pre>
+
+<p>You must call delete on the newed memory.  Unless the destructor of the class cleans up values_.</p>

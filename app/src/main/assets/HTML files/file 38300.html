@@ -1,0 +1,104 @@
+<p><strong>EDIT:</strong> Although upvoted, this does not seem to be correct answer, sorry:</p>
+
+<p><a href="http://en.cppreference.com/w/cpp/memory/shared_ptr/operator_cmp" rel="nofollow">http://en.cppreference.com/w/cpp/memory/shared_ptr/operator_cmp</a></p>
+
+<pre><code>template&lt; class T &gt;
+bool operator==( const shared_ptr&lt;T&gt;&amp; lhs, std::nullptr_t rhs );
+    (7)     (since C++11)
+template&lt; class T &gt;
+bool operator!=( const shared_ptr&lt;T&gt;&amp; lhs, std::nullptr_t rhs );
+    (9)     (since C++11)
+</code></pre>
+
+<p>7) !lhs<br>
+<strong>9) (bool)lhs</strong></p>
+
+<p>....broken implementation?? Really don't know.</p>
+
+<hr>
+
+<p>Test with gcc -std=c++11: (taken from <a href="http://en.cppreference.com/w/cpp/memory/weak_ptr" rel="nofollow">http://en.cppreference.com/w/cpp/memory/weak_ptr</a> and adapted)</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;memory&gt;
+
+std::weak_ptr&lt;int&gt; gw;
+
+void f()
+{
+    auto spt = gw.lock();
+    if (spt != nullptr) {
+        std::cout &lt;&lt; *spt &lt;&lt; "\n";
+    }
+    else {
+        std::cout &lt;&lt; "gw is expired\n";
+    }
+}
+
+int main()
+{
+    {
+        auto sp = std::make_shared&lt;int&gt;(42);
+        gw = sp;
+        f();
+    }
+
+    f();
+}
+</code></pre>
+
+<p>Output as expected:</p>
+
+<pre>
+42
+gw is expired
+</pre>
+
+<p><strong>Must be elsewhere</strong></p>
+
+<hr>
+
+<p><strong>Original:</strong></p>
+
+<p>In short: check it as bool, do not compare to nullptr (that will try <code>lhs.get() == rhs.get()</code> which fails with rhs = shared_ptr on nullptr):</p>
+
+<pre><code>auto foo_sharedptr = foo_weakptr.lock();
+if (foo_sharedptr)
+{
+    // do stuff with foo
+}
+</code></pre>
+
+<p><a href="http://en.cppreference.com/w/cpp/memory/weak_ptr/lock" rel="nofollow">See the documentation:</a></p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;thread&gt;
+
+void observe(std::weak_ptr&lt;int&gt; weak) 
+{
+    std::shared_ptr&lt;int&gt; observe(weak.lock());
+    if (observe) {
+        std::cout &lt;&lt; "\tobserve() able to lock weak_ptr&lt;&gt;, value=" &lt;&lt; *observe &lt;&lt; "\n";
+    } else {
+        std::cout &lt;&lt; "\tobserve() unable to lock weak_ptr&lt;&gt;\n";
+    }
+}
+
+int main()
+{
+    std::weak_ptr&lt;int&gt; weak;
+    std::cout &lt;&lt; "weak_ptr&lt;&gt; not yet initialized\n";
+    observe(weak);
+
+    {
+        std::shared_ptr&lt;int&gt; shared(new int(42));
+        weak = shared;
+        std::cout &lt;&lt; "weak_ptr&lt;&gt; initialized with shared_ptr.\n";
+        observe(weak);
+    }
+
+    std::cout &lt;&lt; "shared_ptr&lt;&gt; has been destructed due to scope exit.\n";
+    observe(weak);
+}
+</code></pre>

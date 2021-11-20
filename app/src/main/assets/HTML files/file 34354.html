@@ -1,0 +1,67 @@
+<p>I am still not quite sure I know what you're trying to do, but here's the fastest way I know to walk a DOM tree and accumulate parent/child info like you're doing to build the data structure you indicated you wanted to end up with:</p>
+
+<pre><code>var treeWalkFast = (function() {
+    // create closure for constants
+    var skipTags = {"SCRIPT": true, "IFRAME": true, "OBJECT": true, 
+        "EMBED": true, "STYLE": true, "LINK": true, "META": true};
+
+    return function(parent, fn, allNodes) {
+        var parents = [];
+        var uuidParents = [];
+        parents.push(parent);
+        uuidParents.push(parent);
+        var node = parent.firstChild, nextNode, lastParent;
+        while (node &amp;&amp; node != parent) {
+            if (allNodes || node.nodeType === 1) {
+                if (fn(node, parents, uuidParents) === false) {
+                    return(false);
+                }
+            }
+            // if it's an element &amp;&amp;
+            //    has children &amp;&amp;
+            //    has a tagname &amp;&amp; is not in the skipTags list
+            //  then, we can enumerate children
+            if (node.nodeType === 1 &amp;&amp; node.firstChild &amp;&amp; !(node.tagName &amp;&amp; skipTags[node.tagName])) {
+                // going down one level, add this item to the parent array
+                parents.push(node);
+                if (node.id &amp;&amp; node.id.substr(0, 5) === "uuid-") {
+                    uuidParents.push(node);
+                }
+                node = node.firstChild;
+            } else  if (node.nextSibling) {
+                // node had no children so going to next sibling
+                node = node.nextSibling;
+            } else {
+                // no child and no nextsibling
+                // find parent that has a nextSibling
+                while ((node = node.parentNode) != parent) {
+                    lastParent = parents.pop();
+                    if (lastParent === uuidParents[uuidParents.length - 1]) {
+                        uuidParents.pop();
+                    }
+                    if (node.nextSibling) {
+                        node = node.nextSibling;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+})();
+
+var objects = {uuid_1: {}};
+treeWalkFast(document.documentElement, function(node, parents, uuidParents) {
+    if (node.id &amp;&amp; node.id.substr(0, 5) === "uuid-") {
+        var uuidParent = uuidParents[uuidParents.length - 1];
+        if (!objects[uuidParent.id]) {
+            objects[uuidParent.id] = {};
+        }
+        objects[uuidParent.id][node.id] = {};
+        objects[node.id] = {};
+    }
+});
+</code></pre>
+
+<p>Working demo here: <a href="http://jsfiddle.net/jfriend00/yzaJ6/" rel="nofollow">http://jsfiddle.net/jfriend00/yzaJ6/</a></p>
+
+<p>This is an adaptation of the <code>treeWalkFast()</code> function I wrote for <a href="http://stackoverflow.com/questions/19259029/using-jquery-is-there-a-way-to-find-the-farthest-deepest-or-most-nested-child/19259752#19259752">this answer</a>.</p>

@@ -1,0 +1,122 @@
+<p>I have made one sample for this kind of webservices. (using webservicex as example, too). You can see it at my <a href="http://blog.asanchez-portfolio.es/en/integracion-retrofit-y-servicios-soap" rel="nofollow">blog</a> or in <a href="https://github.com/asanchezyu/RetrofitSoapSample" rel="nofollow">my github</a></p>
+
+<p>UPDATE</p>
+
+<p>Needed libraries:</p>
+
+<pre><code>...
+    compile 'com.squareup.okhttp3:logging-interceptor:3.3.1'
+    compile 'com.squareup.okhttp3:okhttp:3.3.1'
+    compile 'com.squareup.okhttp3:okhttp-urlconnection:3.3.1'
+
+    compile 'com.squareup.retrofit2:retrofit:2.1.0'
+    compile ('com.squareup.retrofit2:converter-simplexml:2.1.0'){
+        exclude group: 'stax', module: 'stax-api'
+        exclude group: 'stax', module: 'stax'
+        exclude group: 'xpp3', module: 'xpp3'
+    }
+...
+</code></pre>
+
+<p>The sample is for this webservice: <a href="http://www.webservicex.net/New/Home/ServiceDetail/42" rel="nofollow">http://www.webservicex.net/New/Home/ServiceDetail/42</a></p>
+
+<p>First of all, you have to create Retrofit instance:</p>
+
+<pre><code>HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+
+interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+
+Strategy strategy = new AnnotationStrategy();
+
+Serializer serializer = new Persister(strategy);
+
+OkHttpClient okHttpClient = new OkHttpClient.Builder()
+        .addInterceptor(interceptor)
+        .connectTimeout(2, TimeUnit.MINUTES)
+        .writeTimeout(2, TimeUnit.MINUTES)
+        .readTimeout(2, TimeUnit.MINUTES)
+        .build();
+
+Retrofit retrofit =  new Retrofit.Builder()
+        .addConverterFactory(SimpleXmlConverterFactory.create(serializer))
+        .baseUrl("http://www.webservicex.net/")
+        .client(okHttpClient)
+        .build();
+</code></pre>
+
+<p>After that, you have to create the API object:</p>
+
+<pre><code>    public interface UsStatesApi {
+
+    @Headers({
+            "Content-Type: text/xml",
+            "Accept-Charset: utf-8"
+    })
+    @POST("/uszip.asmx")
+    Call&lt;UsStatesResponseEnvelope&gt; requestStateInfo(@Body UsStatesRequestEnvelope body);
+
+}
+</code></pre>
+
+<p>For creating your entities, you have to annotate them correctly. These are the request classes (response classes are made in the same way):</p>
+
+<p>class: UsStatesRequestEnvelope</p>
+
+<pre><code>@Root(name = "soap12:Envelope")
+@NamespaceList({
+        @Namespace( prefix = "xsi", reference = "http://www.w3.org/2001/XMLSchema-instance"),
+        @Namespace( prefix = "xsd", reference = "http://www.w3.org/2001/XMLSchema"),
+        @Namespace( prefix = "soap12", reference = "http://www.w3.org/2003/05/soap-envelope")
+})
+public class UsStatesRequestEnvelope {
+
+    @Element(name = "soap12:Body", required = false)
+    private UsStatesRequestBody body;
+
+    public UsStatesRequestBody getBody() {
+        return body;
+    }
+
+    public void setBody(UsStatesRequestBody body) {
+        this.body = body;
+    }
+}
+</code></pre>
+
+<p>class : UsStatesRequestBody</p>
+
+<pre><code>@Root(name = "soap12:Body", strict = false)
+public class UsStatesRequestBody {
+
+    @Element(name = "GetInfoByCity",required = false)
+    private UsStatesRequestData usStatesRequestData;
+
+    public UsStatesRequestData getUsStatesRequestData() {
+        return usStatesRequestData;
+    }
+
+    public void setUsStatesRequestData(UsStatesRequestData usStatesRequestData) {
+        this.usStatesRequestData = usStatesRequestData;
+    }
+}
+</code></pre>
+
+<p>class: UsStatesRequestData</p>
+
+<pre><code>@Root(name = "GetInfoByState", strict = false)
+@Namespace(reference = "http://www.webserviceX.NET")
+public class UsStatesRequestData {
+
+    @Element(name = "USCity", required = false)
+    private String city;
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+}
+</code></pre>

@@ -1,0 +1,27 @@
+<p>You're doing multiple implicit date conversions in both versions. This:</p>
+
+<pre><code>SELECT to_date(to_char(to_date('01-FEB-1949'))) FROM DUAL; 
+</code></pre>
+
+<p>is equivalent to:</p>
+
+<pre><code>SELECT to_date(to_char(to_date('01-FEB-1949', &lt;NLS_DATE_FORMAT&gt;),
+    &lt;NLS_DATE_FORMAT&gt;, &lt;NLS_DATE_FORMAT&gt;)) FROM DUAL;
+</code></pre>
+
+<p>whereas the second query has one of those replaced with a specific format. It looks like your default format - which you can set, I believe, in the Toad preferences without modifying the registry directly; it isn't clear if you're even modifying something related to Toad - is <code>DD-MON-RR</code>, as shown by plugging that into these queries:</p>
+
+<pre><code>SELECT to_date(to_char(to_date('01-FEB-1949','DD-MON-RR'),
+        'DD-MON-RR'),'DD-MON-RR') AS date1,
+    to_date(to_char(to_date('01-FEB-1949','DD-MON-RR'),
+        'dd-MON-yyyy'),'DD-MON-RR') AS date2 FROM DUAL;
+
+DATE1                            DATE2
+February, 01 2049 00:00:00+0000  February, 01 1949 00:00:00+0000
+</code></pre>
+
+<p>(<a href="http://sqlfiddle.com/#!4/d41d8/11761">SQL Fiddle</a>)</p>
+
+<p>You can see in <a href="http://sqlfiddle.com/#!4/d41d8/11765">this SQL Fiddle</a> that in the first version, the date appears as a string with the year as <code>49</code> rather than <code>1949</code>, and that is then interpreted - by the <code>RR</code> mask - as <code>2049</code>, which is the expected behaviour.</p>
+
+<p>Short version: never rely on implicit date conversions or the NLS date format mask.</p>

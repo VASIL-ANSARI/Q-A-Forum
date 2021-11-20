@@ -1,0 +1,54 @@
+<p>The reason is when you perform the upload your dealing with the request as binary, which invalidates the <code>Request.Form</code> collection (same as if you call <code>Request.BinaryRead()</code>. To counter this the ASPUpload component provides a <a href="http://www.aspupload.com/object_upload.html#Form" rel="nofollow"><code>Form</code> Collection</a> of it's own which contains the posted form values.</p>
+
+<p>Changing the values <code>Request.Form</code> to <code>Upload.Form</code> should fix the problem in this case.</p>
+
+<pre class="lang-vb prettyprint-override"><code>Set Upload = Server.CreateObject("Persits.Upload")
+Upload.OverwriteFiles = False
+Upload.Save Server.MapPath("files/drawings/")
+
+'Also make sure the string concatenation is correct (had extra " in after "values")
+sql = "Insert into Name(first,last) values ('" &amp; Upload.Form("firstname") &amp; "','" &amp; Upload.Form("lastname") &amp; "' " )
+ADOConn.Execute sql
+</code></pre>
+
+<blockquote>
+  <p><strong>WARNING</strong> The above code snippet is not sanitized and open to <a href="http://en.wikipedia.org/wiki/SQL_injection" rel="nofollow">SQL Injection</a>, consider using the <code>ADODB.Command</code> object to parametrise the query before execution (<em>some assumptions about data type and size have been made</em>).</p>
+  
+  <p><em>Quick Example</em></p>
+  
+  <pre class="lang-vb prettyprint-override"><code> Dim cmd, conn, sql
+
+ conn = "your connection string"
+ 'Parametrised query
+ sql = "Insert into Name(first,last) values (?, ?)"
+
+ Set cmd = Server.CreateObject("ADODB.Command")
+ With cmd
+   'No need to pass ADODB.Connection pass connection string and
+   'the ADODB.Command will do it for you.
+   .ActiveConnection = conn
+   .CommandType = adCmdText
+   .CommandText = sql
+   Call .Parameters.Append(.CreateParameter("first", adVarWChar, adParamInput, 100))
+   Call .Parameters.Append(.CreateParameter("last", adVarWChar, adParamInput, 100))
+   'Not returning any records just inserting
+   Call .Execute(adExecuteNoRecords)
+ End With
+ 'Clean-up
+ Set cmd = Nothing
+</code></pre>
+</blockquote>
+
+<ul>
+<li><a href="http://stackoverflow.com/a/22037613/692942">Answer to SQL insert into database with apostrophe</a></li>
+</ul>
+
+<hr>
+
+<blockquote>
+  <p><strong>On a side note:</strong></p>
+  
+  <p>This information isn't hard to find the ASPUpload <a href="http://www.aspupload.com/objectreference.html" rel="nofollow">Object Reference</a> and <a href="http://www.aspupload.com/manual.html" rel="nofollow">Online User Manual</a> are very good. In fact if you had looked at the <a href="http://www.aspupload.com/manual_simple.html#2_2" rel="nofollow">Section 2.2 - FILES and FORM Collections</a> you would have had the answer to your question without posting here.</p>
+  
+  <p>Personal experience has taught me that when dealing with 3rd Party COM Components 9/10 times the supporting documentation is very good, especially so in the case of <a href="http://www.persits.com/" rel="nofollow">Persits Software</a> components.</p>
+</blockquote>

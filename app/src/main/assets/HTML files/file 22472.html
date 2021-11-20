@@ -1,0 +1,11 @@
+<p>There are a few problems here, but the largest one is that Atkinson dithering can't be performed in an efficient manner within a fragment shader. This kind of dithering is a sequential process, being dependent on the results of fragments above and behind it. A fragment shader can only write to one fragment in OpenGL ES, not neighboring ones like is required in that Python implementation you point to.</p>
+
+<p>For potential shader-friendly dither implementations, see the question <a href="http://stackoverflow.com/questions/4057970/floydsteinberg-dithering-alternatives-for-pixel-shader">"FloydâSteinberg dithering alternatives for pixel shader."</a></p>
+
+<p>You also normally can't write to and read from the same texture, although Apple did add some extensions in iOS 6.0 that let you write to a framebuffer and read from that written value in the same render pass.</p>
+
+<p>As to why you're seeing odd error results, the coordinate system within a GPUImage filter is normalized to the range 0.0 - 1.0. When you try to offset a texture coordinate by adding 1.0, you're reading past the end of the texture (which is then clamped to the value at the edge by default). This is why you see me using texelWidth and texelHeight values as uniforms in other filters that require sampling from neighboring pixels. These are calculated as a fraction of the overall image width and height.</p>
+
+<p>I'd also not recommend doing texture coordinate calculation within the fragment shader, as that will lead to a dependent texture read and really slow down the rendering. Move that up to the vertex shader, if you can.</p>
+
+<p>Finally, to answer your title question, usually you can't modify a texture as it is being read, but the iOS texture cache mechanism sometimes allows you to overwrite texture values as a shader is working its way through a scene. This leads to bad tearing artifacts usually.</p>

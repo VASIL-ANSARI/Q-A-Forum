@@ -1,0 +1,133 @@
+<p>I ended up achieving the desired result by rendering to a texture, as described for example <a href="http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/" rel="nofollow">here</a>. The basic idea is to setup a custom framebuffer and attach a texture to it â I then render the line that I want to persist into this framebuffer (without clearing it) and render the whole framebuffer as a texture into the default framebuffer (which is cleared every frame). Instead of clearing the custom framebuffer, I render a slightly opaque quad over the whole screen to make the previous contents fade out a little every frame.</p>
+
+<p>The relevant code is below; setting up the framebuffer and persistence texture is done in the <code>init</code> method:</p>
+
+<pre><code>    // vertex data for fullscreen textured quad (x, y, texX, texY)
+    GLfloat persistVertexData[16] = {-1.0, -1.0, 0.0, 0.0,
+                                 -1.0, 1.0, 0.0, 1.0,
+                                 1.0, -1.0, 1.0, 0.0,
+                                 1.0, 1.0, 1.0, 1.0};
+
+    // setup texture vertex buffer
+    glGenBuffers(1, &amp;persistVertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, persistVertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(persistVertexData), persistVertexData, GL_STATIC_DRAW);
+
+    // create texture for persistence data and bind
+    glGenTextures(1, &amp;persistTexture);
+    glBindTexture(GL_TEXTURE_2D, persistTexture);
+
+    // provide an empty image
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2048, 1536, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+
+    // set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // create frame buffer for persistence data
+    glGenFramebuffers(1, &amp;persistFrameBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, persistFrameBuffer);
+
+    // attach render buffer
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, persistTexture, 0);
+
+    // check for errors
+    NSAssert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, @"Error: persistence framebuffer incomplete!");
+
+    // initialize default frame buffer pointer
+    defaultFrameBuffer = -1;
+</code></pre>
+
+<p>and in the <code>glkView:drawInRect:</code> method:</p>
+
+<pre><code>// get default frame buffer id
+if (defaultFrameBuffer == -1)
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &amp;defaultFrameBuffer);
+
+// clear screen
+glClear(GL_COLOR_BUFFER_BIT);
+
+
+// DRAW PERSISTENCE
+
+// bind persistence framebuffer
+glBindFramebuffer(GL_FRAMEBUFFER, persistFrameBuffer);
+
+// render full screen quad to fade
+glEnableVertexAttribArray(...);
+glBindBuffer(GL_ARRAY_BUFFER, persistVertexBuffer);
+glVertexAttribPointer(...);
+glUniform4f(colorU, 0.0, 0.0, 0.0, 0.01);
+glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+// add most recent line
+glBindBuffer(GL_ARRAY_BUFFER, dataVertexBuffer);
+glVertexAttribPointer(...);
+glUniform4f(colorU, color[0], color[1], color[2], 0.8*color[3]);
+glDrawArrays(...);
+
+// return to normal framebuffer
+glBindFramebuffer(GL_FRAMEBUFFER, defaultFrameBuffer);
+
+// switch to texture shader
+glUseProgram(textureProgram);
+
+// bind texture
+glBindTexture(GL_TEXTURE_2D, persistTexture);
+glUniform1i(textureTextureU, 0);
+
+// set texture vertex attributes
+glBindBuffer(GL_ARRAY_BUFFER, persistVertexBuffer);
+glEnableVertexAttribArray(texturePositionA);
+glEnableVertexAttribArray(textureTexCoordA);
+glVertexAttribPointer(self.shaderBridge.texturePositionA, 2, GL_FLOAT, GL_FALSE, 4*sizeof(GLfloat), 0);
+glVertexAttribPointer(self.shaderBridge.textureTexCoordA, 2, GL_FLOAT, GL_FALSE, 4*sizeof(GLfloat), 2*sizeof(GLfloat));
+
+// draw fullscreen quad with texture
+glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+
+// DRAW NORMAL FRAME
+
+glUseProgram(normalProgram);
+glEnableVertexAttribArray(...);
+glVertexAttribPointer(...);
+
+// draw solid shape
+glDrawArrays(GL_TRIANGLE_STRIP, ...);
+
+// draw line
+glDrawArrays(GL_LINE_STRIP, ...);
+
+// draw points
+glDrawArrays(GL_POINTS, ...);
+</code></pre>
+
+<p>The texture shaders are very simple: the vertex shader just passes the texture coordinate to the fragment shader:</p>
+
+<pre><code>attribute vec4 aPosition;
+attribute vec2 aTexCoord;
+
+varying vec2 vTexCoord;
+
+void main(void)
+{
+    gl_Position = aPosition;
+    vTexCoord = aTexCoord;
+}
+</code></pre>
+
+<p>and the fragment shader reads the fragment color from the texture:</p>
+
+<pre><code>uniform highp sampler2D uTexture;
+varying vec2 vTexCoord;
+
+void main(void)
+{
+    gl_FragColor = texture2D(uTexture, vTexCoord);
+}
+</code></pre>
+
+<p>Although this works, it doesn't seem very efficient, causing the renderer utilization to rise to close to 100%. It only seems better than the brute force approach when the number of lines drawn each frame exceeds 100 or so. If anyone has any suggestions on how to improve this code, I would be very grateful!</p>

@@ -1,0 +1,60 @@
+<p>I have been unable to reproduce the error you are seeing, I've included my test code below if that helps, however...</p>
+
+<p>One common reason you'll see a <code>NVelocity.Exception.ResourceNotFoundException</code> is if you have catch all CLR exceptions turned on in Visual Studio and you run your code under the debugger. If the exception message states that it cannot find the resource <code>VM_global_library.vm</code>, this is a harmless exception, NVelocity is trying to load up an optional resource file for global macros. Because NVelocity is a port from the Java Velocity, exceptions are commonly used for control flow in Java libraries.</p>
+
+<pre><code>[Test]
+public void CustomObservableCollectionT()
+{
+    VelocityEngine velocityEngine = new VelocityEngine();
+    velocityEngine.Init();
+
+    Table table = new Table();
+    table.Columns.Add(new TableColumn { Name = "Full Name" });
+    table.Columns.Add(new TableColumn { Name = "Email Address" });
+    table.Columns.Add(new TableColumn { Name = "DOB" });
+
+    VelocityContext context = new VelocityContext();
+    context.Put("table", table);
+
+    using (StringWriter sw = new StringWriter())
+    {
+        velocityEngine.Evaluate(context, sw, "",
+            "#foreach ($c in $table.Columns)\r\n" +
+            "$c.Name\r\n" +
+            "#end"
+        );
+
+        Assert.AreEqual(
+            "Full Name\r\n" +
+            "Email Address\r\n" +
+            "DOB\r\n",
+            sw.ToString());
+    }
+}
+public class MegaList&lt;T&gt; : ObservableCollection&lt;T&gt;
+{
+}
+public class Table
+{
+    private readonly MegaList&lt;TableColumn&gt; _columns = new MegaList&lt;TableColumn&gt;();
+
+    public MegaList&lt;TableColumn&gt; Columns
+    {
+        get { return _columns; }
+    }
+
+    public List&lt;TableColumn&gt; ColumnList
+    {
+        get { return _columns.ToList(); }
+    }
+
+    public ObservableCollection&lt;TableColumn&gt; ColumnCollection
+    {
+        get { return new ObservableCollection&lt;TableColumn&gt;(_columns); }
+    }
+}
+public class TableColumn
+{
+    public string Name { get; set; }
+}
+</code></pre>

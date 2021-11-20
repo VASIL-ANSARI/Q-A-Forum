@@ -1,0 +1,92 @@
+<p>The pylibmc library has the <a href="http://sendapatch.se/projects/pylibmc/reference.html#pylibmc.Client.set_multi" rel="nofollow"><code>set_multi</code></a> function, which sends a bunch of commands in one go:</p>
+
+<pre><code>mc.set_multi({
+    'key': 'Hello',
+    'another': True,
+    #[..]
+})
+</code></pre>
+
+<p>This should probably work well enough. If you have <em>billions</em> of keys, you probably want to split it into chunks of a few thousand.</p>
+
+<p>You can probably squeeze a bit more performance if you just send the commands over a socket. the <a href="https://github.com/memcached/memcached/blob/master/doc/protocol.txt" rel="nofollow">memcache protocol</a>
+is pretty simple. This has the advantage that you can add the <code>noreply</code> flag, so the server won't bother sending a reply. Of course, this means you can't do any error checking and that losing a few keys for whatever reason is fine.</p>
+
+<p>Here's a simple proof of concept:</p>
+
+<pre><code>#!/usr/bin/env python
+
+import socket
+
+data = 'set key_1 0 86400 5\r\nabcde\r\n'
+data += 'set key_2 0 86400 5\r\nzxcvb\r\n'
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('localhost', 11211))
+s.sendall(data)
+print(s.recv(8192))
+s.close()
+
+# Verify if it worked!
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('localhost', 11211))
+s.sendall('get key_1\r\n')
+s.sendall('get key_2\r\n')
+print(s.recv(8192))
+s.close()
+</code></pre>
+
+<p>Which should output:</p>
+
+<pre><code>STORED
+STORED
+
+VALUE key_1 0 5
+abcde
+END
+VALUE key_2 0 5
+zxcvb
+END
+</code></pre>
+
+<p>The format of the <code>set</code> command is:</p>
+
+<pre><code>set &lt;key&gt; &lt;flags&gt; &lt;exptime&gt; &lt;data_size&gt; [noreply]\r\n
+&lt;data&gt;\r\n
+</code></pre>
+
+<p>Of course, this is just a proof-of-concept; a slightly more advanced example might be something like:</p>
+
+<pre><code>#!/usr/bin/env python
+
+import socket
+
+def make_set(n, data):
+    return 'set key_{} 0 86400 {}\r\n{}\r\n'.format(n, len(data), data)
+
+data = open('/etc/aliases').readlines()
+commands = [ make_set(n, d.strip()) for n, d in enumerate(data) if d.strip() != '' ]
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('localhost', 11211))
+s.sendall(''.join(commands))
+print(s.recv(65000))
+
+# Verify if it worked!
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('localhost', 11211))
+for n in range(0, len(commands)):
+    s.sendall('get key_{}\r\n'.format(n))
+print(s.recv(65000))
+s.close()
+</code></pre>
+
+<p>If you're getting data from MySQL, then consider making a <code>set</code> command with an SQL query! For example:</p>
+
+<pre><code>select
+    concat('set key_', page_id, ' 0 86400 ', length(page_title), '\r\n', page_title, '\r\n')
+    as cmd
+from page limit 2;
+</code></pre>
+
+<p>Not sure this is actually faster, but I suspect it is.</p>

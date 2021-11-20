@@ -1,0 +1,116 @@
+<p>@LokiAstari is right, you clearly have a problem with your pointers on resize.</p>
+
+<p>There's something I don't understand; you say you're using an object pool but that you have problems with too many new statements. If you're using an object pool, I would say it's precisely to avoid new statements, no?</p>
+
+<p>Here are my suggestions, although I'm no expert and there might be better solutions involving the implementation of your own allocator typically (dark side of the force..). You could use a container like <code>std::deque</code>, which ensures the validity of pointers/references on resize.</p>
+
+<p>You would begin with an initial resize of a lot of Objects (your pool), and you can either handle manually the subsequent resize when needed (extending the capacity with chunks of predefined size), or accept the new statements then if you know there shouldn't be a lot, and use the emplace_back method.</p>
+
+<p>I also don't know if you're doing a lot of insertion/deletion of objects with your IDs. If so, you might consider using <code>std::unordered_map</code>.</p>
+
+<p>Here is an example using <code>std::deque</code>:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;deque&gt;
+
+#define POOL_RESERVE 1000
+
+
+// Data storage for your object
+struct MyObjectData
+{
+    double some_data;
+};
+
+
+// Container returned by the factory
+struct MyObject 
+{
+    typedef MyObjectData data_type;
+
+    unsigned   id; 
+    data_type* data;
+
+    MyObject(): id(0), data(0) {}
+    MyObject( const unsigned&amp; id_, data_type* data_ ): id(id_), data(data_) {}
+
+    void set( const unsigned&amp; id_, data_type* data_ )
+        { id = id_; data = data_; }
+};
+
+
+// MyObject Pool
+class MyObjectPool
+{
+public:
+
+    typedef MyObjectData data_type;
+
+    MyObjectPool(): count(0) { pool.resize(POOL_RESERVE); }
+
+    void get( const unsigned&amp; id, MyObject&amp; obj )
+        {
+            // Check requested index
+            if ( id &gt;= count )
+                obj.set( 0, 0 );
+            else
+                obj.set( id, &amp;pool[id] );
+        }
+
+    void create( MyObject&amp; obj )
+        {
+            // Create new data container if needed
+            if ( count++ &gt;= pool.size() ) pool.emplace_back();
+
+            // Return next available object
+            obj.set( count-1, &amp;pool[count-1] );
+        }
+
+private:
+
+    unsigned count;
+    std::deque&lt;data_type&gt; pool;
+};
+
+
+// MyObject factory
+class MyObjectFactory
+{
+    typedef MyObjectFactory self;
+    static MyObject local;
+
+    static MyObjectPool&amp; get_instance()
+        {
+            static MyObjectPool pool; 
+            return pool;
+        }
+
+public:
+
+    static MyObject get( const unsigned&amp; id )
+        {
+            self::get_instance().get(id,local);
+            return local;
+        }
+
+    static MyObject create()
+        {
+            self::get_instance().create(local);
+            return local;
+        }
+};
+
+// Define static variable
+MyObject MyObjectFactory::local = MyObject();
+
+
+// Usage example
+int main()
+{
+    MyObject a,b,c;
+
+    a = MyObjectFactory::create();
+    b = MyObjectFactory::create();
+    c = MyObjectFactory::get(1);
+}
+</code></pre>

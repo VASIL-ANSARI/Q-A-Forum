@@ -1,0 +1,20 @@
+<p>It is not terribly clear why are making it difficult for the C# to use your function.  Keep in mind that the C++/CLI language allows you to either use managed or unmanaged arrays.  You are using an unmanaged array as an argument now, so giving the C# code a hard time to call the function.  It isn't impossible with unsafe code:</p>
+
+<pre><code>    static unsafe void Main(string[] args) {      // NOTE unsafe keyword
+        var arg1 = new double[] { 1, 2, 3 };
+        var arg2 = new double[] { 4, 5, 6 };
+        fixed (double* arg1ptr = arg1)
+        fixed (double* arg2ptr = arg2) {
+            Test_Wrapper_Class.test_wrapper(arg1ptr, arg2ptr, arg1.Length, 42.0);
+        }
+    }
+</code></pre>
+
+<p>Note how the C# code needs to use the <em>unsafe</em> keyword.  And how it is truly unsafe, you didn't include an argument that says how long the 2nd array is so the native code can easily scribble into the GC heap and corrupt it.  </p>
+
+<p>But that isn't necessary when you declare the arguments as managed arrays:</p>
+
+<pre><code>static void test_wrapper(array&lt;double&gt;^ prefix, array&lt;double&gt;^ arr, double value);
+</code></pre>
+
+<p>Safe and easy to call from C#.  Note how you no longer need to pass the array length argument, you already know it from prefix->Length.  If necessary at all, you can use <a href="http://msdn.microsoft.com/en-us/library/1dz8byfh.aspx" rel="nofollow">pin_ptr&lt;></a> in your C++/CLI code to get a <code>double*</code> that native code can use.  Be careful, it is only pinned temporarily.</p>

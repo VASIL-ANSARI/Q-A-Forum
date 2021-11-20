@@ -1,0 +1,40 @@
+<p><strike>In your <code>resources/userCall.php</code> script you are not actually calling the gallery function in order to render it. This appears to be the target of the second AJAX request. The script is merely defining the function.</strike></p>
+
+<p><strong>EDIT</strong>: You've since updated the code in your question to include the call.</p>
+
+<p>Assuming <code>image-path</code> is the parameter you want to supply as <code>$pathToImage</code> you will need to have a script that calls the function <code>getGallery</code> passing the value from <code>$_POST['image-path']</code>.</p>
+
+<p>For example:</p>
+
+<pre><code>&lt;?php
+require_once('resources/uberCall.php');
+
+getGallery($_POST['image-path']);
+</code></pre>
+
+<blockquote>
+  <p><strong>NOTE:</strong> Without any filtering sanitisation, bear in mind this could be potentially <strong>dangerous</strong> as I could pass an <code>image-path</code> parameter that picks a naughty directory.</p>
+</blockquote>
+
+<p>Then use that script as the target of your second AJAX call.</p>
+
+<p><strong>P.S.</strong> Remove the <code>async: false</code> in the second AJAX call, it stops any other interactivity on your page whilst the request is in flight.</p>
+
+<p>Bear in mind that with your parameter checking in the <code>resources/userCall.php</code> the original request is down a directory from the second request. This means the working directory for the second request will be different, the path will resolve to <code>"resources/locations/$path/gallery"</code> and not <code>"locations/$path/gallery"</code>.</p>
+
+<p>You are best off creating a second script for the AJAX action in the same directory as the original and requiring in the <code>resource/userCall.php</code> as per the first script. Or using a configurable absolute directory path to resolve the gallery location:</p>
+
+<pre><code>&lt;?php
+require_once('UberGallery.php');
+require_once('config.php');
+
+function getGallery($path) {
+  UberGallery::init() -&gt; createGallery("{$config['gallery_base_path']}/$path/gallery");
+}
+</code></pre>
+
+<p>With <code>$config['gallery_base_path']</code> being something like <code>/absolute/path/to/my/application/locations</code>.</p>
+
+<p>Additional confusion can be caused by not knowing whether file operations will use the include path, some file options can be told to use the include path which may include the current file path and current script directory, but if not it will only try to find the file from the current working directory. Whereas <code>include</code> and <code>require</code> all use the include path and current script directory as potential points to find a script.</p>
+
+<p><strong>P.S.P.S</strong> Use <a href="http://php.net/manual/en/function.getcwd.php" rel="nofollow">getcwd</a> to find out what the current working directory is at any point in your scripts.</p>

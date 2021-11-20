@@ -1,0 +1,81 @@
+<h1>Technique</h1>
+
+<p>You can achieve this by combining the following steps:</p>
+
+<ul>
+<li>Use off-screen canvas</li>
+<li>Use the shadow feature (the secret ingredient)</li>
+<li>Use composite modes</li>
+</ul>
+
+<p>The concept is based on having the browser make the feather internally by utilizing the blurred shadow. This is much faster than blurring in JavaScript. As we can make shadow for any object you can make complex feathered masks.</p>
+
+<p>The off-screen canvas is used to draw the shadow only. We achieve this by moving the actual shape outside the canvas and then offset the shadow accordingly. The result is that shadow is drawn on the off-screen canvas while the actual shape is "invisible".</p>
+
+<p>Now that we have a feathered version of our shape we can use that as a mask for composite mode. We choose <code>destination-out</code> to cleat where the shadow is drawn, or <code>destination-in</code> to invert the mask.</p>
+
+<h2>Example</h2>
+
+<p>Lets create a wrapper function that do all the steps for us</p>
+
+<p><strong><a href="http://jsfiddle.net/AbdiasSoftware/sZEds/">ONLINE DEMO HERE</a></strong></p>
+
+<pre><code>function clipArc(ctx, x, y, r, f) { /// context, x, y, radius, feather size
+
+    /// create off-screen temporary canvas where we draw in the shadow
+    var temp = document.createElement('canvas'),
+        tx = temp.getContext('2d');
+
+    temp.width = ctx.canvas.width;
+    temp.height = ctx.canvas.height;
+
+    /// offset the context so shape itself is drawn outside canvas
+    tx.translate(-temp.width, 0);
+
+    /// offset the shadow to compensate, draws shadow only on canvas
+    tx.shadowOffsetX = temp.width;    
+    tx.shadowOffsetY = 0;
+
+    /// black so alpha gets solid
+    tx.shadowColor = '#000';
+
+    /// "feather"
+    tx.shadowBlur = f;
+
+    /// draw the arc, only the shadow will be inside the context
+    tx.arc(x, y, r, 0, 2 * Math.PI);
+    tx.closePath();
+    tx.fill();
+
+    /// now punch a hole in main canvas with the blurred shadow
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.drawImage(temp, 0, 0);
+    ctx.restore();
+}
+</code></pre>
+
+<p>That's all there is to it.</p>
+
+<p><strong>USAGE</strong></p>
+
+<pre><code>clipArc(context, centerX, centerY, radius, featherSize);
+</code></pre>
+
+<p>With demo background (see fiddle):</p>
+
+<pre><code>ctx.fillStyle = '#ffa';
+ctx.fillRect(0, 0, demo.width, demo.height);
+
+clipArc(ctx, 200, 200, 150, 40);
+</code></pre>
+
+<p><strong>Result:</strong></p>
+
+<p><img src="http://i.stack.imgur.com/lHpev.jpg" alt="Demo snapshot"></p>
+
+<p>If you want to keep center intact just replace composite mode with <code>destination-in</code>.</p>
+
+<p><strong><a href="http://jsfiddle.net/AbdiasSoftware/8kfBm/">Demo for inverted feathered mask</a></strong></p>
+
+<p><img src="http://i.stack.imgur.com/Or13w.jpg" alt="demo snapshot inverted mask"></p>

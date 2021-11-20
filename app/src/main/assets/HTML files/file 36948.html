@@ -1,0 +1,11 @@
+<p>You'd have to define "really big," and you'd have to <em>test it</em> with your representative data, but the short answer is yes, it's more overhead to use <code>forEach</code> than direct property access, for a couple of reasons:</p>
+
+<ol>
+<li><p>Modern JavaScript engines are pretty smart about objects and can optimize direct property access quite well.</p></li>
+<li><p>To use <code>forEach</code>, you have to make function calls. Function calls are <em>extremely cheap</em>, but they aren't free.</p></li>
+<li><p>In the course of finding the element in the array, you'll be doing various direct property accesses (<code>human.id</code>), so right there you're doing the same work you'd've done with direct access, but you're doing it <em>over and over again</em>.</p></li>
+</ol>
+
+<p>Now, not all objects are equal in terms of property access time. In particular, with a modern engine like V8, if you do something to the object that makes the engine throw away its optimizations and fall back on "dictionary mode" (treating the object like a hash table, instead of doing smarter things), property access on that object will be a <strong>lot</strong> slower than on one where the optimizations remain in place. One such operation is <code>delete</code>, which causes V8 to put the object in "dictionary mode." <a href="http://jsperf.com/dictionary-mode-example" rel="nofollow">Example on jsperf</a> <em>(Firefox's engine, SpiderMonkey, bizarrely shows an</em> improvement <em>with the object <code>delete</code> was used on; perhaps it's so fast it's a measurement error, but I ran it several times with consistent results...)</em></p>
+
+<p>So in <em>theory</em>, if you had a small number of entries in your array, and you built up the array in a way that let the engine optimize it as a true array behind-the-scenes, <strong>and</strong> the object you would have used instead would have been in "dictionary mode," <strong><em>maybe</em></strong> you might find a use case where <code>forEach</code> was faster. It doesn't seem likely, but it's remotely possible.</p>

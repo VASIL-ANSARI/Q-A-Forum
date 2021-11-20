@@ -1,0 +1,34 @@
+<p>You cannot add <code>demo</code> as a dependency there because it does not yet exist. That's the way the <code>$injector</code> works. What you can do is list <code>demo</code> as a dependency in the <code>$get</code> function of the provider. That's going to be executed by the <code>$injector</code> <em>after</em> all providers have been defined.</p>
+
+<p>Check <a href="http://jsfiddle.net/92hxrfvf/" rel="nofollow">this</a>:</p>
+
+<pre><code>&lt;div ng-app="Demo"&gt;
+    &lt;div ng-controller="test"&gt;{{x}}&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>And the definitions:</p>
+
+<pre><code>var module = angular.module('Demo', []);
+
+module.factory('demo', function () {
+        return {
+            data: {x: 'x'},
+        };
+    });
+
+module.provider('foo', function() {
+    this.$get = function(demo) {
+        return {
+            demo: demo
+        };
+    };
+});
+
+module.controller('test', ['$scope', 'foo', function($scope, foo) {
+    $scope.x = foo.demo.data.x;
+}]);
+</code></pre>
+
+<p>The code inside the factory and provider is run at "step 1".
+Then, in "step 2" AngularJS binds the controller. It first uses <code>$injector</code> to inject the dependencies (that have been previously defined in "step 1"). So in practice your <code>$timeout</code> "emulates" this behavior, that's why it works. But it's wrong, that's not the way you are supposed to use them.</p>

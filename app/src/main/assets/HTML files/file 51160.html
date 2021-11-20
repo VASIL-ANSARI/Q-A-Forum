@@ -1,0 +1,111 @@
+<p>One simple way is to use JSON:</p>
+
+<pre><code>public static T DeepClone&lt;T&gt;(T source)
+{
+    var serialized = JsonConvert.SerializeObject(source);
+    return JsonConvert.DeserializeObject&lt;T&gt;(serialized);
+}
+</code></pre>
+
+<p>which does the reflection for you. Obviously it won't work with anything that, for example, has a handle to an unmanaged object and so on.</p>
+
+<p>(You can use NuGet to install Newtonsoft.Json into your project.)</p>
+
+<p>By default Json won't serialise private fields.</p>
+
+<p>You can fix that like so:</p>
+
+<pre><code>public static T DeepClone&lt;T&gt;(T source)
+{
+    var settings = new JsonSerializerSettings {ContractResolver = new MyContractResolver()};
+    var serialized = JsonConvert.SerializeObject(source, settings);
+    return JsonConvert.DeserializeObject&lt;T&gt;(serialized);
+}
+
+public class MyContractResolver : DefaultContractResolver
+{
+    protected override IList&lt;JsonProperty&gt; CreateProperties(Type type, MemberSerialization memberSerialization)
+    {
+        var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        .Select(p =&gt; base.CreateProperty(p, memberSerialization))
+                    .Union(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Select(f =&gt; base.CreateProperty(f, memberSerialization)))
+                    .ToList();
+        props.ForEach(p =&gt; { p.Writable = true; p.Readable = true; });
+        return props;
+    }
+}
+</code></pre>
+
+<p>Here's a full sample console app that shows how an arbitrary class with private fields can be cloned. Note that <code>Json</code> tries to use a constructor to set the fields and/or properties, and if the constructor parameter names don't match the field or property names it won't work correctly:</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+
+namespace ConsoleApplication1
+{
+    class Test
+    {
+        public Test(double y, string s, int x)
+        {
+            this.Y = y;
+            this.s = s;
+            this.X = x;
+        }
+
+        public int X;
+
+        public double Y { get; private set; }
+
+        public string Z         
+        {
+            get
+            {
+                return s;
+            }
+        }
+
+        private string s;
+    }
+
+    class Program
+    {
+        static void Main()
+        {
+            var test = new Test(1.2345, "12345", 12345);
+            test.X = 12345;
+
+            var copy = DeepClone(test);
+
+            Console.WriteLine("X = " + copy.X);
+            Console.WriteLine("Y = " + copy.Y);
+            Console.WriteLine("Z = " + copy.Z);
+        }
+
+        public static T DeepClone&lt;T&gt;(T source)
+        {
+            var settings = new JsonSerializerSettings {ContractResolver = new MyContractResolver()};
+            var serialized = JsonConvert.SerializeObject(source, settings);
+            return JsonConvert.DeserializeObject&lt;T&gt;(serialized);
+        }
+
+        public class MyContractResolver : DefaultContractResolver
+        {
+            protected override IList&lt;JsonProperty&gt; CreateProperties(Type type, MemberSerialization memberSerialization)
+            {
+                var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Select(p =&gt; base.CreateProperty(p, memberSerialization))
+                            .Union(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                        .Select(f =&gt; base.CreateProperty(f, memberSerialization)))
+                            .ToList();
+                props.ForEach(p =&gt; { p.Writable = true; p.Readable = true; });
+                return props;
+            }
+        }
+    }
+}
+</code></pre>

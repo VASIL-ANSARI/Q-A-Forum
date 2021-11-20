@@ -1,0 +1,57 @@
+<p>Whenever I do this I usually make <code>grid.DataSource</code> the result of a LINQ projection on the objects.</p>
+
+<p>So something like this:</p>
+
+<pre><code>grid.DataSource = objects.Select(o =&gt; new
+    { Column1 = o.SomeValue, Column2 = o.SomeOtherValue }).ToList();
+</code></pre>
+
+<p>The nice thing is that you can then set <code>AutoGenerateColumns</code> to true, which will generate columns based on the properties of the projected objects.</p>
+
+<p><strong>Edit:</strong></p>
+
+<p>The one downside to this approach is that by projecting everything into an anonymous object, you can have problems in situations where you need to access a specific object in a click event, for example.</p>
+
+<p>In this case you may be better off defining an explicit view model and projecting your objects into those. E.g.,</p>
+
+<pre><code>class MyViewModel
+{
+    public int Column1 { get;set; }
+    public int Column2 { get;set; }
+}
+
+grid.DataSource = objects.Select(o =&gt; new MyViewModel()
+    { Column1 = o.SomeValue, Column2 = o.SomeOtherValue }).ToList();
+</code></pre>
+
+<p><strong>Edit 2:</strong></p>
+
+<p><code>MyViewModel</code> represents all of the columns you want to display in the <code>DataGridView</code>. The example properties should of course be renamed to suit what you are doing. In general, the point of a ViewModel is to serve as a sort of converter that mediates between the model (in your case your list of objects) and the view.</p>
+
+<p>If you are wanting to retain a reference to the underlying object, the best way might be to supply it via the constructor:</p>
+
+<pre><code>class MyViewModel
+{
+    public int Column1 { get;set; }
+    public int Column2 { get;set; }
+
+    ....
+
+    private SomeType _obj;
+
+    public MyViewModel(SomeType obj)
+    {
+        _obj = obj;
+    }
+
+    public SomeType GetModel()
+    {
+        return _obj;
+    }
+}
+
+grid.DataSource = objects.Select(o =&gt; new MyViewModel(o)
+    { Column1 = o.SomeValue, Column2 = o.SomeOtherValue }).ToList();
+</code></pre>
+
+<p>The reason I have gone for a getter method to retrieve the underlying model object is simply to avoid a column being generated for it.</p>

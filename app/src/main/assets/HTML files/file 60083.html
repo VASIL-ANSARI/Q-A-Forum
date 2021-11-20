@@ -1,0 +1,62 @@
+<p>The folllowing seems to be the way to go:
+First we create a  couple of views so to make the actual select query easier to comprehend</p>
+
+<p>This first view represents rows that are already completely filled - meaning that all 5 numbers have also been called.</p>
+
+<pre><code>create or replace view filled as
+select 
+    r.ticket_id, f.ticket_row_id, 0 path_distance
+from 
+    ticket_row_field f
+    inner join ticket_row r
+        on r.id = f.ticket_row_id
+    inner join ticket t
+        on t.id = r.ticket_id
+    inner join called_number n
+        on n.called_number = f.content
+group by ticket_row_id
+having count(*) = 5;
+</code></pre>
+
+<p>The other view represents rows that are not completely filled</p>
+
+<pre><code>create or replace view incomplete as
+        select 
+            r.ticket_id, f.ticket_row_id,
+                coalesce(filled.path_distance, count(content)) path_distance,
+                case when 
+                    filled.path_distance is not null then 
+                    '' else 
+                    group_concat(content order by content) 
+                end path
+        from 
+            ticket t
+            inner join ticket_row r
+                on r.ticket_id = t.id
+            inner join ticket_row_field f
+                on f.ticket_row_id = r.id
+            left join called_number n
+                on n.game_id = t.game_id
+                and n.called_number = f.content
+            left join filled
+                on filled.ticket_row_id = f.ticket_row_id
+        where 
+            n.called_number is null or filled.ticket_row_id is not null
+        group by 
+            ticket_row_id;
+</code></pre>
+
+<p>Then we use the following select query to get the tickets we need, including their path (= the missing numbers)</p>
+
+<pre><code>select 
+    r1.ticket_id, r1.path_distance + r2.path_distance distance_sum, concat(r1.path, ',', r2.path) path_combined
+from 
+    incomplete r1
+        inner join incomplete r2
+            on r2.ticket_id = r1.ticket_id
+where 
+    r2.ticket_row_id &lt; r1.ticket_row_id
+order by 
+    distance_sum
+limit 5;
+</code></pre>

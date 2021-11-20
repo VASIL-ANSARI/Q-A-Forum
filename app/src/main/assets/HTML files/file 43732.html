@@ -1,0 +1,13 @@
+<p>You could use reflection to get all the possible message types upfront that inherit from <code>MessageBase</code>, and then register them as sub types with the model. This way you wouldn't need any <code>ProtoInclude</code> on <code>MessageBase</code>.</p>
+
+<p>EDIT: As pointed out by Marc Gravell we need to make sure that the order of the types found and therefore field numbers is consistent, at least between executions, to avoid problems deserialising later.</p>
+
+<pre><code>var messageTypes = Assembly.GetAssembly(typeof(MessageBase))
+        .GetTypes()
+        .Where(a =&gt; a.BaseType.Equals(typeof(MessageBase)))
+        .Select((value, i) =&gt; new { Type = value, FieldNo = 100 + i })
+        .OrderBy(a =&gt; a.Type.FullName);
+
+foreach (var messageType in messageTypes)        
+    RuntimeTypeModel.Default[typeof(MessageBase)].AddSubType(messageType.FieldNo, messageType.Type);
+</code></pre>

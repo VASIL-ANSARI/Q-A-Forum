@@ -1,0 +1,77 @@
+<p>The issue is the following. This element</p>
+
+<pre><code>&lt;context:component-scan base-package="ch.bsgroup.scrumit.controller" /&gt;
+</code></pre>
+
+<p>already creates an instance of your <code>UserstoryController</code> controller because of <code>@Controller</code>. And then the <code>&lt;bean&gt;</code> elements in <code>beans.xml</code> creates another one. </p>
+
+<p>When you annotate a class with <code>@Controller</code> and have an appropriate <code>component-scan</code>, you should not declare a separate <code>bean</code> element in your context.</p>
+
+<p>The fact is, all of this</p>
+
+<pre><code>&lt;bean id="boardController" class="ch.bsgroup.scrumit.controller.BoardController"&gt;
+    &lt;property name="sprintService"&gt;
+        &lt;ref local="sprintService"/&gt;
+    &lt;/property&gt;
+    &lt;property name="projectService"&gt;
+        &lt;ref local="projectService"/&gt;
+    &lt;/property&gt;
+    &lt;property name="userStoryService"&gt;
+        &lt;ref local="userStoryService"/&gt;
+    &lt;/property&gt;
+    &lt;property name="taskService"&gt;
+        &lt;ref local="taskService"/&gt;
+    &lt;/property&gt;
+    &lt;property name="burnDownChartService"&gt;
+        &lt;ref local="burnDownChartService"/&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p>can be replaced with appropriate <code>@Autowired</code> annotations on fields. You don't even need getters and setters. For example</p>
+
+<pre><code>@Controller
+@RequestMapping(value="userstory/{projectid}/{sprintid}/")
+@SessionAttributes(value = "user")
+public class UserstoryController {
+    @Autowired
+    private ISprintService sprintService;
+
+    @Autowired
+    private IUserStoryService userStoryService;
+
+    @Autowired
+    private IProjectService projectService;
+
+    @Autowired
+    private IBurnDownChartService burnDownChartService;
+
+    @Autowired
+    private ITaskService taskService;
+
+    @RequestMapping(method=RequestMethod.GET)
+    public String getUserstoryPage(@PathVariable("projectid") int pid, @PathVariable("sprintid") int sid,  @ModelAttribute("user") SerializablePerson user) {
+        if (user.getId() != 0) {
+            Project p = this.projectService.findProjectById(pid);
+            if (p == null) {
+                throw new ResourceNotFoundException(pid);
+            }
+            if (user.getRole().equals("User")) {
+                return "userstory/user_userstory";
+            }
+            else {
+                return "userstory/admin_userstory";
+            }
+        }
+        return "redirect:../../../login";
+    }
+}
+</code></pre>
+
+<p>Here's some related documentation:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/6827752/whats-the-difference-between-component-repository-service-annotations-in">What's the difference between @Component, @Repository &amp; @Service annotations in Spring?</a></li>
+<li><a href="http://stackoverflow.com/questions/13661985/spring-mvc-difference-between-contextcomponent-scan-and-annotation-driven">Spring MVC: difference between <code>&lt;context:component-scan&gt;</code> and <code>&lt;annotation-driven /&gt;</code> tags?</a></li>
+<li><a href="http://stackoverflow.com/questions/7414794/difference-between-contextannotation-config-vs-contextcomponent-scan?lq=1">Difference between <code>&lt;context:annotation-config&gt;</code> vs <code>&lt;context:component-scan&gt;</code></a></li>
+</ul>

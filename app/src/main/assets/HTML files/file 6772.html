@@ -1,0 +1,46 @@
+<p>Using RecursiveCachingIterator:</p>
+
+<pre><code>$rdi = new RecursiveDirectoryIterator('.');
+$rci = new RecursiveCachingIterator($rdi, CachingIterator::FULL_CACHE); 
+$rii = new RecursiveIteratorIterator($rci, RecursiveIteratorIterator::SELF_FIRST);
+
+foreach ($rii as $file) {
+    if ($file-&gt;isDir()) {
+        echo $file-&gt;getFilename() . PHP_EOL;
+    }
+    elseif (!$rii-&gt;hasNext()) {
+        echo $file-&gt;getFilename() . PHP_EOL;
+    }
+    elseif (count($rii-&gt;getCache()) == 1) {
+        echo $file-&gt;getFilename() . PHP_EOL;
+    }
+}
+</code></pre>
+
+<p>Another solution with array:</p>
+
+<pre><code>function buildTree(RecursiveDirectoryIterator $iterator) {
+    $tree = array();
+    foreach ($iterator as $fileinfo) {
+        if ($fileinfo-&gt;isDir()) {
+            $tree[$fileinfo-&gt;getFilename()] = buildTree($iterator-&gt;getChildren());
+        } else {
+            $tree[$fileinfo-&gt;getFilename()] = $fileinfo-&gt;getFilename();
+        }
+    }
+    return $tree;
+}
+
+function filterTree(array $tree) {
+    foreach ($tree as $key =&gt; $value) {
+        if (is_array($value)) {
+            $tree[$key] = filterTree($value);
+        } elseif (reset($tree) !== $value &amp;&amp; end($tree) !== $value) {
+            unset($tree[$key]);
+        }
+    }
+    return $tree;
+}
+
+print_r(filterTree(buildTree(new RecursiveDirectoryIterator('.'))));
+</code></pre>

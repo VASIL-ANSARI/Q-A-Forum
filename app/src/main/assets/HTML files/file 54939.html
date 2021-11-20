@@ -1,0 +1,105 @@
+<p>I don't want to upgrade PHP 5.3 at my CentOS 6 Linux server either.</p>
+
+<p>I have tried using the new <a href="https://github.com/facebook/facebook-php-sdk-v4" rel="nofollow">facebook-php-sdk-v4</a> by commenting the check in its <code>autoload.php</code>:</p>
+
+<pre><code>#if (version_compare(PHP_VERSION, '5.4.0', '&lt;')) {
+  #throw new Exception('The Facebook SDK v4 requires PHP version 5.4 or higher.');
+#}
+</code></pre>
+
+<p>but then there are many places in it where <code>array()</code> is replaced by <code>[]</code>, so I have given up adapting it for now and just use the deprecated (but still working) <a href="https://github.com/facebookarchive/facebook-php-sdk" rel="nofollow">facebook-php-sdk</a>:</p>
+
+<p>Here a successfull user information fetch with it:</p>
+
+<pre><code>&lt;?php
+
+require_once('facebook-php-sdk-3.2.3/src/facebook.php');
+
+const TITLE      = 'My amazing app';
+const REDIRECT   = 'https://example.com/myapp/';
+
+#Facebook::$CURL_OPTS[CURLOPT_SSL_VERIFYPEER] = false;
+#Facebook::$CURL_OPTS[CURLOPT_SSL_VERIFYHOST] = 2;
+
+$client = new Facebook(array(
+        'appId'  =&gt; REPLACE_ME,
+        'secret' =&gt; REPLACE_ME,
+));
+
+if (isset($_REQUEST['logout'])) {
+        $client-&gt;destroySession();
+        header('Location: ' . REDIRECT);
+        exit(0);
+}
+
+if ($client-&gt;getUser()) {
+        try {
+                $me = $client-&gt;api('/me?fields=id,first_name,gender');
+                $body = '&lt;PRE&gt;' . print_r($me, TRUE) . '&lt;/PRE&gt;';
+        } catch (FacebookApiException $ex) {
+                error_log($ex);
+                $body = '&lt;PRE&gt;' . htmlspecialchars($e-&gt;getMessage()) . '&lt;/PRE&gt;';
+        }
+} else {
+        $body = sprintf('&lt;P&gt;&lt;A HREF="%s"&gt;Login&lt;/A&gt;&lt;/P&gt;', $client-&gt;getLoginUrl());
+}
+
+?&gt;
+
+&lt;!DOCTYPE HTML&gt;
+&lt;HTML&gt;
+&lt;HEAD&gt;
+        &lt;TITLE&gt;&lt;?= TITLE ?&gt;&lt;/TITLE&gt;
+&lt;/HEAD&gt;
+&lt;BODY&gt;
+        &lt;?= $body ?&gt;
+        &lt;P&gt;&lt;A HREF="&lt;?= REDIRECT ?&gt;?logout"&gt;Logout&lt;/A&gt;&lt;/P&gt;
+&lt;/BODY&gt;
+&lt;/HTML&gt;
+</code></pre>
+
+<p>Do not forget to -</p>
+
+<ol>
+<li>Get app id and secret at <a href="https://developers.facebook.com" rel="nofollow">Facebook console</a></li>
+<li>Register the <code>https://example.com/myapp/</code> as Canvas callback (and also optionally as valid OAuth2 redirect URL) at the same place</li>
+</ol>
+
+<p>Another alternative is to use the <a href="https://developers.facebook.com/docs/javascript" rel="nofollow">Facebook SDK for JavaScript</a> (here with jQuery):</p>
+
+<pre><code>&lt;!DOCTYPE HTML&gt;
+&lt;HTML&gt;
+&lt;HEAD&gt;
+        &lt;TITLE&gt;&lt;?= TITLE ?&gt;&lt;/TITLE&gt;
+        &lt;SCRIPT SRC="//ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"&gt;&lt;/SCRIPT&gt;
+        &lt;SCRIPT&gt;
+                $(document).ready(function() {
+                        //$.ajaxSetup({ cache: true });
+                        $.getScript('//connect.facebook.net/en_US/sdk.js', function() {
+                                FB.init({
+                                        'appId'  : '&lt;?= APP_ID ?&gt;',
+                                        'xfbml'  : false,
+                                        'cookie' : true,
+                                        'status' : true,
+                                        'version': 'v2.6'
+                                });     
+                                FB.login(function(response) {
+                                        if (response.authResponse) {
+                                                console.log('Fetching your information.... ');
+                                                FB.api('/me?fields=id,first_name,gender', function(response) {
+                                                        console.log(response);
+                                                });
+                                        } else {
+                                                console.log('User cancelled login or did not fully authorize.');
+                                        }
+                                });
+                        });
+                });
+        &lt;/SCRIPT&gt;
+&lt;/HEAD&gt;
+&lt;BODY&gt;
+        &lt;?= $body ?&gt;
+        &lt;P&gt;&lt;A HREF="&lt;?= REDIRECT ?&gt;?logout"&gt;Logout&lt;/A&gt;&lt;/P&gt;
+&lt;/BODY&gt;
+&lt;/HTML&gt;
+</code></pre>

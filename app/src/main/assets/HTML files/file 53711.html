@@ -1,0 +1,57 @@
+
+
+<p>The general statement of "pre-allocation" is about the potential cost of an "update" operation that causes the document to "grow". If that results in a document size that is greater than the currently allocated space, then the document would be "moved" to another location on disk to accomodate the new space. This can be costly, and hence the general recommendation to intially write the document befitting to it's eventual "size".</p>
+
+<p>Honestly the best way to handle such an operation would be to do an "upsert" initially with all the array elements allocated, and then only update the requried element in position. This would reduce to "two" potential writes, and you can further reduce to a single "over the wire" operation using Bulk API methods:</p>
+
+<pre class="lang-js prettyprint-override"><code>var id = _ref,"|"+year+"|"+month;
+var bulk = db.collection('ref_history').initializeOrderedBulkOp();
+
+bulk.find({ "_id": id }).upsert().updateOne({
+    "$setOnInsert": {
+        "dates": Array.apply(null,Array(32)).map(function(el) { return { "count": 0 }})
+   }
+});
+
+var update={"$inc":inc['dates.'+day+'.count'] = 1;};
+bulk.find({ "_id": id }).updateOne(update);
+
+bulk.execute(function(err,results) {
+   // results would show what was modified or not
+});
+</code></pre>
+
+<p>Or since newer drivers are favouring consistency with one another, the "Bulk" parts have been relegated to regular arrays of <code>WriteOperations</code> instead:</p>
+
+<pre class="lang-js prettyprint-override"><code>var update={"$inc":inc['dates.'+day+'.count'] = 1;};
+
+db.collection('ref_history').bulkWrite([
+    { "updateOne": {
+        "filter": { "_id": id },
+        "update": {
+            "$setOnInsert": {
+                "dates": Array.apply(null,Array(32)).map(function(el) {
+                    return { "count": 0 }
+                })
+            }
+        },
+        "upsert": true
+    }},
+    { "updateOne": {
+        "filter": { "_id": id },
+        "update": update
+    }}
+],function(err,result) {
+    // same thing as above really
+});
+</code></pre>
+
+<p>In either case the <a href="https://docs.mongodb.org/manual/reference/operator/update/setOnInsert/" rel="nofollow"><code>$setOnInsert</code></a> as the sole block will only do anything if an "upsert" actually occurs. The main case being that the only contact with the server will be a single request and response, as opposed to "back and forth" operations waiting on network communication.</p>
+
+<p>This is typically what "Bulk" operations are for. They reduce that network overhead when you might as well send a batch of requests to the server. The result significantly speeds things, and neither operation is really dependant on the other with the exception of the exception of "ordered", which is the default in the latter case, and explicitly set by the legacy <code>.initializeOrderedBulkOp()</code>.</p>
+
+<p>Yes there is a "little" overhead in the "upsert", but there is "less" than in testing with <code>.count()</code> and waiting for that result first.</p>
+
+<hr>
+
+<p>N.B Not sure about the 32 array entries in your listing. You possibly meant 24 but copy/paste got the better of you. At any rate there are better ways to do that than hardcoding, as is demonstrated.</p>

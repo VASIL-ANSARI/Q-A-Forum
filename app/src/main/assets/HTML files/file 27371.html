@@ -1,0 +1,97 @@
+<p>You have a two fold problem. First, if you don't call the parameterised constructor, the connection is never created, but if you do, you create a separate instance of <code>Mymain</code>, which means the second instance doesn't have a valid connection, as the valid reference belongs to the parameterised instance </p>
+
+<pre><code>public Mymain(String username, String password) throws IOException, XMPPException, NullPointerException, InterruptedException, InvocationTargetException {
+    ConnectionConfiguration config = new ConnectionConfiguration("talk.google.com", 5222, "gmail.com");
+    connection = new XMPPConnection(config);
+    connection.connect();
+    connection.login(username, password);
+    name = username;
+
+    java.awt.EventQueue.invokeLater(new Runnable() {
+        public void run() {
+            try {
+                // This is a new instance of MyMain, so the connection
+                // you just created is relevant...
+                new Mymain().setVisible(true);
+            } catch (NullPointerException | IOException | XMPPException ex) {
+                Logger.getLogger(Mymain.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    });
+}
+</code></pre>
+
+<p>Start by removing the default constructor and moving its functionality to the parameterised constructor</p>
+
+<p>Remove this</p>
+
+<pre><code>public Mymain() throws NullPointerException, IOException, XMPPException {
+    initComponents();
+    welcome.setText(name);
+}
+</code></pre>
+
+<p>And update this...</p>
+
+<pre><code>public Mymain(String username, String password) throws IOException, XMPPException, NullPointerException, InterruptedException, InvocationTargetException {
+    initComponents();
+    welcome.setText(name);
+
+    ConnectionConfiguration config = new ConnectionConfiguration("talk.google.com", 5222, "gmail.com");
+    connection = new XMPPConnection(config);
+    connection.connect();
+    connection.login(username, password);
+    name = username;
+
+    setVisible(true);
+}
+</code></pre>
+
+<p>A better solution would be to create the connection first and then pass it to an instance of the <code>Mymain</code></p>
+
+<p>For example...</p>
+
+<pre><code>public Mymain(XMPPConnection connection) {
+    this.connection = connection;
+    initComponents();
+    setVisible(true);
+}
+
+try {
+
+    String username, String password) throws IOException, XMPPException, NullPointerException, InterruptedException, InvocationTargetException {
+    ConnectionConfiguration config = new ConnectionConfiguration("talk.google.com", 5222, "gmail.com");
+    connection = new XMPPConnection(config);
+    connection.connect();
+    connection.login(username, password);
+    new MyMain(connection);
+} catch (IOException | XMPPException | NullPointerException | InterruptedException | InvocationTargetException exp) {
+    exp.printStackTrace();
+}
+</code></pre>
+
+<p>Based on the previos example, this works fine for me...</p>
+
+<pre><code>public static void main(String args[]) {
+    try {
+        System.out.println("Connecting...");
+        ConnectionConfiguration config = new ConnectionConfiguration("talk.google.com", 5222, "gmail.com");
+        final XMPPConnection connection = new XMPPConnection(config);
+        connection.connect();
+        String userName = ...;
+        String password = ...;
+        connection.login(userName, password);
+
+        EventQueue.invokeLater(new Runnable() {
+
+            @Override
+            public void run() {
+                System.out.println("Connected...");
+                Mymain mymain = new Mymain(connection);
+            }
+        });
+    } catch (XMPPException exp) {
+        exp.printStackTrace();
+    }
+}
+</code></pre>

@@ -1,0 +1,50 @@
+<p>I don't see any reason why your first variant shouldn't work.</p>
+
+<p>HTML:</p>
+
+<pre><code>&lt;div ng-app="myApp"&gt;
+    &lt;div data-ng-controller="MainController"&gt;
+        &lt;form name="myForm"&gt; 
+            &lt;input name="myInput" ng-model="myInputMdl" business-validation /&gt;
+        &lt;/form&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>Controller and directive:</p>
+
+<pre><code>var myApp = angular.module('myApp', []);
+
+myApp.controller('MainController', function ($scope) {
+    $scope.$watch('myForm.myInput.$valid', function (validity) {
+        console.log('valid', validity);
+    });
+});
+
+myApp.directive('businessValidation', function () {
+    return {
+        restrict: 'A',
+        require: 'ngModel',
+        link: function (scope, elem, attr, ctrl) {
+            function validate (input) {
+                return input === 'hello';
+            }
+
+            ctrl.$parsers.unshift(function (value) {
+                var valid = validate(value);
+                ctrl.$setValidity('businessValidation', valid);
+                return valid ? value : undefined;
+            });
+
+            ctrl.$formatters.unshift(function (value) {
+                ctrl.$setValidity('businessValidation', validate(value));
+                return value;
+            });
+        }
+    };
+});
+</code></pre>
+
+<p><code>$valid</code> property value will change when <code>myInput</code> validity changes, and <code>$watch</code> callback will be fired.</p>
+
+<p>See example: <a href="http://jsfiddle.net/Lzgts/287/" rel="nofollow">http://jsfiddle.net/Lzgts/287/</a></p>

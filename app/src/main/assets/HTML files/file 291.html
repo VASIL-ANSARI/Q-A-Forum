@@ -1,0 +1,82 @@
+<p>There are four steps to making an app that can act as the default web browser. The first three steps allow your app to act as a role handler for the relevant URL schemes (HTTP and HTTPS) and the final step makes it the default role handler for those schemes.</p>
+
+<p><strong>1) Add the URL schemes your app can handle to your application's info.plist file</strong></p>
+
+<p>To add support for <code>http://</code> and <code>https://</code> you'd need to add the following to your application's info.plist file. This tells the OS that your application is capable of handling HTTP and HTTP URLs.</p>
+
+<pre class="lang-xml prettyprint-override"><code>&lt;key&gt;CFBundleURLTypes&lt;/key&gt;
+&lt;array&gt;
+    &lt;dict&gt;
+        &lt;key&gt;CFBundleURLName&lt;/key&gt;
+        &lt;string&gt;http URL&lt;/string&gt;
+        &lt;key&gt;CFBundleURLSchemes&lt;/key&gt;
+        &lt;array&gt;
+            &lt;string&gt;http&lt;/string&gt;
+        &lt;/array&gt;
+    &lt;/dict&gt;
+    &lt;dict&gt;
+        &lt;key&gt;CFBundleURLName&lt;/key&gt;
+        &lt;string&gt;Secure http URL&lt;/string&gt;
+        &lt;key&gt;CFBundleURLSchemes&lt;/key&gt;
+        &lt;array&gt;
+            &lt;string&gt;https&lt;/string&gt;
+        &lt;/array&gt;
+    &lt;/dict&gt;
+&lt;/array&gt;
+</code></pre>
+
+<p><strong>2) Write an URL handler method</strong></p>
+
+<p>This method will be called by the OS when it wants to use your application to open a URL. It doesn't matter which object you add this method to, that'll be explicitly passed to the Event Manager in the next step. The URL handler method should look something like this:</p>
+
+<pre><code>- (void)getUrl:(NSAppleEventDescriptor *)event 
+    withReplyEvent:(NSAppleEventDescriptor *)replyEvent
+{
+  // Get the URL
+  NSString *urlStr = [[event paramDescriptorForKeyword:keyDirectObject] 
+    stringValue];
+
+  //TODO: Your custom URL handling code here
+}
+</code></pre>
+
+<p><strong>3) Register the URL handler method</strong></p>
+
+<p>Next, tell the event manager which object and method to call when it wants to use your app to load an URL. In the code here I'm passed <code>self</code> as the event handler, assuming that we're calling <code>setEventHandler</code> from the same object that defines the <code>getUrl:withReplyEvent:</code> method.</p>
+
+<p>You should add this code somewhere in your application's initialisation code.</p>
+
+<pre><code>NSAppleEventManager *em = [NSAppleEventManager sharedAppleEventManager];
+[em 
+  setEventHandler:self 
+  andSelector:@selector(getUrl:withReplyEvent:) 
+  forEventClass:kInternetEventClass 
+  andEventID:kAEGetURL];
+</code></pre>
+
+<p>Some applications, including early versions of Adobe AIR, use the alternative WWW!/OURL AppleEvent to request that an application opens URLs, so to be compatible with those applications you should also add the following:</p>
+
+<pre><code>[em
+  setEventHandler:self 
+  andSelector:@selector(getUrl:withReplyEvent:) 
+  forEventClass:'WWW!' 
+  andEventID:'OURL'];
+</code></pre>
+
+<p><strong>4) Set your app as the default browser</strong></p>
+
+<p>Everything we've done so far as told the OS that your application is <em>a browser</em>, now we need to make it <em>the default browser</em>.</p>
+
+<p>We've got to use the Launch Services API to do this. In this case we're setting our app to be the default role handler for HTTP and HTTPS links:</p>
+
+<pre><code>CFStringRef bundleID = (CFStringRef)[[NSBundle mainBundle] bundleIdentifier];
+OSStatus httpResult = LSSetDefaultHandlerForURLScheme(CFSTR("http"), bundleID);
+OSStatus httpsResult = LSSetDefaultHandlerForURLScheme(CFSTR("https"), bundleID);
+//TODO: Check httpResult and httpsResult for errors
+</code></pre>
+
+<p>(It's probably best to ask the user's permission before changing their default browser.)</p>
+
+<p><strong>Custom URL schemes</strong></p>
+
+<p>It's worth noting that you can also use these same steps to handle your own custom URL schemes. If you're creating a custom URL scheme it's a good idea to base it on your app's bundle identifier to avoid clashes with other apps. So if your bundle ID is <code>com.example.MyApp</code> you should consider using <code>x-com-example-myapp://</code> URLs.</p>

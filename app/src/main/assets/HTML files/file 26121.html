@@ -1,0 +1,55 @@
+<p>This looks like a redirect loop on the Node side.</p>
+
+<p>You mention server B is the node server, you can accidentally create a redirect loop if you set up the routes incorrectly.  For example, if you are using express on server B - the Node server, you might have two routes, and assuming you keep your route logic in a separate module:</p>
+
+<pre><code>var routes = require(__dirname + '/routes/router')(app);
+//... express setup stuff like app.use &amp; app.configure
+app.post('/apicall1', routes.apicall1);
+app.post('/apicall2', routes.apicall2);
+</code></pre>
+
+<p>Then your routes/router.js might look like:</p>
+
+<pre><code>module.exports = Routes;
+
+function Routes(app){
+    var self = this;
+    if (!(self instanceof Routes)) return new Routes(app);
+    //... do stuff with app if you like
+}
+
+Routes.prototype.apicall1 = function(req, res){
+    res.redirect('/apicall2');
+}
+Routes.prototype.apicall2 = function(req, res){
+    res.redirect('/apicall1');
+}
+</code></pre>
+
+<p>That example is obvious, but you might have a redirect loop hidden in a bunch of conditions in some of those routes.  I'd start with the edge cases, like what happens at the end of the conditionals within the routes in question, what is the default behavior if the call for example doesn't have the right parameters and what is the exception behavior?  </p>
+
+<p>As an aside, you can use something like node-validator (<a href="https://github.com/chriso/node-validator" rel="nofollow">https://github.com/chriso/node-validator</a>) to help determine and handle incorrect request or post parameters</p>
+
+<pre><code>// Inside router/routes.js:
+var check = require('validator').check;
+
+function Routes(app){ /* setup stuff */ }
+
+Routes.prototype.apicall1 = function(req, res){
+    try{
+        check(req.params.csrftoken, 'Invalid CSRF').len(6,255);
+        // Handle it here, invoke appropriate business logic or model, 
+        // or redirect, but be careful! res.redirect('/secure/apicall2');
+    }catch(e){
+        //Here you could Log the error, but don't accidentally create a redirect loop
+        // send appropriate response instead
+        res.send(401);
+    }
+}
+</code></pre>
+
+<p>To help determine if it is a redirect loop you can do one of several things, you can use curl to hit the url with the same post parameters (assuming it is a post, otherwise  you can just use chrome, it'll error out in the console if it notices a redirect loop), or you can write to stdout on the Node server or syslog out inside of the offending route(s).</p>
+
+<p>Hope that helps, good thing you mentioned the "caused by redirect" part, that is I think the problem.</p>
+
+<p>The example situation above uses express to describe the situation, but of course the problem can exist using just connect, other frameworks, or even your own handler code as well if you aren't using any frameworks or libraries at all.  Either way, I'd make it a habit to put in good parameter checking and always test your edge cases, I've run myself into this problem exactly when I've been in a hurry in the past.</p>

@@ -1,0 +1,59 @@
+<p>Apparently there is not.</p>
+
+<p>There's an official HOWTO entry on <a href="http://developer.nokia.com/community/wiki/Handling_an_HTTP_redirect_with_QNetworkAccessManager" rel="nofollow">http://developer.nokia.com/community/wiki/Handling_an_HTTP_redirect_with_QNetworkAccessManager</a> (dead link, unfortunately)</p>
+
+<p>Extraction from link above:  </p>
+
+<pre><code>void QNAMRedirect::replyFinished(QNetworkReply* reply) {
+    /*
+     * Reply is finished!
+     * We'll ask for the reply about the Redirection attribute
+     * http://doc.trolltech.com/qnetworkrequest.html#Attribute-enum
+     */
+    QVariant possibleRedirectUrl =
+             reply-&gt;attribute(QNetworkRequest::RedirectionTargetAttribute);
+
+    /* We'll deduct if the redirection is valid in the redirectUrl function */
+    _urlRedirectedTo = this-&gt;redirectUrl(possibleRedirectUrl.toUrl(),
+                                         _urlRedirectedTo);
+
+    /* If the URL is not empty, we're being redirected. */
+    if(!_urlRedirectedTo.isEmpty()) {
+        QString text = QString("QNAMRedirect::replyFinished: Redirected to ")
+                              .append(_urlRedirectedTo.toString());
+        this-&gt;_textContainer-&gt;setText(text);
+
+        /* We'll do another request to the redirection url. */
+        this-&gt;_qnam-&gt;get(QNetworkRequest(_urlRedirectedTo));
+    }
+    else {
+        /*
+         * We weren't redirected anymore
+         * so we arrived to the final destination...
+         */
+        QString text = QString("QNAMRedirect::replyFinished: Arrived to ")
+                              .append(reply-&gt;url().toString());
+        this-&gt;_textContainer-&gt;setText(text);
+        /* ...so this can be cleared. */
+        _urlRedirectedTo.clear();
+    }
+    /* Clean up. */
+    reply-&gt;deleteLater();
+}
+
+QUrl QNAMRedirect::redirectUrl(const QUrl&amp; possibleRedirectUrl,
+                               const QUrl&amp; oldRedirectUrl) const {
+    QUrl redirectUrl;
+    /*
+     * Check if the URL is empty and
+     * that we aren't being fooled into a infinite redirect loop.
+     * We could also keep track of how many redirects we have been to
+     * and set a limit to it, but we'll leave that to you.
+     */
+    if(!possibleRedirectUrl.isEmpty() &amp;&amp;
+       possibleRedirectUrl != oldRedirectUrl) {
+        redirectUrl = possibleRedirectUrl;
+    }
+    return redirectUrl;
+}
+</code></pre>

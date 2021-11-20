@@ -1,0 +1,56 @@
+<p>Your <code>urlForId:params:parts:</code> method expects the first argument after the <code>parts:</code> keyboard to be an <code>NSString*</code>, but you're passing it a <code>va_list</code>.  Those are different types.  Passing a <code>va_list</code> variable as a function parameter doesn't magically expand it into all of the original arguments.  Under the covers a <code>va_list</code> is really just a pointer into your stack frame, and that's all that gets passed.</p>
+
+<p>What you really need to do here is factor out the section of <code>urlForId:params:parts:</code> that walks the parts list, and call that factored-out section directly from <code>specialUrlForId:params:parts:</code>.  Presumably your <code>urlForId:params:parts:</code> method looks something like this:</p>
+
+<pre><code>- (NSURL *)urlForId:(NSString *)aId params:(NSDictionary *)aParams parts:(NSString *)aPart, ...
+{
+    va_list ap;
+    va_start(ap, aPart);
+
+    // loop over the variable arguments, starting with aPart, perhaps
+    // stopping when you find nil.
+    while (aPart != nil) {
+        doSomething(aPart);
+        aPart = va_arg(ap, NSString *);
+    }
+
+    va_end(ap);
+
+    return someUrl;
+}
+</code></pre>
+
+<p>So what you'd do here is move the part after <code>va_start</code> and before <code>va_end</code> to a method that takes a <code>va_list</code> parameter:</p>
+
+<pre><code>- (NSURL *)urlForId:(NSString *)aId params:(NSDictionary *)aParams arguments:(va_list)ap
+{
+    // loop over the variable arguments, starting with aPart, perhaps
+    // stopping when you find nil.
+    while (aPart != nil) {
+        doSomething(aPart);
+        aPart = va_arg(ap, NSString *);
+    }
+    return someUrl;
+}
+</code></pre>
+
+<p>Then you make both <code>urlForId:params:parts:</code> and <code>specialUrlForId:params:parts:</code> call this new <code>urlForId:params:arguments:</code> method:</p>
+
+<pre><code>- (NSURL *)urlForId:(NSString *)aId params:(NSDictionary *)aParams parts:(NSString *)aPart, ...
+{
+    va_list ap;
+    va_start(ap, aPart);
+    NSURL *url = [self urlForId:aId params:aParams arguments:ap];
+    va_end(ap);
+    return url;
+}
+
+- (NSURL *)specialUrlForId:(NSString *)aId params:(NSDictionary *)aParams parts:(NSString *)aPart, ...
+{
+    va_list ap;
+    va_start(ap, aPart);
+    NSURL *url = [self urlForId:aId params:aParams arguments:ap];
+    va_end(ap);
+    return url;
+}
+</code></pre>

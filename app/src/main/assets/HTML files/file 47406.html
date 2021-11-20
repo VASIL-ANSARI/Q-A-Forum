@@ -1,0 +1,14 @@
+<p>It looks like this is an variance with how the URI is parsed in <a href="https://github.com/rabbitmq/rabbitmq-java-client/blob/master/src/com/rabbitmq/client/ConnectionFactory.java#L239" rel="nofollow">the source</a>.  In particular, the URI is split on /s then URLdecoded; this means that my URI (<code>amqp://guest:guest@localhost:5672/</code>) returns the empty string for the vhost (instead of the default / <a href="https://github.com/pika/pika/blob/2cd8572c6247ef6507b3a7165056063716d769eb/pika/connection.py#L479" rel="nofollow">like python does).</a>  I got around this by using </p>
+
+<pre><code>factory.setUri(System.getenv("CLOUDAMQP_URL"));
+factory.setVirtualHost("/");
+</code></pre>
+
+<p>to overwrite the inferred wrong value, but this is bad solution.  Another working solution is to change the URL:</p>
+
+<pre><code>CLOUDAMQP_URL=amqp://guest:guest@localhost:5672/%2F
+</code></pre>
+
+<p>Note the URLencoded / via <strong>%2F</strong>.  I will open an issue/PR with the library, because the python solution seems more intuitive.</p>
+
+<p>EDIT: I spoke with the library maintainers.  They note that they are the authoritative implementation, and that pika is doing something outside <a href="https://www.rabbitmq.com/uri-spec.html" rel="nofollow">the spec</a> (see appendix A).  It is unfortunate that the stock rabbit implementation (with a vhost of "/") is incompatible with the stock java rabbit mq client's interpretation of the default URI, but so it is.  Use the %2F fix.</p>

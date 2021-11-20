@@ -1,0 +1,64 @@
+<p>This hasn't been tested by try it, I cleaned up some of your code a bit:</p>
+
+<p>1) Combined the first 2 IF statements into 1 </p>
+
+<p>2) Used <code>get_post_gallery()</code> (<a href="http://codex.wordpress.org/Function_Reference/get_post_gallery" rel="nofollow">Codex</a>) which returns the <code>src</code> and the image <code>ID</code>. We use the image ID to return the caption, we can also get the description and more if we needed to.</p>
+
+<p>3) Removed the containing Foreach Statement since both my method only returns 1 gallery, not multiple so no need to loop through. </p>
+
+<pre><code>function show_related_gallery_image_urls( $content ) {
+    global $post;
+
+    // Only do this on singular items 
+    if( ! is_singular() || !has_shortcode( $post-&gt;post_content, 'gallery' ) )
+        return $content;
+
+    // Retrieve all galleries of this post
+    $galleries = get_post_gallery( $post, false );
+
+    $image_list = &lt;&lt;&lt;END
+                    &lt;div class="side_bar"&gt;
+            &lt;div class="related"&gt;
+                &lt;h3&gt;Related Images&lt;/h3&gt;
+END;
+
+    // Loop through each image in each gallery
+    $i = 0; // Iterator
+    foreach( $gallery['src'] as $src ) {
+        $caption = wp_get_attachment($gallery['id'][$i])['caption'];
+
+        $image_list .=  '&lt;a href="' . $src . '" rel="' . get_the_title() . '"&gt;' 
+                        . '&lt;img src="' . $src .'" /&gt;'
+                        . '&lt;div class="caption"&gt;'
+                            . $caption
+                        . '&lt;/div&gt;'
+                    . '&lt;/a&gt;';
+
+        $i++; // Incremenet Interator
+    }
+
+    $image_list .= '&lt;/div&gt;&lt;/div&gt;';
+
+    // Append our image list to the content of our post
+    $content .= $image_list;
+
+    return $content;
+
+ }
+ add_filter( 'the_content', 'show_related_gallery_image_urls' );
+
+function wp_get_attachment( $attachment_id ) {
+
+    $attachment = get_post( $attachment_id );
+    return array(
+        'alt' =&gt; get_post_meta( $attachment-&gt;ID, '_wp_attachment_image_alt', true ),
+        'caption' =&gt; $attachment-&gt;post_excerpt,
+        'description' =&gt; $attachment-&gt;post_content,
+        'href' =&gt; get_permalink( $attachment-&gt;ID ),
+        'src' =&gt; $attachment-&gt;guid,
+        'title' =&gt; $attachment-&gt;post_title
+    );
+}
+</code></pre>
+
+<p>On a sidenote, there is a gallery filter function where you can change how the gallery is displayed <a href="http://codex.wordpress.org/Plugin_API/Filter_Reference/post_gallery" rel="nofollow">post_gallery Filter</a>, <a href="http://wordpress.stackexchange.com/questions/43558/how-to-manually-fix-the-wordpress-gallery-code-using-php-in-functions-php">here's a question</a> that kind of shows how to edit it. There's also a great <a href="http://wordpress.stackexchange.com/">WordPress Stack Exchange</a> where that may be helpful in the future!</p>

@@ -1,0 +1,16 @@
+<p>You would need to synchronize access to <code>myResponse</code>, since it sounds like the <code>AddErrors</code> method is not thread safe:</p>
+
+<pre><code>var myResponse = new Response();
+var syncObj = new object();
+Parallel.ForEach(itemsListDto, new ParallelOptions { MaxDegreeOfParallelism = 10 }, itemDto =&gt;
+    {
+        var tResponse = _itemService.InsertItem(itemDto, new RequestMessage {UserName = RequestUserName});
+        lock(syncObj)
+            myResponse.AddErrors(tResponse.Errors);
+    });
+return myResponse;
+</code></pre>
+
+<p>If <code>InsertItem</code> is a fairly lengthy process, this may be acceptable in terms of performance.</p>
+
+<p>If <code>InsertItem</code> is a fairly fast method, this may add a lot of synchronization overhead, and cause the overall time to approach a synchronous loop.  In that case, you could potentially use the overloads of <a href="http://msdn.microsoft.com/en-us/library/dd991486.aspx" rel="nofollow">Parallel.ForEach which provide local state</a> to lock less frequently, and store the errors in your local state, then aggregate at the end of the full loop.  I have an article describing the <a href="http://reedcopsey.com/2010/01/22/parallelism-in-net-part-4-imperative-data-parallelism-aggregation/" rel="nofollow">process required to aggregate data efficiently using <code>Parallel.ForEach</code></a> in detail.  </p>

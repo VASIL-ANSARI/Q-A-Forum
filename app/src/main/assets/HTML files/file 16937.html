@@ -1,0 +1,40 @@
+<p>Given the situation</p>
+
+<pre><code>id, vote_id, user_id, status 
+1,1,1,1 - the vote is active 
+2,1,1,2 - vote is canceled 
+3,1,1,1 - vote is active again 
+</code></pre>
+
+<p>I assume that the system does not allow for a vote to be canceled <em>unless</em> that vote is active, nor to reactivate unless it is in canceled state.</p>
+
+<p>Therefore, if the number of "state 1"'s for a vote is equal to the number of "state 2"'s, the vote is canceled; otherwise it is active.</p>
+
+<p>Under this hypothesis,</p>
+
+<pre><code>SELECT id, vote_id, user_id, active AS status FROM
+    ( SELECT MAX(id) AS id,
+           SUM(CASE WHEN status = 1 THEN 1 WHEN status = 2 THEN -1 ELSE 0 END)
+              AS active,
+           user_id,
+           vote_id
+    FROM votes GROUP BY user_id, vote_id ) AS votes
+WHERE votes.status = 1;
+</code></pre>
+
+<p>or also - I don't like this because of <code>status</code> name ambiguity -</p>
+
+<pre><code>SELECT MAX(id) AS id,
+    SUM(CASE WHEN status = 1 THEN 1 WHEN status = 2 THEN -1 ELSE 0 END) AS status,
+    user_id,
+    vote_id
+FROM votes GROUP BY user_id, vote_id
+HAVING status = 1;
+</code></pre>
+
+<p>If you are sure of the status values, and there are no others, you could also try</p>
+
+<pre><code>SUM((1-status)*2+1) AS status
+</code></pre>
+
+<p>but I don't know if the speed gain (if any!) can make up for the lack of clarity.</p>

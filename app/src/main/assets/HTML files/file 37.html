@@ -1,0 +1,56 @@
+<p>My eventual (and hopefully temporary) solution to this problem was a Python CGI script.  My script follows for anyone who might find it useful (despite the fact that this is a total hack).  </p>
+
+<pre><code>#!/usr/bin/python
+"""A CGI script to produce an RSS feed of top-level Gallery2 albums."""
+
+#import cgi
+#import cgitb; cgitb.enable()
+from time import gmtime, strftime
+import MySQLdb
+
+ALBUM_QUERY = '''
+    select g_id, g_title, g_originationTimestamp
+    from g_Item
+    where g_canContainChildren = 1 
+    order by g_originationTimestamp desc
+    limit 0, 20
+    '''
+
+RSS_TEMPLATE = '''Content-Type: text/xml
+
+&lt;?xml version="1.0"?&gt;
+&lt;rss version="2.0"&gt;
+  &lt;channel&gt;
+    &lt;title&gt;TITLE&lt;/title&gt;
+    &lt;link&gt;&lt;http://example.com/gallery2/main.php&gt;&lt;/link&gt;
+    &lt;description&gt;DESCRIPTION&lt;/description&gt;
+    &lt;ttl&gt;1440&lt;/ttl&gt;
+%s
+  &lt;/channel&gt;
+&lt;/rss&gt;
+'''
+
+ITEM_TEMPLATE = '''
+    &lt;item&gt;
+      &lt;title&gt;%s&lt;/title&gt;
+      &lt;link&gt;&lt;http://example.com/gallery2/main.php?g2_itemId=%s&gt;&lt;/link&gt;
+      &lt;description&gt;%s&lt;/description&gt;
+      &lt;pubDate&gt;%s&lt;/pubDate&gt;
+    &lt;/item&gt;
+'''
+
+def to_item(row):
+    item_id = row[0]
+    title = row[1]
+    date = strftime("%a, %d %b %Y %H:%M:%S GMT", gmtime(row[2]))
+    return ITEM_TEMPLATE % (title, item_id, title, date)
+
+conn = MySQLdb.connect(host = "HOST",
+                       user = "USER",
+                       passwd = "PASSWORD",
+                       db = "DATABASE")
+curs = conn.cursor()
+curs.execute(ALBUM_QUERY)
+print RSS_TEMPLATE % ''.join([ to_item(row) for row in curs.fetchall() ])
+curs.close()
+</code></pre>

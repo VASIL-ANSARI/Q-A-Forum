@@ -1,0 +1,27 @@
+<p>It's probably easiest to serialize your structure into a string, then encrypt the string. For example:</p>
+
+<pre><code>std::ostringstream buffer;
+
+buffer &lt;&lt; a_record.name &lt;&lt; "\n" &lt;&lt; a_record.location &lt;&lt; "\n" &lt;&lt; a_record.salary;
+
+encode(buffer.str().c_str(), buffer.str().length(), /* ... */);
+</code></pre>
+
+<p>If it were me, I'd probably write <code>encode</code> (or at least a wrapper for it) to take input (and probably produce output) in a vector, string, or stream though. </p>
+
+<p>If you want to get ambitious, there are other possibilities. First of all, @MooingDuck raises a good point that it's often worthwhile to overload <code>operator&lt;&lt;</code> for the class, instead of working with the individual items all the time. This will typically be a small function similar to what's above:</p>
+
+<pre><code>std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, record const &amp;r) { 
+    return os &lt;&lt; r.name &lt;&lt; "\n" &lt;&lt; r.location &lt;&lt; "\n" &lt;&lt; r.salary;
+}
+</code></pre>
+
+<p>Using this, you'd just have:</p>
+
+<pre><code>std::ostringstream os;
+os &lt;&lt; a_record;
+
+encode(os.str().c_str(), os.str().length(), /* ... */);
+</code></pre>
+
+<p>Second, if you want to get really ambitious, you can put the encryption into (for one example) a <code>codecvt</code> facet, so you can automatically encrypt all the data as you write it to a stream, and decrypt it as you read it back in. Another possibility is to build the encryption into a filtering <code>streambuf</code> object instead. The <code>codecvt</code> facet is probably the method that should theoretically be preferred, but the <code>streambuf</code> is almost certainly easier to implement, with less unrelated "stuff" involved.</p>

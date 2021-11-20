@@ -1,0 +1,88 @@
+<p>I'll explain this on my simple understanding, so some probably going to be wrong.</p>
+
+<p>The old function is deprecated which is like removed/discouraged from using, but it is still there to support backward compatibility. You can read about it <a href="https://en.wikipedia.org/wiki/Deprecation" rel="nofollow">here</a>. As far as i know, the old deprecated function is not present in OpenGL ES or WebGL.</p>
+
+<p>You can say buffer object is an OpenGL object that store/allocate memory to store data in the gpu. You can read about it <a href="https://www.opengl.org/wiki/Buffer_Object" rel="nofollow">here</a></p>
+
+<pre><code>glGenBuffers(1, &amp;vertexbuffer);
+</code></pre>
+
+<p>Generate/create a new buffer. It will assign <code>vertexbuffer</code> with a number which you can use to access the buffer.</p>
+
+<pre><code>glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+</code></pre>
+
+<p>Start using (bind) the buffer <code>vertexbuffer</code></p>
+
+<pre><code>glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+</code></pre>
+
+<p>Allocate memory and set the data for the binded buffer. <code>GL_STATIC_DRAW</code>, <code>GL_DYNAMIC_DRAW</code>, <code>GL_STREAM_DRAW</code> will tell the gpu where to store the memory for the best performance.</p>
+
+<pre><code>glEnableVertexAttribArray(0);
+</code></pre>
+
+<p>This tell the gpu to start using the attribute located at <code>0</code>. If you're using a shader you can get it with <code>GLint glGetAttribLocation(GLuint program, const GLchar *name);</code> <a href="https://www.opengl.org/sdk/docs/man/html/glGetAttribLocation.xhtml" rel="nofollow">link</a></p>
+
+<pre><code>glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+</code></pre>
+
+<p>Binded it two times, doesn't do anything much. Except you unbind it somewhere else or bind other buffer.</p>
+
+<pre><code>glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,(void*)0);
+</code></pre>
+
+<p>This is to set how the attribute located at <code>0</code> is going to be used. This means the attribute is going to be used like: for every vertex, there is 3 floats variable that doesn't need to be normalized which is tightly packed (stride = 0, offset = 0).</p>
+
+<p>P.s: shouldn't the stride be <code>3 * sizeof(GLfloat)</code>? Edit: nvm, according to <a href="https://www.opengl.org/sdk/docs/man/html/glVertexAttribPointer.xhtml" rel="nofollow">this</a> it should be fine.</p>
+
+<p>Edit: According to @Nicol Bolas:</p>
+
+<blockquote>
+  <p>it stores the buffer object that was bound to GL_ARRAY_BUFFER at the time the function was called.</p>
+</blockquote>
+
+<p>Edit:
+<code>void glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid * pointer);</code>. Example:
+<a href="http://i.stack.imgur.com/sXx1V.png" rel="nofollow"><img src="http://i.stack.imgur.com/sXx1V.png" alt="Stride and pointer"></a></p>
+
+<p>For the position it would be like <code>glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*) (0 * sizeof(GLfloat)));</code></p>
+
+<p>For the texture coord it would be like <code>glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*) (3 * sizeof(GLfloat)));</code></p>
+
+<p>For the color it would be like <code>glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (void*) (5 * sizeof(GLfloat)));</code></p>
+
+<p>This is assuming your shader has the location for position at 0, for texture coord at 1, and at 2 for color attribute.</p>
+
+<pre><code>glDrawArrays(GL_TRIANGLES, 0, 3); 
+</code></pre>
+
+<p>Tell the gpu to draw a triangles using 3 vertex with offset 0 from the binded vertex buffer (<code>vertexbuffer</code>).</p>
+
+<pre><code>glDisableVertexAttribArray(0);
+</code></pre>
+
+<p>Stop using the attribute located at <code>0</code>.</p>
+
+<p>Vertex Array Object:</p>
+
+<pre><code>GLuint VertexArrayID;
+</code></pre>
+
+<p>This is the same as <code>vertexbuffer</code> from before, it store the id to access it.</p>
+
+<pre><code>glGenVertexArrays(1, &amp;VertexArrayID);
+</code></pre>
+
+<p>Same as before too, this generate/create a new vertex array.</p>
+
+<pre><code>glBindVertexArray(VertexArrayID);
+</code></pre>
+
+<p>Same as before, start using/bind the vertex array.</p>
+
+<p>Now the explanations about vao begin. Basically this object will remember the vbo (can be multiple) and how does it going to be used (from <code>glVertexAttribPointer()</code>), this only needed to be set once. When you're not using vao, each time you unbind and bind the vbo you need to set the attribute again. By using vao you only need to bind the vao as simple as calling <code>glBindVertexArray(GLuint vaoID);</code> and it will do everything for you which help a lot. So, you don't need to bind the vbo, set the attribute, and everything else. Instead just bind the vao, draw, unbind the vao, and done.</p>
+
+<hr>
+
+<p>Sorry for the long and not perfect explanation.</p>

@@ -1,0 +1,22 @@
+<p>Because using bare tasks is hard.</p>
+
+<p>Starting thousands of tasks at the same time is almost always not the optimal solution. There are better options on top of the TPL like PLINQ and TPL Dataflow.</p>
+
+<p>Let's take dataflow for example. You can create a block that does some part of your process. Configure an appropriate degree of parallelism and start posting items into it (you can also bound its size to limit memory usage). Instead of creating thousands of tasks you limit the amount of running tasks which should reduce scheduling overhead and improve the efficiency of your resource usage.</p>
+
+<p>Here's an example:</p>
+
+<pre><code>var block = new ActionBlock&lt;Item&gt;(
+    item =&gt; ProcessItem(item),
+    new ExecutionDataflowOptions { MaxDegreeOfParallelism = 100 });
+
+foreach (var item in GetItems())
+{
+    block.Post(item);
+}
+
+block.Complete();
+await block.Completion;
+</code></pre>
+
+<p>At the end if your processes are all running on the same machine they are using the same resources (i.e. CPU cores and networking stack). It means that by improving the efficiency of your single process you can achieve similar results.</p>

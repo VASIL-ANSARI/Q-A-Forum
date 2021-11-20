@@ -1,0 +1,62 @@
+<p>First, a quick warning: starting with VLC2.2 (current git version, to be released soon), the size parameter is a size_t.
+There's no API for smem (yet? hopefully this will change), which sucks, so this would silently break your application.</p>
+
+<p>Then, a quick comment about the "data" parameter: it's supposed to hold what you need to do your processing. That being a pointer to a struct, an instance of a class, you name it.
+I strongly doubt passing a long long would work on a 32bits machine, since you'd be forcing 64 bits in something which can only contain 32.
+What you should do is to declare a struct, and store what you need into it. Here, a good example could be:</p>
+
+<pre><code>struct MyParamStruct
+{
+    YourMutexType imageMutex; // Here mutex is not a global variable anymore
+    int otherParam; // You can use this to store the value 200 that you were passing before
+};
+//...
+
+// Init the struct somewhere
+MyParamStruct* param = new MyStructParam;
+param-&gt;otherParam = 200;
+//...
+
+sprintf(smem_options
+      , "#transcode{vcodec=h264}:smem{"
+         "video-prerender-callback=%lld,"
+         "video-postrender-callback=%lld,"
+         "video-data=%lld,"
+         "no-time-sync},"
+      , (long long int)(intptr_t)(void*)&amp;cbVideoPrerender
+      , (long long int)(intptr_t)(void*)&amp;cbVideoPostrender //This would normally be useful data, 100 is just test data
+      , (long long int)(intptr_t)(void*)param
+      );
+</code></pre>
+
+<p>About the mutex usage, it looks good to me. Actually it seems that you don't have any concurrency issue here, as you synchronously allocate a new buffer for each frame. If you were using a preallocated buffer each time, you would need to consider locking when exiting the postrender function.</p>
+
+<blockquote>
+  <p>In fact I'm not even sure about what is exactly the void pointer p_video_data.</p>
+</blockquote>
+
+<p>That depends on your image format. For H264, it would depend on the pixel format that will be output by the decoder. Since you're asking for H264 output, it's quite likely you'll get a planar pixel format, though the exact type would depend on your H264 profile.</p>
+
+<p>If you're expecting rawdata as a result (which seems to be the case, as CV_8UC3 seems to be refering to a 3 channels raw image, after a quick glance at google), I'd recommend you switch to RV32:
+<code>#transcode{vcodec=RV32}</code></p>
+
+<p>What you need to pass to the transcode module is your <strong>output</strong> fourcc, VLC will deal with the input for you :)</p>
+
+<h1>Update</h1>
+
+<p>I have no idea if the Mat class takes the ownership of your pointer, but you might want to check that as well.</p>
+
+<h1>Update 2</h1>
+
+<p>To answer your further question about what is RV32:</p>
+
+<pre><code>/* 24 bits RGB */
+#define VLC_CODEC_RGB24           VLC_FOURCC('R','V','2','4')
+/* 24 bits RGB padded to 32 bits */
+#define VLC_CODEC_RGB32           VLC_FOURCC('R','V','3','2')
+/* 32 bits RGBA */
+#define VLC_CODEC_RGBA            VLC_FOURCC('R','G','B','A')
+</code></pre>
+
+<p>If you expect 3 bytes only, then you probably should RV24 a try!
+I should probably have suggested that from the beginning, since the 8CU3 definitely suggests 3 bytes only...</p>

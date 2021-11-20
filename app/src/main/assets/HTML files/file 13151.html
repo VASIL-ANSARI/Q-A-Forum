@@ -1,0 +1,25 @@
+<p>Since you can't rebuild either of the libraries, and since the libraries can not be allowed to reside in the same "dynamic linker namespace" due to conflicting symbols, your only choice is to <em>isolate</em> them.</p>
+
+<p>You can achieve that by using <code>dlopen("lib*.so", RTLD_LOCAL)</code> (for either or both of the libraries), instead of linking to them directly.</p>
+
+<p>This could be workable if you only need a few symbols from e.g. <code>libfoo.so</code> -- you can simply use <code>dlsym</code> instead of calling the functions directly.</p>
+
+<p>If you have "too many" dependencies on both libraries, your other solution may be to build an "interposer" library. Let's say you want to interpose <code>libbar.so</code>, and you need <code>bar1()</code>, <code>bar2()</code>, ... <code>bar1000()</code> from it.</p>
+
+<p>Write (or generate with a simple Perl script) a source file that looks like this:</p>
+
+<pre><code>static void *handle;
+void *bar1()
+{
+   static void* (*pfn)(void *arg1, void *arg2, void *arg3, ..., argN);
+   if (pfn == NULL) {
+      if (handle == NULL)
+        handle = dlopen("libbar.so", RTLD_LOCAL|RTLD_LAZY);
+      pfn = dlsym(handle, "bar1");
+   }
+   return (*pfn)(arg1, arg2, ..., argN);
+}
+... repeat for all other libbar functions you depend on
+</code></pre>
+
+<p>Now compile and link this source into <code>libbar_interposer.so</code> and link your application against it (this will not work for <code>C++</code> due to name mangling, only for plain-<code>C</code>). Voila, no source changes to the application, and you still have isolated <code>libbar.so</code> so its symbols will not be visible to the rest of the application, and in particular will not conflict with any symbols in <code>libpng</code>.</p>

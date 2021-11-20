@@ -1,0 +1,60 @@
+<p>Let me try to translate the C# to python</p>
+
+<p>1.- Convert the bits from a double number to a number (unsigned long long).</p>
+
+<pre><code>long bits = BitConverter.DoubleToInt64Bits(d);
+</code></pre>
+
+<p>translates to</p>
+
+<pre><code>struct.unpack("Q", struct.pack("d", python_double) )[0]
+</code></pre>
+
+<p>it uses the <a href="https://docs.python.org/2/library/struct.html" rel="nofollow">struct</a> module from standard library.</p>
+
+<p>2.- Extract each field from the double representation</p>
+
+<pre><code>bool negative = ((bits &gt;&gt; 63) &amp; 1) != 0;
+long exponent = ((bits &gt;&gt; 52) &amp; 0x7FF) - 1023;
+long mantissa = bits &amp; 0xFFFFFFFFFFFFFL;
+</code></pre>
+
+<p>That can translated alsmot verbatim, since the same operators exist in python.</p>
+
+<pre><code>negative = ((bits &gt;&gt; 63) &amp; 1)    # Integer 1 for negative, 0 for positive
+exponent = ((bits &gt;&gt; 52) &amp; 0x7FF) - 1023
+mantissa = bits &amp; 0xFFFFFFFFFFFFF
+</code></pre>
+
+<p>3.- Pack again the number into 48 bits</p>
+
+<pre><code>long raw = (negative ? 1 : 0);
+raw = (raw &lt;&lt; 39) | (mantissa &gt;&gt; 13);
+raw = (raw &lt;&lt; 8) | ((exponent + 129) &amp; 0xFF);
+</code></pre>
+
+<p>Same as number 2,</p>
+
+<pre><code>raw = negative
+raw = (raw &lt;&lt; 39) | (mantissa &gt;&gt; 13)
+raw = (raw &lt;&lt; 8) | ((exponent + 129) &amp; 0xFF)
+</code></pre>
+
+<p>4.- Convert the number to a string of 6 bytes</p>
+
+<pre><code>for (int k = 0; k &lt; 6; k++)
+{
+  r[k] = (byte)(raw &amp; 0xFF);
+  raw &gt;&gt;= 8;
+}    
+</code></pre>
+
+<p>Use struck as in step 1,</p>
+
+<pre><code>data = struck.pack('Q', raw)
+data = data[:6]  # Drop the 16 MSB
+</code></pre>
+
+<p>NOTE: I'm dropping the last 2 chars because struct uses the processors' endianness by default (x86 in my case), but that can be controled with the first argument.</p>
+
+<p>TIP: If you want to convert a number to a binary representation you could use <code>'{:064b}'.format(number)</code>. This will pad it with zeros to fill 64 chars.</p>

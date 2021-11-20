@@ -1,0 +1,17 @@
+<p>I follow the question, but I suppose I am a bit puzzled why you want to unnecessarily bloat a single <code>.framework</code> with simulator-only i386 and x84_64 slices that are really only relevant to your development builds.  Would you by chance be wanting to distribute a framework to other developers and want to make it work on simulator as well as device?</p>
+
+<p>If so, you are on the right track with using <code>lipo</code> to join the thin binaries for device together or to join the thin binaries for simulator together, but shouldn't be trying to spawn one single device and simulator framework.  Apple's own use of SDKs and Frameworks serves as the guide here.  Within Xcode, there are two different platform SDKs -- iPhoneOS.platform and iPhoneSimulator.platform that contain the SDKs with only the slices for the relevant target architectures:</p>
+
+<p><a href="http://i.stack.imgur.com/E1hkW.png" rel="nofollow"><img src="http://i.stack.imgur.com/E1hkW.png" alt="Xcode&#39;s Platform Options"></a></p>
+
+<p>You can drill into each of these folders and find the UIKit frameworks do indeed follow the per-platform idea and are conditionally linked based on the SDK that is in use:</p>
+
+<p><a href="http://i.stack.imgur.com/vXAdY.png" rel="nofollow"><img src="http://i.stack.imgur.com/vXAdY.png" alt="UIKit Lipo"></a></p>
+
+<p>I'd further guess that you wanted to have one universal, all-architectures framework so that consuming developers didn't have to remember to swap out one .framework file for another depending on how they were compiling the app.  The great news is that you can use conditional linking flags to be able to affect this without needing to do file-system swaps!</p>
+
+<p>As folks adopt your library, part of the setup should be to use conditional linking -- Within the <code>OTHER_LINKER_FLAGS</code> option you can have per-configuration (Debug, Release, Ad-Hoc, etc.) build settings and can also have per-Architecture or per-SDK specific settings too:</p>
+
+<p><a href="http://i.stack.imgur.com/jGaIY.png" rel="nofollow"><img src="http://i.stack.imgur.com/jGaIY.png" alt="Other Linker Flags"></a></p>
+
+<p>To get access to these SDK-specific settings you'll need to click the + next to each of your build configurations where you want to custom tailor framework linking.  You can then select the appropriate SDKs from the dropdown list and add your linker flags for each of the two target frameworks.</p>

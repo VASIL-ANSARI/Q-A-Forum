@@ -1,0 +1,50 @@
+<p>Try this one:</p>
+
+<pre><code>SELECT *
+FROM (SELECT Item, attribute, value FROM MyTable) AS t
+PIVOT
+(
+  MAX(value)
+  FOR attribute IN([Quality], [Color])
+) AS p;
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>âââââââââ¦ââââââââââ¦ââââââââ
+â ITEM  â QUALITY â COLOR â
+â ââââââââ¬ââââââââââ¬ââââââââ£
+â item1 â A       â Red   â
+â item2 â B       â Black â
+âââââââââ©ââââââââââ©ââââââââ
+</code></pre>
+
+<h3>See <a href="http://sqlfiddle.com/#!3/16b50/1" rel="nofollow">this SQLFiddle</a></h3>
+
+<p>You can also use this dynamic query if you don't know the specific value of <code>attribute</code>:</p>
+
+<pre><code>DECLARE @cols AS NVARCHAR(MAX), @query  AS NVARCHAR(MAX)
+
+select @cols = STUFF((SELECT distinct ',' + QUOTENAME(attribute) 
+                    from MyTable
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)') 
+        ,1,1,'')
+
+
+set @query = 'SELECT Item,' + @cols + ' 
+             from 
+             (
+                Select Item, attribute , value
+                from MyTable
+             ) dta
+             pivot 
+             (
+                MAX(Value)
+                for attribute in (' + @cols + ')
+             ) pvt '
+
+execute(@query);
+</code></pre>
+
+<h3>See <a href="http://sqlfiddle.com/#!3/16b50/2" rel="nofollow">this SQLFiddle</a></h3>

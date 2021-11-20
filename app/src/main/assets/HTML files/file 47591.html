@@ -1,0 +1,17 @@
+<p>Since you're running your test on a Linux system, source code is UTF-8, which is why <code>x</code> and <code>y</code> are the same thing. Those bytes are shunted, unmodified, into the standard output by <code>std::cout &lt;&lt; x</code> and <code>std::cout &lt;&lt; y</code>, and when you view the web page (or when you look at the linux terminal), you see the character as you expected.</p>
+
+<p><code>std::wcout &lt;&lt; z</code> will print if you do two things:</p>
+
+<pre><code>std::ios::sync_with_stdio(false);
+std::wcout.imbue(std::locale("en_US.utf8"));
+</code></pre>
+
+<p>without unsynching from C, GNU libstdc++ goes through C IO streams, which can never print a wide char after printing a narrow char on the same stream. LLVM libc++ appears to work even synched, but of course still needs the imbue to tell the stream how to convert the wide chars to the bytes it sends into the standard output.</p>
+
+<p>To print <code>b</code> and <code>a</code>, you will have to convert them to wide or narrow; even with <code>wbuffer_convert</code> setting up a char32_t stream is a lot of work. It would look like this:</p>
+
+<pre><code>std::wstring_convert&lt;std::codecvt_utf8&lt;char32_t&gt;, char32_t&gt; conv32;
+std::cout &lt;&lt; conv32.to_bytes(a) &lt;&lt; '\n';
+</code></pre>
+
+<p>Putting it all together: <a href="http://coliru.stacked-crooked.com/a/a809c38e21cc1743" rel="nofollow">http://coliru.stacked-crooked.com/a/a809c38e21cc1743</a></p>

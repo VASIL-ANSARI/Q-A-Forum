@@ -1,0 +1,17 @@
+<p>The answer was found in an obscure sentence written in a seemingly unrelated piece of Amazon documentation:</p>
+
+<p><code>When you configure CloudFront to forward cookies to your origin [...] If-Modified-Since and If-None-Match conditional requests are not supported.</code></p>
+
+<p>Strange, but indeed the reality of the situation is far worse; It's not that forwarding cookies to your origin servers disables conditional requests, but rather that is disables them <em>sometimes</em> -- to the point where the HTTP result code (304 vs 200) is virtually random.</p>
+
+<p>It's important to note that you'll be bitten by this bizarre behavior <strong>even if you're not using cookies at all</strong>. It's still absolutely essential that the Forward Cookies drop-down be set to "None" as shown in the image below:</p>
+
+<p><img src="http://i.stack.imgur.com/9s0nz.png" alt="enter image description here"></p>
+
+<p>Switching the setting to "None" fixes the errant behavior described in my original post.</p>
+
+<p>This solution presents you with another problem though. You're telling CloudFront to totally strip out all cookies prior to forwarding the request to your origin. But your origin server might <em>need</em> those cookies. Further, if you're using the ELB (load balancer) as your origin, a critical cookie that the ELB depends upon to maintain sticky sessions will be totally dropped. Not good.</p>
+
+<p>The solution to the cookie-stripping problem will depend on how your site is organized. In my case, transmission of cookies (session-related or otherwise) is only necessary when posting AJAX data to <code>myDomain.com/ajax/</code>. Because all cookie-dependent URLs fall under the category of <code>ajax/*</code> , a new behavioral rule for that path had to be created and in that rule, and that rule only, the Forward Cookies drop-down is set to "All" instead of "None."</p>
+
+<p>So there it is. Hope this helps someone.</p>

@@ -1,0 +1,136 @@
+<p>The article you've linked is pretty outdated. For example <a href="http://pear.php.net/package/Services_JSON/" rel="nofollow"><code>Services_JSON</code></a> is <em>normally</em> not needed any longer.</p>
+
+<p>The stable PHP 5.4 version right now has <a href="http://php.net/json_encode" rel="nofollow"><code>json_encode()</code> function</a> and the <a href="http://php.net/class.jsonserializable" rel="nofollow"><code>JsonSerializable</code> interface</a> as well as <a href="http://php.net/iterator_to_array" rel="nofollow"><code>iterator_to_array</code></a>. Even if you're using the older PHP 5.3 version, the following example is pretty easy to adopt.</p>
+
+<p>So what you actually need is your own JSON encoding of a <code>SimpleXMLElement</code>.</p>
+
+<p>So first of all, let's just create "our own" Json encoder:</p>
+
+<pre><code>class XML2Json extends SimpleXMLElement
+{
+}
+</code></pre>
+
+<p>Wow. That was dead simple. Let's check that it works:</p>
+
+<pre><code>$converter = new XML2Json($bufferXml);
+
+echo json_encode($converter, JSON_PRETTY_PRINT), "\n";
+</code></pre>
+
+<p>And the result is already similiar to the result with <code>Services_JSON</code>:</p>
+
+<pre><code>{
+    "status": "OK",
+    "users": {
+        "user": [
+            {
+                "userName": "johndoe"
+            },
+            {
+                "userName": "johndoe1",
+                "fullName": "John Doe"
+            },
+            {
+                "userName": "johndoe2"
+            },
+            {
+                "userName": "johndoe3",
+                "fullName": "John Doe Mother"
+            },
+            {
+                "userName": "johndoe4"
+            }
+        ]
+    }
+}
+</code></pre>
+
+<p>But this is not fitting. As the output shows, the <em>searchResult</em> property is missing and also the users are not in a single array like you want them.</p>
+
+<p>So the <code>json_encode</code> needs to be user-defined. To do this in PHP, PHP has the <code>JsonSerializable</code> interface. It consists of a single method named <code>jsonSerialize()</code> and we will make it return a different value now if the name is <em>searchResult</em> to offer both it's name as property and the users as a flat array. Let's extend and implement the interface:</p>
+
+<pre><code>class XML2JsonSearchResult extends XML2Json implements JsonSerializable
+{
+
+    public function jsonSerialize()
+    {
+        $name = $this-&gt;getName();
+
+        if ($name !== 'searchResult') {
+            return $this;
+        }
+
+        $value          = (array)$this;
+        $value['users'] = iterator_to_array($value['users']-&gt;user, FALSE);
+
+        return [$name =&gt; $value];
+    }
+}
+</code></pre>
+
+<p>All elements that don't have the name <em>searchResult</em> will get their default JSON encoding by returning <code>$this</code>.</p>
+
+<p>The <em>searchResult</em> will be named and it's users are flattened by the <code>iterator_to_array()</code> function.</p>
+
+<p>And that is all you need to do. Again the usage-example, it works exactly the same, only this time the class-name differs:</p>
+
+<pre><code>$converter = new XML2JsonSearchResult($bufferXml);
+
+echo json_encode($converter, JSON_PRETTY_PRINT);
+</code></pre>
+
+<p>And the output now is like you want it:</p>
+
+<pre><code>{
+    "searchResult": {
+        "status": "OK",
+        "users": [
+            {
+                "userName": "johndoe"
+            },
+            {
+                "userName": "johndoe1",
+                "fullName": "John Doe"
+            },
+            {
+                "userName": "johndoe2"
+            },
+            {
+                "userName": "johndoe3",
+                "fullName": "John Doe Mother"
+            },
+            {
+                "userName": "johndoe4"
+            }
+        ]
+    }
+}
+</code></pre>
+
+<p>Hope this gives you a good example how to do it nowadays.</p>
+
+<p>The whole code-example at a glance (<a href="http://eval.in/32839" rel="nofollow">Online Demo</a>):</p>
+
+<pre><code>class XML2JsonSearchResult extends SimpleXMLElement implements JsonSerializable
+{
+
+    public function jsonSerialize()
+    {
+        $name = $this-&gt;getName();
+
+        if ($name !== 'searchResult') {
+            return $this;
+        }
+
+        $value          = (array)$this;
+        $value['users'] = iterator_to_array($value['users']-&gt;user, FALSE);
+
+        return [$name =&gt; $value];
+    }
+}
+
+$converter = new XML2JsonSearchResult($bufferXml);
+
+echo json_encode($converter, JSON_PRETTY_PRINT);
+</code></pre>

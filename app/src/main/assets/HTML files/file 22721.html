@@ -1,0 +1,35 @@
+<p>Your question doesn't provide enough information to get a complete answer. C++ as a language doesn't really have functions to work with folders, or files in that sense. That's because C++ is platform-agnostic which means that you can compile C++ code to run on Windows, MacOS, iOS, Android, Linux any many other devices that don't even have a file system.</p>
+
+<p>Of course, in your case you are probably referring to either Windows or Linux. And if that's the case then, depending on which one it is, you can use file-system functions to copy or move files in the file-system.</p>
+
+<p>For Windows, the Win32 API has the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa363851%28v=vs.85%29.aspx" rel="nofollow">CopyFile</a> and CopyFileEx function to copy files and the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa365239%28v=vs.85%29.aspx" rel="nofollow">MoveFile</a> and MoveFileEx functions to move or rename files.</p>
+
+<p>For Linux, you might use the <a href="http://linux.die.net/man/2/sendfile" rel="nofollow">sendfile</a> API function to copy a file using the kernel.</p>
+
+<p>I should point out that it is possible to write some platform agnostic code in C/C++ to copy the contents of a file to another file using the open/read/write functions(i.e. open the source file in read mode, open the target file in write mode, and then keep reading from the source and writing to the target until the end of source file is reached) but other file-system functions are more difficult, if not impossible to reproduce without platform-specific libraries.</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Since you specified that you want to do it in linux, here's how you might use the sendfile function:</p>
+
+<pre><code>int inputFileDesc;
+int outputFileDesc;
+struct stat statBuffer;
+off_t offset = 0;
+
+// open the source file, and get a file descriptor to identify it later (for closing and sendfile fn)
+inputFileDesc = open ("path_to_source_file", O_RDONLY);
+
+// this function will fill the statBuffer struct with info about the file, including the size in bytes
+fstat (inputFileDesc, &amp;statBuffer);
+
+// open the destination file and get a descriptor to identify it later (for closing and writing to it)
+outputFileDesc = open ("path_to_destination_file", O_WRONLY | O_CREAT, statBuffer.st_mode);
+
+// this is the API function that actually copies file data from source to dest;
+//   it takes as params the descriptors of the input and output files and an offset and length for the amount of data to copy over
+sendfile (outputFileDesc, inputFileDesc, &amp;offset, statBuffer.st_size);
+
+close (outputFileDesc);    // closes the output file (identified by descriptor) 
+close (inputFileDesc);     // closes the input file (identified by descriptor) 
+</code></pre>

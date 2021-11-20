@@ -1,0 +1,9 @@
+<p>Its not a problem with the shared memory value, its the variable on the queue object itself that disappears.</p>
+
+<p>Multiprocessing works differently on machines that implement the *nix forking model verses the Windows create-process model. On *nix, when you create a <code>multiprocessing</code> process, the parent process is forked and since the child has as copy-on-write view of the parent's memory space, all of the python objects (including your queue) are in the child space ready to be used.</p>
+
+<p>On Windows, there is no <code>fork</code>. A new process is created and the relevant parts of the parent process is pickled, sent to the child and unpickled. This only works for picklable objects so code that works in linux may fail in windows.</p>
+
+<p>If you have an object that isn't natively picklable, you can implement <code>__getstate__</code> and <code>__setstate__</code> methods that return a pickable subset of the object and rebuild the object from that state. That's been done with the <code>multiprocessing.Queue</code> object. It doesn't include your variable in <code>__getstate__</code> so the variable isn't included in the child object when its recreated.</p>
+
+<p>An easy solution is to put your data some place else. If that isn't viable, create your own subclass of <code>multiprocessing.Queue</code> and write your own <code>__getstate__</code> and <code>__setstate__</code> methods.</p>

@@ -1,0 +1,33 @@
+<p>Well it kind'a depends on what you want to do with the data.</p>
+
+<p>Your table structure is fine.</p>
+
+<p>If you want the same number of rows returned as current - i.e. 1 per affiliate per blogpost (assuming 1 per picture per blogpost?) then you'll need to package up the tags into a single column in the resultset. </p>
+
+<p>Alternatively you could simply manage the full resultset in code: </p>
+
+<p>For example you could have a BlogPost object which contained a collection of Tags - An ORM would handle this for you easily - alternatively use a datareader with a loop and iterate through building up the tag collection, moving onto the next record when the blogpostid changes.</p>
+
+<p>In SQL - you could write a UDF to perform the same function.</p>
+
+<pre><code>CREATE FUNCTION [dbo].[GetTagsByBlogPostId] (
+@BlogPostID int
+)
+RETURNS varchar(max)
+AS
+DECLARE @Tags @OUTPUT varchar(max)
+SELECT @Tags = COALESCE(@Tags + ', ', '') + Tag
+FROM BlogPostTags
+where BlogPostId = @BlogPostId
+
+RETURN @Tags END
+</code></pre>
+
+<p>Then in your SQL Statement above just append a call to the UDF to the SELECT statement:</p>
+
+<pre><code> select * from BlogPosts,BlogAffiliates, Blogs, BlogPostPictures, dbo.GetTagsByBlogPostId(BlogPosts.BlogPostId)
+  where BlogAffiliates.UserID = @UserID 
+  and BlogPosts.BlogID = BlogAffiliates.BlogID
+  and Blogs.BlogID = BlogAffiliates.BlogID and 
+  BlogPosts.BlogPostID = BlogPostPictures.BlogPostID
+</code></pre>

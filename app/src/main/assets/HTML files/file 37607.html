@@ -1,0 +1,34 @@
+<p>Try either wrapping the resulting string in another element, such as a <code>&lt;span&gt;</code>:</p>
+
+<pre><code>var result = urlText.replace(urlRegex, function(url) {
+    return '&lt;a href="' + url + '"&gt;' + url + '&lt;/a&gt;';
+});
+return '&lt;span&gt;' + result + '&lt;/span&gt;';
+</code></pre>
+
+<p>Or return DOM Nodes by <a href="http://api.jquery.com/jQuery.parseHTML/" rel="nofollow">parsing the string directly</a> (note: jQuery 1.8 or later):</p>
+
+<pre><code>var result = urlText.replace(urlRegex, function(url) {
+    return '&lt;a href="' + url + '"&gt;' + url + '&lt;/a&gt;';
+});
+return $.parseHTML(result);
+</code></pre>
+
+<hr>
+
+<p>The error you mentioned <a href="https://github.com/jquery/sizzle/blob/2.0.0/src/sizzle.js#L874-L876" rel="nofollow">is from Sizzle</a>, the selector engine that's typically behind <code>jQuery(selector)</code>.</p>
+
+<p>It suggests that the result from <code>getLocationLink()</code> is being passed to <code>jQuery()</code>, which is treating it <a href="http://api.jquery.com/jQuery/#jQuery1" rel="nofollow">as a <code>selector</code></a> rather than <a href="http://api.jquery.com/jQuery/#jQuery2" rel="nofollow">as <code>html</code></a>.</p>
+
+<pre><code>jQuery('test &lt;a href&gt;http://google.com&lt;/a&gt; test');
+// Syntax error, unrecognized expression: ...
+</code></pre>
+
+<p>Having the string start with <code>&lt;</code>, as with the <code>&lt;span&gt;</code>, will convince <code>jQuery()</code> it's markup. And, providing <a href="http://api.jquery.com/jQuery/#jQuery-elementArray" rel="nofollow">a collection of Nodes</a> will avoid the conditional parsing.</p>
+
+<pre><code>jQuery('&lt;span&gt;test &lt;a href&gt;http://google.com&lt;/a&gt; test&lt;/span&gt;');
+// [ &lt;span&gt;...&lt;/span&gt; ]
+
+jQuery(jQuery.parseHTML('test &lt;a href&gt;http://google.com&lt;/a&gt; test'));
+// [ "test ", &lt;a&gt;...&lt;/a&gt;, " test" ]
+</code></pre>

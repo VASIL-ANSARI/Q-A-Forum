@@ -1,0 +1,29 @@
+<p>TVPs are Table Variables which don't maintain statistics and hence report only have 1 row. There are two ways to improve statistics on TVPs:</p>
+
+<ol>
+<li><p>If you have no need to modify any of the values in the TVP or add columns to it to track operational data, then you can do a simple, statement-level <code>OPTION (RECOMPILE)</code> on any query that uses a table variable (TVP or locally created) and is doing more with that table variable than a simple SELECT (i.e. doing <code>INSERT INTO RealTable (columns) SELECT (columns) FROM @TVP;</code> does not need the statement-level recompile). Do the following test in SSMS to see this behavior in action:
+</p>
+
+<pre><code>DECLARE @TableVariable TABLE (Col1 INT NOT NULL);
+
+INSERT INTO @TableVariable (Col1)
+  SELECT so.[object_id]
+  FROM   [master].[sys].[objects] so;
+
+-- Control-M to turn on "Include Actual Execution Plan"
+
+SELECT * FROM @TableVariable; -- Estimated Number of Rows = 1 (incorrect)
+
+SELECT * FROM @TableVariable
+OPTION (RECOMPILE); -- Estimated Number of Rows = 91 (correct)
+
+SELECT * FROM @TableVariable; -- Estimated Number of Rows = 1 (back to incorrect)
+</code></pre></li>
+<li><p>Create a local temporary table (single <code>#</code>) and copy the TVP data to that. While this does duplicate the data in <code>tempdb</code>, the benefits are:</p>
+
+<ul>
+<li>better statistics for a temp table as opposed to table variable (i.e. no need for statement-level recompiles)</li>
+<li>ability to add columns</li>
+<li>ability to modify values</li>
+</ul></li>
+</ol>

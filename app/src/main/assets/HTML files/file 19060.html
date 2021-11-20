@@ -1,0 +1,47 @@
+<ol>
+<li><p>After looking through the table structure and query, I don't think
+there is a way to select a tree of a particular node without an
+additional sub-query (I may be wrong, but this is the only way I
+could get it to work while testing). To do this, I would suggest
+adding a sub-query into the <code>FROM</code> clause as if you're selecting
+from a 3rd-table. Then, add an extra <code>BETWEEN</code> condition in your
+<code>WHERE</code> clause to test it.</p>
+
+<p>Something like this:</p>
+
+<pre><code>SELECT
+    n.cat_ID, n.cat_name, n.cat_nicename, COUNT(*)-1 AS depth
+FROM
+    categories AS n,
+    categories AS p,
+    (SELECT lft, rgt FROM categories WHERE cat_nicename = 'mobile') AS q
+WHERE
+    n.lft BETWEEN p.lft AND p.rgt
+    AND p.lft BETWEEN q.lft AND q.rgt
+GROUP BY n.lft
+ORDER BY n.lft;
+</code></pre>
+
+<p>Using this, you would need to add all of the logic handling "which"
+node you want to get a tree for in the sub-query. The first two
+tables (<code>n</code> and <code>p</code>) are selected-from as normal. This is required
+to get the proper <code>depth</code> values. <em>Then</em>, it compares <code>p</code> and <code>q</code> -
+but <code>q</code> is already limited. So, once you have the proper <code>depth</code>
+values you then limit it to only the categories you want.</p></li>
+<li><p>To display all of the root categories only is far easier. Using your
+query, the definition of a "root category" is one that has <code>depth =
+0</code>. If you use MySQL's <a href="http://dev.mysql.com/doc/refman/5.0/en/select.html" rel="nofollow"><code>HAVING</code></a> clause, you can easily check it
+with <code>HAVING depth = 0</code>. Try the following:</p>
+
+<pre><code>SELECT
+    n.cat_ID, n.cat_name, n.cat_nicename, COUNT(*)-1 AS depth
+FROM
+    categories AS n,
+    categories AS p
+WHERE
+    n.lft BETWEEN p.lft AND p.rgt
+GROUP BY n.lft
+HAVING depth = 0
+ORDER BY n.lft;
+</code></pre></li>
+</ol>

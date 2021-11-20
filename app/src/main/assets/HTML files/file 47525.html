@@ -1,0 +1,33 @@
+<p><strong>Update:</strong> This solution, though <em>seemingly</em> correct, doesn't work as intended (it seemed it was at first though). For reasons best explained in <a href="http://stackoverflow.com/users/864651/nmott">nmott</a>'s <a href="http://stackoverflow.com/a/31932687/2184155">answer</a> below. Will leave it here for posterity.</p>
+
+<hr>
+
+<p>I was able to get this working using <code>container_commands</code> via the <code>.ebextensions</code> directory config files. Learn <a href="http://docs.aws.amazon.com/elasticbeanstalk/latest/dg/customize-containers-ec2.html#customize-containers-format-container_commands" rel="nofollow">more about container commands</a> here. And I quote ...</p>
+
+<blockquote>
+  <p>The commands in <code>container_commands</code> are processed in alphabetical
+  order by name. They run after the application and web server have been
+  set up and the application version file has been extracted, but before
+  the application version is deployed. They also have access to
+  environment variables such as your AWS security credentials.
+  Additionally, you can use leader_only. One instance is chosen to be
+  the leader in an Auto Scaling group. If the leader_only value is set
+  to true, the command runs only on the instance that is marked as the
+  leader.</p>
+</blockquote>
+
+<p>So, applying that knowledge ... the <code>container_commands.config</code> will be ...</p>
+
+<pre><code># .ebextensions/container_commands.config
+container_commands:
+  01_migrate_db:
+    command: docker exec `docker ps -l -q -f 'status=running'` rake db:migrate RAILS_ENV=production
+    leader_only: true
+    ignoreErrors: false
+  02_seed_db:
+    command: docker exec `docker ps -l -q -f 'status=running'` rake db:seed RAILS_ENV=production
+    leader_only: true
+    ignoreErrors: false
+</code></pre>
+
+<p>That runs the migrations first and then seeds the database. We use <code>docker exec [OPTIONS] CONTAINER_ID COMMAND [ARG...]</code> which runs the appended <code>COMMAND [ARG...]</code> in the context of the existing container (not the host). And we get <code>CONTAINER_ID</code> by running <code>docker ps -q</code>.</p>

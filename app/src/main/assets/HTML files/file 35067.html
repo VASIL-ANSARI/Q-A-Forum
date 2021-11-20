@@ -1,0 +1,83 @@
+<p>Not sure if it is the best way but this is how I solved it:
+<br><br>
+In my activity:</p>
+
+<pre><code>private MyService mService;
+final Messenger mMessenger = new Messenger(new IncomingHandler(this));
+
+@Override
+protected void onStart() {
+    super.onStart();
+    Intent intent = new Intent(this, MyService.class);
+    bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+}
+
+private ServiceConnection mConnection = new ServiceConnection() {
+
+    @Override
+    public void onServiceConnected(ComponentName className, IBinder service) {
+        LocalBinder binder = (LocalBinder) service;
+        mService = binder.getService();
+        mService.RegisterMessenger(mMessenger);
+        mBound = true;
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName arg0) {
+        mBound = false;
+    }
+};
+
+public static class IncomingHandler extends Handler {
+    private final WeakReference&lt;MyActivity&gt; activity; 
+
+    IncomingHandler(MyActivity activity) {
+        this.activity = new WeakReference&lt;MyActivity&gt;(activity);
+    }
+
+    @Override
+    public void handleMessage(Message msg) {
+        MyActivity dialog = activity.get();
+        Bundle data = msg.getData();
+
+        //TODO: update view here
+    }
+};
+</code></pre>
+
+<p><br>
+In my service:</p>
+
+<pre><code>private ArrayList&lt;Messenger&gt; messengers = new ArrayList&lt;Messenger&gt;();
+
+public class LocalBinder extends Binder {
+    public MyService getService() {
+        return MyService.this;
+    }
+}
+
+public void RegisterMessenger(Messenger messenger)
+{       
+    messengers.add(messenger);
+}
+
+public class MyReceiver extends BroadcastReceiver{
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        for (Messenger messenger : messengers)
+        {           
+            Message m = new Message();
+            Bundle data = new Bundle();
+            //TODO: add data to the message here
+
+            messenger.send(m);
+        }
+    }
+}
+</code></pre>
+
+<p>There are some parts missing (unregistering messenger, unbinding service) but this should be the main part.</p>
+
+<p>If you have problems registering the BroadcastReceiver, this post can help: <a href="http://stackoverflow.com/a/10851904/3047078">http://stackoverflow.com/a/10851904/3047078</a></p>
+
+<p>Maybe you can even do it without the service by just creating a BroadcastReceiver as inner class of your activity.</p>

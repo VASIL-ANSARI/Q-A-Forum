@@ -1,0 +1,35 @@
+<p>I'm going to take a wild stab and guess that this is what you are after. They key feature is correlating the subselects with the update (the <code>carr</code> in the subselects refer to the table in the outer statement).</p>
+
+<pre><code>Update
+    argus_app.cmn_reg_reports carr
+set 
+    carr.date_submitted = (
+        Select
+            To_Date(m.AcknowledgmentHeader.MessageDate, 'YYYYMMDDHH24MISS') Messagedate 
+        from 
+            esm_owner.Messages m
+                inner join
+            esm_owner.SafetyReport sr
+                on m.msg_id = sr.msg_id
+        where
+            carr.esm_report_id = sr.report_id And
+            m.AcknowledgmentHeader.MessageSenderIdentifier = 'PMDA'
+        )
+Where
+    Exists (
+        Select
+            'x'
+        From
+            esm_owner.Messages m
+                Inner Join
+            esm_owner.SafetyReport sr
+                on m.msg_id = sr.msg_id
+        Where
+            carr.esm_report_id = sr.report_id and
+            m.AcknowledgmentHeader.MessageSenderIdentifier = 'PMDA' 
+    )
+</code></pre>
+
+<p>Here's an example showing the basic principle works:</p>
+
+<p><strong><kbd><a href="http://sqlfiddle.com/#!4/e373e/1" rel="nofollow">Example Fiddle</a></kbd></strong></p>

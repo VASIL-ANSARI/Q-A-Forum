@@ -1,0 +1,39 @@
+<p>The <a href="https://docs.python.org/3/library/functions.html#globals" rel="nofollow"><code>globals()</code> function</a> returns the global namespace for the <em>module it is used in</em>. You are seeing the modules that are imported in your <code>imports</code> module, and there are 0 such imports. You can't use this function if you wanted to access the globals of the code that called your function.</p>
+
+<p>You'd have to use the globals of the <em>calling frame</em> instead; in CPython you can do this with the <a href="https://docs.python.org/3/library/sys.html#sys._getframe" rel="nofollow"><code>sys._getframe()</code> function</a>, which returns a frame object; the <code>f_globals</code> attribute on that frame is the global namespace of the caller of your function:</p>
+
+<pre><code>caller_frame = sys._getframe(1)
+for name, val in caller_frame.f_globals.items():
+</code></pre>
+
+<p>Alternatively, have the caller pass in a namespace; that way you can list the modules used in <em>any</em> module:</p>
+
+<pre><code>def imports(namespace=None):
+    import types, sys
+
+    if namespace is None:
+        # default: caller globals
+        namespace = sys._getframe(1).f_globals
+
+    modules = []
+
+    for name, val in namespace.items():
+        if isinstance(val, types.ModuleType):
+            module_name = val.__name__
+            modules.append(module_name)
+
+    return modules
+</code></pre>
+
+<p>The above version still uses <code>sys._getframe(1)</code> if you call the function without arguments. But you could use it on any dictionary now:</p>
+
+<pre><code>import string
+print(imports(vars(string)))
+</code></pre>
+
+<p>This uses the <a href="https://docs.python.org/3/library/functions.html#vars" rel="nofollow"><code>vars()</code> function</a> to grab the namespace dictionary of the <code>string</code> module, for example. This produces:</p>
+
+<pre><code>&gt;&gt;&gt; import string
+&gt;&gt;&gt; imports(vars(string))
+['re', '_string']
+</code></pre>

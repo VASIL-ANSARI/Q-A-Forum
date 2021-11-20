@@ -1,0 +1,63 @@
+<p>Datastore is not a good storage option for this use case, as the maximum entity size is limited to <a href="https://cloud.google.com/appengine/docs/python/datastore/#Python_Quotas_and_limits" rel="nofollow">1mb</a>. GCS is a recommended option for this use case. Also, if youâre not very comfortable with Java, you can use Python for your GAE backend. </p>
+
+<p>Regarding your question on how to move recordings from Android to GAE GCS / Datastore, you can use one of these options:</p>
+
+<ol>
+<li>Use <a href="https://cloud.google.com/storage/docs/json_api/v1/json-api-examples" rel="nofollow">GCS</a> JSON API via Google APIs Client library to upload directly from Android app. Thats an easy option and there are plenty of samples available. This library can be used for <a href="https://cloud.google.com/datastore/docs/apis/v1beta2/" rel="nofollow">Datastore</a> too if you insist on using it.</li>
+<li>Use <a href="https://cloud.google.com/appengine/docs/python/endpoints/" rel="nofollow">Cloud Endpoints</a> as a proxy. You can submit a file to an endpoint handler, endpoint handler saves the file in GCS and returns a response. As youâre not concerned with security, hereâs an example that doesnât use OAuth:</li>
+</ol>
+
+<blockquote>
+<pre><code>import cloudstorage as gcs
+import endpoints
+import os
+
+from google.appengine.api import app_identity
+from protorpc import messages
+from protorpc import message_types
+from protorpc import remote
+
+class Base64File(messages.Message):
+    file = messages.BytesField(1, required=True, variant=messages.Variant.BYTES)
+
+class ResponseMSG(messages.Message):
+    message = messages.StringField(1)
+
+FILE_RESOURCE = endpoints.ResourceContainer(Base64File,
+                                            file_name=messages.StringField(2,required=True),
+                                            content_type=messages.StringField(3,required=True))
+
+@endpoints.api(name='gcsuploadapi', version='v0.1',
+                                      description='Upload a file to GCS.')
+class GCSUploadAPI(remote.Service):
+    @endpoints.method(FILE_RESOURCE, ResponseMSG,
+                        path='upload/{file_name}', http_method='POST',
+                        name='upload.file')
+    def upload_file(self, request):
+        # get app default bucket and prepare filename (project should have billing enabled)
+        bucket_name = os.environ.get('BUCKET_NAME',
+                                 app_identity.get_default_gcs_bucket_name())
+        bucket = '/' + bucket_name
+        filename = bucket + '/' + request.file_name
+
+        # create file (request.content_type contains MIME type submitted)
+        write_retry_params = gcs.RetryParams(backoff_factor=1.1)
+        gcs_file = gcs.open(filename, 'w',
+                            content_type=request.content_type,
+                            retry_params=write_retry_params)
+        gcs_file.write(request.file)
+        gcs_file.close()
+
+        return ResponseMSG(message="done")
+
+app = endpoints.api_server([GCSUploadAPI])
+</code></pre>
+</blockquote>
+
+<p>You donât have to generate client libraries and can submit directly via HTTP POST. Endpoints only support HTTPS connections and requests are a subject to same restrictions as other <a href="https://cloud.google.com/appengine/docs/python/requests#Python_Quotas_and_limits" rel="nofollow">GAE requests</a>. The main concern is the request size of 32 megabytes. Taking into account the binary data submitted to an endpoint should be base64 encoded, it leaves you with an approximate limit of 23-24mb of binary data. Another limit is a 60 second deadline for a request, it can be resolved if you go with a <a href="https://cloud.google.com/appengine/docs/python/modules/" rel="nofollow">modular approach</a> for your GAE app and use a backend instance for your endpoint.</p>
+
+<p>Thatâs probably the hardest option to implement, but the example I provided should be a good start.</p>
+
+<ol start="3">
+<li>Use Cloud Endpoints to generate a Blobstore API upload url. Blobstore API allows <a href="https://cloud.google.com/appengine/docs/python/blobstore/#Python_Using_the_Blobstore_API_with_Google_Cloud_Storage" rel="nofollow">uploading to GCS</a> instead of Blobstore. Thats a rather easy option too.</li>
+</ol>

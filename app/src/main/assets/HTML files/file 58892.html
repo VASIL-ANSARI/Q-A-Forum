@@ -1,0 +1,37 @@
+<p>You <em>can</em> do this by writing your own decorator:</p>
+
+<pre><code>import functools
+
+def silent_exec(default=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs):
+            except Exception:
+                return default
+        return wrapper
+    return decorator
+</code></pre>
+
+<p>With that said, I'd be <em>very</em> wary of using this.  You should <em>very rarely</em> be catching <em>all</em> exceptions (as we've done here).  Normally you it's better to specify a tuple of exceptions that you actually expect and know how to handle...</p>
+
+<pre><code>import functools
+
+def silent_exec(exceptions, default=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs):
+            except exceptions:
+                return default
+        return wrapper
+    return decorator
+
+@silent_exec((IndexError, KeyError), default=None)
+def get_property_b():
+  self.data.get("field_2")[0].get("b")
+</code></pre>
+
+<p>This way, you don't end up catching/silencing <em>programming</em> errors -- those will still get raised, you can look at them in the logs or wherever they get reported and you can go back in and fix them.</p>

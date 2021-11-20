@@ -1,0 +1,23 @@
+<p>The issue might be you are querying the dataset and accessing the result object (under 'this works fine") and reading it all in a loop and then immediately trying to do another loop again with upserts on the same result object. The error is telling you that the resource has been closed, basically once you read it the connection is closed automatically (as a feature!). (<a href="http://stackoverflow.com/questions/14375666/sqlalchemy-prevent-automatic-closing/14388356#14388356">see this answer</a> about 'automatic closing' for more on the why and ways to get around it.)</p>
+
+<p>Given that result resources tend to get closed, try fetching the results again at the beginning of your upsert loop:</p>
+
+<pre><code>i = 1 # 'i' here exemplifies data that I'll add through my scraper.
+testdata = db['test'].all()
+for row in testdata:
+    data = {'TestID': i}
+    db['test'].upsert(data, ['TestID'])
+    print("Upserted within loop (i = " + str(i) + ")")
+    i += 1
+</code></pre>
+
+<p><strong>Edit</strong>: See comment, the above code would change the testdata inside the loop and thus still gives the same error, so a way to get around this is to read the data into an array first and then loop through that array to do the updates. Something like:</p>
+
+<pre><code>i = 1 # 'i' here exemplifies data that I'll add through my scraper.
+testdata = [row for row in db['test'].all()]
+for row in testdata:
+    data = {'TestID': i}
+    db['test'].upsert(data, ['TestID'])
+    print("Upserted within loop (i = " + str(i) + ")")
+    i += 1
+</code></pre>

@@ -1,0 +1,25 @@
+<p>This is a bug. I have opened <a href="https://github.com/openstacknetsdk/openstack.net/issues/528" rel="nofollow">issue 528</a> but in the meantime here is a workaround.</p>
+
+<pre><code>var cloudIdentity = new CloudIdentity
+{
+    Username = "{username}",
+    APIKey = "{api-key}"
+};
+
+var cloudIdentityProvider = new CloudIdentityProvider(cloudIdentity);
+var userAccess = cloudIdentityProvider.Authenticate(cloudIdentity);
+
+var request = new HttpRequestMessage(HttpMethod.Post, string.Format("https://identity.api.rackspacecloud.com/v2.0/users/{0}", userAccess.User.Id));
+request.Headers.Add("X-Auth-Token", userAccess.Token.Id);
+
+var requestBody = JObject.FromObject(new { user = new { username = userAccess.User.Name } });
+((JObject)requestBody["user"]).Add("OS-KSADM:password", "{new-password}");
+request.Content = new StringContent(requestBody.ToString(), Encoding.UTF8, "application/json");
+
+using (var client = new HttpClient())
+{
+    var response = client.SendAsync(request).Result;
+}
+</code></pre>
+
+<p>The cloud identity used must be an admin if you need to change another user's password, otherwise non-admins may only change their own password. </p>

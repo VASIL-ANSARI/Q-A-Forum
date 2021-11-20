@@ -1,0 +1,60 @@
+<p>There is a bit of tweaking needed on top of the post you provided.</p>
+
+<p>General idea to solve your issue is this one:</p>
+
+<ol>
+<li>We create a VivaGraph svg graphics (which will create an svg element in the dom)</li>
+<li>Into this svg graphic we create only once a clip path with <strong>relative coordinates</strong></li>
+<li>When we create a node we refer to the clip path</li>
+</ol>
+
+<p>Code is:</p>
+
+<pre><code>        var graph = Viva.Graph.graph();
+
+        graph.addNode('a', { img : 'a.jpg' });
+        graph.addNode('b', { img : 'b.jpg' });
+
+        graph.addLink('a', 'b');
+
+        var graphics = Viva.Graph.View.svgGraphics();
+
+        // Create the clipPath node
+        var clipPath = Viva.Graph.svg('clipPath').attr('id', 'clipCircle').attr('clipPathUnits', 'objectBoundingBox');
+        var circle = Viva.Graph.svg('circle').attr('r', .5).attr('cx', .5).attr('cy', .5);
+        clipPath.appendChild(circle);
+
+        // Add the clipPath to the svg root
+        graphics.getSvgRoot().appendChild(clipPath);
+
+        graphics.node(function(node) {
+               return Viva.Graph.svg('image')
+                     .attr('width', 30)
+                     .attr('height', 30)
+                     // I refer to the same clip path for each node
+                     .attr('clip-path', 'url(#clipCircle)')
+                     .link(node.data.img);
+            })
+            .placeNode(function(nodeUI, pos){
+                nodeUI.attr('x', pos.x - 15).attr('y', pos.y - 15);
+            });
+
+        var renderer = Viva.Graph.View.renderer(graph, { graphics : graphics });
+        renderer.run();
+</code></pre>
+
+<p>The result in the dom will be like this: </p>
+
+<pre><code>&lt;svg&gt;
+    &lt;g buffered-rendering="dynamic" transform="matrix(1, 0, 0,1,720,230.5)"&gt;
+        &lt;line stroke="#999" x1="-77.49251279562495" y1="-44.795726056131116" x2="6.447213894549255" y2="-56.29464520347651"&gt;&lt;/line&gt;
+        &lt;image width="30" height="30" clip-path="url(#clipCircle)" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="a.jpg" x="-92.49251279562495" y="-59.795726056131116"&gt;&lt;/image&gt;
+        &lt;image width="30" height="30" clip-path="url(#clipCircle)" xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="b.jpg" x="-8.552786105450746" y="-71.2946452034765"&gt;&lt;/image&gt;
+    &lt;/g&gt;
+    &lt;clipPath id="clipCircle" clipPathUnits="objectBoundingBox"&gt;
+        &lt;circle r="0.5" cx="0.5" cy="0.5"&gt;&lt;/circle&gt;
+    &lt;/clipPath&gt;
+&lt;/svg&gt;
+</code></pre>
+
+<p>Notice the clipPathUnits="objectBoundingBox", since it's the main trick for this solution.</p>

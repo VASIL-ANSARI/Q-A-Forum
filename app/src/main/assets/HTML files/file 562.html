@@ -1,0 +1,267 @@
+<p>I had the same banging-my-head-against-the-wall experience you did, and ended up writing a custom authentication provider that does an LDAP query against the Active Directory server.</p>
+
+<p>So my security-related beans are:</p>
+
+<pre><code>&lt;beans:bean id="contextSource"
+	class="org.springframework.security.ldap.DefaultSpringSecurityContextSource"&gt;
+	&lt;beans:constructor-arg value="ldap://hostname.queso.com:389/" /&gt;
+&lt;/beans:bean&gt;
+
+&lt;beans:bean id="ldapAuthenticationProvider"
+	class="org.queso.ad.service.authentication.LdapAuthenticationProvider"&gt;
+	&lt;beans:property name="authenticator" ref="ldapAuthenticator" /&gt;
+	&lt;custom-authentication-provider /&gt;
+&lt;/beans:bean&gt;
+
+&lt;beans:bean id="ldapAuthenticator"
+	class="org.queso.ad.service.authentication.LdapAuthenticatorImpl"&gt;
+	&lt;beans:property name="contextFactory" ref="contextSource" /&gt;
+	&lt;beans:property name="principalPrefix" value="QUESO\" /&gt;
+&lt;/beans:bean&gt;
+</code></pre>
+
+<p>Then the LdapAuthenticationProvider class:</p>
+
+<pre><code>/**
+ * Custom Spring Security authentication provider which tries to bind to an LDAP server with
+ * the passed-in credentials; of note, when used with the custom {@link LdapAuthenticatorImpl},
+ * does &lt;strong&gt;not&lt;/strong&gt; require an LDAP username and password for initial binding.
+ * 
+ * @author Jason
+ */
+public class LdapAuthenticationProvider implements AuthenticationProvider {
+
+	private LdapAuthenticator authenticator;
+
+	public Authentication authenticate(Authentication auth) throws AuthenticationException {
+
+		// Authenticate, using the passed-in credentials.
+		DirContextOperations authAdapter = authenticator.authenticate(auth);
+
+		// Creating an LdapAuthenticationToken (rather than using the existing Authentication
+		// object) allows us to add the already-created LDAP context for our app to use later.
+		LdapAuthenticationToken ldapAuth = new LdapAuthenticationToken(auth, "ROLE_USER");
+		InitialLdapContext ldapContext = (InitialLdapContext) authAdapter
+				.getObjectAttribute("ldapContext");
+		if (ldapContext != null) {
+			ldapAuth.setContext(ldapContext);
+		}
+
+		return ldapAuth;
+	}
+
+	public boolean supports(Class clazz) {
+		return (UsernamePasswordAuthenticationToken.class.isAssignableFrom(clazz));
+	}
+
+	public LdapAuthenticator getAuthenticator() {
+		return authenticator;
+	}
+
+	public void setAuthenticator(LdapAuthenticator authenticator) {
+		this.authenticator = authenticator;
+	}
+
+}
+</code></pre>
+
+<p>Then the LdapAuthenticatorImpl class:</p>
+
+<pre><code>/**
+ * Custom Spring Security LDAP authenticator which tries to bind to an LDAP server using the
+ * passed-in credentials; does &lt;strong&gt;not&lt;/strong&gt; require "master" credentials for an
+ * initial bind prior to searching for the passed-in username.
+ * 
+ * @author Jason
+ */
+public class LdapAuthenticatorImpl implements LdapAuthenticator {
+
+	private DefaultSpringSecurityContextSource contextFactory;
+	private String principalPrefix = "";
+
+	public DirContextOperations authenticate(Authentication authentication) {
+
+		// Grab the username and password out of the authentication object.
+		String principal = principalPrefix + authentication.getName();
+		String password = "";
+		if (authentication.getCredentials() != null) {
+			password = authentication.getCredentials().toString();
+		}
+
+		// If we have a valid username and password, try to authenticate.
+		if (!("".equals(principal.trim())) &amp;&amp; !("".equals(password.trim()))) {
+			InitialLdapContext ldapContext = (InitialLdapContext) contextFactory
+					.getReadWriteContext(principal, password);
+
+			// We need to pass the context back out, so that the auth provider can add it to the
+			// Authentication object.
+			DirContextOperations authAdapter = new DirContextAdapter();
+			authAdapter.addAttributeValue("ldapContext", ldapContext);
+
+			return authAdapter;
+		} else {
+			throw new BadCredentialsException("Blank username and/or password!");
+		}
+	}
+
+	/**
+	 * Since the InitialLdapContext that's stored as a property of an LdapAuthenticationToken is
+	 * transient (because it isn't Serializable), we need some way to recreate the
+	 * InitialLdapContext if it's null (e.g., if the LdapAuthenticationToken has been serialized
+	 * and deserialized). This is that mechanism.
+	 * 
+	 * @param authenticator
+	 *          the LdapAuthenticator instance from your application's context
+	 * @param auth
+	 *          the LdapAuthenticationToken in which to recreate the InitialLdapContext
+	 * @return
+	 */
+	static public InitialLdapContext recreateLdapContext(LdapAuthenticator authenticator,
+			LdapAuthenticationToken auth) {
+		DirContextOperations authAdapter = authenticator.authenticate(auth);
+		InitialLdapContext context = (InitialLdapContext) authAdapter
+				.getObjectAttribute("ldapContext");
+		auth.setContext(context);
+		return context;
+	}
+
+	public DefaultSpringSecurityContextSource getContextFactory() {
+		return contextFactory;
+	}
+
+	/**
+	 * Set the context factory to use for generating a new LDAP context.
+	 * 
+	 * @param contextFactory
+	 */
+	public void setContextFactory(DefaultSpringSecurityContextSource contextFactory) {
+		this.contextFactory = contextFactory;
+	}
+
+	public String getPrincipalPrefix() {
+		return principalPrefix;
+	}
+
+	/**
+	 * Set the string to be prepended to all principal names prior to attempting authentication
+	 * against the LDAP server.  (For example, if the Active Directory wants the domain-name-plus
+	 * backslash prepended, use this.)
+	 * 
+	 * @param principalPrefix
+	 */
+	public void setPrincipalPrefix(String principalPrefix) {
+		if (principalPrefix != null) {
+			this.principalPrefix = principalPrefix;
+		} else {
+			this.principalPrefix = "";
+		}
+	}
+
+}
+</code></pre>
+
+<p>And finally, the LdapAuthenticationToken class:</p>
+
+<pre><code>/**
+ * &lt;p&gt;
+ * Authentication token to use when an app needs further access to the LDAP context used to
+ * authenticate the user.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * When this is the Authentication object stored in the Spring Security context, an application
+ * can retrieve the current LDAP context thusly:
+ * &lt;/p&gt;
+ * 
+ * &lt;pre&gt;
+ * LdapAuthenticationToken ldapAuth = (LdapAuthenticationToken) SecurityContextHolder
+ * 		.getContext().getAuthentication();
+ * InitialLdapContext ldapContext = ldapAuth.getContext();
+ * &lt;/pre&gt;
+ * 
+ * @author Jason
+ * 
+ */
+public class LdapAuthenticationToken extends AbstractAuthenticationToken {
+
+	private static final long serialVersionUID = -5040340622950665401L;
+
+	private Authentication auth;
+	transient private InitialLdapContext context;
+	private List&lt;GrantedAuthority&gt; authorities = new ArrayList&lt;GrantedAuthority&gt;();
+
+	/**
+	 * Construct a new LdapAuthenticationToken, using an existing Authentication object and
+	 * granting all users a default authority.
+	 * 
+	 * @param auth
+	 * @param defaultAuthority
+	 */
+	public LdapAuthenticationToken(Authentication auth, GrantedAuthority defaultAuthority) {
+		this.auth = auth;
+		if (auth.getAuthorities() != null) {
+			this.authorities.addAll(Arrays.asList(auth.getAuthorities()));
+		}
+		if (defaultAuthority != null) {
+			this.authorities.add(defaultAuthority);
+		}
+		super.setAuthenticated(true);
+	}
+
+	/**
+	 * Construct a new LdapAuthenticationToken, using an existing Authentication object and
+	 * granting all users a default authority.
+	 * 
+	 * @param auth
+	 * @param defaultAuthority
+	 */
+	public LdapAuthenticationToken(Authentication auth, String defaultAuthority) {
+		this(auth, new GrantedAuthorityImpl(defaultAuthority));
+	}
+
+	public GrantedAuthority[] getAuthorities() {
+		GrantedAuthority[] authoritiesArray = this.authorities.toArray(new GrantedAuthority[0]);
+		return authoritiesArray;
+	}
+
+	public void addAuthority(GrantedAuthority authority) {
+		this.authorities.add(authority);
+	}
+
+	public Object getCredentials() {
+		return auth.getCredentials();
+	}
+
+	public Object getPrincipal() {
+		return auth.getPrincipal();
+	}
+
+	/**
+	 * Retrieve the LDAP context attached to this user's authentication object.
+	 * 
+	 * @return the LDAP context
+	 */
+	public InitialLdapContext getContext() {
+		return context;
+	}
+
+	/**
+	 * Attach an LDAP context to this user's authentication object.
+	 * 
+	 * @param context
+	 *          the LDAP context
+	 */
+	public void setContext(InitialLdapContext context) {
+		this.context = context;
+	}
+
+}
+</code></pre>
+
+<p>You'll notice that there are a few bits in there that you might not need.</p>
+
+<p>For example, my app needed to retain the successfully-logged-in LDAP context for further use by the user once logged in -- the app's purpose is to let users log in via their AD credentials and then perform further AD-related functions.  So because of that, I have a custom authentication token, LdapAuthenticationToken, that I pass around (rather than Spring's default Authentication token) which allows me to attach the LDAP context.  In LdapAuthenticationProvider.authenticate(), I create that token and pass it back out; in LdapAuthenticatorImpl.authenticate(), I attach the logged-in context to the return object so that it can be added to the user's Spring authentication object.</p>
+
+<p>Also, in LdapAuthenticationProvider.authenticate(), I assign all logged-in users the ROLE_USER role -- that's what lets me then test for that role in my intercept-url elements.  You'll want to make this match whatever role you want to test for, or even assign roles based on Active Directory groups or whatever.</p>
+
+<p>Finally, and a corollary to that, the way I implemented LdapAuthenticationProvider.authenticate() gives all users with valid AD accounts the same ROLE_USER role.  Obviously, in that method, you can perform further tests on the user (i.e., is the user in a specific AD group?) and assign roles that way, or even test for some condition before even granting the user access at <em>all</em>.</p>

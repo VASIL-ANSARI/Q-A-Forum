@@ -1,0 +1,49 @@
+<p>This problem occurs for several reasons.</p>
+
+<p>Firstly, Any code placed within <code>$(document).ready();</code> and loaded on the ajax called page (contained page) will not be executed after it is loaded.</p>
+
+<p>Secondly, any references to external scripts (<code>&lt;script src&gt;</code>) aren't guarantied to load before inline scripts. In the case of Yii2 these inline scripts would be registered with <code>registerJs()</code></p>
+
+<p>Getting Pjax to play nice with complex script dependent pages to load is <strong>not</strong> trivial.</p>
+
+<p>A few things to solve your issues:</p>
+
+<p><strong>1)</strong> Inline scripts loaded with <code>registerJs()</code> and set with a position of <code>POS_READY</code> (default?) will be contained within a <code>$(document).ready()</code> if the view is rendered via <code>render()</code>.</p>
+
+<p>Thus it is important to render via <code>renderAjax()</code>. This will ensure that the inline scripts will run.</p>
+
+<p>Sometimes (most times) you will need to use <code>render()</code> when statically loaded and <code>renderAjax()</code> when pjax loads a page. In your instance this is required in order to place the Pjax widget in the layout. You can use the following code for these situations:</p>
+
+<pre><code>if(Yii::$app-&gt;request-&gt;getHeaders()-&gt;has('X-PJAX'))
+{
+    return $this-&gt;renderAjax('myview');
+}
+else
+{
+    return $this-&gt;render('myview');
+}
+</code></pre>
+
+<p><strong>2)</strong> When writing external scripts that you know will load within the context of a pjax call. Use:</p>
+
+<pre><code>$(document).on('ready pjax:success', function(){
+    // ...
+});
+</code></pre>
+
+<p>This will load the script correctly. But keep in mind that it will reload/rebind the script every time a Pjax call succeeds. That might not be desired unfortunately.</p>
+
+<p>Also keep in mind that the <code>pjax:success</code> event does not necessarily fire after the external scripts from the contained page are loaded. See 3) </p>
+
+<p><strong>3)</strong> To solve script order issues you will need to remove the following line from the pjax.js script: </p>
+
+<pre><code>obj.scripts = findAll(obj.contents, 'script[src]').remove() 
+</code></pre>
+
+<p>This will however create issues with browsers that are set to disable <code>eval()</code> (hence why the line exists in the first place)</p>
+
+<p>Pjax will eventualy have this sorted. You can keep track of the progress <a href="https://github.com/defunkt/jquery-pjax/issues/331" rel="nofollow">here</a></p>
+
+<p>If anything is unclear let me know and I'll rephrase.</p>
+
+<p><strong>UPDATE:</strong> Yii 2.0.7 has introduced changes. One of which is updating the <code>bower\yii2-pjax</code>to <code>2.0.6</code>. This makes point <strong>3)</strong> no longer necessary and makes point <strong>2)</strong> less important, although it's still a good thing to know.</p>

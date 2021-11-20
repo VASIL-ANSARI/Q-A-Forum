@@ -1,0 +1,51 @@
+<p>You can't manipulate <code>Fragment</code>s inside a <code>BroadCastReceiver</code>'s context. Essentially broadcast receivers are run inside application context and in which you can't access UI stuff.</p>
+
+<p>If you would like to start an Activity once that broadcast is fired, you would need the following code:</p>
+
+<pre><code>Intent intent = new Intent(context, MyActivity.class);
+intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+context.startActivity(intent);
+</code></pre>
+
+<p><strong>Note:</strong> Accessing to UI (including Fragments) must be done in an activity context.</p>
+
+<hr>
+
+<p><strong>Update #1</strong></p>
+
+<blockquote>
+  <p>It seems that the BroadcastReceiver gets called everyday at around 2pm, not only on Tuesdays at 2pm, I want the app to update once a week. Is it maybe because I call my setAlarm() method on my UpcomingFragment's onCreate?</p>
+</blockquote>
+
+<p>I think I have a better approach than yours. </p>
+
+<ul>
+<li><p>Getting current time and setting its day of week to Tuesday may result in <a href="http://stackoverflow.com/q/1319473/1841194">weird behaviors</a>.</p></li>
+<li><p>Using a <a href="http://stackoverflow.com/q/19433001/1841194">boot completed broadcast receiver to set the alarm</a> may be better.</p></li>
+</ul>
+
+<p>For the former, your scheduling codes should set the alarm to the nearest coming Tuesday on 2 PM. For this, <a href="http://stackoverflow.com/questions/3463756/is-there-a-good-way-to-get-the-date-of-the-coming-wednesday">this answer</a>  may be helpful.</p>
+
+<p>For the latter, first, add the following permission to your manifest file.</p>
+
+<pre><code>&lt;uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /&gt;
+</code></pre>
+
+<p>Then, define another broadcast receiver and declare it to the manifest file.</p>
+
+<pre><code>&lt;receiver android:name="your.package.name.BootCompletedReceiver"&gt;
+    &lt;intent-filter&gt;
+        &lt;action android:name="android.intent.action.BOOT_COMPLETED"/&gt;
+    &lt;/intent-filter&gt;
+&lt;/receiver&gt;
+</code></pre>
+
+<p>In your newly created broadcast receiver add this code.</p>
+
+<pre><code>@Override
+public void onReceive(Context context, Intent intent) {
+    // Set the alarm to coming Tuesday on 2 PM
+}
+</code></pre>
+
+<p>This ensures your app to get updated on every Tuesday on 2 PM in all circumstances. </p>

@@ -1,0 +1,59 @@
+<p>Finally I got it. I made an <code>ArrayAdapter</code> extension, which has an internal <code>Filter</code> extension, and overriding <code>performFiltering(CharSequence)</code> and <code>publishResults(CharSequence, FilterResults)</code> I was able to implement the behavior I needed (basically compare two <code>String</code>s using <code>contains()</code> instead of default <code>startsWith()</code>).</p>
+
+<p>The code would be something like this, hope it may help someone.</p>
+
+<pre><code>public class SubstringFilterArrayAdapter&lt;T&gt; extends ArrayAdapter&lt;T&gt; implements Filterable {
+  // Needed data structures
+  ...
+  final List&lt;T&gt; objects;
+  final CustomFilter myfilter = new CustomFilter();
+  ...
+
+  public SubstringFilterArrayAdapter(final Context context_, final int tvResId_, final List&lt;T&gt; objects_) {
+    objects = objects_;
+    ...
+  }
+
+  @Override
+  public Filter getFilter() {
+    ...
+  }
+
+  private class CustomFilter extends Filter {
+    @Override
+    protected FilterResults performFiltering(final CharSequence prefix) {
+      final FilterResults results = new FilterResults();
+      final ArrayList&lt;T&gt; matched = new ArrayList&lt;T&gt;();
+
+
+      // Put in matched the results that match the prefix using your own implementation
+      ...
+
+      results.values = matched;
+      results.count = matched.size();
+
+      return results;
+    }
+
+    @Override
+    protected void publishResults(final CharSequence constraint, final FilterResults results) {
+      objects = (List&lt;T&gt;) results.values;
+
+      if (results.count &gt; 0)
+        notifyDataSetChanged();
+      else
+        notifyDataSetInvalidated();
+    }
+  }
+
+  @Override
+  public int getCount() {
+    return objects.size();
+  }
+
+  @Override
+  public T getItem(int position) {
+    return objects.get(position);
+  }
+}
+</code></pre>

@@ -1,0 +1,166 @@
+<p>For what it's worth, this is the regex that you're looking for:</p>
+
+<p><strong>Raw Match Pattern:</strong></p>
+
+<pre><code>&lt;a ((?:(?!href).)*?)href=[\"\']https:\/\/((?:(?!my-domain.de).)*?)[\"\'](.*?)&gt;(.*?)&lt;\/a&gt;
+</code></pre>
+
+<p><strong>Raw Replace Pattern:</strong></p>
+
+<pre><code>&lt;a $1href="http://$2"$3&gt;$4&lt;/a&gt;
+</code></pre>
+
+<p><strong>The PHP code is:</strong></p>
+
+<pre><code>$content = preg_replace('/&lt;a ((?:(?!href).)*?)href=[\"\']https:\/\/((?:(?!my-domain.de).)*?)[\"\'](.*?)&gt;(.*?)&lt;\/a&gt;/i','&lt;a $1href="http://$2"$3&gt;$4&lt;/a&gt;',$content);
+</code></pre>
+
+<p><strong>That being said, be forewarned -- to <a href="http://stackoverflow.com/users/8454/andy-lester">Andy Lester</a>'s point, this regex is not reliable.</strong> Though in my opinion, the issue is not quite "the nature of HTML", or at least not simply that. The point being made in this admittedly-great resource -- <a href="http://htmlparsing.com/regexes" rel="nofollow">http://htmlparsing.com/regexes</a> -- is that you're attempting to re-invent the wheel on a very bumpy road. The broader concern is <strong>"not that regular expressions are evil, per se, but that <em>overuse</em> of regular expressions is evil."</strong> That quote is by Jeff Atwood, from an exceptional elaboration on the joy and terror of regular expressions here: <a href="http://www.codinghorror.com/blog/2008/06/regular-expressions-now-you-have-two-problems.html" rel="nofollow">Regular Expressions: Now You Have Two Problems</a> (He also has an article specifically warning against using regular expressions to parse HTML -- <a href="http://www.codinghorror.com/blog/2009/11/parsing-html-the-cthulhu-way.html" rel="nofollow">Parsing Html The Cthulhu Way</a>.)</p>
+
+<p>Specifically in the case of my "solution" above, for instance -- the following input (with line returns) will not be matched, despite being valid HTML:</p>
+
+<pre><code>&lt;a title="mytitle"
+href="https://www.other-domain.de/path/index.html" 
+target="_blank"&gt;other domain&lt;/a&gt;
+</code></pre>
+
+<p>The following inputs, however, are handled as desired:</p>
+
+<pre><code>&lt;a href="https://my-domain.de"&gt;my domain&lt;/a&gt;
+&lt;a href="https://other-domain.de"&gt;other domain&lt;/a&gt;
+
+&lt;a href="https://www.my-domain.de/path/index.html"&gt;my domain&lt;/a&gt;
+&lt;a href="https://www.other-domain.de/path/index.html"&gt;other domain&lt;/a&gt;
+
+&lt;a title="other title" href="https://www.my-domain.de/path/index.html" target="_blank"&gt;other domain&lt;/a&gt;
+&lt;a title="my title" href="https://www.other-domain.de/path/index.html" target="_blank"&gt;my domain&lt;/a&gt;
+</code></pre>
+
+<p>becomes:</p>
+
+<pre><code>&lt;a href="https://my-domain.de"&gt;my domain&lt;/a&gt;
+&lt;a href="http://other-domain.de"&gt;other domain&lt;/a&gt;
+
+&lt;a href="https://www.my-domain.de/path/index.html"&gt;my domain&lt;/a&gt;
+&lt;a href="http://www.other-domain.de/path/index.html"&gt;other domain&lt;/a&gt;
+
+&lt;a title="other title" href="https://www.my-domain.de/path/index.html" target="_blank"&gt;other domain&lt;/a&gt;
+&lt;a title="my title" href="http://www.other-domain.de/path/index.html" target="_blank"&gt;my domain&lt;/a&gt;
+</code></pre>
+
+<p>A great resource for explaining the full breakdown of the regex is here: <a href="http://www.myregextester.com/index.php" rel="nofollow">http://www.myregextester.com/index.php</a></p>
+
+<p>To replicate the test on that tool:</p>
+
+<ul>
+<li>select the "replace" operation</li>
+<li>put your regex into "match pattern"</li>
+<li>put the replacment into "replace pattern"</li>
+<li>select the "i" flag checkbox</li>
+<li>select the "explain" checkbox</li>
+<li>select the "PHP" checkbox</li>
+<li>put your target content into "source text"</li>
+<li>click "Submit"</li>
+</ul>
+
+<p>For convenience and posterity, I've included the full explanation provided by that tool below, but two of the conceptual highlights are:</p>
+
+<ul>
+<li><p>Lookaheads and negative lookaheads -- eg <code>(?!text)</code> <a href="http://php.net/manual/en/regexp.reference.assertions.php" rel="nofollow">http://php.net/manual/en/regexp.reference.assertions.php</a></p></li>
+<li><p>Non-capturing subpatterns -- eg <code>(?:text)</code> or the outer part of <code>(?:(?!text))</code> <a href="http://php.net/manual/en/regexp.reference.subpatterns.php" rel="nofollow">http://php.net/manual/en/regexp.reference.subpatterns.php</a></p></li>
+</ul>
+
+<p><strong>Match Pattern Explanation:</strong></p>
+
+<pre><code>The regular expression:
+
+`(?i-msx:&lt;a ((?:(?!href).)*?)href=[\"\']https:\/\/((?:(?!my-domain.de).)*?)[\"\'](.*?)&gt;(.*?)&lt;\/a&gt;)`
+
+matches as follows:
+
+NODE                     EXPLANATION
+----------------------------------------------------------------------
+(?i-msx:                 group, but do not capture (case-insensitive)
+                         (with ^ and $ matching normally) (with . not
+                         matching \n) (matching whitespace and #
+                         normally):
+----------------------------------------------------------------------
+  &lt;a                       '&lt;a '
+----------------------------------------------------------------------
+  (                        group and capture to \1:
+----------------------------------------------------------------------
+    (?:                      group, but do not capture (0 or more
+                             times (matching the least amount
+                             possible)):
+----------------------------------------------------------------------
+      (?!                      look ahead to see if there is not:
+----------------------------------------------------------------------
+        href                     'href'
+----------------------------------------------------------------------
+      )                        end of look-ahead
+----------------------------------------------------------------------
+      .                        any character except \n
+----------------------------------------------------------------------
+    )*?                      end of grouping
+----------------------------------------------------------------------
+  )                        end of \1
+----------------------------------------------------------------------
+  href=                    'href='
+----------------------------------------------------------------------
+  [\"\']                   any character of: '\"', '\''
+----------------------------------------------------------------------
+  https:                   'https:'
+----------------------------------------------------------------------
+  \/                       '/'
+----------------------------------------------------------------------
+  \/                       '/'
+----------------------------------------------------------------------
+  (                        group and capture to \2:
+----------------------------------------------------------------------
+    (?:                      group, but do not capture (0 or more
+                             times (matching the least amount
+                             possible)):
+----------------------------------------------------------------------
+      (?!                      look ahead to see if there is not:
+----------------------------------------------------------------------
+        my-domain                'my-domain'
+----------------------------------------------------------------------
+        .                        any character except \n
+----------------------------------------------------------------------
+        de                       'de'
+----------------------------------------------------------------------
+      )                        end of look-ahead
+----------------------------------------------------------------------
+      .                        any character except \n
+----------------------------------------------------------------------
+    )*?                      end of grouping
+----------------------------------------------------------------------
+  )                        end of \2
+----------------------------------------------------------------------
+  [\"\']                   any character of: '\"', '\''
+----------------------------------------------------------------------
+  (                        group and capture to \3:
+----------------------------------------------------------------------
+    .*?                      any character except \n (0 or more times
+                             (matching the least amount possible))
+----------------------------------------------------------------------
+  )                        end of \3
+----------------------------------------------------------------------
+  &gt;                        '&gt;'
+----------------------------------------------------------------------
+  (                        group and capture to \4:
+----------------------------------------------------------------------
+    .*?                      any character except \n (0 or more times
+                             (matching the least amount possible))
+----------------------------------------------------------------------
+  )                        end of \4
+----------------------------------------------------------------------
+  &lt;                        '&lt;'
+----------------------------------------------------------------------
+  \/                       '/'
+----------------------------------------------------------------------
+  a&gt;                       'a&gt;'
+----------------------------------------------------------------------
+)                        end of grouping
+----------------------------------------------------------------------
+</code></pre>

@@ -1,0 +1,60 @@
+<p>This is an interesting question, I enjoyed solving it, thanks :)</p>
+
+<pre><code>from copy import deepcopy
+
+
+class C(object):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+class D(object):
+    def __init__(self, c, d):
+        self.c = c
+        self.d = d
+
+d = D(
+    c=C(x=1, y='hi'),
+    d='bye'
+)
+
+
+FILTER_PARAMS = (
+    #(class_reference, process_recursively, ['attributes', 'on', 'whitelist'])
+    (D, True, ['c']),
+    (C, False, ['x']),
+)
+
+def attr_filter(obj, filter_params):
+    for attr in dir(obj):
+        if attr.startswith('__'):
+            # ignore builtins
+            continue
+
+        attr_val = obj.__getattribute__(attr)
+        # loop through filter params
+        for (cls, do_recursive, whitelist) in filter_params:
+            if isinstance(obj, cls) and attr in whitelist:
+                # filter class matches the current obj's class and
+                # current attribute is on the whitelist
+                if do_recursive:
+                    # must process this attribute the same way as the parent
+                    setattr(obj, attr, attr_filter(attr_val, filter_params))                
+                # break will avoid the execution of the else clause meaning
+                # the attribute was on the white list so don't delete it
+                break
+        else:
+            # delete the current attribute of the instance as it was
+            # not on the whitelist
+            delattr(obj, attr)
+
+    return obj
+
+
+# do a deepcopy of the object you pass in, so the original will be preserved
+filtered_instance = attr_filter(deepcopy(d), FILTER_PARAMS)
+print dir(filtered_instance)
+print dir(filtered_instance.c)
+
+# now pass filtered_instance to yaml's dump function
+</code></pre>

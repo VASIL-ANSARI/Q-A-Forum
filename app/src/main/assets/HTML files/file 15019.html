@@ -1,0 +1,18 @@
+<p>From what I can tell, you are trying to calculate how many reblogs/day this Tumblr account/blog had? If so,</p>
+
+<pre><code>notes.where(:note_type =&gt; 'reblog', :created_at =&gt; Date.today.years_ago(1)..Date.today).group('DATE(created_at)').count.values
+</code></pre>
+
+<p>should give you the right result, without having to iterate over the result list again. One thing to note, your call right now won't indicate when there are days with 0 reblogs. If you drop the call to <code>#values</code>, you'll get a hash of <code>date =&gt; count</code>.</p>
+
+<p>As an aside and in case you didn't know, I'd also suggest making more use of the ActiveRecord relations:</p>
+
+<pre><code>Class Tumblr
+  has_many :notes
+end
+
+@tumblr = Tumblr.find(params[:id])
+@notes = @tumblr.notes
+</code></pre>
+
+<p>this way you avoid writing code like <code>Note.where("tumblr_id = '#{@tumblr.id}'")</code>. It's best to avoid string-interpolated parameters, in favour of code like <code>Note.where(:tumblr_id =&gt; @tumblr.id)</code> or <code>Note.where("tumblr_id = ?", @tumblr.id)</code> to leave less chance that you'll write code <a href="http://guides.rubyonrails.org/security.html#sql-injection" rel="nofollow">vulnerable to SQL injection</a></p>

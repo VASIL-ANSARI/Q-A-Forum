@@ -1,0 +1,85 @@
+<p>Ironically it appears to be a bug with 7.1 not 8.1 by my math. I have not tested this with 7.1 though.</p>
+
+<p>First I couldn't get any of your code working with <code>self.userInteractionEnabled = NO;</code> because nothing would recieve touches.</p>
+
+<p>zPosition is used when you set <code>ignoreSiblingsOrder</code> but it is based on its parent. So if parent is -1 and you add a child with 0 its rendering zPosition is still -1. Same goes with touches but in a reverse order. Last one rendered with userInteraction gets the touch event.</p>
+
+<p>Hopefully this makes sense. See added comments and debugging.</p>
+
+<pre><code>#import "GameScene.h"
+
+@interface Button : SKSpriteNode
+-(instancetype)initWithColor:(UIColor *)color size:(CGSize)size;
+-(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event;
+@end
+
+
+@implementation Button
+-(instancetype)initWithColor:(UIColor *)color size:(CGSize)size {
+    self = [super initWithColor:color size:size];
+    self.userInteractionEnabled = YES;
+    return self;
+}
+
+-(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    NSLog(@"%@ hit", self.name);
+}
+@end
+
+@implementation GameScene
+
+-(id)initWithSize:(CGSize)size {
+    if (self = [super initWithSize:size]) {
+
+        SKNode* root = [SKNode new];
+        root.name = @"root";
+
+        SKNode* layer1 = [SKNode new];
+        layer1.name = @"layer1";
+
+        SKNode* layer2 = [SKNode new];
+        layer2.name = @"layer2";
+
+        layer1.zPosition = -1;//layer1 and layer2 are just containers
+        layer2.zPosition = -2;
+
+
+        Button* button = [Button spriteNodeWithColor:[SKColor yellowColor] size:CGSizeMake(100, 100)];
+        button.name = @"yellow button";
+        button.position = CGPointMake(CGRectGetMidX(self.frame),CGRectGetMidY(self.frame));
+
+        //layer1 is at -1 and button does not have a z so it will be -1 in the scene like its parent (-1+0)
+        [layer1 addChild:button];
+
+        //root is 0 layer1 is -1 (along with button) root is above layer1 and will recieve any touches
+        [root addChild:layer1];
+
+        //root is 0 layer2 is -2 layer1 (and button) are above layer2 and root is above layer1 root gets touch
+        [root addChild:layer2];
+
+        //nothing changes except root is added
+        [self addChild:root];
+
+        //button needs to be on same zPosition or higher to get touch
+        //it is -1 because of parent node + 1 = 0
+        //best if you do +2 to ensure it is above
+
+//        button.zPosition = 2;
+
+    }
+    return self;
+}
+
+-(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event{
+
+    for (UITouch *touch in touches)
+    {
+        CGPoint point = [touch locationInNode:self];
+        SKNode *node = [self nodeAtPoint:point];
+        NSLog(@"Touch detected: %@", node.name);
+    }
+
+}
+</code></pre>
+
+<p>Also I would advise against using negative number for the zPosition. It does make things even more confusing.</p>

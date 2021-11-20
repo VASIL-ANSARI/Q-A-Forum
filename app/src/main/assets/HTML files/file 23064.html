@@ -1,0 +1,136 @@
+<p>The problem I see with your approach above is that your Radio Buttons and Check Boxes are defined in your View. This is obviously a problem if they are coming out of a database or an enum or something. What you should do is add a ViewModel property that represents all the possible options for a given radio/checkbox group, as well as a property that holds the selected values that the user chose for that group. </p>
+
+<p>First, check out these <strong>GREAT</strong> helper methods for "<a href="http://twentyeighttwelve.com/checkboxlist-helper-extension-method-asp-net-mvc-3/" rel="nofollow">CheckBoxListFor</a>" and "<a href="http://jonlanceley.blogspot.com/2011/06/mvc3-radiobuttonlist-helper.html" rel="nofollow">RadioButtonListFor</a>". Copy them into your project.</p>
+
+<p>Next, you need to expose your collections on the ViewModel as <code>IEnumerable&lt;SelectListItem&gt;</code>. These are the possible options for your radiolist/checkboxlist/dropdown element.</p>
+
+<p>Then, your ViewModel, you will need to define a prop for a single selected option (from a Dropdown or a radio button list) or a collection of the selected option (from a Checkbox list). You can use int/string from the item's database ID, or if the type to be selected is an enum, you can bind directly to that.</p>
+
+<p>Finally, your View become SUPER SIMPLE, and won't need to be touched if you add new options. In the case of database-driven options, no code at all has to change.</p>
+
+<p>Below is a sample from a demo page I have open. I believe you should be able to look at it and apply it to your own project. </p>
+
+<p><strong>The ViewModel:</strong> </p>
+
+<pre><code>public class OrderViewModel
+    {
+        public int FavoriteMovieID { get; set; }
+        public List&lt;int&gt; MovieIdsForMoviesILike { get; set; }
+
+        public MovieCategories FavoriteMovieType { get; set; }
+        public List&lt;MovieCategories&gt; MovieCategoriesILike { get; set; }
+
+        public IEnumerable&lt;SelectListItem&gt; MoviesToSelectFrom 
+        {
+            get
+            {
+                return from x in OrderDetailsRepo.GetAllMovies()
+                       select new SelectListItem {
+                           Text = x.Title,
+                           Value = x.ID.ToString(),
+                           Selected = MovieIdsForMoviesILike.Contains(x.ID),
+                       };
+            }
+        }
+
+        public IEnumerable&lt;SelectListItem&gt; MovieCategoriesToSelectFrom
+        {
+            get
+            {
+                return from cat in Enum.GetValues(typeof(MovieCategories)).Cast&lt;MovieCategories&gt;()
+                       select new SelectListItem {
+                           Text = cat.ToString(),
+                           Value = cat.ToString(),
+                           Selected = MovieCategoriesILike.Contains(cat),
+                       };
+            }
+        }
+
+        public OrderViewModel()
+        {
+            // to ensure they are never NULL
+            MovieIdsForMoviesILike = new List&lt;int&gt;();
+            MovieCategoriesILike = new List&lt;MovieCategories&gt;();
+        }
+}
+</code></pre>
+
+<p><strong>The Domain Model class and the method to provide the collections:</strong></p>
+
+<pre><code> public static class OrderDetailsRepo
+        {
+            public static List&lt;Movie&gt; GetAllMovies()
+            {
+                return new List&lt;Movie&gt; {
+                    new Movie { ID = 0, Title = "Great Expectation" },
+                    new Movie { ID = 1, Title = "Gone with the Wind" },
+                    new Movie { ID = 2, Title = "Lion of Winter" },
+                };
+            }
+        }
+
+    public class Movie
+        {
+            public string Title { get; set; }
+            public int ID { get; set; }
+        }
+
+    public enum MovieCategories
+        {
+            Horror,
+            Drama,
+            Comedy,
+        }
+</code></pre>
+
+<p><strong>And the super-simplified View:</strong></p>
+
+<pre><code>@model MVC3App.ViewModels.OrderViewModel
+@using MVC3App.MVCHtmlHelpers @* RadioButtonList and CheckBoxList are defined in here *@
+
+@{
+    ViewBag.Title = "ViewPage1";
+}
+
+&lt;script src="@Url.Content("~/Scripts/jquery.validate.min.js")" type="text/javascript"&gt;&lt;/script&gt;
+&lt;script src="@Url.Content("~/Scripts/jquery.validate.unobtrusive.min.js")" type="text/javascript"&gt;&lt;/script&gt;
+
+@using (Html.BeginForm()) {
+    @Html.ValidationSummary(true)
+
+    &lt;div class="editor-label"&gt;
+        What's your favorite movie?
+    &lt;/div&gt;
+    &lt;div class="editor-field"&gt;
+        @Html.RadioButtonListFor(model =&gt; model.FavoriteMovieID, Model.MoviesToSelectFrom)
+        @Html.ValidationMessageFor(model =&gt; model.FavoriteMovieID)
+    &lt;/div&gt;
+
+    &lt;div class="editor-label"&gt;
+        What movies do you like in general?
+    &lt;/div&gt;
+    &lt;div class="editor-field"&gt;
+        @Html.CheckboxListFor(model =&gt; model.MovieIdsForMoviesILike, Model.MoviesToSelectFrom)
+        @Html.ValidationMessageFor(model =&gt; model.MovieIdsForMoviesILike)
+    &lt;/div&gt;
+
+    &lt;div class="editor-label"&gt;
+        What's your favorite Movie Genre?
+    &lt;/div&gt;
+    &lt;div class="editor-field"&gt;
+        @Html.RadioButtonListFor(model =&gt; model.FavoriteMovieType, Model.MovieCategoriesToSelectFrom)
+        @Html.ValidationMessageFor(model =&gt; model.FavoriteMovieType)
+    &lt;/div&gt;
+
+    &lt;div class="editor-label"&gt;
+        What Movie Genres do you like in general?
+    &lt;/div&gt;
+    &lt;div class="editor-field"&gt;
+        @Html.CheckboxListFor(model =&gt; model.MovieCategoriesILike, Model.MovieCategoriesToSelectFrom)
+        @Html.ValidationMessageFor(model =&gt; model.MovieCategoriesILike)
+    &lt;/div&gt;
+
+    &lt;br /&gt;&lt;br /&gt;
+    &lt;input type="submit" value="Save" /&gt;
+}
+</code></pre>

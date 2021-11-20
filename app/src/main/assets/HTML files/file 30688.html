@@ -1,0 +1,43 @@
+<p>Ok, I figured out that I need to put the class loader into the current thread's context. I am also using an anonymous class loader now, so that only requested classes get loaded (also improves debugging).</p>
+
+<pre><code>// check if customizer classes are present and load them
+final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+final URL customizersUrl = classLoader.findResource("customizers.jar");
+if (customizersUrl != null) {
+
+    ClassLoader cl = new ClassLoader() {
+
+        @Override
+        public Class loadClass(String className) throws ClassNotFoundException {
+            try {
+                return contextClassLoader.loadClass(className);
+            } catch (ClassNotFoundException ex) {
+
+                if (customizersUrl != null) {
+                    try {
+                        URI jarUri = customizersUrl.toURI();
+                        URL[] jarContentUrls = {new URL("jar:file:" + jarUri.getPath() + "!/")};
+                        URLClassLoader customizerInnerClassLoader = URLClassLoader.newInstance(jarContentUrls);
+                        return customizerInnerClassLoader.loadClass(className);
+
+                    } catch (URISyntaxException ex1) {
+                        logger.debug("Exception during customizer class loading", ex1);
+                    } catch (IOException ex1) {
+                        logger.debug("Exception during customizer class loading", ex1);
+                    } catch (ClassNotFoundException ex1) {
+                        throw new ClassNotFoundException("Exception during customizer class loading", ex1);
+                    }
+                }
+            }
+            return null;
+        }
+    };
+
+    // squeeze our own class loader in
+    Thread.currentThread().setContextClassLoader(cl);
+
+}
+byte[] result = generate(jasperReport, parameters);
+// changing the class loader back to its origin... just to be safe
+Thread.currentThread().setContextClassLoader(contextClassLoader);
+</code></pre>

@@ -1,0 +1,31 @@
+<p>There is no directly support for javas try-with-resources construct in scala, but your can pretty easy build your own support, by applying the loan pattern:</p>
+
+<pre><code>import java.lang.AutoCloseable
+import java.nio.file.{Files, Paths}
+import java.util.Optional
+
+def autoClose[A &lt;: AutoCloseable,B](
+        closeable: A)(fun: (A) â B): B = {
+    try {
+        fun(closeable)
+    } finally {
+        closeable.close()
+    }
+}
+</code></pre>
+
+<p>This defines a reusable method, that works pretty much like a try-with-resource construct in java. It works by taken two parameter. First is takes the a subclass of Autoclosable instance, and second it takes a function that takes the same Autoclosable type as a paremeter. The return type of the function parameter, is used as return type of the method. The method then executes the function inside a try, and close the autocloseble in its finally block.</p>
+
+<p>You can use it like this (here used to get the result of findAny() on the stream.</p>
+
+<pre><code>val result: Optional[String] = autoClose(Files.lines(Paths.get("somefile.txt"))) { stream â
+    stream.findAny()
+}
+</code></pre>
+
+<p>In case your want to do catch exceptions, you have 2 choices.</p>
+
+<ol>
+<li><p>Add a try/catch block around the stream.findAny() call.</p></li>
+<li><p>Or add a catch block to the try block in the autoClose method. Note that this should only be done, if the logic inside the catch block is usable from all places where autoClose is called.</p></li>
+</ol>

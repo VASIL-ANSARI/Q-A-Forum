@@ -1,0 +1,67 @@
+<p>It is possible to run external commands from Grandle and integrate those into your build process. My example runs <code>inkscape.exe</code> on Windows and defines its parameters in the build script, you can also just run a shell script this way.</p>
+
+<p>The following code goes into the <code>app\build.gradle</code> file. Task <code>convertDrawable</code> is written in Groovy syntax and accomplishes the following (<em>tl;dr it is an implementation of your "simple example"</em>):</p>
+
+<ul>
+<li>It looks through all the <code>*.svg</code> files in a custom folder <code>art/drawable</code></li>
+<li>Within each of those <code>*.svg</code> files, looks through all the <code>drawable-*</code> folders in your resources folder</li>
+<li>Based on <code>drawable-*</code> folder name, determine the target resolution.</li>
+<li>Then calls <code>inkscape.exe</code> to convert each <code>*.svg</code> to <code>*.png</code> with the required size.</li>
+</ul>
+
+<p>Code:</p>
+
+<pre><code>task convertDrawables() {
+    def ink =  'C:\\Program Files (x86)\\Inkscape\\inkscape.exe'
+
+    // look for *.svg files in app/src/art/drawable folder
+    new File('app\\src\\art\\drawable').eachFileMatch(~/.*\.svg/) { file -&gt;
+        // look for destination folders
+        new File('app\\src\\main\\res').eachFileMatch(~/drawable-.*/) { outputDir -&gt;
+
+            // define size based on folder name
+            def size = ''
+            switch (outputDir.getAbsolutePath()) {
+                case ~/.*-ldpi/:
+                    size = '36'
+                    break
+                case ~/.*-mdpi/:
+                    size = '48'
+                    break
+                case ~/.*-hdpi/:
+                    size = '72'
+                    break
+                case ~/.*-xhdpi/:
+                    size = '96'
+                    break
+                case ~/.*-xxhdpi/:
+                    size = '144'
+                    break
+                case ~/.*-xxxhdpi/:
+                    size = '192'
+                    break
+            }
+            def cmd = ink + ' ' + file.getCanonicalPath() + ' --export-png=' + outputDir.getAbsolutePath() + '\\ic_launcher2.png -w ' + size + ' -h ' + size + ' --export-area-page'
+            def process = cmd.execute();
+            process.waitFor();
+        }
+    }
+}
+
+
+// make sure the convertDrawable task is executed somewhere in the make process
+gradle.projectsEvaluated {
+    preBuild.dependsOn(convertDrawable)
+}
+</code></pre>
+
+<p>Here are the resources I used:</p>
+
+<ul>
+<li><a href="http://www.gradle.org/docs/current/userguide/more_about_tasks.html" rel="nofollow">Gradle Doc <em>Chapter 15: More about Tasks</em></a></li>
+<li><a href="https://gradle.org/docs/current/userguide/custom_tasks.html" rel="nofollow">Gradle Doc <em>Chapter 58. Writing Custom Task Classes</em></a></li>
+<li><a href="http://www.gradle.org/docs/current/dsl/org.gradle.api.tasks.Exec.html" rel="nofollow">Gradle Doc <em>Exec function</em></a></li>
+<li><a href="http://groovy.codehaus.org/Executing+External+Processes+From+Groovy" rel="nofollow">Groovy execute()</a></li>
+<li><a href="http://stackoverflow.com/questions/16853130/run-task-before-compilation-using-android-gradle-plugin">Stackoverflow <em>Run task before compilation using Android Gradle plugin</em></a></li>
+<li><a href="http://groovy.codehaus.org/groovy-jdk/java/io/File.html" rel="nofollow">Groovy Doc for File</a></li>
+</ul>

@@ -1,0 +1,28 @@
+<p>I suspect the problem isn't with <code>File.WriteAllLines</code>, but with <code>Attachment</code> - that implements <code>IDisposable</code>, but you're not disposing of it... so if that's got an open file handle on it, that would explain what you're seeing. You can just use:</p>
+
+<pre><code>var path = HttpContext.Current.Server.MapPath("OutlookCalendar.ics");
+using (Attachment mailAttachment = new Attachment(path))
+{
+    mail.Attachments.Add(mailAttachment);
+
+    mail.IsBodyHtml = true;
+    //Set email message and subjet
+    mail.Subject = header;
+    mail.Body = message;
+
+    smtpClient.Send(mail);
+}
+</code></pre>
+
+<p>However, it's not clear why you need to write to a file at all. It would be better to change your code to just create a <code>MemoryStream</code>. For example:</p>
+
+<pre><code>string text = string.Join("\r\n", contents);
+byte[] encoded = Encoding.UTF8.GetBytes(text);
+var stream = new MemoryStream(encoded);
+using (var attachment = new Attachment(stream, "OutlookCalendar.ics"))
+{
+    ...
+}
+</code></pre>
+
+<p>Now no files are involved at all, so there can't be any conflicts.</p>

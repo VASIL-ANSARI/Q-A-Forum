@@ -1,0 +1,46 @@
+<p><code>Nz()</code> is definitely the function you're looking for. You say that you tried it and it returned <code>Null</code>, but I find that hard to believe because the whole point of <code>Nz()</code> is to <strong><em>not</em></strong> return <code>Null</code>. For reference:</p>
+
+<p><code>x = Nz(Null, 0)</code> returns 0 (<code>VbVarType.vbInteger</code>)</p>
+
+<p><code>x = Nz(Null, "")</code> returns an empty string (<code>VbVarType.vbString</code>)</p>
+
+<p><code>x = Nz(Null)</code> returns an empty variable (<code>VbVarType.vbEmpty</code>, <em>not</em> <code>VbVarType.vbNull</code>)</p>
+
+<h2>Edit</h2>
+
+<p>Further investigation shows that the problem in your particular case is that you are doing a <code>COUNT(re.rule_status)</code> in a query that also does <code>GROUP BY re.rule_status</code>. If the <code>WHERE</code> clause of the query results in an empty set (no rows returned) then the overall query simply returns no rows instead of a single row with a value of 0 or Null.</p>
+
+<p>This can be verified with the following test code...</p>
+
+<pre><code>Sub NzTest()
+Dim rst As DAO.Recordset, strSQL As String
+strSQL = "SELECT Nz(COUNT(LastName), 0) FROM Members WHERE False GROUP BY LastName"
+Debug.Print strSQL
+Set rst = CurrentDb.OpenRecordset(strSQL, dbOpenSnapshot)
+If rst.EOF Then
+    Debug.Print "No rows were returned."
+Else
+    Debug.Print "Count = " &amp; rst(0).Value
+End If
+rst.Close
+Set rst = Nothing
+End Sub
+</code></pre>
+
+<p>...which produces the result</p>
+
+<pre><code>SELECT Nz(COUNT(LastName), 0) FROM Members WHERE False GROUP BY LastName
+No rows were returned.
+</code></pre>
+
+<p>When the <code>GROUP BY</code> is removed we get...</p>
+
+<pre><code>SELECT Nz(COUNT(LastName), 0) FROM Members WHERE False
+Count = 0
+</code></pre>
+
+<p>...and in fact <code>Nz()</code> is not even required in that case:</p>
+
+<pre><code>SELECT COUNT(LastName) FROM Members WHERE False
+Count = 0
+</code></pre>

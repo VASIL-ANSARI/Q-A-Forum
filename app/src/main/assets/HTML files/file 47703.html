@@ -1,0 +1,20 @@
+<p>When you fetch a collection of objects through a relation on a model, the relation constraint is always included, hence the <strong>AND</strong>. And it makes perfect sense, otherwise you could get $model->units objects that are not related to <strong>$model</strong>.</p>
+
+<p>I can see what you're trying to achieve here - fetch units related to that <strong>$model</strong> together with units not related to any models. You can achieve it by adding the following method to your model:</p>
+
+<pre><code>public function getAllUnits() {
+  $genericUnits = IngredientUnit::whereIngredientId(-1);
+  return $this-&gt;units()-&gt;union($genericUnits)-&gt;get();
+}
+</code></pre>
+
+<p>OR</p>
+
+<pre><code>public function getAllUnits() {
+  return IngredientUnit::whereIn('ingredient_id', [$this-&gt;id, -1])-&gt;get();
+}
+</code></pre>
+
+<p>The only issue here is that it won't be used by eager loading logic but would result in separate query for every model for which you want to return units. But if you always fetch that for a single model anyway, it won't be a problem.</p>
+
+<p><strong>One suggestion</strong>: store <strong>NULL</strong> in ingredient_id instead of -1. This way you'll be able to make use of <strong>foreign key constraints</strong>.</p>

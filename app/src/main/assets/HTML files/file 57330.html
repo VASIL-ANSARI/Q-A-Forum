@@ -1,0 +1,52 @@
+<p>I'm going to make a guess based on your <code>can't pickle lock objects</code> message that you may be trying to <code>pickle</code> your objects with the default SMTP <code>connection</code> included.</p>
+
+<p>Try it without it - grepping through the source it is the <code>smtp</code> module that has a <code>self._lock</code>.  Pass <code>connection=None</code> to the constructor of the messages.  </p>
+
+<p>On Django 1.9, this works for me (Python2):</p>
+
+<pre><code>from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
+import pickle
+
+email = EmailMessage(
+    'Hello',
+    'Body goes here',
+    'from@example.com',
+    ['to1@example.com', 'to2@example.com'],
+    ['bcc@example.com'],
+    reply_to=['another@example.com'],
+    headers={'Message-ID': 'foo'},
+    connection=None,
+)
+
+email.attach("foo", [l for l in open(__file__)], 'text')
+
+print len(pickle.dumps(email))
+
+subject, from_email, to = 'hello', 'from@example.com', 'to@example.com'
+text_content = 'This is an important message.'
+html_content = '&lt;p&gt;This is an &lt;strong&gt;important&lt;/strong&gt; message.&lt;/p&gt;'
+msg = EmailMultiAlternatives(subject, text_content, from_email, [to], connection=None)
+msg.attach_alternative(html_content, "text/html")
+
+print len(pickle.dumps(msg))
+</code></pre>
+
+<p>According to the Django code in <code>messages.py</code>, later when you call <code>send()</code> it will attempt to use <code>get_connection()</code> from <code>django.core.mail</code> to get your default connection if <code>EmailMessage.connection</code> is <code>None</code>.</p>
+
+<p>....Alternatively, if you want to use <code>json</code>, this also worked with <code>connection=None</code>:</p>
+
+<pre><code>import json                                                            
+print json.dumps(msg.__dict__)                                         
+print json.dumps(email.__dict__)
+</code></pre>
+
+<p>This means you could fairly easily write a <code>JSONEncoder</code> and <code>JSONDecoder</code> to serialize/deserialize your objects as well by basically using the <code>__dict__</code> of the object.</p>
+
+<p>More on JSON:</p>
+
+<p>As I showed above, encoding the <code>__dict__</code> makes the encoding easy.  You could do <code>msg.__dict__ = json.load(...)</code>, but what makes it difficult is the <code>EmailMessage</code> object must be created before you change its values.  So you could initialize <code>msg</code> with an <code>EmailMessage</code> that has dummy values, and then assign the <code>__dict__</code>, or decode the <code>JSON</code> and construct the object explicitly by passing the arguments (...and functions) stored in the JSON to the constructor.  This requires you to know the internals, though.</p>
+
+<p>I'd go with <code>pickle</code>, although there are security implications.</p>
+
+<p><a href="http://stackoverflow.com/questions/19606858/pickle-not-safe-or-fast">This SO question</a> covers some other alternatives as well.</p>

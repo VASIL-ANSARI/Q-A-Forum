@@ -1,0 +1,11 @@
+<p>The Flex SDK includes a customized version of the Xerces parser (lib/xercesPatch.jar). The custom classes all end in MM (for Macromedia). AFAICT, the parser was customized to associate line numbers with parsed attributes. </p>
+
+<p>In my case, the problem was caused by making the the application classloader the parent of the classloader which handled the Flex SDK libraries. I have Xerces in the application classpath; Xerces is also in the Flex SDK classpath. The MM parser classes are loaded by the flexSdkClassLoader because they are uniquely named. However, the parser base classes are being found by the application classloader (parhaps they were already loaded). </p>
+
+<p>The fix was to use the bootstrap classloader as the parent of the flexSdkClassLoader:  </p>
+
+<pre><code>List&lt;URL&gt; flexSdkJars = ...; 
+URLClassLoader flexSdkClassLoader = new URLClassLoader(flexSdkJars.toArray(new URL[flexSdkJars.size()]), String.class.getClassLoader());
+</code></pre>
+
+<p>The IllegalAccessError also affects some Ant users running the mxmlc task. The workaround for that case is to run the mxmlc task as a separate process via fork="true". </p>

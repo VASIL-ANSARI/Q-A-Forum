@@ -1,0 +1,20 @@
+<p>The other ends of the those pointers must be fetched.  If they really are pointers, then you can treat them as incompletely initialized objects, so...</p>
+
+<pre><code>Parse.Cloud.afterSave("Comment", function(request){
+    var comment = request.object;
+    var fromUser = request.user;
+    var onIdea = comment.get("ideaPointer");
+    onIdea.fetch().then(function(onIdeaObject) {
+        var ideaOwner = onIdea.get("owner");
+        return ideaOwner.fetch();
+    }).then(function(ideaOwnerObject) {
+        var getNotification = ideaOwnerObject.get("getCommentNotifications");
+        if (getNotification) {
+            var message = fromUser.getUsername() + " commented on your idea.";
+            var pushQuery = new Parse.Query(Parse.Installation);
+            pushQuery.equalTo("user", ideaOwnerObject);
+            return Parse.Push.send({ where: pushQuery, data: { alert: message, ideaId: onIdea.id } });
+        } 
+    });
+});
+</code></pre>

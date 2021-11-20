@@ -1,0 +1,87 @@
+<p>Well, as you've already discovered, you can't serialize an interface...that said, you might be able to work around this and still be "in the dark" about the actual object types:</p>
+
+<p>First, any IEnumerable can be transmogrified into an array via a <code>Cast</code>/<code>ToArray</code> combo</p>
+
+<pre><code>var enumerableThing = Foo.GetEnumerable();    
+var asArray = enumerableThing.Cast&lt;object&gt;().ToArray();
+</code></pre>
+
+<p>Second, Arrays of a "known type" <em>are</em> Serializable</p>
+
+<pre><code>var allContainedTypes = asArray.Select(x =&gt; x.GetType()).Distinct().ToArray();
+var ser = new XmlSerializer(asArray.GetType(), allContainedTypes);
+</code></pre>
+
+<p><strike>var ser = new XmlSerializer(asArray.GetType());</strike></p>
+
+<pre><code>var sb = new StringBuilder();
+using(var sw = new StringWriter(sb))
+using(var xw = XmlWriter.Create(sw))
+    ser.Serialize(xw, asArray);
+
+sb.ToString().Dump();
+</code></pre>
+
+<p>Or, all together:</p>
+
+<pre><code>void Main()
+{
+    var enumerableThing = Foo.GetEnumerable();    
+    var asArray = enumerableThing.Cast&lt;object&gt;().ToArray();
+
+    var allContainedTypes = asArray.Select(x =&gt; x.GetType()).Distinct().ToArray();
+    var ser = new XmlSerializer(asArray.GetType(), allContainedTypes);
+    var sb = new StringBuilder();
+    using(var sw = new StringWriter(sb))
+    using(var xw = XmlWriter.Create(sw))
+        ser.Serialize(xw, asArray);
+
+    sb.ToString().Dump();
+}
+
+
+public class Foo
+{
+    public static IEnumerable GetEnumerable()
+    {
+        return new[] { 1, 2, 3, 4, 5, 6, 7 };
+    }
+    public static IEnumerable GetEnumerable2()
+    {
+        return new object[] { "1", 2, "bob", 4, null, 6, 7 };
+    }
+}
+</code></pre>
+
+<p>Oh, this produces the format:</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="utf-16"?&gt;
+&lt;ArrayOfAnyType 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;1&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;2&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;3&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;4&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;5&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;6&lt;/anyType&gt;
+    &lt;anyType xsi:type="xsd:int"&gt;7&lt;/anyType&gt;
+&lt;/ArrayOfAnyType&gt;
+</code></pre>
+
+<p>Edit: Deserialization does pose some problems - however, you can do something akin to:</p>
+
+<pre><code>// Least common denominator...
+object[] tempResult;
+
+var assemblyStuffIsFrom = Assembly.GetExecutingAssembly();
+var allSerializableTypes = assemblyStuffIsFrom
+    .GetTypes()
+    .Where(t =&gt; t.GetCustomAttributes(typeof(SerializableAttribute), true).Any())
+    // TODO: add as much filtering as you can here to help trim down the set
+    .ToArray();
+var hope = new XmlSerializer(typeof(object[]), allSerializableTypes);
+using(var sr = new StringReader(sb.ToString()))
+using(var xr = XmlReader.Create(sr))
+    tempResult = ((object[])hope.Deserialize(xr));
+</code></pre>

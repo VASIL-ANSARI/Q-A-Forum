@@ -1,0 +1,35 @@
+<p>I believe that what you're looking for is NSJSONSerialization. </p>
+
+<p>This answer assumes use of NSURLConnection's block based API to execute your GET. </p>
+
+<pre><code>[NSURLConnection sendAsynchronousRequest:req queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+    if (data) {
+        NSError *jsonError = nil;
+        NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&amp;jsonError];
+        if (dict) {
+            // You got a valid NSDictionary out of your JSON response.
+            NSLog(@"my returned dictionary: %@", dict);
+        } else if (jsonError) {
+            // JSON data could not be parsed into NSDictionary. Handle as appropriate for your application.
+            return;
+        }
+    } else if (connectionError) {
+        // Handle connection error
+    }
+}];
+</code></pre>
+
+<p>But even if you're using dataWithContentsOfURL:, the point is the same. Feed your data in to NSJSONSerialization's + jsonObjectWithData:options:error: method, check if you get a dictionary back from that, and proceed. </p>
+
+<p>EDIT: If you're looking to create a JSON post body for an HTTP request from an NSDictionary, NSJSONSerialization has you covered there as well. </p>
+
+<pre><code>NSError *error = nil;
+NSData *data = [NSJSONSerialization dataWithJSONObject:someDictionary options:NSJSONWritingPrettyPrinted error:&amp;error];
+if (data) {
+    // You got your data.
+    NSLog(@"my data: %@", data);
+    [someURLRequest setHTTPBody:data];
+} else if (error) {
+    NSLog(@"error: %@", [error localizedDescription]);
+}
+</code></pre>

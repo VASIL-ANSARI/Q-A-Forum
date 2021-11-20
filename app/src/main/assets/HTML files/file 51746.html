@@ -1,0 +1,28 @@
+<p>I learned that STI fails on validation when attempting a type change.  (Read more <a href="http://blog.arkency.com/2013/07/sti" rel="nofollow">http://blog.arkency.com/2013/07/sti</a>).  So, I solved the problem by always creating a new payment_processor but restoring the old if validation fails.  It's inelegant, but it works.</p>
+
+<p>Copy the original payment_processor then delete it:</p>
+
+<pre><code>original = self.payment_processor.destroy
+self.payment_processor.destroy
+</code></pre>
+
+<p>Instead of passing the new type, we delete it from the params, but use the new_gateway_type to create the new gateway. </p>
+
+<pre><code>new_gateway_type = params[:payment_processor][:gateway_type]
+params[:payment_processor].delete(:gateway_type)
+</code></pre>
+
+<p>For example, if the new gateway is 'Paypal', we'll constantize the new_gateway_type to create a new object, then update the params:</p>
+
+<pre><code>payment_processor = "PaymentProcessors::#{new_gateway_type}".constantize.new(:account_id =&gt; self.id)
+payment_processor.update_attributes(params[:payment_processor)
+</code></pre>
+
+<p>Finally, we save the new gateway.  If the validation fails for this new_gateway, we restore the old by constantizing the object model name, and passing in the new attributes except for type and id:</p>
+
+<pre><code>begin
+  payment_processor.save!
+rescue ActiveRecord::RecordInvalid =&gt; invalid
+  original.type.constantize.new(original.attributes.except("id", "type")).save
+end
+</code></pre>

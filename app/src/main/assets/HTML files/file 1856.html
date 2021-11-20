@@ -1,0 +1,39 @@
+<p>OK, I think after much research, I realize the error in my thinking.</p>
+
+<p>First, there is a way to do Max Alpha openGL blending, and that is using glBlendEquations.  You would have to modify the draw method to do this (and make some new attribute for a textureNode to switch between these methods), and use either of these: </p>
+
+<pre><code> glBlendEquationOES( GL_MAX_EXT );
+ glBlendEquationSeparateOES( GL_FUNC_ADD_OES, GL_MAX_EXT );
+</code></pre>
+
+<p>The first uses max() for RGBA, while the second uses standard addition for RGB, and max() for alpha.</p>
+
+<p>Now, the problem is that each sprite, and it's children, in z-order, are drawn to the <strong><em>screen</em></strong>.  This means, that after the first shadow is drawn, it is part of the main screen buffer.  In other words, its opacity is changed, and with max() blending and a standard opaque background, it's now painted onto the background, so when you draw the next shadow, it will do max(As, 1) which is 1, because the background is opaque.  So I don't achieve the blending I want.  It would "work" if my background was transparent, but then I could not apply any background "behind" that, we can only add to the buffer.</p>
+
+<p>I could draw the shadows first, using the max() blend and then do a {ONE_MINUS_DST_ALPHA, DST_ALPHA} glBlend.  This is an OK workaround, but I have other issues that make this difficult.</p>
+
+<p>Now, the real solution, I finally realize, is to use a RenderTexture to render the shadows to a separate buffer before applying them to the background.  This could have performance implications, so we'll see where this goes.</p>
+
+<p><strong>Update:</strong></p>
+
+<p>OK, I have a working solution now.</p>
+
+<p>Oddly, I ended up not needing this solution after all, because in my particular case, the banding was not noticeable enough to warrant the effort, however this is the solution I came up with that seemed to do what I wanted:</p>
+
+<ol>
+<li><p>First draw a 0% black alpha png to the entire screen.  (I don't know if this is necessary.  I don't know what the default alpha of the screen is).</p></li>
+<li><p>Draw the shadows to the screen using <code>glEquationSeperateOES( GL_ADD, GL_MAX_ENT)</code> and <code>glBlend( GL_ONE, GL_ONE )</code>.  This will blend all of the shadows together as described, taking the max() of the alphas.  </p>
+
+<ul>
+<li><p>Because you are compositing to black, it is equivalent to use <code>glBlendEquationOES( GL_MAX_ENT )</code>.   (X+0 == max(X,0))</p></li>
+<li><p><code>glBlend( GL_ZERO, GL_ONE )</code> will eliminate the need of step 1, or at least the requirement of that layer to be 0% black.  <code>GL_ZERO</code> essentially forces it to be 0% black.</p></li>
+</ul></li>
+<li><p>Draw the floor, which will be <strong>over</strong> the shadows, but use <code>glBlend( ONE_MINUS_DST_ALPHA, DST_ALPHA )</code>.  This results in exactly the same results as if you added the shadows to the floor with <code>glBlend( SRC_ALPHA, ONE_MINUS_SRC_ALPHA )</code>, however if you did it this way, you would not be able to blend the shadows together (read why at top of answer).</p></li>
+<li><p>You are done!  The nice thing about this method is that the shadow sprites can be animated as usual, without having to call "visit" on a separate renderTexture.</p></li>
+</ol>
+
+<p><strong>The rest:</strong></p>
+
+<p>I also modified CocosNode to allow me to add a shadow to a layer, which links to another CocosNode.  This way, the shadow is rendered as a child of the floor, (or the 0% black background sprite for the shadow blending), but is linked to another CocosNode.  When a sprite moves, if it has a shadow, it updates the shadows position as well.  This allows me to have all shadows below all objects on the screen, and to have the shadows automatically follow the object.</p>
+
+<p>Sorry for the long answer.  Maybe my solution is kludgy, but it seems to work great.</p>

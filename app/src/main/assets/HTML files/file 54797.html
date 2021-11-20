@@ -1,0 +1,59 @@
+<p>So to answer this myself: This is a problem of wrong expectations.</p>
+
+<p>What we expected here is to set the timer forward <em>during the callback</em> by the amount we set (24us). But if we take a look at the kernel implementation of <code>hrtimer_forward_now()</code>we can see that the time is actually added to the last <strong>event/occurrence</strong> of the timer (see the calculation of <code>delta</code>):</p>
+
+<p>From <a href="http://lxr.free-electrons.com/source/kernel/time/hrtimer.c#L833" rel="nofollow">Linux/kernel/time/hrtimer.c</a>
+</p>
+
+<pre><code>833 u64 hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
+834 {
+835         u64 orun = 1;
+836         ktime_t delta;
+837 
+838         delta = ktime_sub(now, hrtimer_get_expires(timer));
+839 
+840         if (delta.tv64 &lt; 0)
+841                 return 0;
+842 
+843         if (WARN_ON(timer-&gt;state &amp; HRTIMER_STATE_ENQUEUED))
+844                 return 0;
+845 
+846         if (interval.tv64 &lt; hrtimer_resolution)
+847                 interval.tv64 = hrtimer_resolution;
+848 
+849         if (unlikely(delta.tv64 &gt;= interval.tv64)) {
+850                 s64 incr = ktime_to_ns(interval);
+851 
+852                 orun = ktime_divns(delta, incr);
+853                 hrtimer_add_expires_ns(timer, incr * orun);
+854                 if (hrtimer_get_expires_tv64(timer) &gt; now.tv64)
+855                         return orun;
+856                 /*
+857                  * This (and the ktime_add() below) is the
+858                  * correction for exact:
+859                  */
+860                 orun++;
+861         }
+862         hrtimer_add_expires(timer, interval);
+863 
+864         return orun;
+865 }
+</code></pre>
+
+<p>That means that the time delay it took between the timer firing and the callback actually executing is not taken into account here. The hrtimers are meant to be precise in interval timing and not be influenced by the usual delays between firing and the callback.
+Where our expectancy was to <strong>include</strong> that time into the calculation because we wanted the timer to restart from the moment we executed an action in the timer callback.</p>
+
+<p>I tried to draw this into the following diagram:
+<a href="http://i.stack.imgur.com/1PnSW.png" rel="nofollow"><img src="http://i.stack.imgur.com/1PnSW.png" alt="hrtimer expectation vs reality diagram"></a></p>
+
+<p>Following the red numbered bubbles we get:</p>
+
+<ol>
+<li>timer is started with X time to fire</li>
+<li>time X has passed, the timer is triggered</li>
+<li>after "delay X" depending on the load of the system and other factors, the callback function for the hrtimer is called</li>
+<li><code>hrtimer_forward_now</code> sets the new timer forward based on the last event plus the new expected time (which might be only 2us in the future instead of 24)</li>
+<li>Here is the discrepancy of expectation vs reality. The hrtimer fires 24us after the last <strong>event</strong> when we expect it to fire 24us after the call to <code>forward_now()</code></li>
+</ol>
+
+<p>To sum it all up, we completely trashed the above code example and went with a <code>usleep_range()</code> call between triggering the two GPIO pins. The underlying implementation of that function is also done with <code>hrtimer</code> but it is hidden from the user and it acts as we expect in this case.</p>

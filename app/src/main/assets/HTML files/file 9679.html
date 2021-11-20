@@ -1,0 +1,23 @@
+<p>The <code>NewResponse</code> subscriber is called <em>after</em> your view is invoked.</p>
+
+<p>You want to be using an event that is invoked earlier, for example <code>NewRequest</code> or <code>ContextFound</code>. In Pyramid 1.0, you'll need to use <code>ContextFound</code> to properly handle things because you cannot raise exceptions in <code>NewRequest</code> events (this is fixed in 1.1).</p>
+
+<p>The way to do this with a <code>ContextFound</code> event is to register an exception view for HTTPException objects like this:</p>
+
+<pre><code>config.add_view(lambda ctx, req: ctx, 'pyramid.httpexceptions.HTTPException')
+</code></pre>
+
+<p>Basically this will return the exception as the response object when you raise it, which is perfectly valid for HTTPException objects which are valid Pyramid <code>Response</code> objects.</p>
+
+<p>You can then register your event and deal with the CSRF validation:</p>
+
+<pre><code>@subscriber(ContextFound)
+def csrf_validation_event(event):
+    request = event.request
+    user = getattr(request, 'user', None)
+    csrf = request.params.get('csrf_token')
+    if (request.method == 'POST' or request.is_xhr) and \
+       (user and user.is_authenticated()) and \
+       (csrf != unicode(request.session.get_csrf_token())):
+        raise HTTPUnauthorized
+</code></pre>

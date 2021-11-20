@@ -1,0 +1,42 @@
+<p>What you are missing is the fact that calling a <code>cmap</code> with some value assumes fixed values. If you pass a <code>float</code>, the range of the cmap is fixed between 0 and 1. If you pass an <code>int</code> the range is 0 to 255. You are, apparently, passing very small values to the <code>cmap</code> which then returns colors equal or close to the value 0 (so Blue for jet).</p>
+
+<p>You then pass this 'color array' to imshow, this assumes and displays the array as an RGB(A) image. Any <code>vmin</code>, <code>vmax</code> and <code>cmap</code> stuff you add is ignored, because its already a RGB image, there is nothing to map.</p>
+
+<p>What you want to do is create a <code>ScalarMappable</code> which you can create with a <code>cmap</code> AND a <code>normalizer</code> which sets the range.</p>
+
+<p>Since you dont define your 'scalar_field' i'll use some sample data from the MPL Gallery:</p>
+
+<pre><code>import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+
+# create the sample data
+# after http://matplotlib.org/examples/images_contours_and_fields/pcolormesh_levels.html
+dx, dy = 0.05, 0.05
+y, x = np.mgrid[slice(1, 5 + dy, dy),
+                slice(1, 5 + dx, dx)]
+
+z = np.sin(x) ** 10 + np.cos(10 + y * x) * np.cos(x)
+
+
+fig, ax = plt.subplots(figsize=(6,6))
+ax.axis('off')
+
+# with a normalizer you can set the range against which you want to map
+norm = mpl.colors.Normalize(vmin=-1, vmax=1)
+# the cmap of your choice
+cmap = plt.cm.jet
+
+# create a 'mapper'
+mapper = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+
+# map the data to a rgba array
+rgba = mapper.to_rgba(z)
+
+# make some adjustments to the alpha
+rgba[:,:,3] = 0.5
+
+# and plot
+# there is no need for vmin, cmap etc keywords, its already rgba
+ax.imshow(rgba)
+</code></pre>

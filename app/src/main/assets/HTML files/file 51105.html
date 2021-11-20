@@ -1,0 +1,19 @@
+<p>I've found the answer. It seems that the device is responding to the request from a different source port. This means that the Windows drivers (and Wireshark) marks the messages as unrelated. (Not responding from the same socket/port is a rather foolish thing to do and I'm guessing it's an error.)</p>
+
+<p>However, it can be fixed. Instead of the 'unicast' socket above, one have to create a server socket. Like so:</p>
+
+<pre><code>//create transport
+IPEndPoint local = new IPEndPoint(m_interface_ip, 0); //bind to any free port
+m_conn = new UdpClient();
+m_conn.Client.Bind(local);
+m_conn.EnableBroadcast = true;
+m_conn.BeginReceive(new AsyncCallback(OnDataReceived), m_conn);
+
+//create packet...
+//...
+
+//send
+m_conn.Send(buffer, length, new IPEndPoint(m_destination_ip, m_port));
+</code></pre>
+
+<p>This will annoy the firewall, but it seems to work.</p>

@@ -1,0 +1,44 @@
+<p>I can't quite follow your need for a proxy if the delegate that you're trying to proxy is null, or did you mean that the delegate that you needed to proxy was the scroll view's WeakDelegate?</p>
+
+<p>A WeakDelegate is essentially any NSObject, and any methods that you need to implement must be 'exported' in order for the delegate's owner to be able to invoke them.</p>
+
+<pre><code>[Export("scrollViewDidEndDecelerating:")]
+public void MyDecelerationEndedMethod(UIScrollView scrollView)
+{
+  ...
+}
+</code></pre>
+
+<p>You can add methods like this onto any NSObject, a view controller for example. If you needed to use a WeakDelegate as the subject of your proxy you'd have to query it to see it if responds to the selector and then perform the selector - which I think is what you were meaning. </p>
+
+<p>However, I don't think you'd be able to write a generic proxy that could handle any delegate because although the proxy gets RespondsToSelector called, it doesn't get PerformSelector called - the selector is sent directly to the proxy and not via PerformSelector.  You'd have to write a proxy that implements exactly the same methods as the delegate you want to proxy.</p>
+
+<p>The best I could come up with is something like the following where you'd have to implement each method that the delegate implements.</p>
+
+<pre><code>public class TestProxy : NSObject
+{
+    private NSObject realDelegate;
+
+    public TestProxy(NSObject realDelegate)
+    {
+        this.realDelegate = realDelegate;
+    }
+
+    public override bool RespondsToSelector(MonoTouch.ObjCRuntime.Selector sel)
+    {
+        Console.WriteLine("Query : " + sel.Name);
+        return this.realDelegate.RespondsToSelector(sel);
+    }
+
+    [Export("tableView:didSelectRowAtIndexPath:")]
+    public void RowSelected(UITableView tableView, NSIndexPath indexPath)
+    {
+        // invoke method on realDelegate either by casting to the correct type or by using
+        // reflection to find the method that matches the export and pass this method's arguments.
+        // which way you implement depends on your needs and what you know about the delegate being
+        // proxied - casting would be much faster than reflection.
+    }
+}
+</code></pre>
+
+<p>Because you're implementing all the methods that the delegate implements, the RespondsToSelector in redundant and not required.</p>

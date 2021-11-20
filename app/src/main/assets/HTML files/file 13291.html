@@ -1,0 +1,17 @@
+<p>Your <code>replaceBytesInRange</code> calls looks a bit weird:</p>
+
+<pre><code>[soundFileData replaceBytesInRange:NSMakeRange(4, 4) withBytes:[NSString stringWithFormat:@"%X", totalLength-8]];
+[soundFileData replaceBytesInRange:NSMakeRange(42, 4) withBytes:[NSString stringWithFormat:@"%X", totalLength]];
+</code></pre>
+
+<p>This will pass pointers to <code>NSString</code> instances to be used as new bytes.</p>
+
+<p>I think you want to do something like this:</p>
+
+<pre><code>[soundFileData replaceBytesInRange:NSMakeRange(4, 4)
+                         withBytes:&amp;(UInt32){NSSwapHostIntToLittle(totalLength-8)}];
+[soundFileData replaceBytesInRange:NSMakeRange(42, 4)
+                         withBytes:&amp;(UInt32){NSSwapHostIntToLittle(totalLength)}];
+</code></pre>
+
+<p>Now the length will the correct bytes in little endian order as the WAV format specifies. The byte swapping to little endian is probably a NOP when building for both iOS simulator and ARM but it's probably good to be explicit.</p>

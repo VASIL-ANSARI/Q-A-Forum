@@ -1,0 +1,89 @@
+<blockquote>
+  <p>Can these callbacks be used from the SQLite CLI...</p>
+</blockquote>
+
+<p>Reading through the SQLite source code, it doesn't look like that function is used anywhere in the CLI source code, so I doubt you can do it via the CLI.</p>
+
+<blockquote>
+  <p>...or from Bash...</p>
+</blockquote>
+
+<p>Not sure what you mean by that.</p>
+
+<blockquote>
+  <p>...or from Python?</p>
+</blockquote>
+
+<p>It's not exposed via the standard <a href="http://docs.python.org/2/library/sqlite3.html"><code>sqlite3</code></a> module, but you can use it with the <a href="http://docs.python.org/2/library/ctypes.html"><code>ctypes</code></a> module.</p>
+
+<blockquote>
+  <p>If so, how?</p>
+</blockquote>
+
+<p>Here's a quick n' dirty example of using it via <code>ctypes</code>...</p>
+
+<pre><code>from ctypes import *
+
+# Define some symbols
+SQLITE_DELETE =  9
+SQLITE_INSERT = 18
+SQLITE_UPDATE = 23
+
+# Define our callback function
+#
+# 'user_data' will be the third param passed to sqlite3_update_hook
+# 'operation' will be one of: SQLITE_DELETE, SQLITE_INSERT, or SQLITE_UPDATE
+# 'db name' will be the name of the affected database
+# 'table_name' will be the name of the affected table
+# 'row_id' will be the ID of the affected row
+def callback(user_data, operation, db_name, table_name, row_id):
+    if operation == SQLITE_DELETE:
+        optext = 'Deleted row'
+    elif operation == SQLITE_INSERT:
+        optext = 'Inserted row'
+    elif operation == SQLITE_UPDATE:
+        optext = 'Updated row'
+    else:
+        optext = 'Unknown operation on row'
+    s = '%s %ld of table "%s" in database "%s"' % (optext, row_id, table_name, db_name)
+    print s
+
+# Translate into a ctypes callback
+c_callback = CFUNCTYPE(c_void_p, c_void_p, c_int, c_char_p, c_char_p, c_int64)(callback)
+
+# Load sqlite3
+dll = CDLL('libsqlite3.so')
+
+# Holds a pointer to the database connection
+db = c_void_p()
+
+# Open a connection to 'test.db'
+dll.sqlite3_open('test.db', byref(db))
+
+# Register callback
+dll.sqlite3_update_hook(db, c_callback, None)
+
+# Create a variable to hold error messages
+err = c_char_p()
+
+# Now execute some SQL
+dll.sqlite3_exec(db, 'create table foo (id int, name varchar(255))', None, None, byref(err))
+if err:
+    print err.value
+dll.sqlite3_exec(db, 'insert into foo values (1, "Bob")', None, None, byref(err))
+if err:
+    print err.value
+</code></pre>
+
+<p>...which prints out...</p>
+
+<pre><code>Inserted row 1 of table "foo" in database "main"
+</code></pre>
+
+<p>...on the first run and...</p>
+
+<pre><code>table foo already exists
+Inserted row 2 of table "foo" in database "main"
+</code></pre>
+
+<p>...on the second run.</p>

@@ -1,0 +1,38 @@
+<p>Could you elaborate on the issue that you're running into (perhaps showing code a small example of code that isn't working for you)?  Because <code>TypeBuilder</code> derives from <code>Type</code>, if you're trying to define mutually recursive types you can pass the two <code>TypeBuilder</code>s wherever you'd like to refer to the types.</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>There's no need to "resolve" the types.  You have access to the <code>TypeBuilder</code>s for each and can use them just as if they were fully defined types.  Here's an example that generates the code you requested in your update:</p>
+
+<pre><code>private void DefineAutoProp(string name, Type t, TypeBuilder tb)
+{
+    var fldName = name.Substring(0, 1).ToLower() + name.Substring(1);
+    var fld = tb.DefineField(fldName, t, FieldAttributes.Private);
+    var prop = tb.DefineProperty(name, PropertyAttributes.None, t, null);
+    var getter = tb.DefineMethod("get_" + name, MethodAttributes.Public, t, null);
+    var ilg = getter.GetILGenerator();
+    ilg.Emit(OpCodes.Ldarg_0);
+    ilg.Emit(OpCodes.Ldfld, fld);
+    ilg.Emit(OpCodes.Ret);
+    var setter = tb.DefineMethod("set_" + name, MethodAttributes.Public, typeof(void), new[] { t });
+    ilg = setter.GetILGenerator();
+    ilg.Emit(OpCodes.Ldarg_0);
+    ilg.Emit(OpCodes.Ldarg_1);
+    ilg.Emit(OpCodes.Stfld, fld);
+    ilg.Emit(OpCodes.Ret);
+    prop.SetGetMethod(getter);
+    prop.SetSetMethod(setter);
+}
+
+public void DefineTypes()
+{
+    var ab = AppDomain.CurrentDomain.DefineDynamicAssembly(new AssemblyName("test"), AssemblyBuilderAccess.Run);
+    var mb = ab.DefineDynamicModule("test");
+    var A = mb.DefineType("A", TypeAttributes.Public | TypeAttributes.Class);
+    var B = mb.DefineType("B", TypeAttributes.Public | TypeAttributes.Class);
+    DefineAutoProp("AnInstanceOfA", A, B);
+    DefineAutoProp("AnInstanceOfB", B, A);
+    A.CreateType();
+    B.CreateType();
+}
+</code></pre>

@@ -1,0 +1,80 @@
+<p>First, I suspect it's because your TableView is not allowing selection.  Hence, <code>[tableView indexPathForSelectedRow]</code> might be returning <code>nil</code>.  Check to make sure it is returning what you expect.  If it still is not, delete the segue from the UITableViewCell and create one from FolderTableViewController --> FolderCollectionViewController.  Then, in the UITableViewDelegate implement:</p>
+
+<pre><code>- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath; {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    [self performSegueWithIdentifier:@"showFolderCollection" sender:indexPath];
+}
+</code></pre>
+
+<p>Second, after reading your comments, this is how I would set up your prepare for segue method:</p>
+
+<pre><code>-(void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender{
+    if([segue.identifier isEqualToString:@"showFolderCollection"]) {
+        NSIndexPath *indexPath = [sender isKindOfClass:[NSIndexPath class] ? sender : [self.tableView indexPathForSelectedRow];
+        Folder *selectedFolder = self.folders[indexPath.row];
+        FolderCollectionViewController *fcvc = (FolderCollectionViewController *)segue.destinationViewController;
+        [fcvc loadFolder:selectedFolder];
+    }
+}
+</code></pre>
+
+<p>Note that in <code>FolderCollectionViewController</code> the <code>prepareForSegue</code> is called after <code>viewDidLoad</code> and before <code>viewWillAppear</code></p>
+
+<ol>
+<li>FoldersTableViewController: User Touches Row</li>
+<li>Apple figures out what the tapped Row / Segue should do</li>
+<li>FolderCollectionViewController: <code>viewDidLoad</code></li>
+<li>FoldersTableViewController: <code>prepareForSegue</code></li>
+<li>FolderCollectionViewController: <code>viewWillAppear:</code></li>
+</ol>
+
+<p>So don't rely on <code>folder</code> being there in your <code>viewDidLoad</code> method for FolderCollectionViewController.</p>
+
+<pre><code>- (void)viewDidLoad {
+    [super viewDidLoad];
+    // don't load your data here.
+}
+</code></pre>
+
+<p>Instead, create a method like this:</p>
+
+<pre><code>-(void) loadFolder:(Folder*)folder {
+    self.folder = folder;
+    self.photoImages = [folder loadAllImages]; // or whatever
+    [self.collectionView reloadData]; // put this here or in -viewWillAppear:
+}
+</code></pre>
+
+<p>In regards to the folder class, I'd define it like the following:</p>
+
+<pre><code>@interface Folder : NSObject
+
++(instanceType) folderWithName:(NSString*)name date:(NSDate*)date andImagePaths:(NSArray*)imagePaths;
+
+@property (nonatomic) NSString *name;
+@property (nonatomic) NSDate *date;
+@property (nonatomic) NSArray *imagePaths;
+@property (nonatomic, readonly) NSString *thumbPath; // use this for the UITableView Image
+
+@end
+
+@implementation Folder
+
++(instanceType) folderWithName:(NSString*)name date:(NSDate*)date andImagePaths:(NSArray*)imagePaths; {
+    Folder *folder = [Folder new];
+    folder.name = name;
+    folder.date = date;
+    folder.imagePaths = imagePaths;
+}
+
+- (NSString*) thumbPath {
+    if (self.imagePaths != nil &amp;&amp;
+        self.imagePaths.count &gt; 0) {
+        return [self.imagePaths firstObject];
+    } else {
+        return nil;
+    }
+}
+
+@end
+</code></pre>

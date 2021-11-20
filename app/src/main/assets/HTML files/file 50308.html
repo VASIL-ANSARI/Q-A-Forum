@@ -1,0 +1,47 @@
+<blockquote>
+  <p>The client send a message, the server return the same message in
+  uppercase. How can i allow the client to send infinite message and
+  don't destroy itself after sending the first message ?</p>
+</blockquote>
+
+<p>just have the client use a loop</p>
+
+<pre><code>boolean quit = false;
+while (!quit) {
+    sentence = this.inUser.readLine();
+    quit = sentence.trim().equals("quit");
+    this.out.writeBytes(sentence + '\n');
+    modifiedSentence = this.inServeur.readLine();
+    System.out.println("FROM SERVER: " + modifiedSentence);
+}
+this.socket.close();
+</code></pre>
+
+<blockquote>
+  <p>The server looks ok, but when i will have multiple client, will it
+  make difference between multiple client ? How can i broadcast ? send
+  message to focused client ?</p>
+</blockquote>
+
+<p>Yes, this server blocks reading the first client so any other client would have to wait. You probably want to put the code for blocking on each client in a separate thread or submit it to an ExecutiveService. And all of the variables that are specific to a client can not be in the single server class since you need one set for each client.</p>
+
+<pre><code>while (true) {
+    final Socket socket = serverSocket.accept();
+    new Thread(() -&gt; {
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            boolean quit = false;
+            while (!quit) {
+                String msgClient = in.readLine();
+                quit = msgClient.trim().equals("quit");
+                System.out.println("Received: " + msgClient);
+                String msgServeur = msgClient.toUpperCase() + '\n';
+                out.writeBytes(msgServeur);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }).start();
+}
+</code></pre>

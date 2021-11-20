@@ -1,0 +1,112 @@
+<p>Your idea is very close. It's not so much a <em>chain</em>, the ajax calls can run in parallel, but you need to know when they've all finished. jQuery has just the thing for you: <a href="http://api.jquery.com/jQuery.when" rel="nofollow"><code>$.when</code></a>:</p>
+
+<pre><code>function App() {
+    var t = this;
+    t.readyPromise = $.when(
+        $.ajax({
+          url: '/users',
+          dataType: "json",
+          success: function(data) {
+              t.users = data;
+          }
+        }),
+        $.ajax({
+          url: '/items',
+          dataType: "json",
+          success: function(data) {
+              t.items = data;
+          }
+        }),
+        $.ajax({
+          url: '/pets',
+          dataType: "json",
+          success: function(data) {
+              t.pets = data;
+          }
+        })
+    );
+}
+</code></pre>
+
+<p>Since <code>App</code> looks like a constructor, I'll note that the instance you get from <code>new App()</code> won't be ready to use until its <code>readyPromise</code> resolves. You might reorganize the code so that you don't have a partially-constructed object (partially-constructed objects tend to be a bad idea). We can also make use of the way <code>$.when</code> collects the results of promises for us:</p>
+
+<pre><code>function App(users, items, pets) {
+    this.users = users;
+    this.items = items;
+    this.pets = pets;
+}
+App.get = function() {
+    return $.when(
+        $.ajax({
+          url: '/users',
+          dataType: "json"
+        }),
+        $.ajax({
+          url: '/items',
+          dataType: "json"
+        }),
+        $.ajax({
+          url: '/pets',
+          dataType: "json"
+        })
+    ).then(function(users, items, pets) {
+        return new App(users, items, pets);
+    });
+};
+</code></pre>
+
+<p>Usage:</p>
+
+<pre><code>App.get().then(function(app) {
+    // use `app` here
+});
+</code></pre>
+
+<p>Live Example:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="true" data-console="true" data-babel="false">
+<div class="snippet-code snippet-currently-hidden">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function fakeAjax(opts) {
+  var d = $.Deferred();
+  setTimeout(function() {
+    d.resolve(["some " + opts.url.substring(1)]);
+  }, Math.floor(Math.random() * 500));
+  return d.promise();
+}
+function App(users, items, pets) {
+  this.users = users;
+  this.items = items;
+  this.pets = pets;
+}
+console.log("Getting...");
+App.get = function() {
+  return $.when(
+    fakeAjax({
+      url: '/users',
+      dataType: "json"
+    }),
+    fakeAjax({
+      url: '/items',
+      dataType: "json"
+    }),
+    fakeAjax({
+      url: '/pets',
+      dataType: "json"
+    })
+  ).then(function(users, items, pets) {
+    return new App(users, items, pets);
+  });
+};
+
+// Usage:
+App.get().then(function(app) {
+  console.log(app);
+});</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<hr>
+
+<p>Side note: It's <code>dataType</code>, not <code>datatype</code>; I've fixed it in the above. There were also essential missing commas.</p>

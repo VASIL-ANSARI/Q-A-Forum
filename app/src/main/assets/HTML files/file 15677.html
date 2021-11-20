@@ -1,0 +1,17 @@
+<p>I was really hoping someone would chime in with a definitive answer on the public key question. Seems like it should work. However, in the meantime, I've switched from a public key to a self-signed certificate. The openssl library in PHP seems happy with extracting an acceptable public key from that. Which means the real problem (verifying signed data) is solved for me. Server clients will now have the data, signature, and x.509 certificate.</p>
+
+<p>Here are the code snippet(s).</p>
+
+<pre><code>$ openssl genrsa -out server.key 4096
+$ openssl req -new -key server.key -out server.csr
+$ openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+$ openssl dgst -sha1 -sign server.key -out file.sha1 file.txt
+</code></pre>
+
+<p>...</p>
+
+<pre><code>$pubkey = openssl_pkey_get_public(file_get_contents('/var/key/server.crt')); 
+$sig = file_get_contents('/var/key/file.sha1');
+$data = file_get_contents('/var/key/file.txt');
+$verifyResult = (openssl_verify($data, $sig, $pubkey) == 1);
+</code></pre>

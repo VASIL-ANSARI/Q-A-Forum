@@ -1,0 +1,52 @@
+<blockquote>
+  <p>would a mapping between an Entity and an Interface even work? (in
+  general)</p>
+</blockquote>
+
+<p>The JPA Specification defines relationships between entities. The JPA Spec s 2.1 states interfaces must ânot be designated as an entityâ.  So <code>Pushable</code> cannot be the target for a relationship in any portable way.
+Further, your <code>Plan</code> object is an embedded object and not an entity in its own right and also cannot be the target of a relationship.</p>
+
+<blockquote>
+  <p>would it be a problem to have two ID columns in a join table?
+  Both Account and Service get @Id from BasicEntity</p>
+</blockquote>
+
+<p>There is a principle issue with the @JoinTable you have set up regardless of the fact that an interface is the target. </p>
+
+<pre><code>@ManyToMany(cascade=CascadeType.ALL)
+  @JoinTable(name="PUSHABLES_ACCOUNTS", joinColumns=@JoinColumn(name="ID"), 
+  inverseJoinColumns=@JoinColumn(name="ID"))
+</code></pre>
+
+<p>In <code>@JoinColumn(name="ID")</code>, ânameâ refers to the name of the column in the link table <code>PUSHABLES_ACCOUNTS</code>, this is also true  for  <code>inverseJoinColumns=@JoinColumn(name="ID"))</code>
+So, (and ignoring the fact that Pushables is not an entity), your joinColumns and inverseJoinColumns refer to the same column in the <code>PUSHABLES_ACCOUNTS</code> link table. You need to link the ID of the Account, to the ID of the Pushable.
+You would expect a join table to look something like the following:</p>
+
+<pre><code>       PUSHABLES_ACCOUNTS
+**Account_ID**    **PUSHABLES_ID**
+    005                 017
+    â¦.                  â¦.
+</code></pre>
+
+<p>Therefore your join table would be:  </p>
+
+<pre><code>@ManyToMany(cascade=CascadeType.ALL)
+  @JoinTable(name="PUSHABLES_ACCOUNTS", 
+    joinColumns=@JoinColumn(name=" Account_ID ", referencedColumnName=âIDâ), 
+    inverseJoinColumns=@JoinColumn(name=" PUSHABLES_ID " , referencedColumnName=âIDâ))
+</code></pre>
+
+<p>Iâve added <code>referencedColumnName</code> here, although these values would be used by default. These are the columns of the source table (joinColumns) and target table (inverseJoinColumns). It is possible for this relationship to be self referencing and for the source table = target table.</p>
+
+<hr>
+
+<p><strong>Options</strong></p>
+
+<p>The only possible relationship targets from Account in your current class diagram are therefore Package and Service. So you could define Two ManyToMany relationships from Account â one to Package and one to Service. Then dig out the embedded Plan from each of the Service entities and build the list of Pushables that way.</p>
+
+<p>Thereâs quite a lot of flexibility available to you depending on your business requirements, and when non-entities such as interfaces, embeddables, mapped-superclass look like they need to be part of relationships, thinking about promoting or masaging these to entities might also help.</p>
+
+<p>For example change BasicEntity to an entity form a MappedSuperclass â you would need to define your inheritance strategy though â and you can then have a relationship between Account and BasicEntity. </p>
+
+<p>Another option which â and I havenât tried this - is to define and Abstract entity class that extends BasicEntity and is a super to Package and Service. The class can then be a convenient target for the Many-to-Many from Account, again you would need to think about you inheritance strategy.
+.</p>

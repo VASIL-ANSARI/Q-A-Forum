@@ -1,0 +1,103 @@
+<p>This link <a href="http://squarey.me/cloud-virtualization/pox-controller-learning-four.html" rel="nofollow">http://squarey.me/cloud-virtualization/pox-controller-learning-four.html</a>
+ provides examples of POX component that listens to ConnectionUp events from all switches and get the dpid</p>
+
+<p><strong>1. Use the component script "connectionDown.py" inside POX directory:</strong></p>
+
+<pre><code>#!/usr/bin/python
+from pox.core import core
+from pox.lib.util import dpid_to_str
+from pox.lib.revent import *
+
+log = core.getLogger()
+
+class ConnectionUp(Event):
+    def __init__(self,connection,ofp):
+        Event.__init__(self)
+        self.connection = connection
+        self.dpid = connection.dpid
+        self.ofp = ofp
+class ConnectionDown(Event):
+    def __init__(self,connection,ofp):
+        Event.__init__(self)
+        self.connection = connection
+        self.dpid = connection.dpid
+
+class MyComponent(object):
+    def __init__(self):
+        core.openflow.addListeners(self)
+
+    def _handle_ConnectionUp(self,event):
+        ConnectionUp(event.connection,event.ofp)
+        log.info("Switch %s has come up.",dpid_to_str(event.dpid))
+
+    def _handle_ConnectionDown(self,event):
+        ConnectionDown(event.connection,event.dpid)
+        log.info("Switch %s has shutdown.",dpid_to_str(event.dpid))
+
+def launch():
+    core.registerNew(MyComponent)
+</code></pre>
+
+<p><strong>2- (POX controller xterm) Start the POX controller with custom component</strong></p>
+
+<pre><code>mininet@mininet-vm:~/pox$ ./pox.py connectionDown
+POX 0.1.0 (betta) / Copyright 2011-2013 James McCauley, et al.
+INFO:core:POX 0.1.0 (betta) is up.
+</code></pre>
+
+<p><strong>3- (mininet xterm) start mininet topology with multiple switches</strong></p>
+
+<pre><code>mininet@mininet-vm:~$ sudo mn --topo linear --mac --controller remote --switch ovsk
+*** Creating network
+*** Adding controller
+*** Adding hosts:
+h1 h2
+*** Adding switches:
+s1 s2
+*** Adding links:
+(h1, s1) (h2, s2) (s1, s2)
+*** Configuring hosts
+h1 h2
+*** Starting controller
+*** Starting 2 switches
+s1 s2
+*** Starting CLI:
+mininet&gt;
+</code></pre>
+
+<p><strong>4- Back to POX controller xterm, here is what observe in POX xterm:</strong></p>
+
+<pre><code>./pox.py connectionDown
+POX 0.1.0 (betta) / Copyright 2011-2013 James McCauley, et al.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-02 2] connected
+INFO:connectionDown:Switch 00-00-00-00-00-02 has come up.
+INFO:openflow.of_01:[00-00-00-00-00-01 1] connected
+INFO:connectionDown:Switch 00-00-00-00-00-01 has come up.
+</code></pre>
+
+<p><strong>5- S#POX  should react to any changes to rhe switches:</strong></p>
+
+<pre><code>mininet&gt; py s1.stop()
+mininet&gt; py s1.start([c0])
+mininet&gt;
+</code></pre>
+
+<p><strong>4- Back to POX controller xterm:</strong></p>
+
+<pre><code>mininet@mininet-vm:~/pox$ ./pox.py connectionDown
+POX 0.1.0 (betta) / Copyright 2011-2013 James McCauley, et al.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-02 2] connected
+INFO:connectionDown:Switch 00-00-00-00-00-02 has come up.
+INFO:openflow.of_01:[00-00-00-00-00-01 1] connected
+INFO:connectionDown:Switch 00-00-00-00-00-01 has come up.
+</code></pre>
+
+<blockquote>
+<pre><code>INFO:openflow.of_01:[00-00-00-00-00-01 1] closed
+INFO:connectionDown:Switch 00-00-00-00-00-01 has shutdown.
+INFO:openflow.of_01:[00-00-00-00-00-01 3] connected
+INFO:connectionDown:Switch 00-00-00-00-00-01 has come up.
+</code></pre>
+</blockquote>

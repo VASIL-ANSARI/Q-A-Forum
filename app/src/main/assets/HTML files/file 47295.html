@@ -1,0 +1,20 @@
+<p>It requires some manual work, but you could something like this:</p>
+
+<pre><code>select
+    TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,
+    cmd = 'select ''' + table_name + ''' as tabname, ''' + column_name + ''' as colname, count(*) as rows from [' + TABLE_CATALOG + '].[' + TABLE_SCHEMA  + '].[' +  TABLE_NAME + '] where [' + COLUMN_NAME + '] like ''%%'' union all '
+from INFORMATION_SCHEMA.COLUMNS
+where 1=1
+    and DATA_TYPE like '%char'
+    and TABLE_NAME like '%%'
+</code></pre>
+
+<p>Then you just execute the resulting query (change the select to fit your needs better and remove the last <code>union all</code>). 
+The results for every column in the same table will be in different rows, but you could use <code>FOR XML PATH</code> to generate <code>OR</code> statements so it doesn't return same rows duplicated by searched columns.</p>
+
+<p>If you need this to be dynamic, without copying and pasting, check this <strong>undocumented</strong> procedure out:</p>
+
+<pre><code>sp_msforeachtable @command1="declare @x Nvarchar(255); set @x='select count(*) from ?'; execute sp_executesql @x"
+</code></pre>
+
+<p>Build your queries in <code>@command1</code> using <code>information_schema.columns</code>, like in previous example.</p>

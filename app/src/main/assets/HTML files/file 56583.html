@@ -1,0 +1,64 @@
+<p>As said in your post, Spark is loading an older version of the <code>httpclient</code>. The solution is to use the Maven's <a href="https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html" rel="nofollow"><code>relocation</code></a> facility to produce a neat conflict-free project.</p>
+
+<p>Here's an example of how to use it in your <code>pom.xml</code> file : </p>
+
+<pre><code>&lt;project&gt;
+  &lt;!-- Your project definition here, with the groupId, artifactId, and it's dependencies --&gt; 
+  &lt;build&gt;
+    &lt;plugins&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+        &lt;artifactId&gt;maven-shade-plugin&lt;/artifactId&gt;
+        &lt;version&gt;2.4.3&lt;/version&gt;
+        &lt;executions&gt;
+          &lt;execution&gt;
+            &lt;phase&gt;package&lt;/phase&gt;
+            &lt;goals&gt;
+              &lt;goal&gt;shade&lt;/goal&gt;
+            &lt;/goals&gt;
+            &lt;configuration&gt;
+              &lt;relocations&gt;
+                &lt;relocation&gt;
+                  &lt;pattern&gt;org.apache.http.client&lt;/pattern&gt;
+                  &lt;shadedPattern&gt;shaded.org.apache.http.client&lt;/shadedPattern&gt;
+                &lt;/relocation&gt;
+              &lt;/relocations&gt;
+            &lt;/configuration&gt;
+          &lt;/execution&gt;
+        &lt;/executions&gt;
+      &lt;/plugin&gt;
+    &lt;/plugins&gt;
+  &lt;/build&gt;
+
+&lt;/project&gt;
+</code></pre>
+
+<p>This will move all files from <code>org.apache.http.client</code> to <code>shaded.org.apache.http.client</code>, resolving the conflict. </p>
+
+<hr>
+
+<p><strong>Original post :</strong></p>
+
+<p>If this is simply a matter of transitive dependencies, you could just add this to your <code>spark-core</code> dependency to exclude the HttpClient used by Spark :</p>
+
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.spark&lt;/groupId&gt;
+    &lt;artifactId&gt;spark-core_2.10&lt;/artifactId&gt;
+    &lt;version&gt;1.2.2&lt;/version&gt;
+    &lt;scope&gt;provided&lt;/scope&gt;
+    &lt;exclusions&gt;
+        &lt;exclusion&gt;
+            &lt;groupId&gt;org.apache.httpcomponents&lt;/groupId&gt;
+            &lt;artifactId&gt;httpclient&lt;/artifactId&gt;
+        &lt;/exclusion&gt;
+    &lt;/exclusions&gt;
+&lt;/dependency&gt;
+</code></pre>
+
+<p>I also added the <code>scope</code> as <code>provided</code> in your dependency as it will be provided by your cluster.  </p>
+
+<p>However, that might muck around with Spark's internal behaviour. If you still get an error after doing this, you could try using Maven's <a href="https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html" rel="nofollow"><code>relocation</code></a> facility that should produce a neat conflict-free project.</p>
+
+<p>Regarding the fact you can't upgrade Spark's version, did you use exactly <a href="http://mvnrepository.com/artifact/org.apache.spark/spark-core_2.10/1.6.1" rel="nofollow">this dependency</a> declaration from mvnrepository ? </p>
+
+<p>Spark being backwards compatible, there shouldn't be any problem deploying your job on a cluster with a higher version.   </p>

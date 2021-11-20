@@ -1,0 +1,40 @@
+<p>You can do that in multiple statements, first Get <code>WarehouseID</code> along with distinct products in each warehouse and their count like:</p>
+
+<pre><code>var query = products.GroupBy(r =&gt; r.WarehouseID)
+                    .Select(grp =&gt; new
+                    {
+
+                        WarehouseID = grp.Key,
+                        DistinctProducts = grp.Select(r =&gt; r.SKU).Distinct(),
+                        DistinctCount = grp.Select(r =&gt; r.SKU).Distinct().Count(),
+                    });
+</code></pre>
+
+<p>Later create a result list like:</p>
+
+<pre><code>List&lt;Products&gt; result = new List&lt;Products&gt;();
+
+foreach (var item in query.OrderByDescending(r =&gt; r.DistinctCount)) //warehouse with most products
+{
+    if (!result.Any(r =&gt; item.DistinctProducts.Any(t =&gt; t == r.SKU)))
+    {
+        result.AddRange(item.DistinctProducts.Select(r =&gt; new Products { SKU = r, WarehouseID = item.WarehouseID }));
+    }
+}
+</code></pre>
+
+<p>For output:</p>
+
+<pre><code>foreach (var item in result)
+{
+    Console.WriteLine("{0} | {1}", item.SKU, item.WarehouseID);
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>SKU001 | 3
+SKU002 | 3
+SKU003 | 3
+SKU004 | 1
+</code></pre>

@@ -1,0 +1,49 @@
+<p>Instead of opening the file twice, what about:</p>
+
+<pre><code>import numpy as np
+
+with open('input.txt', "r") as data:
+    while True:
+        line = data.readline()
+        if not line.startswith('#'): break
+
+    header = [e for e in line.strip().split('\t') if e]
+    print(header)
+
+    B = np.genfromtxt(data, names=header, dtype=None, delimiter='\t')
+
+print B
+print B['y_1']
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code># header
+['p', 'q', 'r', 'y 1', 'y 2', 'y 3', 'y 4']
+
+# B
+[(2, 8, 14, 748, 748, 748, 790) (2, 9, 22, 262, 245, 252, 328)
+ (1, 5, 19, 512, 514, 511, 569) (2, 7, 19, 748, 748, 748, 805)
+ (3, 11, 13, 160, 168, 108, 164) (2, 7, 20, 788, 788, 788, 848)
+ (1, 4, 15, 310, 310, 310, 355) (3, 12, 17, 230, 210, 213, 218)]
+
+# B['y_1']
+[748 262 512 748 160 788 310 230]
+</code></pre>
+
+<p>Instead of passing the filename to <code>np.genfromtxt</code>, here, you pass <code>data</code> the file reader generator.</p>
+
+<p>Otherwise, you get into a weird situation where <code>skip_header</code> doesn't really work, because it considers comment lines.  So you'd have to say <code>skip_header=4</code> (3 comment lines + 1 header line) when what makes is <code>skip_header=1</code>.</p>
+
+<p>So this approach first "throws out" comment lines.  Then for the next line it extracts the headers.  It passes the remaining lines into the <code>np.genfromtxt</code> function with the associated headers.</p>
+
+<p>A few notes:</p>
+
+<ul>
+<li><p><code>unpack=True</code> + <code>transpose()</code> cancel each other out.  So the effect of using both is the same as using neither.  So use neither.</p></li>
+<li><p>And if you really want to access the fields using names with spaces (instead of underscores) you can always rename the fields after you generate the <code>ndarray</code>:</p>
+
+<pre><code>B.dtype.names = [n.replace('_', ' ') for n in B.dtype.names]
+print B['y 1']  # [748 262 512 748 160 788 310 230]
+</code></pre></li>
+</ul>

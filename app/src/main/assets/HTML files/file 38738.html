@@ -1,0 +1,61 @@
+<p>Okay, I figured out a way to avoid setInterval.</p>
+
+<p>Firstly, I pushed the update function as Raphael custom Attribute:</p>
+
+<pre><code>    RaphaelCont = Raphael("menu", "100%", "100%");
+    RaphaelCont.customAttributes.update = function(){
+            var xy = getXY(this.data('startObj'), true);
+            var xye = getXY(this.data('endObj'), true);
+            var xyq = getQP(xy, xye);
+            var path = [["M", xy[0], xy[1]],["Q", xyq[0], xyq[1], xye[0], xye[1]]];
+            this.attr({path: path});};
+</code></pre>
+
+<p>Function getXY and getQP remain unchanged.</p>
+
+<p>Then, I modify the custructCurve function like this:</p>
+
+<pre><code>    var constructCurve = function(R, obj1, obj2, c) { //Creates a quadratic bezier curve between obj1 and obj2, using CSS ID, in a given Raphael object (R), in c color
+    var xy = getXY(obj1, true);
+    var xye = getXY(obj2, true)
+    var xyq = getQP(xy, xye);
+    //Create Curve
+    var path = [
+            ["M", xy[0], xy[1]],
+            ["Q", xyq[0], xyq[1], xye[0], xye[1]]
+        ];
+    var curve = R.path(path).attr({
+            stroke: c,
+            "stroke-width": 8,
+            "stroke-linecap": "round"
+        });
+        curve.data('startObj', obj1);
+        curve.data('endObj', obj2);
+    return curve;
+}
+</code></pre>
+
+<p>I add startObj and endObj data to the curve.</p>
+
+<p>Lastly, when creating a curve, I assign them to variables and push them in an array"</p>
+
+<pre><code>var RaphaelCurves = [];
+RaphaelCurves.push(constructCurve(RaphaelCont, menu_home, menu_projects, "#fff"));
+    RaphaelCurves.push(constructCurve(RaphaelCont, menu_home, menu_skills, "#fff"));
+    RaphaelCurves.push(constructCurve(RaphaelCont, menu_home, menu_contact, "#fff"));
+    RaphaelCurves.push(constructCurve(RaphaelCont, menu_home, menu_about, "#fff"));
+</code></pre>
+
+<p>Now, I can call RaphaelCurves[index].attr({update: "foo"}) at any point (foo is just a filler to match Raphael, throws error if nothing is present after update: ).</p>
+
+<p>In my case, i link it to TweenMax.tick event:</p>
+
+<pre><code>    TweenMax.ticker.addEventListener("tick", myFunction);
+        function myFunction(event) {
+         for(var i=0; i&lt;RaphaelCurves.length; i++) {
+             RaphaelCurves[i].attr({update: "foo"});
+            }
+        }
+</code></pre>
+
+<p>Here's the updated codpen: <a href="http://codepen.io/mussler/pen/JgcEh" rel="nofollow">http://codepen.io/mussler/pen/JgcEh</a></p>

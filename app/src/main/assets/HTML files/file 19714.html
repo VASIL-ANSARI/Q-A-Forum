@@ -1,0 +1,25 @@
+<p>There is no way to pass the string <code>'Horror'</code> into the <code>INSERT</code> command for the <code>Film</code> table, because that table has no such column.</p>
+
+<p>In an embedded database like SQLite, there are no stored procedures because implementing the logic in your own program would not be any less efficient.</p>
+
+<p>So just do it yourself; the program would look like this:</p>
+
+<pre class="lang-py prettyprint-override"><code>cursor = db.executeQuery('SELECT id FROM Genre WHERE name = ?', ['Horror'])
+if cursor.hasSomeRecord:
+    genreID = cursor['id']
+else:
+    db.executeCommand('INSERT INTO Genre(id, name) VALUES(NULL, ?)', ['Horror'])
+    genreID = db.last_insert_rowid()
+
+db.executeCommand('INSERT INTO Film(name, genre) VALUES(?, ?)', ['...', genreID])
+</code></pre>
+
+<hr>
+
+<p>If you have a <code>UNIQUE</code> constraint on the <code>Genre(name)</code> field, you can easily insert the genre while automatically avoiding duplicates:</p>
+
+<pre class="lang-sql prettyprint-override"><code>INSERT OR IGNORE INTO Genre(name)
+  VALUES('Horror');
+INSERT INTO Film(name, genre)
+  VALUES('...', (SELECT id FROM Genre WHERE name = 'Horror'));
+</code></pre>

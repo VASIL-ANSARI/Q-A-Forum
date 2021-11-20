@@ -1,0 +1,37 @@
+<p>The issue with the above (why it doesnt work as expected) is <code>getProductArticleData</code> <strong>isnt</strong> actually treated like a normal function. It behaves more like the function seen in controllers where the parameters specified are actually going to be injected by angular:</p>
+
+<pre><code>angular.module("ourApp").controller(function ($scope, Service1, Service2) {
+    // some code
+});
+</code></pre>
+
+<p>So in your example, <code>ProductArticleApiService</code> is an angular service that will be injected and your app is probably broken because angular is now trying to inject <code>article_id</code> and <code>siteaccess</code> as services. Since (I assume) there are no such services it fails.</p>
+
+<p>I suspect what you're trying to do is to alow the parameters for the <code>$http</code> request to be specified external to the service. So This might be what you're looking for:</p>
+
+<pre><code>.state('product-article', {
+        resolve: {
+            // I moved the function here for clarity
+            // added $stateParams to be injected
+            productArticleData: function (ProductArticleApiService, $stateParams) {
+                return ProductArticleApiService.getData($stateParams.articleId, $stateParams.siteaccess);
+            }
+        },
+        // changed url
+        url: '/product-article/:articleId/:siteaccess',
+        templateUrl: siteInfo.templateRoot + '/productArticlePage.html',
+        controller: 'ProductArticlePageController',
+        controllerAs: 'ProductArticlePageCtrl'
+    })
+</code></pre>
+
+<p>A couple of things to note here:</p>
+
+<ul>
+<li>I changed the URL to accept two parameters <code>:articleId</code> and <code>siteaccess</code> and it can now be called as <code>/product-article/98/en</code></li>
+<li>I changed the function to accept both <code>ProductArticleApiService</code> and <code>$sateParams</code>. <code>$stateParams</code> is a "service" that provides the url parameters from above.</li>
+</ul>
+
+<p>I highly suggest you take a deep look at how routing in angular works, specifically <a href="https://docs.angularjs.org/api/ngRoute" rel="nofollow">ngRoute</a> and <a href="https://github.com/angular-ui/ui-router/wiki" rel="nofollow">ui-router</a> (they are related but different + you are using ui-router in your code).</p>
+
+<p>Hopefully that should be enough to get you started. Comment for clarification on anything.</p>

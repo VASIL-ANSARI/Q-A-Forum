@@ -1,0 +1,56 @@
+<p>I attempted to duplicate this with a wider group of assignment contexts:</p>
+
+<pre><code>final byte b = 12;
+Byte b2 = b;
+Character c = b;  // Only an error if b isn't final
+char c2 = b;      // Only an error if b isn't final
+Short s = b;      // Only an error if b isn't final
+short s2 = b;
+Integer i = b;  // Error, as indicated in the question
+int i2 = b;
+Long l = b;     // Also an error
+long l2 = b;
+Float f = b;    // Also an error
+float f2 = b;
+Double d = b;   // Also an error
+double d2 = b;
+</code></pre>
+
+<p>Assigning not just to a <code>Integer</code>, but also to a <code>Float</code>, a <code>Long</code> or a <code>Double</code> is also an error.</p>
+
+<p>Interestingly, if the original declaration of <code>b</code> was NOT <code>final</code>, then assigning to a <code>Character</code>, a <code>char</code>, or a <code>Short</code> fails also.</p>
+
+<p><a href="http://docs.oracle.com/javase/specs/jls/se8/html/jls-5.html#jls-5.2" rel="nofollow">Section 5.2 of the JLS</a> sheds a little light on the subject of assignment contexts and their allowed conversions.</p>
+
+<blockquote>
+  <p>Assignment contexts allow the use of one of the following:</p>
+  
+  <ul>
+  <li><p>an identity conversion (Â§5.1.1)</p></li>
+  <li><p>a widening primitive conversion (Â§5.1.2)</p></li>
+  <li><p>a widening reference conversion (Â§5.1.5)</p></li>
+  <li><p>a boxing conversion (Â§5.1.7) optionally followed by a widening reference conversion</p></li>
+  <li><p>an unboxing conversion (Â§5.1.8) optionally followed by a widening primitive conversion.</p></li>
+  </ul>
+</blockquote>
+
+<p>This covers all of the conversions to wider primitive variables, which are always allowed, whether <code>b</code> is <code>final</code> or not.  (That holds unless <code>b</code> is negative, in which case the assignment to an unsigned <code>char</code> (or <code>Character</code>) would fail.)  Continuing:</p>
+
+<blockquote>
+  <p>In addition, if the expression is a constant expression (Â§15.28) of type byte, short, char, or int:</p>
+  
+  <ul>
+  <li><p>A narrowing primitive conversion may be used if the type of the variable is byte, short, or char, and the value of the constant expression is representable in the type of the variable.</p></li>
+  <li><p>A narrowing primitive conversion followed by a boxing conversion may be used if the type of the variable is:</p>
+  
+  <ul>
+  <li><p>Byte and the value of the constant expression is representable in the type byte.</p></li>
+  <li><p>Short and the value of the constant expression is representable in the type short.</p></li>
+  <li><p>Character and the value of the constant expression is representable in the type char.</p></li>
+  </ul></li>
+  </ul>
+</blockquote>
+
+<p>Because <code>b</code> is <code>final</code>, the expression <code>b</code> is a <em>constant expression</em>, allowing it to be narrowed from the <code>int</code> constant expression <code>12</code> to <code>byte</code>, <code>char</code>, or <code>short</code> and then boxed to <code>Byte</code>, <code>Character</code>, or <code>Short</code>, but strangely, not to <code>Integer</code> or anything "above".  The only possible explanation I can think of is that constant expressions that are subject to a primitive narrowing conversion aren't specifically allowed to be converted to <code>Integer</code>, <code>Long</code>, <code>Float</code>, or <code>Double</code>.</p>
+
+<p>If <code>b</code> isn't <code>final</code>, then the narrowing followed by boxing isn't allowed, and a non-constant expression can't be promoted from <code>byte</code> to <code>char</code> either.</p>

@@ -1,0 +1,36 @@
+<p>Assuming, the <code>my_file</code> is to be chosen by <code>extension</code>, one might do:</p>
+
+<pre><code>Dir["/working_directory/**/*"].select do |dir_or_file|
+  File.directory? dir_or_file # select only directories, recursively
+end.inject({}) do |memo, dir|
+  new_name = Dir["#{dir}/*.extension"].to_a
+  unless new_name.size == 1 # check if the folder contains only one proper file
+    puts "Multiple/No choices; can not rename dir [#{dir}] â skipping..."
+    next memo # skip if no condition met
+  end
+  my_file = new_name.first[/[^\/]+(?=\.extension\z)/] # get my_name
+  memo[dir] = dir.gsub /[^\/]+(?=\/#{myfile}\.extension\z)/, my_file
+  memo
+end.each do |old, neu|
+  # dry run to make sure everything is OK 
+  puts "Gonna rename #{old} to #{neu}"
+  # uncomment the lines below as you are certain the code works properly
+  # neu_folder = neu[/(.*?)([^\/]+\z)/, 1]
+  # FileUtils.mkdir neu_folder unless File.exist? neu_folder
+  # FileUtils.mv old, neu # rename
+end
+</code></pre>
+
+<p>The rename is done after the main processing for the sake of previous iterator consistency, probably in this case it might be done in the previous loop, instead of injecting <code>old: neu</code> pairs into hash and iterating it later.</p>
+
+<p>We are heavily using string parsing with regexps here.</p>
+
+<pre><code>  my_file = new_name.first[/[^\/]+(?=\.extension\z)/] # get my_name
+</code></pre>
+
+<p>this line gets a new folder name by parsing a tail of the string, containing no slashes and trailing with <code>'.extension\z'</code> (see positive lookahead.)</p>
+
+<pre><code>  memo[dir] = dir.gsub /[^\/]+(?=\/#{myfile}\.extension\z)/, my_file
+</code></pre>
+
+<p>This line assigns a new element on an accumulator hash, substituting the old folder name with the new one.</p>

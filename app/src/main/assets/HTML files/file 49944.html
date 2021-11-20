@@ -1,0 +1,33 @@
+<p>I would do this with a single <code>ConcurrentMap</code> and <code>AsyncSubject</code>:</p>
+
+<pre><code>public class RequestCache&lt;K, V&gt; {
+    final ConcurrentMap&lt;K, AsyncSubject&lt;V&gt;&gt; values;
+    final Function&lt;? super K, ? extends Observable&lt;? extends V&gt;&gt; valueGenerator;
+
+    public RequestCache(
+            Function&lt;? super K, ? extends Observable&lt;? extends V&gt;&gt; valueGenerator) {
+        this.values = new ConcurrentHashMap&lt;&gt;();
+        this.valueGenerator = valueGenerator;
+    }
+
+    public Observable&lt;V&gt; get(K key) {
+        AsyncSubject&lt;V&gt; result = values.get(key);
+        if (result == null) {
+            result = AsyncSubject.create();
+
+            AsyncSubject&lt;V&gt; current = values.putIfAbsent(key, result);
+            if (current == null) {
+                Observable&lt;? extends V&gt; source = valueGenerator.apply(key);
+
+                source.subscribe(result);
+            } else {
+                result = current;
+            }
+        }
+
+        return result;
+    }
+}
+</code></pre>
+
+<p>This is fully threadsafe and calls <code>valueGenerator</code> once per key only.</p>

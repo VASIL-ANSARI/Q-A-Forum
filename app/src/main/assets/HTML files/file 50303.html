@@ -1,0 +1,184 @@
+<blockquote>
+  <p>You can use the following snippet for any multipart request using
+  volley.</p>
+</blockquote>
+
+<pre><code>import com.android.volley.AuthFailureError;
+import com.android.volley.NetworkResponse;
+import com.android.volley.ParseError;
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.VolleyLog;
+import com.android.volley.toolbox.HttpHeaderParser;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.FileBody;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.Map;
+
+public class TestMultiPartRequestextends Request&lt;JSONObject&gt; {
+
+// private MultipartEntity entity = new MultipartEntity();
+
+    MultipartEntityBuilder entity = MultipartEntityBuilder.create();
+    HttpEntity httpentity;
+    private static final String FILE_PART_NAME = "import_file";
+
+    private final Response.Listener&lt;JSONObject&gt; mListener;
+    private final Response.ErrorListener mErrorListener;
+    private final File mFilePart;
+    private final Map&lt;String, String&gt; mStringPart;
+
+    public TestMultiPartRequest(String url, Response.ErrorListener errorListener,
+                                 Response.Listener&lt;JSONObject&gt; listener, File file,
+                                 Map&lt;String, String&gt; mStringPart) {
+        super(Method.POST, url, errorListener);
+        this.mErrorListener = errorListener;
+        mListener = listener;
+        mFilePart = file;
+        this.mStringPart = mStringPart;
+        entity.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+        buildMultipartEntity();
+    }
+
+    public void addStringBody(String param, String value) {
+        mStringPart.put(param, value);
+    }
+
+    private void buildMultipartEntity() {
+        entity.addPart(FILE_PART_NAME, new FileBody(mFilePart));
+        for (Map.Entry&lt;String, String&gt; entry : mStringPart.entrySet()) {
+            entity.addTextBody(entry.getKey(), entry.getValue());
+        }
+    }
+
+    @Override
+    public String getBodyContentType() {
+        return httpentity.getContentType().getValue();
+    }
+
+    @Override
+    public byte[] getBody() throws AuthFailureError {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try {
+            httpentity = entity.build();
+            httpentity.writeTo(bos);
+        } catch (IOException e) {
+            VolleyLog.e("IOException writing to ByteArrayOutputStream");
+        }
+        return bos.toByteArray();
+    }
+
+    @Override
+    protected Response&lt;JSONObject&gt; parseNetworkResponse(NetworkResponse response) {
+        try {
+            String jsonString = new String(response.data, HttpHeaderParser.parseCharset(response.headers));
+            return Response.success(new JSONObject(jsonString), HttpHeaderParser.parseCacheHeaders(response));
+        } catch (UnsupportedEncodingException e) {
+            return Response.error(new ParseError(e));
+        } catch (JSONException je) {
+            return Response.error(new ParseError(je));
+        }
+    }
+
+    @Override
+    public void deliverError(VolleyError error) {
+        mErrorListener.onErrorResponse(error);
+    }
+
+    @Override
+    protected void deliverResponse(JSONObject response) {
+        mListener.onResponse(response);
+    }
+}
+</code></pre>
+
+<blockquote>
+  <p>Usage</p>
+</blockquote>
+
+<pre><code>TestMultiPartRequest multiPartRequest = new TestMultiPartRequest (URL, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+               //Error response
+            }
+        }, new Response.Listener&lt;JSONObject&gt;() {
+            @Override
+            public void onResponse(JSONObject response) {
+               //Response
+            }
+        }, new File(fPath), params);
+
+        multiPartRequest.setRetryPolicy(new DefaultRetryPolicy(5 * 1000, 0,
+                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+        TestVolleyHelper.getInstance(getApplicationContext()).addToRequestQueue(multiPartRequest);
+</code></pre>
+
+<blockquote>
+  <p>TestVolleyHelper</p>
+</blockquote>
+
+<pre><code>import android.content.Context;
+import android.text.TextUtils;
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.toolbox.Volley;
+
+
+public class TestVolleyHelper {
+
+    private static final String TAG = TestVolleyHelper.class
+            .getSimpleName();
+
+    private RequestQueue mRequestQueue;
+    private static TestVolleyHelper mInstance;
+
+    public TestVolleyHelper(Context context) {
+        if (mRequestQueue == null) {
+            mRequestQueue = Volley.newRequestQueue(context);
+        }
+    }
+
+    public static synchronized TestVolleyHelper getInstance(Context context) {
+        if (mInstance == null) {
+            mInstance = new TestVolleyHelper(context);
+        }
+        return mInstance;
+    }
+
+    public RequestQueue getRequestQueue() {
+        return mRequestQueue;
+    }
+
+    public &lt;T&gt; void addToRequestQueue(Request&lt;T&gt; req, String tag) {
+        // set the default tag if tag is empty
+        req.setTag(TextUtils.isEmpty(tag) ? TAG : tag);
+        getRequestQueue().add(req);
+    }
+
+    public &lt;T&gt; void addToRequestQueue(Request&lt;T&gt; req) {
+        req.setTag(TAG);
+        getRequestQueue().add(req);
+    }
+
+    public void cancelPendingRequests(Object tag) {
+        if (mRequestQueue != null) {
+            mRequestQueue.cancelAll(tag);
+        }
+    }
+}
+</code></pre>
+
+<p>Take a look <a href="http://www.frattv.com/how-to-send-multipart-request-using-volley-without-httpentity/" rel="nofollow">this</a> is an example without using <code>HttpEntity</code>.</p>
+
+<p><strong><em>And don't use <a href="http://developer.android.com/intl/es/about/versions/marshmallow/android-6.0-changes.html#behavior-apache-http-client" rel="nofollow"><code>HttpEntity</code></a>.it was completely removed in Android-M as it's deprecated recently.</em></strong></p>

@@ -1,0 +1,92 @@
+<p>To test a suspision of mine I took your code, added the minimal includes and using declarations to allow the compiler to get to the call to <code>edit_distance</code> and compiled it. Here is the complete contents of the file I compiled:</p>
+
+<pre><code>#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &lt;algorithm&gt;
+using std::vector;
+using std::string;
+
+template &lt;class T&gt; unsigned int edit_distance(const T&amp; s1, const T&amp; s2)
+{
+    const size_t len1 = s1.size(), len2 = s2.size();
+    vector&lt;vector&lt;unsigned int&gt; &gt; d(len1 + 1, vector&lt;unsigned int&gt;(len2 + 1));
+
+    d[0][0] = 0;
+    for(unsigned int i = 1; i &lt;= len1; ++i) d[i][0] = i;
+    for(unsigned int i = 1; i &lt;= len2; ++i) d[0][i] = i;
+
+    for(unsigned int i = 1; i &lt;= len1; ++i)
+        for(unsigned int j = 1; j &lt;= len2; ++j)
+
+            d[i][j] = std::min( std::min(d[i - 1][j] + 1,d[i][j - 1] + 1),
+                               d[i - 1][j - 1] + (s1[i - 1] == s2[j - 1] ? 0 : 1) );
+    return d[len1][len2];
+}
+
+string text1="house";
+string text2="houses";
+edit_distance &lt;int&gt; (text1, text2);
+</code></pre>
+
+<p>And my suspision checked out; I got the following error:</p>
+
+<pre><code>main.cpp:26:22: error: C++ requires a type specifier for all declarations
+edit_distance &lt;int&gt; (text1, text2);
+                     ^~~~~
+</code></pre>
+
+<p>This is the exact error you mention, therefore I believe it's very likely you've made the same mistake as I included in my test source code. Most experienced programmers would just assume that your incomplete code is shown as it is for brevity, and would automatically insert some surrounding code that would completely avoid this error.</p>
+
+<hr>
+
+<p>The thing you have not understood seems to be that in C++ code does not just go anywhere. C++ programs are not simply a series of statements that get executed as an interpreter reads them in the source.</p>
+
+<p>C++ is a compiled language. The program is a series of declarations and definitions of functions, classes, etc. Statements, i.e. code that does stuff, goes only inside definitions. Your function call <code>edit_distance&lt;int&gt;(text1, text2);</code> is not inside any definition, and therefore the compiler is not expecting a statement and has no idea what you're saying. So put it inside a definition. You probably want to use a function definition:</p>
+
+<pre><code>void foo() {
+    string text1="house";
+    string text2="houses";
+    edit_distance &lt;int&gt; (text1, text2);
+}
+</code></pre>
+
+<p>Also, when the compiled code is executed the execution begins in a special entry point function, main. Only the code that is reachable through this entry point ever gets executed. (actually this isn't really true, but the other cases are irrelevant at the moment.)</p>
+
+<p>Therefore, you need a main function that eventually leads to the code you want to execute. You could have <code>main</code> call the above <code>foo</code>, or you could just put your code directly in <code>main</code>:</p>
+
+<pre><code>int main() {
+    string text1="house";
+    string text2="houses";
+    edit_distance &lt;int&gt; (text1, text2);
+}
+</code></pre>
+
+<p>This code will still not compile, because the <code>&lt;int&gt;</code> part is incorrect. The type inside the angle brackets becomes the type assigned to <code>T</code> in the edit_distance function template:</p>
+
+<pre><code>template &lt;class T&gt; unsigned int edit_distance(const T&amp; s1, const T&amp; s2)
+</code></pre>
+
+<p><code>edit_distance&lt;int&gt;</code> says to set T equal to int:</p>
+
+<pre><code>unsigned int edit_distance(const int&amp; s1, const int&amp; s2)
+</code></pre>
+
+<p>And that's not what you want. You probably want to set T equal to string so that the s1 and s2 parameters are strings.</p>
+
+<pre><code>int main() {
+    string text1="house";
+    string text2="houses";
+    edit_distance&lt;string&gt;(text1,text2);
+}
+</code></pre>
+
+<p>Next you probably want to actually see the return value. Add <code>#include &lt;iostream&gt;</code> at the beginning of the source with your other includes, and then use the main function:</p>
+
+<pre><code>int main() {
+    string text1="house";
+    string text2="houses";
+    std::cout &lt;&lt; edit_distance&lt;string&gt;(text1,text2) &lt;&lt; '\n';
+}
+</code></pre>
+
+<p><a href="http://ideone.com/QAPqf" rel="nofollow">Complete, compilable program</a></p>

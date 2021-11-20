@@ -1,0 +1,26 @@
+<p>Since you're looking for an answer that leverages the existing LINQ query operators, rather than using iterator blocks, here's one.  Note that it won't be as efficient as some other solutions; the use of these query operators isn't as efficient as, say Eric Lippert's solution.  (It is a lot shorter though.)</p>
+
+<p>Also note that since this solution uses the overloads of <code>SelectMany</code> and <code>Where</code> that accept an index, those operators need to be called using method syntax, not query syntax, and several of the other operators don't have query syntax equivalents.  I could change the one <code>Select</code> into query syntax, but for consistencies sake I did not.</p>
+
+<pre><code>public static IEnumerable&lt;IEnumerable&lt;T&gt;&gt; Permuatations&lt;T&gt;(
+    this IEnumerable&lt;T&gt; source)
+{
+    var list = source.ToList();//becase we iterate it multiple times
+    return list.SelectMany((item, i) =&gt; list.Where((_, index) =&gt; index != i)
+            .Permuatations()
+            .Select(subsequence =&gt; new[] { item }.Concat(subsequence)))
+        .DefaultIfEmpty(Enumerable.Empty&lt;T&gt;());
+}
+</code></pre>
+
+<p>So, to talk through what this is doing.</p>
+
+<p>First it goes through the source sequence; for each item in that sequence it creates a sequence that is just like the source sequence but with the "current item" taken out.  (This is the <code>list.Where</code> method).</p>
+
+<p>Next it (recursively) gets all of the permutations of that subsequence.</p>
+
+<p>After that it prepends the "removed" item to the beginning of each of those subsequences.</p>
+
+<p>All of these subsequences are flattened together as they are all inside the <code>SelectMany</code>.</p>
+
+<p>The <code>DefaultIfEmpty</code> is there to ensure that the outer sequence is never empty.  Permuting an empty sequence results in a sequence with an empty sequence inside of it.  This is effective the "base case" of the recursive operation.</p>

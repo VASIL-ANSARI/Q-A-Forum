@@ -1,0 +1,193 @@
+<p>The problem is <code>complete</code> is executed asynchronously, ie the counter condition is executed is before the animations are completed.</p>
+
+<p>You can use the animation promise to solve it</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>//  ********************************************************
+//  SLOT MACHINE ICONS. Each array has 3 icons for each slot 
+//  ********************************************************
+
+var array1 = [
+  '&lt;div data-id="0" style="width:100%; background:#fff; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="1" style="width:100%; background:#ccc; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="0" style="width:100%; background:#666; height:150px;"&gt;&lt;/div&gt;'
+]
+var array2 = [
+  '&lt;div data-id="0" style="width:100%; background:#fff; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="1" style="width:100%; background:#ccc; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="0" style="width:100%; background:#666; height:150px;"&gt;&lt;/div&gt;'
+]
+var array3 = [
+  '&lt;div data-id="0" style="width:100%; background:#fff; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="1" style="width:100%; background:#ccc; height:150px;"&gt;&lt;/div&gt;',
+  '&lt;div data-id="0" style="width:100%; background:#666; height:150px;"&gt;&lt;/div&gt;'
+]
+
+
+//  Generates random # between 0 and 2. Used for choosing winner and creating random slots
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+//  Generates winning array item between coffee, tea and espresso
+function win(whatArray) {
+  var arrayItem = getRandomInt(0, 2);
+  var winItem = whatArray[arrayItem];
+  return winItem;
+}
+
+//  Populates each slot with random icons to spin through
+var makeList = function(whatArray, whatSlot) {
+  var slotArray = [];
+
+  for (i = 0; i &lt; 100; i++) {
+
+    var randNum = getRandomInt(0, 2); // Generate random number
+    var findItem = whatArray[randNum]; // Use random number to find associated array item
+    var slot = whatSlot; // Set which slot to append array item to (first, second or third)
+    $('#' + slot).append('&lt;div&gt;' + findItem + '&lt;/div&gt;'); // Append icon to HTML 
+  }
+
+  var winItem = win(whatArray); // Generate winning icon for slot
+  console.log("winner " + winItem);
+  $('#' + slot).append('&lt;div&gt;' + winItem + '&lt;/div&gt;'); // Append winning icon to end of list
+}
+
+
+
+
+
+// Spin the slot and win some caffeine!
+function Spin() {
+
+    var counter = 0;
+
+    //  Generate lists for each slot
+    makeList(array1, 'slot-1');
+    makeList(array2, 'slot-2');
+    makeList(array3, 'slot-3');
+
+    var p1 = MoveSlots($('#slot1-wrapper'), 2500);
+    var p2 = MoveSlots($('#slot2-wrapper'), 5200);
+    var p3 = MoveSlots($('#slot3-wrapper'), 500);
+
+    $.when(p1, p2, p3).then(function() {
+      //var running = true;
+      // console.log(running);
+
+      var slot1attr = $('#slot1-wrapper div').children().last().attr('data-id');
+      var slot2attr = $('#slot2-wrapper div').children().last().attr('data-id');
+      var slot3attr = $('#slot3-wrapper div').children().last().attr('data-id');
+
+      console.log('counter = ' + counter);
+
+      if (counter &gt; 0) {
+        if (slot1attr == slot2attr &amp;&amp; slot1attr == slot3attr) {
+
+          console.log("WIN");
+        } else {
+          console.log("LOSE");
+        }
+      }
+
+    });
+
+    function MoveSlots(el, speed) {
+
+        var time = speed;
+        time += Math.round(Math.random() * 10000);
+        el.stop(true, true);
+
+        var marginTop = -(100 * 150); //change 100 to height placeholder
+
+        var running = true;
+
+        el.animate({
+          'margin-top': '+=' + marginTop + 'px'
+        }, {
+          'duration': time,
+          'easing': 'easeInOutQuint',
+          complete: function() {
+            console.log('yolo');
+            counter++;
+            console.log(counter);
+          }
+        });
+
+        return el.promise();
+      } // end MoveSlots
+  } // end Spin</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>body {
+  /*background-color:white;*/
+  padding: 50px;
+  margin: 50px;
+  background: #505f77 !important;
+}
+#slotWrapper {
+  width: 410px;
+  height: 150px;
+  margin: 50px auto;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #f00;
+}
+#slot1-wrapper,
+#slot2-wrapper,
+#slot3-wrapper {
+  margin-top: 0;
+  position: relative;
+}
+.slot {
+  width: 120px;
+  height: 150px;
+  margin-right: 25px;
+  text-align: center;
+  float: left;
+  position: absolute;
+}
+#slot-3 {
+  margin-right: 0;
+}
+#slot-1 {
+  top: 0;
+  left: 0;
+}
+#slot-2 {
+  top: 0;
+  left: 145px;
+}
+#slot-3 {
+  top: 0;
+  left: 290px;
+}
+.slot div {
+  width: 120px;
+  height: 150px;
+}
+.slot div img {
+  width: 100%;
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;
+&lt;script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.js"&gt;&lt;/script&gt;
+&lt;link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/redmond/jquery-ui.css" rel="stylesheet" /&gt;
+&lt;div style="text-align:center"&gt;
+  &lt;input type="button" value="spin!" onClick="Spin();" style="margin-top:4px;"&gt;
+&lt;/div&gt;
+
+&lt;div id="slotWrapper"&gt;
+
+  &lt;div id="slot1-wrapper"&gt;
+    &lt;div id="slot-1" class="slot"&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div id="slot2-wrapper"&gt;
+    &lt;div id="slot-2" class="slot"&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div id="slot3-wrapper"&gt;
+    &lt;div id="slot-3" class="slot"&gt;&lt;/div&gt;
+  &lt;/div&gt;
+
+&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

@@ -1,0 +1,52 @@
+<p>Why not just use <code>XMLHttpRequest()</code> with POST?</p>
+
+<pre><code>function beginQuoteFileUnquoteUpload(data)
+{
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "http://www.mysite.com/myuploadhandler.php", true);
+    xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xhr.onreadystatechange = function ()
+    {
+        if (xhr.readyState == 4 &amp;&amp; xhr.status == 200)
+            alert("File uploaded!");
+    }
+    xhr.send("filedata="+encodeURIComponent(data));
+}
+</code></pre>
+
+<p>The handler script at the server just writes the file data to a file.</p>
+
+<p><strong>EDIT</strong><br>
+File upload is still a http post with a different content type.  You can use this content type and separate your content with boundaries:</p>
+
+<pre><code>function beginQuoteFileUnquoteUpload(data)
+{
+    // Define a boundary, I stole this from IE but you can use any string AFAIK
+    var boundary = "---------------------------7da24f2e50046";
+    var xhr = new XMLHttpRequest();
+    var body = '--' + boundary + '\r\n'
+             // Parameter name is "file" and local filename is "temp.txt"
+             + 'Content-Disposition: form-data; name="file";'
+             + 'filename="temp.txt"\r\n'
+             // Add the file's mime-type
+             + 'Content-type: plain/text\r\n\r\n'
+             + data + '\r\n'
+             + boundary + '--';
+
+    xhr.open("POST", "http://www.mysite.com/myuploadhandler.php", true);
+    xhr.setRequestHeader(
+        "Content-type", "multipart/form-data; boundary="+boundary
+
+    );
+    xhr.onreadystatechange = function ()
+    {
+        if (xhr.readyState == 4 &amp;&amp; xhr.status == 200)
+            alert("File uploaded!");
+    }
+    xhr.send(body);
+}
+</code></pre>
+
+<p>If you want to send additional data, you just separate each section with a boundary and describe the content-disposition and content-type headers for each section.  Each header is separated by a newline and the body is separated from the headers by an additional newline.  Naturally, uploading binary data in this fashion would be slightly more difficult :-)</p>
+
+<p>Further edit: forgot to mention, make sure whatever boundary string isn't in the text "file" that you're sending, otherwise it will be treated as a boundary.</p>

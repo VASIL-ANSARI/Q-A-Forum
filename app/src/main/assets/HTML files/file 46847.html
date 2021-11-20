@@ -1,0 +1,293 @@
+<p>Try out in this way worked for me long back</p>
+
+<pre><code>using Android.Content;
+using Android.Graphics;
+using Android.Util;
+using Android.Views;
+using Android.Widget;
+using System;
+
+namespace TestApp.Mobile.AL
+{
+public class ScaleImageView : ImageView, View.IOnTouchListener
+{
+private Context _cContext;
+private float MAX_SCALE = 2f;
+
+    private Matrix _mMatrix;
+    private float[] _fMatrixValues = new float[9];
+
+    // display width height.
+    private int _iWidth;
+    private int _iHeight;
+
+    private int _iIntrinsicWidth;
+    private int _iIntrinsicHeight;
+
+    private float _fScale;
+    private float _fMinScale;
+
+    private float _fPrevDistance;
+    private bool _bIsScaling;
+
+    private int _iPrevMoveX;
+    private int _iPrevMoveY;
+    private GestureDetector _gdDetector;
+
+    String TAG = "ScaleImageView";
+
+    public ScaleImageView(Context cContext, IAttributeSet asAttr)
+        : base(cContext, asAttr)
+    {
+        this._cContext = cContext;
+        Initialize();
+    }
+
+    public ScaleImageView(Context context)
+        : base(context)
+    {
+        this._cContext = context;
+        Initialize();
+    }
+
+    public override void SetImageBitmap(Bitmap bBitmap)
+    {
+        base.SetImageBitmap(bBitmap);
+        this.Initialize();
+    }
+
+
+    public override void SetImageResource(int iResId)
+    {
+        base.SetImageResource(iResId);
+        this.Initialize();
+    }
+
+    private void Initialize()
+    {
+        this.SetScaleType(ScaleType.Matrix);
+        this._mMatrix = new Matrix();
+        Android.Graphics.Drawables.Drawable dDrawable = this.Drawable;
+        if (dDrawable != null)
+        {
+            _iIntrinsicWidth = dDrawable.IntrinsicWidth;
+            _iIntrinsicHeight = dDrawable.IntrinsicHeight;
+            SetOnTouchListener(this);
+        }
+
+        ScaleImageViewGestureListner glListner = new ScaleImageViewGestureListner(this);
+        _gdDetector = new GestureDetector(_cContext, glListner);
+    }
+
+    protected override bool SetFrame(int iL, int iT, int iR, int iB)
+    {
+        _iWidth = iR - iL;
+        _iHeight = iB - iT;
+
+        _mMatrix.Reset();
+        int r_norm = iR - iL;
+        _fScale = (float)r_norm / (float)_iIntrinsicWidth;
+
+        int paddingHeight = 0;
+        int paddingWidth = 0;
+        // scaling vertical
+        if (_fScale * _iIntrinsicHeight &gt; _iHeight)
+        {
+            _fScale = (float)_iHeight / (float)_iIntrinsicHeight;
+            _mMatrix.PostScale(_fScale, _fScale);
+            paddingWidth = (iR - _iWidth) / 2;
+            paddingHeight = 0;
+            // scaling horizontal
+        }
+        else
+        {
+            _mMatrix.PostScale(_fScale, _fScale);
+            paddingHeight = (iB - _iHeight) / 2;
+            paddingWidth = 0;
+        }
+        _mMatrix.PostTranslate(paddingWidth, paddingHeight);
+
+        this.ImageMatrix = _mMatrix;
+        _fMinScale = _fScale;
+        ZoomTo(_fScale, _iWidth / 2, _iHeight / 2);
+        Cutting();
+        return SetFrame(iL, iT, iR, iB);
+    }
+
+    protected float GetValue(Matrix mMatrix, int iWhichValue)
+    {
+        mMatrix.GetValues(_fMatrixValues);
+        return _fMatrixValues[iWhichValue];
+    }
+
+    protected float GetScale()
+    {
+        return GetValue(_mMatrix, Matrix.MscaleX);
+    }
+
+    public float GetTranslateX()
+    {
+        return GetValue(_mMatrix, Matrix.MscaleX);
+    }
+
+    protected float GetTranslateY()
+    {
+        return GetValue(_mMatrix, Matrix.MscaleY);
+    }
+
+    protected void MaxZoomTo(int iX, int iY)
+    {
+        if (_fMinScale != GetScale() &amp;&amp; (GetScale() - _fMinScale) &gt; 0.1f)
+        {
+            // threshold 0.1f
+            float scale = _fMinScale / GetScale();
+            ZoomTo(scale, iX, iY);
+        }
+        else
+        {
+            float scale = MAX_SCALE / GetScale();
+            ZoomTo(scale, iX, iY);
+        }
+    }
+
+    public void ZoomTo(float fScale, int iX, int iY)
+    {
+        if (GetScale() * fScale &lt; _fMinScale)
+        {
+            return;
+        }
+        if (fScale &gt;= 1 &amp;&amp; GetScale() * fScale &gt; MAX_SCALE)
+        {
+            return;
+        }
+        _mMatrix.PostScale(fScale, fScale);
+        // move to center
+        _mMatrix.PostTranslate(-(_iWidth * fScale - _iWidth) / 2, -(_iHeight * fScale - _iHeight) / 2);
+
+        // move x and y distance
+        _mMatrix.PostTranslate(-(iX - (_iWidth / 2)) * fScale, 0);
+        _mMatrix.PostTranslate(0, -(iY - (_iHeight / 2)) * fScale);
+        this.ImageMatrix = _mMatrix;
+    }
+
+    public void Cutting()
+    {
+        int iWidth = (int)(_iIntrinsicWidth * GetScale());
+        int iHeight = (int)(_iIntrinsicHeight * GetScale());
+        if (GetTranslateX() &lt; -(iWidth - _iWidth))
+        {
+            _mMatrix.PostTranslate(-(GetTranslateX() + iWidth - _iWidth), 0);
+        }
+        if (GetTranslateX() &gt; 0)
+        {
+            _mMatrix.PostTranslate(-GetTranslateX(), 0);
+        }
+        if (GetTranslateY() &lt; -(iHeight - _iHeight))
+        {
+            _mMatrix.PostTranslate(0, -(GetTranslateY() + iHeight - _iHeight));
+        }
+        if (GetTranslateY() &gt; 0)
+        {
+            _mMatrix.PostTranslate(0, -GetTranslateY());
+        }
+        if (iWidth &lt; _iWidth)
+        {
+            _mMatrix.PostTranslate((_iWidth - iWidth) / 2, 0);
+        }
+        if (iHeight &lt; _iHeight)
+        {
+            _mMatrix.PostTranslate(0, (_iHeight - iHeight) / 2);
+        }
+        this.ImageMatrix = _mMatrix;
+    }
+
+    private float Distance(float fX0, float fX1, float fY0, float fY1)
+    {
+        float x = fX0 - fX1;
+        float y = fY0 - fY1;
+        return FloatMath.Sqrt(x * x + y * y);
+    }
+
+    private float DispDistance()
+    {
+        return FloatMath.Sqrt(_iWidth * _iWidth + _iHeight * _iHeight);
+    }
+
+    public override bool OnTouchEvent(MotionEvent meMotionEvent)
+    {
+        if (_gdDetector.OnTouchEvent(meMotionEvent))
+        {
+            return true;
+        }
+        int iTouchCount = meMotionEvent.PointerCount;
+        if (meMotionEvent.Action == MotionEventActions.Down || meMotionEvent.Action == MotionEventActions.Pointer1Down || meMotionEvent.Action == MotionEventActions.Pointer2Down)
+        {
+            if (iTouchCount &gt;= 2)
+            {
+                float distance = Distance(meMotionEvent.GetX(0), meMotionEvent.GetX(1), meMotionEvent.GetY(0), meMotionEvent.GetY(1));
+                _fPrevDistance = distance;
+                _bIsScaling = true;
+            }
+            else
+            {
+                _iPrevMoveX = (int)meMotionEvent.GetX();
+                _iPrevMoveY = (int)meMotionEvent.GetY();
+            }
+        }
+        else if (meMotionEvent.Action == MotionEventActions.Move)
+        {
+            if (iTouchCount &gt;= 2 &amp;&amp; _bIsScaling)
+            {
+                float dist = Distance(meMotionEvent.GetX(0), meMotionEvent.GetX(1), meMotionEvent.GetY(0), meMotionEvent.GetY(1));
+                float scale = (dist - _fPrevDistance) / DispDistance();
+                _fPrevDistance = dist;
+                scale += 1;
+                scale = scale * scale;
+                ZoomTo(scale, _iWidth / 2, _iHeight / 2);
+                Cutting();
+            }
+            else if (!_bIsScaling)
+            {
+                int distanceX = _iPrevMoveX - (int)meMotionEvent.GetX();
+                int distanceY = _iPrevMoveY - (int)meMotionEvent.GetY();
+                _iPrevMoveX = (int)meMotionEvent.GetX();
+                _iPrevMoveY = (int)meMotionEvent.GetY();
+                _mMatrix.PostTranslate(-distanceX, -distanceY);
+                Cutting();
+            }
+        }
+        else if (meMotionEvent.Action == MotionEventActions.Up || meMotionEvent.Action == MotionEventActions.Pointer1Up || meMotionEvent.Action == MotionEventActions.Pointer2Up)
+        {
+            if (meMotionEvent.PointerCount &lt;= 1)
+            {
+                _bIsScaling = false;
+            }
+        }
+        return true;
+    }
+
+    public bool OnTouch(Android.Views.View vView, Android.Views.MotionEvent meMotionEvent)
+    {
+        return OnTouchEvent(meMotionEvent);
+    }
+
+    public class ScaleImageViewGestureListner : GestureDetector.SimpleOnGestureListener
+    {
+        private ScaleImageView _sivView;
+
+        public ScaleImageViewGestureListner(ScaleImageView sivView)
+        {
+            this._sivView = sivView;
+        }
+
+        public override bool OnDoubleTap(MotionEvent e)
+        {
+            _sivView.MaxZoomTo((int)e.GetX(), (int)e.GetY());
+            _sivView.Cutting();
+            return OnDoubleTap(e);
+        }
+    }
+ }
+
+}
+</code></pre>

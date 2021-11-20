@@ -1,0 +1,55 @@
+<p>Keeping comments is possible but formatting is a different story and I'm not aware of a proper way of doing it using Json.Net, however <code>JsonTextReader</code> has <code>LineNumber</code> and <code>LinePosition</code> and it should be possible to use them to preserve formatting to a degree but it feels hacky and fragile, hence if it is not really important I suggest to use Json.Net internal formatting. </p>
+
+<p>Here is a sample for updating properties and keeping comments but not formatting.</p>
+
+<pre><code>        private static string Update(string json, object update)
+        {
+            var updateObj = JObject.Parse(JsonConvert.SerializeObject(update));
+
+            var result = new StringWriter();
+            var writer = new JsonTextWriter(result);
+            writer.Formatting = Formatting.Indented;
+
+            var reader = new JsonTextReader(new StringReader(json));
+            while (reader.Read())
+            {
+
+                if (reader.Value == null)
+                {
+                    writer.WriteToken(reader.TokenType);
+                    continue;
+                }
+
+                var token= 
+                   reader.TokenType == JsonToken.Comment ||
+                   reader.TokenType == JsonToken.PropertyName || 
+                   string.IsNullOrEmpty(reader.Path)
+                   ? null 
+                   : updateObj.SelectToken(reader.Path);
+
+                if (token == null)
+                    writer.WriteToken(reader.TokenType, reader.Value);
+                else
+                    writer.WriteToken(reader.TokenType, token.ToObject(reader.ValueType));
+            }
+
+            return result.ToString();
+        }
+
+        static void Main(string[] args)
+        {
+            string json = @"{
+   //broken
+   'CPU': 'Intel',
+   'PSU': '500W',
+   'Drives': [
+     'DVD read/writer'
+     /*broken*/,
+     '500 gigabyte hard drive',
+     '200 gigabype hard drive'
+   ]
+}";
+
+            var update=Update(json, new { CPU = "AMD", Drives = new[] { "120 gigabytes ssd" } });
+        }
+</code></pre>

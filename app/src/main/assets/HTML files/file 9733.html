@@ -1,0 +1,29 @@
+<p>So I figured this out, and there are a couple of factors here.</p>
+
+<ol>
+<li><p>There isn't a login function for SoapClient, the login I was calling is a call as defined in the WSDL</p></li>
+<li><p>The various magento API methods are not defined in the WSDL, you provide an argument resource method to method defined as <code>call</code> by the WSDL.  This created a bit of confusion because using <code>$client-&gt;call()</code> seems to invoke <code>call</code> as defined by the SOAP_Client class, so I need to use <code>$client-&gt;call('call')</code> to invoke the SOAP method <code>call</code></p></li>
+</ol>
+
+<p>The final code ended up being:</p>
+
+<pre><code>$method = 'catalog_product.info';
+$args = array($product_id);
+
+$client = new SOAP_Client($wsdl, true);
+$session_id = $client-&gt;call(
+    'login',
+    array(
+        'username'=&gt;$username,
+        'apiKey'=&gt; $pasword
+    )
+);
+$ret = $client-&gt;call(
+    'call',
+    array(
+        'sessionId'=&gt;$session_id,
+        'resourcePath'=&gt;$method,
+        'args'=&gt;$args
+    )
+);
+</code></pre>

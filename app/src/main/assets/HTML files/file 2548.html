@@ -1,0 +1,69 @@
+<p>There are bugs in the xsd.exe tool.  I don't remember this particular one, but I do remember finding problems with jagged arrays, and it's possible this remains a bug.  if you're willing, you could use the <a href="http://www.microsoft.com/downloads/details.aspx?familyid=89e6b1e5-f66c-4a4d-933b-46222bb01eb0&amp;displaylang=en" rel="nofollow">XsdObjbectGen</a> tool, also from Microsoft, but released independently and out-of-band from the .NET SDK.  </p>
+
+<p>One thing you could do is go the reverse direction:  write the C# code, then generate the schema with xsd.exe, and see what is different.  It's possible xsd.exe wants the schema to look a particular way, in order to correctly generate correct code for jagged arrays. </p>
+
+<hr>
+
+<p>Actually, upon re-reading your question, you never said what you really wanted.  Do you want SuccessType to contain an array-of-arrays, or not?  </p>
+
+<p>And is it <strong>WarningsType</strong> or <strong>WarningType</strong>?   There's some disagreement between the code snips you provided.</p>
+
+<hr>
+
+<p>Assuming you wanted the array-of-arrays, I wrote this C# code:</p>
+
+<pre><code>public class WarningType
+{
+    public String oof;
+}
+
+
+public partial class SuccessType
+{
+    private WarningType[][] warningsField;
+
+    /// &lt;remarks/&gt;
+    [System.Xml.Serialization.XmlArrayItemAttribute("Warning", typeof(WarningType[]), IsNullable = false)]
+    public WarningType[][] Warnings
+    {
+        get
+        {
+            return this.warningsField;
+        }
+        set
+        {
+            this.warningsField = value;
+        }
+    }
+}
+</code></pre>
+
+<p>... then compiled it into a DLL.  Then I ran xsd.exe on that DLL, and generated this XSD: </p>
+
+<pre><code>&lt;xs:schema elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema"&gt;
+  &lt;xs:element name="WarningType" nillable="true" type="WarningType" /&gt;
+  &lt;xs:complexType name="WarningType"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element minOccurs="0" maxOccurs="1" name="oof" type="xs:string" /&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:complexType&gt;
+  &lt;xs:element name="SuccessType" nillable="true" type="SuccessType" /&gt;
+  &lt;xs:complexType name="SuccessType"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element minOccurs="0" maxOccurs="1" name="Warnings" type="ArrayOfArrayOfWarningType" /&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:complexType&gt;
+  &lt;xs:complexType name="ArrayOfArrayOfWarningType"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element minOccurs="0" maxOccurs="unbounded" name="Warning" type="ArrayOfWarningType" /&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:complexType&gt;
+  &lt;xs:complexType name="ArrayOfWarningType"&gt;
+    &lt;xs:sequence&gt;
+      &lt;xs:element minOccurs="0" maxOccurs="unbounded" name="WarningType" nillable="true" type="WarningType" /&gt;
+    &lt;/xs:sequence&gt;
+  &lt;/xs:complexType&gt;
+&lt;/xs:schema&gt;
+</code></pre>
+
+<p>...and it round-trips.  If I then run xsd.exe on that schema, I get a type that wraps an array-of-arrays. </p>

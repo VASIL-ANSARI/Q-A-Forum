@@ -1,0 +1,32 @@
+<p>To determine if your build is triggered by an IDE, the Android build chain will set a specific property:</p>
+
+<pre><code>def isIdeBuild() {
+    return project.properties['android.injected.invoked.from.ide'] == 'true'
+}
+</code></pre>
+
+<p>In our builds we use this method to set a static <code>versionCode</code> for our IDE builds, but keep the desired behavior to automatically increase it on our build servers:</p>
+
+<pre><code>def getNumberOfGitCommits() {
+    def text = 'git rev-list --count HEAD'.execute().text.trim()
+    return text == '' ? 0 : text.toInteger()
+}
+
+def calculateVersionCode() {
+    return isIdeBuild() ? 123456789 : getNumberOfGitCommits()
+}
+
+android {
+    defaultConfig {
+        // ...
+        versionCode calculateVersionCode()
+    }
+}
+</code></pre>
+
+<p>This solved two problems we had:</p>
+
+<ol>
+<li>Before, new commits effectively disabled Instant Run. Because the <code>versionCode</code> was updated automatically, the Manifest was changed â which triggers a full rebuild in Instant Run.</li>
+<li>Before, when we switched Git branches, the <code>versionCode</code> often changed to a smaller one (downgrade), so we had to re-install the app. Now we have the same versionCode for all our IDE builds.</li>
+</ol>

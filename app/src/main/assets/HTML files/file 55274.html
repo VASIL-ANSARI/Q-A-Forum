@@ -1,0 +1,23 @@
+<blockquote>
+  <p>Is my way really efficient?</p>
+</blockquote>
+
+<p>No. This is why it is not supported out of the box on Android 5.1+, and this is why Android 6.0 introduced Doze mode.</p>
+
+<blockquote>
+  <p>I need to run this repeating alarm in the background, even when the device is off.</p>
+</blockquote>
+
+<p>I assume that by "the device is off" that you really mean "the screen is off". If the device is powered down, your code will not run.</p>
+
+<p>You can use <code>setExact()</code> to "manually" do your own repeating events on a 30-second interval, where the work that you do on the alarm event includes scheduling the next alarm. This too will fail on Android 6.0+ devices, when the device is in Doze mode. The only way to get every-30-second behavior on Android 6.0+ would be for the user to add your app to the battery optimization whitelist in Settings.</p>
+
+<blockquote>
+  <p>Currently I am executing the pendingintent which leads to a broadcastreceiver which in turn executes to asynctasks, one for server authentification, one for posting the coordinates.</p>
+</blockquote>
+
+<p>First, that is unlikely to be reliable. Your process can be terminated as soon as <code>onReceive()</code> returns, since Android thinks that your work is done.</p>
+
+<p>Second, <code>AsyncTask</code> is usually pointless from a background operation like a broadcast. The entire point behind <code>AsyncTask</code> is for you to do work on the main application thread when background work ends, and there is little reason to do work on the main application thread in the background. For this and the above reason, use a single <code>IntentService</code> to replace the two <code>AsyncTasks</code>.</p>
+
+<p>Third, there is a decent chance that, on any given alarm event, you will be unable to complete your work in 30 seconds, due to network congestion, server issues, etc. You need to make sure that you handle this appropriately, so that you do not wind up queueing up all sorts of requests (or, in your current implementation, fork lots of parallel <code>AsyncTasks</code> all trying to do their work).</p>

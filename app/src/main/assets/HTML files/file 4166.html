@@ -1,0 +1,16 @@
+<p>Per default Jinja2 doesn't use any caching at all, but it's recommended to configure a caching backend to speed things up a little bit. So that jinja2 doesn't have to parse and compile every template on every requests. Jinja2 supports currently 2 different cache types out of the box:</p>
+
+<p>One of them is <code>FileSystemBytecodeCache</code> which is (like the name suggests) file based. So all compiled templates are stored on the file system and retrieved from there. If you look closely at the implementation, you will also find a <code>cache.clear()</code> method there which simply deletes all files in this temporary folder. Causing all templates to be parsed/compiled again.</p>
+
+<p>The other cache type is a called <code>MemcachedBytecodeCache</code> which is just a thin wrapper for Memcache. This method is recommended, because Memcache stores everything in memory, so it's a little bit faster than hitting the disk, and you can use the same cache from different hosts (which is useful if you are running some kind of cluster).</p>
+
+<p>The underlying Memcache client (either werkzeug.contrib.cache, python-memcached or cmemcache) does also provide a <code>clear()</code> method which will delete everything inside the cache. But because you probably use the cache for other things too (e.g. storing the result of expensive database queries there), the <code>clear()</code> method isn't exposed in jinja, because it will affect everything (and not just the templates).</p>
+
+<p>So, to summarize your options are:</p>
+
+<ul>
+<li>Use Jinja2 without a Cache</li>
+<li>Use Jinja2 with a <code>FileSystemBytecodeCache</code> and call <code>cache.clear()</code></li>
+<li>Use Jinja2 with a <code>MemcachedBytecodeCache</code> and call <code>memcache_client.clear()</code> (which will also clear everything else in the cache).</li>
+<li>Run a separate memcached process on another port which is only used with Jinja2. Then call <code>memcache_client.clear()</code> and all templates will be cleared.</li>
+</ul>

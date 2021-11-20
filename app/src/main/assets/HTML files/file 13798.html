@@ -1,0 +1,53 @@
+<p>There is a php code snippet I can share from a project that uses the api (same rough logic with java). The User context just prepares the url and the framework of the specific environment (java runtime, or php library) is used to do the post and retrieve the results (in this case it is using php CURL). </p>
+
+<pre class="lang-php prettyprint-override"><code>        $apiPath = "/d2l/api/le/" . VERSION. "/" . $courseid . "/content/isbn/";
+        $uri = $opContext-&gt;createAuthenticatedUri ($apiPath, 'POST');
+        $uri = str_replace ("https", "http", $uri);
+        curl_setopt ($ch, CURLOPT_URL, $uri);
+        curl_setopt ($ch, CURLOPT_POST, true);
+
+        $response = curl_exec ($ch);
+        $httpCode = curl_getinfo ($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo ($ch, CURLINFO_CONTENT_TYPE);
+        $responseCode = $opContext-&gt;handleResult ($response, $httpCode, $contentType);
+
+        $ret = json_decode($response, true);
+
+        if ($responseCode == D2LUserContext::RESULT_OKAY)
+        {
+            $ret = "$response";
+            $tryAgain = false;
+        }
+        elseif ($responseCode == D2LUserContext::RESULT_INVALID_TIMESTAMP)
+        {
+            $tryAgain = true;
+        }
+        elseif (isset ($ret['Errors'][0]['Message']))
+        {
+            if ($ret['Errors'][0]['Message'] == "Invalid ISBN")
+            {
+                $allowedOrgId[] = $c;
+            }
+            $tryAgain = false;
+        }
+</code></pre>
+
+<p>A sample of a trace of a post message is: </p>
+
+<pre><code>PUT https://valence.desire2learn.com/d2l/api/lp/1.0/users/3691?x_b=TwULqrltMXvTE8utuLCN5O&amp;x_a=L2Hd9WvDTcyiyu5n2AEgpg&amp;x_d=OKuPjV-a0ZoSBuZvJkQLpFva2D59gNjTMiP8km6bdjk&amp;x_c=UjCMpy1VNHsPCJOjKAE_92g1YqSxmebLHnQ0cbhoSPI&amp;x_t=1336498251 HTTP/1.1
+Accept-Encoding: gzip,deflate
+Accept: application/json
+Content-Type: application/json
+
+{
+"OrgDefinedId": "85033380",
+"FirstName": "First",
+"MiddleName": "Middle",
+"LastName": "Last",
+"ExternalEmail": "me@somehostname.com",
+"UserName": "Username",
+"Activation": {
+        "IsActive": true
+}
+}
+</code></pre>

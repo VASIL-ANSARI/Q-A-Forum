@@ -1,0 +1,33 @@
+<p>The problem is that your <code>getInfo</code> method makes calls into the UI, like this:</p>
+
+<pre><code>[self.navigationController popToRootViewControllerAnimated:YES];
+</code></pre>
+
+<p>â¦ but you're running it on a background thread.</p>
+
+<p>The whole point of <a href="https://github.com/jdg/MBProgressHUD/blob/master/MBProgressHUD.h#L219" rel="nofollow"><code>-showWhileExecuting: onTarget: withObject: animated:</code></a> is that it automatically runs your code in a background thread.</p>
+
+<p>So, you need to protect things the same way as you do when manually running in a background thread.</p>
+
+<p>So, any UI code in your method needs to use <code>performSelectorOnMainThread:</code> and friends, or <code>dispatch_async</code> or other means of doing the same thing.</p>
+
+<p>In this particular case, you want to dispatch a method that takes a primitive (<code>BOOL</code>) argument, which means you can't just use <code>-performSelectorOnMainThread: withObject:</code>. But you also presumably want to wait until it's done, which means you can't just use <code>dispatch_async</code>.</p>
+
+<p>You can just write a wrapper method that takes no arguments:</p>
+
+<pre><code>- (void)popNavigationControllerToRoot {
+    [self.navigationController popToRootViewControllerAnimated:YES];
+}
+</code></pre>
+
+<p>â¦ and then:</p>
+
+<pre><code>[self performSelectorOnMainThread:@selector(popNavigationControllerToRoot)
+                    waitUntilDone:YES];
+</code></pre>
+
+<p>Or you can use wrappers around <code>NSInvocation</code>, like the ones <a href="http://www.dribin.org/dave/blog/archives/2008/05/22/invoke%5Fon%5Fmain%5Fthread/" rel="nofollow">here</a>:</p>
+
+<pre><code>[[self.navigationController dd_invokeOnMainThreadAndWaitUntilDone:YES] 
+ popToRootViewControllerAnimated:YES];
+</code></pre>

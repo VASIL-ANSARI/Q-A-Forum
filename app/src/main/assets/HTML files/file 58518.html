@@ -1,0 +1,44 @@
+<p>When you <code>return {a,b};</code> you directly construct the return value.</p>
+
+<p>No temporary, logical or otherwise, is created.  No elision occurs.</p>
+
+<p>This return value is available in the returned context in <code>main</code>.  You can call its <code>.ephemeral()</code> operation.  At the end of the full-expression, it goes out of scope, unless you "store" it in a <code>A const&amp;</code> (reference lifetime extension kicks in) or in a <code>A&amp;&amp;</code> (ditto) or in an <code>auto const&amp;</code> or <code>auto&amp;&amp;</code> variable like this:</p>
+
+<pre><code>auto&amp;&amp; a = make_A(1, 2);
+a.ephemeral();
+</code></pre>
+
+<p>Still, in the above case, no copy occurs.</p>
+
+<p>None of these actions can cause a copy under the standard.</p>
+
+<p>You are correct in some cases copy construction can be elided out of existence.  Elision is when two objects have their identity and lifetimes merged.  So if <code>make_A</code> read:</p>
+
+<pre><code>A make_A(int a, int b){
+  A r{a,b};
+  return r;
+}
+</code></pre>
+
+<p><code>r</code> could be <em>elided</em> into the return value.  Here, however, the compiler would demand that <code>A(A const&amp;)</code> or <code>A(A&amp;&amp;)</code> be defined, so it would not compile with your <code>A</code>.  In practice, once it checked that they are defined, it wouldn't call them because the <code>r</code> within <code>make_A</code> would be elided to be the same object as the return value of <code>make_A</code>.</p>
+
+<p>Similarly,</p>
+
+<pre><code>A a = make_A(1,2);
+</code></pre>
+
+<p>the temporary returned by <code>make_A</code> is elided to be the same as the named variable <code>a</code>.  Elision is transient, so this could also elide together a variable <em>within</em> <code>make_A</code>.  In this case, you also need <code>A(A&amp;&amp;)</code> or <code>A(A const&amp;)</code> to exist.</p>
+
+<p>By deleting the move/copy ctors, they cannot be called, so the object cannot be copied.  Only one destructor can be called per constructor (barring manual construction or destruction).</p>
+
+<p>If the code tries to call them, it will generate an error at compile time.</p>
+
+<hr>
+
+<p>In C++17 you can even <code>return A(a,b);</code> and a similar guarantee occurs.</p>
+
+<p>You can also <code>A a = make_A(1,2);</code> and a similar guarantee occurs.</p>
+
+<p>This is described as "guaranteed elision", but rather it turns some operations into "descriptions of how to construct something".</p>
+
+<p>So there are cases where you'll be able to do things that required move or copy ctors in C++03 or C++11 or C++14 but in C++17 now do something similar to "elision" and no longer require the move or copy ctors.</p>

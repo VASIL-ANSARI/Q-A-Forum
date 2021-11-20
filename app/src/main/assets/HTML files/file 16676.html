@@ -1,0 +1,87 @@
+<p>All the options that belongs to a mutually exclusive set are mutually exclusive between them.
+Follow this example:</p>
+
+<pre><code>class Options {
+  [Option("a", null, MutuallyExclusiveSet="zero")] 
+  public string OptionA { get; set; }
+  [Option("b", null, MutuallyExclusiveSet="zero")] 
+  public string OptionB { get; set; }
+  [Option("c", null, MutuallyExclusiveSet="one")] 
+  public string OptionC { get; set; }
+  [Option("d", null, MutuallyExclusiveSet="one")] 
+  public string OptionD { get; set; }
+}
+</code></pre>
+
+<p>With these rules following command lines are valid:</p>
+
+<pre><code>$ app -a foo -c bar
+$ app -a foo -d bar
+$ app -b foo -c bar
+$ app -b foo -d bar
+</code></pre>
+
+<p>and these aren't:</p>
+
+<pre><code>$ app -a foo -b bar
+$ app -c foo -d bar
+$ app -a foo -b bar -c foo1 -d foo2
+</code></pre>
+
+<p>As you can see you can't specify options together that belong to the same set. Remember also that prebuilt singleton (<strong>CommandLineParser.Default</strong>) don't work with <strong>MutualliyExclusiveSet</strong> attribute. You need to dress up a parser by your own:</p>
+
+<pre><code>if (new CommandLineParser(new CommandLineParserSettings {
+                            MutuallyExclusive = true,
+                            CaseSensitive = true,
+                            HelpWriter = Console.Error}).ParseArguments(args, opts) {
+  // consume values here
+  Console.WriteLine(opts.OptionA);
+}
+</code></pre>
+
+<p>This is the way mutually exclusive options work in Command Line Parser Library. Anyway to solve your specific problem, I suggest you to define all the options as you would do in a normal console application. Then add the <strong>Gui</strong> boolean switch. If this option is specified ignore others. If not behave as a normal console app.</p>
+
+<p><em>(Another thing: in a subsequent version will be a feature called "subcommands" that will let you manage multiple Options types; this maybe the right case for this upcoming feature.)</em></p>
+
+<p><strong>EDIT 2015-08-30:</strong></p>
+
+<p>The feature as implemented in 1.9.x stable always created confusion, was disabled by default and required the developer to activate it via settings instance.</p>
+
+<p>Version 2.0.x, where the kernel was completely rewritten, the feature is always active and I'll try to show a simple example (remember that public API is changed since 2.0.x is a major release update).</p>
+
+<pre><code>
+class Options {
+  [Option(SetName = "web")]
+  public string WebUrl { get; set; }
+  [Option(SetName = "web")]
+  public int MaxLinks { get; set; }
+
+  [Option(SetName = "ftp")]
+  public string FtpUrl { get; set; }
+  [Option(SetName = "ftp")]
+  public int MaxFiles { get; set; }
+
+  [Option]
+  public bool Verbose { get; set; }
+}
+</code></pre>
+
+<p>Set from <code>ftp</code> set are not compatible with the ones from <code>web</code>, <code>--verbose</code> (which doesn't belong to a set, or better belongs to the default one <code>""</code> is neutral and can be intermixed at will).
+Valid:</p>
+
+<pre><code>
+$ app --weburl http://stackoverflow.com --maxlinks 99
+$ app --ftpurl ftp://ftp.myoffice.files.com --maxfiles 1234
+$ app --verbose --weburl http://twitter.com --maxlinks 777
+$ app --ftpurl ftp://ftp.xyz.org --maxfiles 44 --verbose
+$ app --verbose
+</code></pre>
+
+<p>Not valid:</p>
+
+<pre><code>
+$ app --weburl http://stackoverflow.com --maxlinks 99 --ftpurl ftp://ftp.xyz.org
+$ app --ftpurl ftp://ftp.myoffice.files.com --maxfiles 1234 --maxlinks 777
+$ app --verbose --weburl http://twitter.com --maxfiles 44
+$ app --maxfiles 44 --maxlinks 99
+</code></pre>

@@ -1,0 +1,81 @@
+<p>I downloaded source from because blog.bignerdranch.com/1836-hijacking-for-fun-and-profit.    You then call the functions that he declared which I'm pretty sure you guys know how to do.  But I will show you how I called the functions.</p>
+
+<p>First you have to link the classes.  Then in the view did load method you have to start the high jacking.</p>
+
+<pre><code>    // Hijack standard out.
+self.stdoutHijacker = [XXFdHijacker hijackerWithFd: fileno(stdout)];
+setbuf (stdout, NULL);
+self.stdoutHijacker.delegate = self;
+[self.stdoutHijacker startHijacking];
+[self.stdoutHijacker startReplicating];
+
+// Hijack standard error
+self.stderrHijacker = [XXFdHijacker hijackerWithFd: fileno(stderr)];
+setbuf (stderr, NULL);
+self.stderrHijacker.delegate = self;
+[self.stderrHijacker startHijacking];
+[self.stderrHijacker startReplicating];
+
+self.contents = [NSMutableString string];
+</code></pre>
+
+<p>After that I had an IBAction for when a person typed in a command.  system() takes a const char so I had to convert the text in the text field to a const char so I will just show you system() with some text in it</p>
+
+<pre><code>-(IBAction)doCommand:(id)sender{
+    system("ls");  //shows contents of root directory in my case
+}
+</code></pre>
+
+<p>Next we define a void to scroll to end of text view</p>
+
+<pre><code>- (void) scrollToEnd {
+    NSRange range = NSMakeRange (self.contents.length, 0);
+    [self.loggingView scrollRangeToVisible: range];
+} // scrollToEnd
+</code></pre>
+
+<p>Finally we get the text</p>
+
+<pre><code>- (void) hijacker: (XXFdHijacker *) hijacker  gotText: (NSString *) text {
+    if (hijacker == self.stdoutHijacker) [self.contents appendString: @"stdout: "];
+    if (hijacker == self.stderrHijacker) [self.contents appendString: @"stderr: "];
+
+    [self.contents appendString: text];
+    self.loggingView.text = self.contents;
+    [self scrollToEnd];
+} // hijacker
+</code></pre>
+
+<p>This will get both errors and an anything sent to NSLog.  If you don't want errors then erase</p>
+
+<pre><code>// Hijack standard error
+self.stderrHijacker = [XXFdHijacker hijackerWithFd: fileno(stderr)];
+setbuf (stderr, NULL);
+self.stderrHijacker.delegate = self;
+[self.stderrHijacker startHijacking];
+[self.stderrHijacker startReplicating];
+</code></pre>
+
+<p>from viewDidLoad.  If you only want data then erase</p>
+
+<pre><code>    // Hijack standard out.
+self.stdoutHijacker = [XXFdHijacker hijackerWithFd: fileno(stdout)];
+setbuf (stdout, NULL);
+self.stdoutHijacker.delegate = self;
+[self.stdoutHijacker startHijacking];
+[self.stdoutHijacker startReplicating];
+</code></pre>
+
+<p>Oh and one more thing...add the top of your implementation file of the view controller you will be using the code in.  Make it look exactly like mine except change where it says viewController to the name of your view controller</p>
+
+<pre><code>    @interface XXViewController () &lt;XXFdHijackerDelegate&gt;
+
+@property (weak, nonatomic) IBOutlet UITextView *loggingView;
+
+@property (strong, nonatomic) XXFdHijacker *stdoutHijacker;
+@property (strong, nonatomic) XXFdHijacker *stderrHijacker;
+
+@property (strong, nonatomic) NSMutableString *contents;
+
+@end // extension
+</code></pre>

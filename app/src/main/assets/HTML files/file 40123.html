@@ -1,0 +1,54 @@
+<p>As you probably know, the basic parametric equation for a circle is, with <code>rad</code> being the radius and <code>phi</code> the angle in the range [0, 2*PI]:</p>
+
+<pre><code>x = rad * cos(phi)
+y = rad * sin(phi)
+</code></pre>
+
+<p>As <code>phi</code> sweeps from 0 to 2 * PI, this starts on the right (positive x-axis), and moves counter-clockwise. Which means that the initial movement is upwards, in the direction of the positive y-axis.</p>
+
+<p>The exact calculation you need depends on whether you want the animation to go clockwise or counter-clockwise, and where it starts. Since it's just a slight variation, I'll cover them in order.</p>
+
+<p>For the counter-clockwise orientation, we can generalize the start point by simply adding a start angle. We'll also express the angle as a function of time <code>t</code>:</p>
+
+<pre><code>x = rad * cos(phiStart + speed * t)
+y = rad * sin(phiStart + speed * t)
+</code></pre>
+
+<p>This gives you the components of the translation. For the rotation of the fish, since its base position is pointing right, but the initial movement of the circular motion is pointing up, we need to rotate it by 90 degrees before applying the circular motion. Which means that <code>0.5 * PI</code> (90 degrees) are added to the angle used for the translation:</p>
+
+<pre><code>rotAng = 0.5 * PI + phiStart + speed * t
+</code></pre>
+
+<p>Without being familiar with the matrix library you are using, I hope that it uses the standard order for matrix multiplications. So expressed in code, the above would looks something like:</p>
+
+<pre><code>float phiStart = 0.0f;  // start at right, set different start angle if desired
+float phi = phiStart + elapsedTime;  
+mesh-&gt;objectModelMatrix =
+    glm::translate(glm::mat4(1.0f),
+                   glm::vec3(5.0f * cos(phi), initialY, 5.0f * sin(phi)));
+mesh-&gt;objectModelMatrix =
+    glm::rotate(mesh-&gt;objectModelMatrix,
+                0.5f * M_PI + phi, glm::vec3(0.0f, 0.0f, 1.0f));
+</code></pre>
+
+<p>To move clockwise instead, we can simply invert the sign of the angle. The only other difference is that since the initial movement is downwards now, the initial rotation of the fish is also 90 degrees clockwise, which corresponds to <code>-0.5 * PI</code>:</p>
+
+<pre><code>float phiStart = 0.5f * M_PI;  // start at top, set different start angle if desired
+float phi = phiStart - elapsedTime;  
+mesh-&gt;objectModelMatrix =
+    glm::translate(glm::mat4(1.0f),
+                   glm::vec3(5.0f * cos(phi), initialY, 5.0f * sin(phi)));
+mesh-&gt;objectModelMatrix =
+    glm::rotate(mesh-&gt;objectModelMatrix,
+                -0.5f * M_PI + phi, glm::vec3(0.0f, 0.0f, 1.0f));
+</code></pre>
+
+<p>I couldn't find clear documentation for the matrix library you are using. It's possible that the second argument to <code>glm::rotate()</code> is the angle in degrees instead of radians. If that's true,
+those calls for the two cases become:</p>
+
+<pre><code>    glm::rotate(mesh-&gt;objectModelMatrix,
+                90.0f + phi * (180.0f / M_PI), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    glm::rotate(mesh-&gt;objectModelMatrix,
+                -90.0f + phi * (180.0f / M_PI), glm::vec3(0.0f, 0.0f, 1.0f));
+</code></pre>

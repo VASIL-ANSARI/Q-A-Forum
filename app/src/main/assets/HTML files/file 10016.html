@@ -1,0 +1,66 @@
+<p>The image view being the subview draws on top of the holder view. The imageview is opaque. This means that when the views are drawn there is no part of the holder view that is actually visible, so it's <code>drawRect</code> call is optimised out.</p>
+
+<p>Try ordering the views the other way around, so that the holder view is the subview of the imageview. Then the imageview will draw and the holder view will draw on top of it.</p>
+
+<p>Also, note that you should use the bounds of the parent view as the frame of the subview.</p>
+
+<pre><code>UIView* subview = [[UIView alloc] initWithFrame:[parentview bounds]];
+</code></pre>
+
+<p>Edit (add):</p>
+
+<p>See <a href="http://developer.apple.com/library/ios/#documentation/WindowsViews/Conceptual/ViewPG_iPhoneOS/WindowsandViews/WindowsandViews.html%23//apple_ref/doc/uid/TP40009503-CH2-SW1" rel="nofollow">http://developer.apple.com/library/ios/#documentation/WindowsViews/Conceptual/ViewPG_iPhoneOS/WindowsandViews/WindowsandViews.html%23//apple_ref/doc/uid/TP40009503-CH2-SW1</a>
+, specifically under the section "View Hierarchies and Subview Management":</p>
+
+<p>"Visually, the content of a subview obscures all or part of the content of its parent view"</p>
+
+<p>So, try make the imageview the parent, do your initialisation like so:</p>
+
+<pre><code>// instance variables:
+UIImageView* imageView;
+MyHolderView* holderView;
+
+imageView = [[UIImageView alloc] initWithFrame:mainRect];
+holderView = [[MyHolderView alloc] initWithFrame:[imageView bounds]];
+holderView.opaque = NO;
+holderView.backgroundColor = [UIColor clearColor];
+[imageView addSubview:holderView];
+
+UIPinchGestureRecognizer *pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:holderView action:@selector(scale:)];
+[pinchRecognizer setDelegate:self];
+[holderView addGestureRecognizer:pinchRecognizer];
+[pinchRecognizer release];
+
+// etc...
+</code></pre>
+
+<p>Now, the image view is drawn, and the holder view, its subview is drawn on top of it. Now when you call setNeedsDisplay on the holderview it will receive a <code>drawRect:</code> call.</p>
+
+<p>For example, track the gesture like so. This could be in your view controller or in your MyHolderView view subclass; the example here would be in the MyHolderView class so that the <code>location1</code> and <code>location2</code> instance variables can be shared easily with the <code>drawRect:</code> method.:</p>
+
+<pre><code>-(void)scale:(id)sender {
+  if (sender == pinchRecognizer) { // this allows the responder to work with multiple gestures if required
+    // get position of touches, for example:
+    NSUInteger num_touches = [pinchRecognizer numberOfTouches];
+
+    // save locations to some instance variables, like `CGPoint location1, location2;`
+    if (num_touches &gt;= 1) {
+      location1 = [pinchRecognizer locationOfTouch:0 inView:holderView];
+    }
+    if (num_touches &gt;= 2) {
+      location2 = [pinchRecognizer locationOfTouch:1 inView:holderView];
+    }
+
+    // tell the view to redraw.
+    [holderView setNeedsDisplay];
+  }
+}
+</code></pre>
+
+<p>and then in the holder view drawRect routine:</p>
+
+<pre><code>-(void)drawRect:(CGRect)rect {
+
+  // use instance variables location1 and location2 to draw the line.
+}
+</code></pre>

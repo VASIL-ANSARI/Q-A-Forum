@@ -1,0 +1,38 @@
+<p>Something you can do is save the file to a temporary location on the server, and then use something like <a href="https://github.com/PHPMailer/PHPMailer" rel="nofollow">PHPMailer</a> to attach that saved file to the email. PHPMailer is a lot easier to use for attachments than PHP's built-in <a href="http://php.net/manual/en/function.mail.php" rel="nofollow"><code>mail</code></a> function.</p>
+
+<p>You can temporarily store your PDF file a number of ways. Here's one:</p>
+
+<pre><code>$tempfilename = time().'.pdf';
+$pdf-&gt;Output($tempfilename,'F');
+</code></pre>
+
+<p>Then in PDFMailer, you can attach it as such:</p>
+
+<pre><code>$mail-&gt;addAttachment($tempfilename);
+</code></pre>
+
+<p>And then after you are done, you can remove the temporary file from the server.</p>
+
+<pre><code>unlink($tempfilename);
+</code></pre>
+
+<p>If PDFMailer is not possible to use for your situation for whatever reason, you can use PHP's built-in <a href="http://php.net/manual/en/function.mail.php" rel="nofollow"><code>mail</code></a> function. If you're working from a fresh file or a small file where the cost of adding PHPMailer is relatively small, do that if you can. Otherwise, you may try adding code like this to your <code>$headers</code>. Adapted from an answer on using <a href="http://stackoverflow.com/a/12313090/4770933"><code>mail</code> to send attachments</a>:</p>
+
+<pre><code>//  Generate a random hash to send mixed content
+$sep = md5(time());
+
+//  End of line
+$eol = PHP_EOL;
+
+//  Content of file
+$content = file_get_contents($tempfilename);
+$content = chunk_split(base64_encode($content));
+
+//  Add attachment to headers
+$headers .= "--" . $sep . $eol;
+$headers .= "Content-Type: application/octet-stream; name=\"" . $tempfilename . "\"" . $eol;
+$headers .= "Content-Transfer-Encoding: base64" . $eol;
+$headers .= "Content-Disposition: attachment" . $eol . $eol;
+$headers .= $content . $eol . $eol;
+$headers .= "--" . $sep . "--";
+</code></pre>

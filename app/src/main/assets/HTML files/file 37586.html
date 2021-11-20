@@ -1,0 +1,31 @@
+<p>From the <code>requests</code> docs:</p>
+
+<blockquote>
+  <p>Excellent news â thanks to urllib3, keep-alive is 100% automatic
+  within a session! Any requests that you make within a session will
+  automatically reuse the appropriate connection!</p>
+  
+  <p>Note that <strong>connections are only released back to the pool for reuse
+  once all body data has been read</strong>; be sure to either set stream to
+  False or read the content property of the Response object.</p>
+</blockquote>
+
+<p>Sounds like the large request is holding up that connection, or, as abarnert suggests, there's an issue with the server. Try setting <code>stream=False</code>, or access the content of that first <code>res</code> object so that <code>requests</code> knows that it can free up that connection.</p>
+
+<p>EDIT: This looks like the issue. When you call <code>requests.get</code>, you set <code>verify = False</code> explicity. This is unnecessary, since the default for <code>requests.get</code> is <code>False</code>. </p>
+
+<p>However, your lockup is in <code>adapter.send(request, **kwargs)</code>. So it looks like an <code>HTTPAdapter</code> object is at fault. <code>adapter.send</code> has the following signature:</p>
+
+<pre><code> send(request, stream=False, timeout=None, verify=True, cert=None, proxies=None)
+</code></pre>
+
+<p>with <code>verify=True</code> as the default. </p>
+
+<p>This sounds like a bug in <code>requests</code>, but my guess is that the <code>verify</code> parameter isn't getting passed down from the <code>Session</code>. The signature for <code>sess.request</code> is:</p>
+
+<pre><code>request(method, url, params=None, data=None, headers=None, cookies=None, files=None, auth=None, timeout=None, allow_redirects=True, proxies=None, hooks=None, stream=None, verify=None, cert=None)
+</code></pre>
+
+<p>where <code>verify=None</code> rather than <code>False</code>, so maybe that means that it's getting overriden somewhere. </p>
+
+<p>Try explicitly setting <code>verify=False</code> in <code>sess.get</code>.</p>

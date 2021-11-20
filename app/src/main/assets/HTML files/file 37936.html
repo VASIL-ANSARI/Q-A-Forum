@@ -1,0 +1,48 @@
+<p>One way is with <code>regexp_split_to_table()</code></p>
+
+<pre><code>SELECT regexp_split_to_table(id2, '[:-]')
+FROM  (VALUES ('chr1:10000485-10006485@NM_022787@NMNAT1')) tbl(id2)
+</code></pre>
+
+<p>Results in multiple rows:</p>
+
+<pre><code>regexp_split_to_table
+----------------------
+chr1
+10000485
+10006485@NM_022787@NMNAT1
+</code></pre>
+
+<p>Or with <code>regexp_split_to_array()</code>:</p>
+
+<pre><code>SELECT regexp_split_to_array(id2, '[:-]')
+</code></pre>
+
+<p>Which you can then access:</p>
+
+<pre><code>SELECT arr[1] AS s1, arr[2] AS s2, arr[3] AS s3 --, ...
+FROM (
+    SELECT regexp_split_to_array(id2, '[:-]') AS arr
+    FROM  (VALUES ('chr1:10000485-10006485@NM_022787@NMNAT1')) tbl(id2)
+    ) sub;
+
+s1      s2          s3
+--------------------------------------------
+chr1    10000485    10006485@NM_022787@NMNAT1
+</code></pre>
+
+<p>Or nest <code>split_part()</code> - and add all input columns to the right, as requested in the comment:</p>
+
+<pre><code>SELECT split_part(id2, ':', 1) AS s1
+      ,split_part(split_part(id2, ':', 2), '-', 1) AS s2
+      ,split_part(split_part(id2, ':', 2), '-', 2) AS s3
+      ,*
+FROM  (VALUES ('chr1:10000485-10006485@NM_022787@NMNAT1')) tbl(id2);
+</code></pre>
+
+<p>Same result (plus all input columns). It really depends on how your strings can vary.</p>
+
+<h3>Explain error</h3>
+
+<p>The error you get results from the fact that you can only reference <em>input</em> columns in the SELECT list, not <em>output</em> columns.<br>
+You would need to wrap the query in a <em>subquery</em> to reference output columns (<code>s2</code> in your case), or <em>repeat</em> the expression based on input columns, like demonstrated above.</p>

@@ -1,0 +1,114 @@
+<p>DXGI automatically handles resizing the 'front buffer', i.e. the swap chain part that is displayed to the user. However, the application is responsible for resizing the 'back buffer'. When you do this, you should also handle recreating all 'windows-size dependent' resources.</p>
+
+<p>The basic logic is pretty simple:</p>
+
+<pre><code>// 1. Clear the existing references to the backbuffer
+ID3D11RenderTargetView* nullViews [] = { nullptr };
+m_d3dContext-&gt;OMSetRenderTargets(ARRAYSIZE(nullViews), nullViews, nullptr);
+m_renderTargetView.Reset(); // Microsoft::WRL::ComPtr here does a Release();
+m_depthStencilView.Reset();
+m_d3dContext-&gt;Flush();
+
+// 2. Resize the existing swapchain
+hr = m_swapChain-&gt;ResizeBuffers(2, backBufferWidth, backBufferHeight, backBufferFormat, 0);
+if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+    // You have to destroy the device, swapchain, and all resources and
+    // recreate them to recover from this case. The device was hardware reset,
+    // physically removed, or the driver was updated and/or restarted
+</code></pre>
+
+<p>After that, the rest of the steps are exactly what you did when you first created the swapchain</p>
+
+<pre><code>// 3. Get the new backbuffer texture to use as a render target
+hr = m_swapChain-&gt;GetBuffer(0, __uuidof(ID3D11Texture2D), &amp;backBuffer);
+
+hr = m_d3dDevice-&gt;CreateRenderTargetView(backBuffer.Get(), nullptr, &amp;m_renderTargetView);
+
+// 4. Create a depth/stencil buffer and create the depth stencil view
+CD3D11_TEXTURE2D_DESC depthStencilDesc(depthBufferFormat, backBufferWidth, backBufferHeight, 1, 1, D3D11_BIND_DEPTH_STENCIL);
+hr = m_d3dDevice-&gt;CreateTexture2D(&amp;depthStencilDesc, nullptr, &amp;depthStencil);
+
+CD3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc(D3D11_DSV_DIMENSION_TEXTURE2D);
+hr = m_d3dDevice-&gt;CreateDepthStencilView(depthStencil.Get(), &amp;depthStencilViewDesc, &amp;m_depthStencilView));
+
+// 5. Reset the rendering viewport to the new size
+CD3D11_VIEWPORT viewPort(0.0f, 0.0f, static_cast&lt;float&gt;(backBufferWidth), static_cast&lt;float&gt;(backBufferHeight));
+m_d3dContext-&gt;RSSetViewports(1, &amp;viewPort);
+
+// 6. Reset your camera's aspect ratio based on backBufferWidth/backBufferHeight
+
+// 7. Set your render target view/depth stencil view for rendering
+m_d3dContext-&gt;OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), m_depthStencilView.Get());
+</code></pre>
+
+<p>For Win32 desktop apps, the trick is knowing exactly <em>when</em> to do this process.</p>
+
+<pre><code>LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    PAINTSTRUCT ps;
+    HDC hdc;
+
+    static bool s_in_sizemove = false;
+    static bool s_minimized = false;
+
+    switch (message)
+    {
+
+    ...
+
+    case WM_SIZE:
+        if (wParam == SIZE_MINIMIZED)
+        {
+            if (!s_minimized)
+            {
+                s_minimized = true;
+                // Your app should probably suspend
+            }
+        }
+        else if (s_minimized)
+        {
+            s_minimized = false;
+            // Your app should resume
+        }
+        else if ( !s_in_sizemove )
+            // HERE is where you'd trigger a resize based on MINIMIZE/MAXIMIZE/RESTORE
+        break;
+
+    case WM_ENTERSIZEMOVE:
+        s_in_sizemove = true;
+        break;
+
+    case WM_EXITSIZEMOVE:
+        s_in_sizemove = false;
+        // HERE is where you'd trigger a resize based on the user resizing the window
+        break;
+
+       case WM_GETMINMAXINFO:
+       {
+            // You should set a minimize window size that is reasonable for your app. Here I use 320x200
+           auto info = reinterpret_cast&lt;MINMAXINFO*&gt;(lParam);
+            info-&gt;ptMinTrackSize.x = 320;
+            info-&gt;ptMinTrackSize.y = 200;
+        }
+        break;
+    }
+
+    ...
+    return DefWindowProc(hWnd, message, wParam, lParam);
+}
+</code></pre>
+
+<blockquote>
+  <p>For Windows Store apps/Windows phone apps, the VS template has a distinct function for creating the device, another for creating the device-dependent resources, and another for creating the window-size dependent resources. This last one is invoked for resizing.</p>
+</blockquote>
+
+<p><strong>Full-screen</strong> mode is a bit trickier, but is basically the same idea. If your application does not support full-screen, you should make sure to disable the default ALT+ENTER behavior by calling this when you first create the swapchain and setup the HWND association:</p>
+
+<pre><code>dxgiFactory-&gt;MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+</code></pre>
+
+<blockquote>
+  <p>Windows Store apps/Windows phone apps do not allow true 'full-screen' mode resolution changes, so this case doesn't apply to them.</p>
+</blockquote>
+
+<p>See <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/ee417025.aspx" rel="nofollow">DirectX Graphics Infrastructure (DXGI): Best Practices</a></p>

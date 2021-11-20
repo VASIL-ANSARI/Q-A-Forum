@@ -1,0 +1,75 @@
+<p><a href="http://jquery.com/" rel="nofollow">jQuery</a>, a great javascript framework for DOM manipulation and performing ajax calls, provides two great hooks for determining when ajax calls are in progress:</p>
+
+<p><a href="http://api.jquery.com/ajaxStart/" rel="nofollow"><code>$.ajaxStart()</code></a> and <a href="http://api.jquery.com/ajaxStop/" rel="nofollow"><code>$.ajaxStop()</code></a></p>
+
+<p>Both of these hooks take a handler function that will be called when an ajax call is about to start, and when all ajax calls have ceased, respectively. These functions can be bound to any element on the page. You could set a global boolean value in your <code>$.ajaxStart()</code> handler to true and set it back to false in your <code>$.ajaxStop()</code> handler. </p>
+
+<p>You could then check that boolean flag and determine whether ajax calls are in progress.</p>
+
+<p>Something along these lines:</p>
+
+<pre><code>$(document).ajaxStart(function() {
+    window.ajaxBusy = true;
+});
+
+$(document).ajaxStop(function() {
+    window.ajaxBusy = false;
+});
+</code></pre>
+
+<p>As far as determining when the browser is loading the current page, you could check
+<code>document.readyState</code>. It returns a string of <code>"loading"</code> while the document is loading and a string of <code>"complete"</code> once it has loaded.  You can bind a handler to <code>document.onreadystatechange</code> and set a global boolean that will indicate whether the document is still loading or not.</p>
+
+<p>Something like this:</p>
+
+<pre><code>document.onreadystatechange = function() {
+    switch (document.readyState) {
+        case "loading":
+            window.documentLoading = true;
+            break;
+        case "complete":
+            window.documentLoading = false;
+            break;
+        default:
+            window.documentLoading = false;
+    }
+}   
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>It appears that <code>$.ajaxStart()</code> and <code>$.ajaxStop()</code> do NOT work for ajax calls invoked without jQuery. All XMLhttprequest objects have an event called <code>readystatechange</code> that you can attach a handler to. You could utilize this functionality to determine whether or not that individual call is done. You could push all references to outstanding calls onto an array, and in a <code>setInterval()</code> check that array's length. If it > 1, there are out standing ajax calls. It's a rough approach, and only one way of getting about it. There are probably other ways to do this. But here's the general approach:</p>
+
+<pre><code>// declare array to hold references to outstanding requets
+window.orequets = [];
+
+var req = XMLHttpRequest(); 
+// open the request and send it here....
+// then attach a handler to `onreadystatechange`
+req.onreadystatechange = function() {
+    if (req.readyState != 4 || req.readyState != 3) {
+        // req is still in progress
+        orequests.push(req);
+        window.reqPos = orequests.length -1
+    } else {
+        window.orequests = orequests.slice(reqPos, reqPos + 1);
+    }
+}
+</code></pre>
+
+<p>Do the above for each <code>XMLHttpRequest()</code> you will be sending, of course changing the request name for each one. Then run a <code>setInterval()</code> that runs every x amount of milliseconds, and checks the length property of <code>orequests</code>. If it is equal to zero, no requests are happening, if it is greater than zero, requests are still happening. If no requests are happening, you can either clear the interval through <code>clearInterval()</code> or keep it running. </p>
+
+<p>Your setInterval might look something like this:</p>
+
+<pre><code>var ajaxInterval = setInterval(function() {
+    if (orequests.length &gt; 0) {
+      // ajax calls are in progress
+      window.xttpBusy = true;
+    } else {
+      // ajax calls have ceased
+      window.xttpBusy = false;
+      // you could call clearInterval(ajaxInterval) here but I don't know if that's your intention
+    },
+    3000 // run every 3 seconds. (You can decide how often you want to run it)
+}); 
+</code></pre>

@@ -1,0 +1,66 @@
+<blockquote>
+  <p>I don't understand how either of these is failing. If it's null or undefined, it should evaluate to true for the empty string and set it equal to that.</p>
+</blockquote>
+
+<p>Not quite: the statement <code>txt || ""</code> will <em>return</em> the value of <code>txt</code> or <code>""</code>, whichever is truthy first. It <strong>does not</strong> assign that value anywhere, especially not to <code>txt</code>. You assign separately.</p>
+
+<p>Therefore, in your example (reduced to the necessary parts for example):</p>
+
+<pre><code>var TrSet = function(valid,stat,txt,dd){
+  this.txtValue = txt || "";
+  console.log('txt will still be undefined but txtValue will not be', txt, this.txtValue);
+  this.txtValue.value = txt.value || "";
+}
+</code></pre>
+
+<p>To do what you expect, you would need to default out <code>txt</code> again, like so:</p>
+
+<pre><code>var TrSet = function(valid,stat,txt,dd){
+  this.txtValue = txt || "";
+  console.log('txt will still be undefined but txtValue will not be', txt, this.txtValue);
+  this.txtValue.value = (txt || "").value || ""; // &lt;- change here
+}
+</code></pre>
+
+<p>Of course, that's largely unreadable (how does <code>.value || ''</code> group? do you know at a glance?), so we'd probably cache it:</p>
+
+<pre><code>var TrSet = function(valid,stat,txt,dd){
+  var realTxt = txt || ""
+  this.txtValue = realTxt;
+  this.txtValue.value = realTxt.value || "";
+}
+</code></pre>
+
+<p>Now, that works, but is less than ideal. ES6 added the ability to provide a default directly in the parameter list, which is much cleaner:</p>
+
+<pre><code>var TrSet = function(valid = "", stat = "", txt = "", dd = "") {
+  this.txtValue = txt;
+  this.txtValue.value = txt.value || "";
+}
+</code></pre>
+
+<p>To directly address the two brief questions you added:</p>
+
+<blockquote>
+<pre><code>var TrSet = function(txt) {
+  this.txtValue = txt || "";
+  this.txtValue.value = txt.value || "";
+}
+</code></pre>
+  
+  <p>If txt is null set it equal to "", if txt.value is null set it equal to "". how does this fail?</p>
+</blockquote>
+
+<p>Because <code>txt || ""</code> <strong>does not</strong> <em>assign</em> to <code>txt</code>, it simply <em>returns</em> <code>txt</code> <em>or</em> <code>""</code> and that return value is assigned to <code>this.txtValue</code>.</p>
+
+<blockquote>
+<pre><code>var TrSet = function(stat) {
+  this.statusDropDown = stat || "";
+
+if (this.statusDropDown.hasOwnProperty("value")) { }
+</code></pre>
+  
+  <p>If stat is null set statusDropDown equal to "". Then I check if if it hasOwnProperty. Why does this fail?</p>
+</blockquote>
+
+<p>Probably because <code>this</code> is not bound, so it doesn't actually have a value for <code>statusDropDown</code>. In JavaScript, <code>this</code> can change depending on how a function is called. Check out <a href="http://stackoverflow.com/questions/3127429/how-does-the-this-keyword-work">this question</a> for more details.</p>

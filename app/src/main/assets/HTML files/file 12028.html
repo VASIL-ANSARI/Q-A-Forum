@@ -1,0 +1,59 @@
+<p>I've never found a nice way to do this. I've had to use a custom action to set the value as needed for the specific call. Something like this:</p>
+
+<pre><code>[TestFixture]
+public class Testing
+{
+    public interface IXyz
+    {
+        bool Load();
+    }
+
+    public class DelegateAction&lt;T&gt; : NMock2.IAction
+    {
+        private Func&lt;T&gt; _resultFunc;
+
+        public void SetResultFunction(Func&lt;T&gt; func)
+        {
+            _resultFunc = func;
+        }
+
+        public DelegateAction(Func&lt;T&gt; resultFunc)
+        {
+            _resultFunc = resultFunc;
+        }
+
+
+        public void Invoke(Invocation invocation)
+        {
+            invocation.Result = _resultFunc();
+        }
+
+        public void DescribeTo(TextWriter writer)
+        {
+        }
+    }
+
+    private bool _result = true;
+    private DelegateAction&lt;bool&gt; _action;
+
+    [Test]
+    public void ResetTheReturnValue()
+    {
+        //would be done in general setup...
+        Mockery mocker = new Mockery();
+        IXyz test = mocker.NewMock&lt;IXyz&gt;();
+        _action = new DelegateAction&lt;bool&gt;(() =&gt; _result);
+        Stub.On(test).Method("Load").Will(_action);
+
+        //Reset for test.... - if you comment it out true is 
+                       //returned as default and the test passes
+        _action.SetResultFunction(() =&gt; { throw new Exception();});
+
+        Assert.IsTrue(test.Load());
+    }
+}
+</code></pre>
+
+<p>I wouldn't normally allow the function to be set as I'd generally just want to return a different value ocasionally, which could be done by changing the field. Make sure to reset things at the end of the test.</p>
+
+<p>Yes, I know this is pretty crappy and would love a better way if anyone knows of one. As an aside - if you aren't stuck with NMock you might want to take a look at something like Moq instead. I tend to have better results with it, although obviously your mileage may vary :)</p>

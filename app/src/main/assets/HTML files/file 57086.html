@@ -1,0 +1,190 @@
+<p>Looking at the body of your <code>decide</code> member function you need four things:</p>
+
+<ul>
+<li>a <code>qi::symbols&lt;char&gt; vistring</code> which belongs to <code>str_menager</code> (and thus does not need to be a parameter).</li>
+<li>a <code>std::string s</code> which is the attribute of <code>name</code>.</li>
+<li>a <code>std::list&lt;std::string&gt;</code> which is the attribute of <code>stringslist</code>.</li>
+<li>a <code>bool m_Flag</code> that allows you to signal a failure when parsing.</li>
+</ul>
+
+<p>So ideally your <code>decide</code> member function should be simply:</p>
+
+<pre><code>void define(const std::string&amp; s, std::list&lt;std::string&gt;&amp; list, bool&amp; m_Flag)
+{
+    if (vistrings.find(s) != nullptr)
+    {
+        list.push_back(s);
+    }
+    else
+    {
+        m_Flag = false;
+    }
+}
+</code></pre>
+
+<p>and should be called with:</p>
+
+<pre><code>name[adapted_decide(qi::_1,qi::_val,qi::_pass)]
+</code></pre>
+
+<p>The problem is that since <code>decide</code> is a member function the Phoenix function adaptation macros don't work directly (and defining your own <code>phoenix::function</code> is a lot of boilerplate).</p>
+
+<p><a href="http://stackoverflow.com/questions/25770420/problems-adapting-member-functions-in-phoenix">One workaround could be using</a>:</p>
+
+<pre><code>BOOST_PHOENIX_ADAPT_FUNCTION(void,decide_,boost::mem_fn(&amp;str_menager::decide),4);
+</code></pre>
+
+<p>Note that you need to pass 4 (not 3) in order to take into account the need to also pass an instance of <code>str_menager</code> (and on this subject you need to make <code>controler</code> a member of your grammar, since in your example its lifetime ends when the constructor completes but you try to use it long after that).</p>
+
+<p>Here is the full example: (<a href="http://coliru.stacked-crooked.com/a/f93f90b8ebb21199" rel="nofollow">Running on Coliru</a>)</p>
+
+<pre><code>#include &lt;boost/config/warning_disable.hpp&gt;
+#include &lt;boost/spirit/include/qi.hpp&gt;
+#include &lt;boost/variant.hpp&gt;
+#include &lt;boost/spirit/include/phoenix_core.hpp&gt;
+#include &lt;boost/spirit/include/phoenix_operator.hpp&gt;
+#include &lt;boost/spirit/include/phoenix_function.hpp&gt;
+#include &lt;boost/spirit/include/phoenix_fusion.hpp&gt;
+#include &lt;boost/spirit/include/phoenix_object.hpp&gt;
+#include &lt;boost/foreach.hpp&gt;
+#include &lt;string&gt;
+#include &lt;list&gt;
+#include &lt;boost/mem_fn.hpp&gt;
+
+
+namespace testParser {
+        namespace qi = boost::spirit::qi;
+        namespace ascii = boost::spirit::ascii;
+        namespace sp = boost::spirit;
+        namespace fu = boost::fusion;
+        namespace phx = boost::phoenix;
+
+
+        class str_menager
+        {
+            qi::symbols&lt;char&gt; const&amp; vistrings;
+
+        public:
+            typedef void result_type;
+                        typedef void type;
+            str_menager(qi::symbols&lt;char&gt; const&amp; ss) :vistrings(ss) {  }
+
+
+            void decide(std::string const&amp; s, 
+                std::list&lt;std::string&gt;&amp; list,
+                bool&amp; m_Flag)
+
+            {
+                if (vistrings.find(s) != nullptr)
+                {
+                    list.push_back(s);
+                }
+                else
+                {
+                    m_Flag = false;
+                }
+            }
+        };
+
+        BOOST_PHOENIX_ADAPT_FUNCTION(void,decide_,boost::mem_fn(&amp;str_menager::decide),4);//you need to put here number_of_args+1 to take into account the instance parameter
+
+
+
+        typedef std::list&lt;std::string&gt; strings;
+        template &lt;typename iterator, typename Skiper = ascii::space_type&gt;
+        struct stringParser :qi::grammar &lt;iterator, strings(), Skiper&gt;
+        {
+            stringParser() : stringParser::base_type(stringslist),vistrings(),controler(vistrings) {
+                using boost::spirit::qi::omit;
+                using boost::spirit::qi::lexeme;
+                using boost::spirit::ascii::alpha;
+                using boost::spirit::qi::raw;
+                using boost::spirit::qi::fail;
+                using boost::spirit::qi::on_error;
+                using phx::val;
+                using phx::ref;
+                using phx::construct;
+
+
+                name = raw[lexeme[*alpha]];
+                stringslist =
+                    *(
+                        omit[("VIS" &gt; name)[ref(vistrings) += qi::_1]
+                        ] |
+                            name
+                       [decide_(&amp;controler, qi::_1, qi::_val, qi::_pass)]
+                        )
+                    ;
+                name.name("some_name");
+                stringslist.name("stringslist");
+                on_error&lt;fail&gt;
+                    (stringslist,
+                        std::cout &lt;&lt; val("Error! Expectiong ")
+                        &lt;&lt; qi::_4
+                        &lt;&lt; val(" here: \"")
+                        &lt;&lt; construct&lt;std::string&gt;(qi::_3, qi::_2)
+                        &lt;&lt; val("\"")
+                        &lt;&lt; std::endl);
+            }
+            qi::symbols&lt;char&gt; vistrings;
+            str_menager controler;
+            qi::rule&lt;iterator, strings(), ascii::space_type&gt; stringslist;
+            qi::rule&lt;iterator, std::string(), ascii::space_type&gt; name;
+
+
+
+        };
+    }
+
+void parse(const std::string&amp; str)
+{
+    typedef std::string::const_iterator iterator_type;
+    typedef testParser::stringParser&lt;iterator_type&gt; stringParser;
+
+    stringParser strParser;
+
+    iterator_type end = str.end();
+    iterator_type iter = str.begin();
+
+    testParser::strings strings;
+    boost::spirit::ascii::space_type sp;
+    bool r = boost::spirit::qi::phrase_parse(iter, end, strParser, sp, strings);
+    if(r)
+    {
+        std::cout &lt;&lt; "Success.\n";
+        BOOST_FOREACH(std::string const&amp; p, strings)
+        {
+            std::cout &lt;&lt; p &lt;&lt; "\n";
+        }
+    }
+    else
+    {
+        std::cout &lt;&lt; "Something failed.\n";
+    }
+    if(iter!=end)
+    {
+        std::cout &lt;&lt; "Unparsed: [" &lt;&lt; std::string(iter,end) &lt;&lt; "]";
+    }
+
+    std::cout &lt;&lt; std::endl;
+}
+
+int main()
+{
+    parse(" VIS someString someString otherString");
+    parse("VIS foo VIS bar foo bar baz");
+    parse("VIS foo bar foo VIS bar baz");
+}
+</code></pre>
+
+<p>P.S.: Unless this is a simplified example and you plan to do a lot more in your <code>str_menager</code> struct, you could simply define <code>decide</code> as a free function, and pass <code>vistring</code> directly as a parameter, i.e:</p>
+
+<pre><code>void decide(const qi::symbols&lt;char&gt;&amp; vistring, const std::string&amp; s, std::list&lt;std::string&gt;&amp; list, bool&amp; m_Flag)
+{
+    //same as before
+}
+BOOST_PHOENIX_ADAPT_FUNCTION(void,decide_,decide,4);
+...
+name[decide_(phx::ref(vistring),qi::_1,qi::_val,qi::_pass)]
+...
+</code></pre>

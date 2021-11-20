@@ -1,0 +1,31 @@
+<p>OK, I've ran experiments and the answer seems to be that in rest easy 2.01GA running in JBoss jboss-as-7.1.1.Final I get different instances for the preProcess and the postProcess.</p>
+
+<p>So the answer to "would this be legal?" is NO.</p>
+
+<p>So as a workaround I'm including the context of the HttpServletRequest and storing the state as a request attribute:</p>
+
+<pre><code>@ServerInterceptor
+@Provider
+public class MyInterceptor implements PreProcessInterceptor, PostProcessInterceptor {
+
+    private static final String ATTRIBUTE_NAME = MyInterceptor.class.getName();
+
+    @Context
+    HttpServletRequest servletRequest;
+
+    @Override
+    public ServerResponse preProcess(HttpRequest request, ResourceMethod resourceMethod) throws Failure, WebApplicationException {
+        String url = request.getUri().getRequestUri().toString();
+        servletRequest.setAttribute(ATTRIBUTE_NAME, url);
+        return null;
+    }
+
+    @Override
+    public void postProcess(ServerResponse response) {
+        String url = servletRequest.getAttribute(ATTRIBUTE_NAME);
+        System.out.println(url);
+    }
+}
+</code></pre>
+
+<p>I found for my use this wasn't adequate as the postProcess isn't called when there's an error (401, 500 etc.), I ended up using a <code>javax.servlet.Filter</code></p>

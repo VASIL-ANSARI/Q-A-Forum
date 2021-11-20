@@ -1,0 +1,24 @@
+<blockquote>
+  <p>What I need however is some kind of wait/notify like in Java.</p>
+</blockquote>
+
+<p>This works poorly in iOS. It can generate too many blocked threads, which can deadlock the entire system. Instead, you need to think in terms of queues, not threads.</p>
+
+<p>In general, the way this is handled in iOS is to include a completion handler or delegate along with the request. So your request would look something like:</p>
+
+<pre><code>conn.sendRequest(request, completion: {
+   // thing to do when it completes
+})
+</code></pre>
+
+<p>This does not block. <code>sendRequest</code> will put <code>completion</code> into a dictionary of request identifiers -> completion handlers. When the response comes back, you then look up the completion handler and execute it. For example:</p>
+
+<pre><code>if let handler = self.handlers[identifier] {
+    handler(response)
+} else {
+    // We got a response we weren't expecting... This may be an error, or we might ignore.
+}
+</code></pre>
+
+<p>For more details on why the async/await model works very poorly in iOS, see <a href="https://developer.apple.com/videos/wwdc/2015/?id=718" rel="nofollow">Building Responsive and Efficient Apps with GCD
+</a>. See also the <a href="https://developer.apple.com/library/ios/documentation/General/Conceptual/ConcurrencyProgrammingGuide/Introduction/Introduction.html" rel="nofollow">Concurrency Programming Guide</a>, and particularly the section "Migrating Away from Threads."</p>

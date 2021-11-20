@@ -1,0 +1,54 @@
+<p>You've discovered an incompatibility between the <code>attr_list</code> and <code>tables</code> extensions. <code>&lt;td&gt;</code> is a block-level element, so by default, <code>attr_list</code> looks for the attribute list on the next line, not inline. I think there is a good case for an exception for cell elements (as there currently are for header elements), because there is no way to have multi-line cells with the <code>tables</code> extension.</p>
+
+<p>To decide which solution to implement, you'll have to weigh the pain of switching to a new table format with that of switching to a development version of python-markdown.</p>
+
+<h3>Block Level Solution: use <code>grid_tables</code> rather than <code>tables</code> (recommended)</h3>
+
+<p>Grab <a href="https://github.com/smartboyathome/Markdown-GridTables" rel="nofollow">the third-party Grid Tables extension</a>, which supports multi-line cells, and put your attribute list it's own line like so:</p>
+
+<pre><code>+-------+----------+-------------------------------+
+| Title            | blabla                        |
++=======+==========+===============================+
+| foo   | bar                                      |
+|       | {: class="foo bar" title="Some title!" } |
++-------+------------------------------------------+
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th colspan="2" rowspan="1"&gt;
+&lt;p&gt;Title&lt;/p&gt;
+&lt;/th&gt;
+&lt;th colspan="1" rowspan="1"&gt;
+&lt;p&gt;blabla&lt;/p&gt;
+&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td colspan="1" rowspan="1"&gt;
+&lt;p&gt;foo
+&lt;/p&gt;
+&lt;/td&gt;
+&lt;td colspan="2" rowspan="1"&gt;
+&lt;p class="foo bar" title="Some title!"&gt;bar&lt;/p&gt;
+&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+</code></pre>
+
+<h3>Inline Solution: modify <code>attr_list</code> to be compatible with <code>tables</code></h3>
+
+<p><code>attr_list</code> can support inline attribute lists on cell elements by adding the following lines to attr_list.py:</p>
+
+<pre><code>if not m and elem.tag == 'td':
+    m = re.search(self.BASE_RE, elem.text)
+</code></pre>
+
+<p>Unfortunately, both of these extensions are part of <code>extra</code>, which is built into python-markdown. They rely on internal modules, so making your own extension (compatible with the current pip package) isn't realistic. If you want to implement this solution now, you can install <a href="https://github.com/ryneeverett/Python-Markdown" rel="nofollow">my fork</a>.</p>
+
+<p>Note: <a href="http://pythonhosted.org/Markdown/extensions/attr_list.html#inline" rel="nofollow">you cannot leave any space between the cell content and attribute list</a> (as you did in your question).</p>

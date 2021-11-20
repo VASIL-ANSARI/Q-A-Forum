@@ -1,0 +1,25 @@
+<p>You're dealing with a tree so recursion is a natural solution. A simple depth-first search (look at the current node then look at its children) is probably the easiest solution. Something like this:</p>
+
+<pre><code>slice = (o, properties...) -&gt;
+    ret = { }
+    ret[p] = o[p] for p in properties
+    ret
+
+find_path = (a, slug) -&gt;
+    for o in a
+        # Bail out now if this is what we're looking for.
+        if(o.slug == slug)
+            return [ slice(o, 'name', 'slug') ]
+        # Scan the children if not.
+        if(sub = find_path(o.children, slug))
+            return [ slice(o, 'name', 'slug') ].concat(sub)
+    # Explicitly return `undefined` to make sure the caller
+    # gets The Right Thing back.
+    return
+</code></pre>
+
+<p>Demo: <a href="http://jsfiddle.net/ambiguous/3FNZy/" rel="nofollow">http://jsfiddle.net/ambiguous/3FNZy/</a></p>
+
+<p>Each step in the recursion gives you nothing or the path from the current node to the one you're looking for. Then unwinding the recursion builds the path through the <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/concat" rel="nofollow"><code>concat</code></a> calls. Granted, there is a fair bit of array copying going on here but that's not worth worrying about for small data sets like this (and if you have more data then you'd want to switch to some sort of indexed structure).</p>
+
+<p>The <code>slice</code> function is just there to make the "copy <code>e</code> but not <code>e.children</code>" logic a bit more readable; unfortunately you can't use a compound structure like <code>{ x.a, x.b } = obj</code> in a <a href="http://coffeescript.org/#destructuring" rel="nofollow">destructured assignment</a> so a <code>slice</code> function is about as good as you're going to get (you <em>can</em> say <code>{a,b} = obj</code> but you can't add the extra level of nesting to get an object slice).</p>

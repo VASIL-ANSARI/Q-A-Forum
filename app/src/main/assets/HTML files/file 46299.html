@@ -1,0 +1,48 @@
+<p>The multipart message produced by your program is wrong: Missing the main body, missing the boundary declaration... This is the format you should produce instead:</p>
+
+<pre><code>Message-ID: &lt;000000001&gt;
+MIME-Version: 1.0
+Content-Type: multipart/mixed; 
+    boundary="----=_Part_0_842618406.1437326651362"
+
+------=_Part_0_842618406.1437326651362
+Content-Type: application/octet-stream; name=myfile.pdf
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename=myfile.pdf
+
+&lt;...binary data...&gt;
+------=_Part_0_842618406.1437326651362--
+</code></pre>
+
+<p>I truly recommend to you not to produce MIME messages from the scratch; instead you'll save yourself trouble by using the Java Mail API, for example with this program:</p>
+
+<pre><code>public void createMultipartMessage(File[] files, OutputStream out)
+    throws MessagingException,
+    IOException
+{
+    Session session=Session.getDefaultInstance(System.getProperties());
+    MimeMessage mime=new MimeMessage(session);
+    Multipart multipart=new MimeMultipart();
+    BodyPart part;
+
+    // Send form data (as for http://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.2):
+    part=new MimeBodyPart();
+    part.setDisposition("Content-Disposition: form-data; name=\"&lt;name&gt;\"");
+    part.setContent("&lt;value&gt;");        
+    multipart.addBodyPart(part);
+
+    // Send binary files:
+    for (File file : files)
+    {
+        part=new MimeBodyPart();
+        part.setFileName(file.getName());
+        DataHandler dh=new DataHandler(new FileDataSource(file));
+        part.setDataHandler(dh);
+        multipart.addBodyPart(part);
+    }
+    mime.setContent(multipart);
+    mime.writeTo(out);
+}
+</code></pre>
+
+<p>You must include in your runtime the mail-1.4.1.jar and activation-1.1.1.jar libraries.</p>

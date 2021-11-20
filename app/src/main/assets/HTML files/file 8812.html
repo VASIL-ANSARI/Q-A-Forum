@@ -1,0 +1,79 @@
+<p>Some of your variables are autoreleased, so they mustn't be released (they will be relaeased automatically) :</p>
+
+<ul>
+<li>data</li>
+<li>request</li>
+<li>url</li>
+<li>response</li>
+<li>err</li>
+<li>responseData </li>
+</ul>
+
+<p>Plus, userID belongs to another object (theController)</p>
+
+<p>You only call release when you call</p>
+
+<ul>
+<li>alloc</li>
+<li>new</li>
+<li>copy</li>
+<li>retain</li>
+</ul>
+
+<p>explicitly on a variable, or any method starting by copy/new (copyWithZone:,newWithFoo:)...</p>
+
+<p>So replace</p>
+
+<pre><code>[userID release];
+[data release];
+[request release];
+[url release];
+[userString release];
+[response release];
+[err release];
+[responseData release];
+</code></pre>
+
+<p>By</p>
+
+<pre><code>[userString release];
+</code></pre>
+
+<p>since userString is the only variable you alloc explicitly.</p>
+
+<p>This will fix the issue, and your object should not leak.</p>
+
+<p>Also theController seems to be an instance variable, so you may want to have ownership on it :</p>
+
+<pre><code>        if ( [viewController isMemberOfClass:[profileViewController class]] ) {
+            theController = [(profileViewController *)viewController retain];
+        }
+</code></pre>
+
+<p>Or, if it is a property synthesized with retain</p>
+
+<pre><code>        if ( [viewController isMemberOfClass:[profileViewController class]] ) {
+            self.theController = (profileViewController *)viewController;
+        }
+</code></pre>
+
+<p>Instead of</p>
+
+<pre><code>        if ( [viewController isMemberOfClass:[profileViewController class]] ) {
+            theController = (profileViewController *)viewController;;
+        }
+</code></pre>
+
+<p>(I just realized you also have two semicolons at the end of the line)</p>
+
+<p>And add in your dealloc method :</p>
+
+<pre><code>-(void) dealloc
+{
+ //...release the other objects you have ownership on
+ [theController release];
+ [super dealloc];
+}
+</code></pre>
+
+<p>If you're new to Objective-C, you may want to have a look at the <a href="http://developer.apple.com/library/mac/#documentation/Cocoa/Conceptual/MemoryMgmt/MemoryMgmt.html" rel="nofollow">Apple documentation about memory management</a> (or any resource on this topic). Try to read it carefully, it's not very difficult, but it's the most confusing thing if you don't do it right.</p>

@@ -1,0 +1,205 @@
+<p>This answer is for hashing, <a href="http://php.net/manual/en/function.password-hash.php" rel="nofollow">password_hash()</a>, and <a href="http://php.net/manual/en/function.password-verify.php" rel="nofollow">password_verify()</a>. For both mysqli and pdo. The link at the bottom has further links and some language about salts and the like.</p>
+
+<p>It is crucial to not use user-supplied data directly with selects and inserts. Rather, bind parameters and call prepared statements to <a href="http://stackoverflow.com/questions/60174/how-can-i-prevent-sql-injection-in-php">Avoid sql injection attacks</a>. Passwords should never be saved in the clear (cleartext) in databases. Rather, they should be sent through one-way hashes.</p>
+
+<p>Also note. This is showing registration hashing and login verify. It is <strong>not full blown</strong> functionality I am trying to hock on codecanyon for ten bucks ... such that it shows a re-registration of an email address (the login) already exists, does updates, mind you. In that case the insert will simply fail due to the unique key set in place in the db. I leave that to you, the reader, to do the lookup, and say 'email already registered.'</p>
+
+<h2>Schema</h2>
+
+<pre><code>CREATE TABLE `user_accounts2` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  unique key(email) -- that better be the case
+) ENGINE=InnoDB;
+</code></pre>
+
+<p>After running through register.php and saving a user, the data might look like this:</p>
+
+<pre><code>select * from user_accounts2;
++----+-----------+--------------------------------------------------------------+
+| id | email     | password                                                     |
++----+-----------+--------------------------------------------------------------+
+|  1 | d@d.com   | $2y$10$U6.WR.tiOIYNGDWddfT7kevJU8uiz8KAkdxXpda9e1xuplhC/eTJS |
++----+-----------+--------------------------------------------------------------+
+</code></pre>
+
+<blockquote>
+  <p>mysqli section first</p>
+</blockquote>
+
+<h2>register.php</h2>
+
+<pre><code>&lt;?php
+    mysqli_report(MYSQLI_REPORT_ALL);
+    error_reporting(E_ALL); // report all PHP errors
+    ini_set("display_errors", 1); // display them
+    session_start();
+
+    if(isset($_SESSION['userid'])!="") {
+        // you are already logged in as session has been set
+        header("Location: safe.php");   // note that this re-direct will at the top of that page
+        // ... and there to verify the session state so no tricks can be performed
+        // no tricks and gimmicks
+    }
+
+    if(isset($_POST['register'])) {
+        $email = $_POST['email'];
+        $ctPassword = $_POST['password'];   // cleartext password from user
+        $hp=password_hash($ctPassword,PASSWORD_DEFAULT); // hashed password using cleartext one
+
+        // pretend the following is locked in a vault and loaded but hard coded here
+        $host="yourhostname";
+        $dbname="dbname";
+        $user="dbuser";
+        $pwd="password";
+        $port=3306; // comes along for the ride so I don't need to look up param order below
+        // end pretend
+
+        try {
+            $mysqli= new mysqli($host, $user, $pwd, $dbname,$port);
+            if ($mysqli-&gt;connect_error) {
+                die('Connect Error (' . $mysqli-&gt;connect_errno . ') ' . $mysqli-&gt;connect_error);
+            }
+            //echo "I am connected and feel happy.&lt;br/&gt;";
+            $query = "INSERT INTO user_accounts2(email,password) VALUES (?,?)";
+            $stmt = $mysqli-&gt;prepare($query);
+
+            // note the 2 s's below, s is for string
+            $stmt-&gt;bind_param("ss", $email,$hp);    // never ever use non-sanitized user supplied data. Bind it
+            $stmt-&gt;execute();
+            // password is saved as hashed, will be verified on login page with password_verify()
+            $iLastInsertId=$mysqli-&gt;insert_id;  // do something special with this (or not)
+            // redirect to some login page (for now you just sit here)
+            $stmt-&gt;close(); 
+            $mysqli-&gt;close();
+        } catch (mysqli_sql_exception $e) { 
+            throw $e; 
+        } 
+    }
+?&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Register new user&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id="reg-form"&gt;
+&lt;form method="post"&gt;
+    &lt;table&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;input type="email" name="email" placeholder="Email" required /&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;input type="password" name="password" placeholder="Password" required /&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;button type="submit" name="register"&gt;Register&lt;/button&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;a href="index.php"&gt;Normal Login In Here&lt;/a&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+    &lt;/table&gt;
+&lt;/form&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<h2>login.php</h2>
+
+<pre><code>&lt;?php
+    mysqli_report(MYSQLI_REPORT_ALL);
+    error_reporting(E_ALL); // report all PHP errors
+    ini_set("display_errors", 1); // display them
+    session_start();
+
+    if(isset($_SESSION['userid'])!="") {
+        // you are already logged in as session has been set
+        header("Location: safe.php");   // note that this re-direct will at the top of that page
+        // ... and there to verify the session state so no tricks can be performed
+        // no tricks and gimmicks
+    }
+
+    if(isset($_POST['login'])) {
+        $email = $_POST['email'];
+        $ctPassword = $_POST['password'];   // cleartext password from user
+
+        // pretend the following is locked in a vault and loaded but hard coded here
+        $host="yourhostname";
+        $dbname="dbname";
+        $user="dbuser";
+        $pwd="password";
+        $port=3306; // comes along for the ride so I don't need to look up param order below
+        // end pretend
+
+        try {
+            $mysqli= new mysqli($host, $user, $pwd, $dbname,$port);
+            if ($mysqli-&gt;connect_error) {
+                die('Connect Error (' . $mysqli-&gt;connect_errno . ') ' . $mysqli-&gt;connect_error);
+            }
+            //echo "I am connected and feel happy.&lt;br/&gt;";
+            $query = "select id,email,password from user_accounts2 where email=?";
+            $stmt = $mysqli-&gt;prepare($query);
+
+            // note the "s" below, s is for string
+            $stmt-&gt;bind_param("s", $email); // never ever use non-sanitized user supplied data. Bind it
+            $stmt-&gt;execute();
+            $result = $stmt-&gt;get_result();
+            if ($row = $result-&gt;fetch_array(MYSQLI_ASSOC)) {
+                $dbHashedPassword=$row['password'];
+                if (password_verify($ctPassword,$dbHashedPassword)) {
+                    echo "right, userid=";
+                    $_SESSION['userid']=$row['id'];
+                    echo $_SESSION['userid'];
+                    // redirect to safe.php (note safeguards verbiage at top of this file about it)
+                }
+                else {
+                    echo "wrong";
+                    // could be overkill here, but in logout.php
+                    // clear the $_SESSION['userid']
+                }
+            }
+            else {
+                echo 'no such record';
+            }
+            // remember, there is no iterating through rows, since there is 1 or 0 (email has a unique key)
+            // also, hashes are one-way functions in the db. Once you hash and do the insert
+            // there is pretty much no coming back to cleartext from the db with it. you just VERIFY it
+
+            $stmt-&gt;close(); 
+            $mysqli-&gt;close();
+        } catch (mysqli_sql_exception $e) { 
+            throw $e; 
+        } 
+    }
+?&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Login&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id="reg-form"&gt;
+&lt;form method="post"&gt;
+    &lt;table&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;input type="email" name="email" placeholder="Email" required /&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;input type="password" name="password" placeholder="Password" required /&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+        &lt;td&gt;&lt;button type="submit" name="login"&gt;Login&lt;/button&gt;&lt;/td&gt;
+        &lt;/tr&gt;
+    &lt;/table&gt;
+&lt;/form&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<blockquote>
+  <p>pdo section below</p>
+</blockquote>
+
+<p>When I have time, probably tomorrow, but for now I point you to this <a href="http://stackoverflow.com/a/32556010">Answer of mine</a>.</p>

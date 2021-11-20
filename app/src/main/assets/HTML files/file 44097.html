@@ -1,0 +1,126 @@
+<p>No you can't change the order of SQL clauses, it should be in following form:</p>
+
+<pre><code>SELECT &lt;attribute and function list&gt;
+FROM &lt;table list&gt;
+[ WHERE &lt;condition&gt; ]
+[ GROUP BY &lt;grouping attribute(s)&gt; ]
+[ HAVING &lt;group condition&gt; ]
+[ ORDER BY &lt;attribute list&gt; ];
+</code></pre>
+
+<p>Retrieval queries in SQL consist of these (up to) six clauses, but only the first two â <code>SELECT</code> and <code>FROM</code> â are mandatory. </p>
+
+<p><code>GROUP BY</code> specifies grouping attributes (doesn't guarantee in which order the result appears), whereas <code>ORDER BY</code> specifies an order for displaying the result of a query.</p>
+
+<p><a href="http://stackoverflow.com/questions/29459260/what-is-the-difference-between-group-and-order-in-sql#comment47082807_29459340">comment</a>:</p>
+
+<blockquote>
+  <p>QUERY = "select * from animals where species = 'orangutan' order by name ;" here when i replace order with group i didn't saw any difference </p>
+</blockquote>
+
+<p>Standard SQL doesn't guarantee the order in which result should be appear and  a query that includes a GROUP BY clause <strong>cannot refer to nonaggregated columns in the select list that are not named in the GROUP BY clause.</strong></p>
+
+<p>so:</p>
+
+<pre><code>select * 
+from animals 
+where species = 'orangutan' 
+group by name;
+</code></pre>
+
+<p>This <strong>query is illegal</strong> in <strong>standard SQL</strong> because it includes every fields of table. check this MySQL doc <a href="https://dev.mysql.com/doc/refman/5.1/en/group-by-handling.html" rel="nofollow">MySQL Handling of GROUP BY</a>. </p>
+
+<p>whereas,</p>
+
+<pre><code>select * 
+from animals 
+where species = 'orangutan' 
+order by name;
+</code></pre>
+
+<p>is perfectly valid. </p>
+
+<p>Anyways, some implementation of SQL like MySQL also sorts the output result, check:</p>
+
+<blockquote>
+  <h3><a href="https://dev.mysql.com/doc/refman/5.1/en/group-by-handling.html" rel="nofollow">12.17.3 MySQL Handling of GROUP BY</a></h3>
+  
+  <p>MySQL extends the use of GROUP BY so that the select list can refer to nonaggregated columns not named in the GROUP BY clause. This means that the preceding query is legal in MySQL. You can use this feature to get better performance by avoiding unnecessary column sorting and grouping. However.....</p>
+</blockquote>
+
+<p>How does GROUP BY orders? </p>
+
+<blockquote>
+  <p><a href="https://dev.mysql.com/doc/refman/5.1/en/group-by-modifiers.html" rel="nofollow">Other Considerations When using ROLLUP</a></p>
+  
+  <p>GROUP BY in MySQL sorts results, and you can use explicit ASC and DESC keywords with columns named in the GROUP BY list to specify sort order for individual columns.</p>
+</blockquote>
+
+<p>Similar, behavior is also found in your DBMS.</p>
+
+<p>If you can tag name of your DBMS then I or someone else can simulate difference between with some example. Below I am giving an example in MySQL:</p>
+
+<blockquote>
+  <h3><a href="https://dev.mysql.com/doc/refman/5.1/en/group-by-handling.html" rel="nofollow">12.17.3 MySQL Handling of GROUP BY</a></h3>
+  
+  <p>.... However, this is useful primarily when all values in each nonaggregated column not named in the GROUP BY are the same for each group. The server is free to choose any value from each group, so unless they are the same, the values chosen are indeterminate. Furthermore, the selection of values from each group cannot be influenced by adding an ORDER BY clause. </p>
+</blockquote>
+
+<p>I have a Employee table, like below:</p>
+
+<pre><code>mysql&gt; select * FROM Employee;
++-----+------+-------------+------+
+| SSN | Name | Designation | MSSN |
++-----+------+-------------+------+
+| 1   | A    | OWNER       | 1    |
+| 10  | G    | WORKER      | 5    |
+| 11  | D    | WORKER      | 4    |
+| 12  | E    | WORKER      | 4    |
+| 2   | B    | BOSS        | 1    |
+| 3   | F    | BOSS        | 1    |
+| 4   | C    | BOSS        | 2    |
+| 5   | H    | BOSS        | 2    |
+| 6   | L    | WORKER      | 2    |
+| 7   | I    | BOSS        | 2    |
+| 8   | K    | WORKER      | 3    |
+| 9   | J    | WORKER      | 7    |
++-----+------+-------------+------+
+12 rows in set (0.00 sec)
+</code></pre>
+
+<p>If I apply group by 'Designation', it make groups and order result </p>
+
+<pre><code>mysql&gt; select * from Employee group by Designation;
++-----+------+-------------+------+
+| SSN | Name | Designation | MSSN |
++-----+------+-------------+------+
+| 2   | B    | BOSS        | 1    |
+| 1   | A    | OWNER       | 1    |
+| 10  | G    | WORKER      | 5    |
++-----+------+-------------+------+
+3 rows in set (0.00 sec)
+</code></pre>
+
+<p>Three row for three types of 'Designation' values present in table, which one picked is indeterminate according to MySQL doc.</p>
+
+<p>and order by query's result is quite different:</p>
+
+<pre><code>mysql&gt; select * from Employee order by Designation;
++-----+------+-------------+------+
+| SSN | Name | Designation | MSSN |
++-----+------+-------------+------+
+| 4   | C    | BOSS        | 2    |
+| 7   | I    | BOSS        | 2    |
+| 5   | H    | BOSS        | 2    |
+| 2   | B    | BOSS        | 1    |
+| 3   | F    | BOSS        | 1    |
+| 1   | A    | OWNER       | 1    |
+| 12  | E    | WORKER      | 4    |
+| 11  | D    | WORKER      | 4    |
+| 6   | L    | WORKER      | 2    |
+| 10  | G    | WORKER      | 5    |
+| 8   | K    | WORKER      | 3    |
+| 9   | J    | WORKER      | 7    |
++-----+------+-------------+------+
+12 rows in set (0.00 sec)
+</code></pre>

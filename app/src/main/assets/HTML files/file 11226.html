@@ -1,0 +1,33 @@
+<p>Without guessing at the logic, what's wrong is that you need a <code>GROUP BY</code> to count:</p>
+
+<pre><code>SELECT problems.problem_id, categories.category_id, category_name, 
+COUNT(problems.problem_id) as num_problems, is_top
+FROM problems 
+LEFT JOIN problem_categories 
+ON problems.problem_id = problem_categories.category_id
+LEFT JOIN categories 
+ON problem_categories.category_id = categories.category_id
+WHERE is_top = 1;
+GROUP BY  problems.problem_id, categories.category_id, category_name
+</code></pre>
+
+<p>But if you want the number of problems per top-category, your logic probably goes like this instead:</p>
+
+<pre><code>SELECT category_name, categories.category_id, problems.problem_id, 
+COUNT(problems.problem_id) as num_problems
+FROM categories 
+JOIN problem_categories 
+ON problem_categories.category_id = categories.category_id
+JOIN problems 
+ON problems.problem_id = problem_categories.category_id
+WHERE is_top = 1;
+GROUP BY category_name, categories.category_id, problems.problem_id
+</code></pre>
+
+<p>Notice that:</p>
+
+<ul>
+<li>For each category, you get the problems, and you count those instead</li>
+<li>You use JOIN instead of LEFT JOIN, since you don't care about categories that have no problem(s) anyway.</li>
+<li>You can leave the is_top out of the select, since you put it in your WHERE clause anyway. Selecting something which is not in your GROUP BY will get any random value, but since all values are 1, you can safely do it, or just leave it.</li>
+</ul>

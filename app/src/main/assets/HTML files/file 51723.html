@@ -1,0 +1,60 @@
+<p>I see two ways of tacking this problem:</p>
+
+<p>1- When Flask-Admin generate the form, add <code>data</code> attributes with the <code>mid</code> of each <code>methodArg</code> on each <code>option</code> tag in the <code>methodArg</code> select. Then have some JS code filter the <code>option</code> tags based on the recipe selected.</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>Here is a tentative try at putting a <code>data-mid</code> attribute on each <code>option</code>:</p>
+
+<pre><code>def monkeypatched_call(self, field, **kwargs):
+    kwargs.setdefault('id', field.id)
+    if self.multiple:
+        kwargs['multiple'] = True
+    html = ['&lt;select %s&gt;' % html_params(name=field.name, **kwargs)]
+    for (val, label, selected), (_, methodarg) in zip(field.iter_choices(), field._get_object_list()):
+        html.append(self.render_option(val, label, selected, **{'data-mid': methodarg.mid}))
+    html.append('&lt;/select&gt;')
+    return HTMLString(''.join(html))
+
+Select.__call__ = monkeypatched_call
+</code></pre>
+
+<p>The blocker is in the fact that those render calls are triggered from the jinja templates, so you are pretty much stuck updating a widget (<code>Select</code> being the most low-level one in WTForms, and is used as a base for Flask-Admin's <code>Select2Field</code>).</p>
+
+<p>After getting those <code>data-mid</code> on each of your options, you can proceed with just binding an <code>change</code> on your recipe's select and display the methodarg's <code>option</code> that have a matching <code>data-mid</code>. Considering Flask-Admin uses <code>select2</code>, you might have to do some JS tweaking (easiest ugly solution would be to clean up the widget and re-create it for each <code>change</code> event triggered)</p>
+
+<p>Overall, I find this one less robust than the second solution. I kept the monkeypatch to make it clear this should not be used in production imho. (the second solution is slightly less intrusive)</p>
+
+<p>2- Use the supported ajax-completion in Flask-Admin to hack your way into getting the options that you want based on the selected recipe:</p>
+
+<p>First, create a custom AjaxModelLoader that will be responsible for executing the right selection query to the DB:</p>
+
+<pre><code>class MethodArgAjaxModelLoader(sqla.ajax.QueryAjaxModelLoader):
+    def get_list(self, term, offset=0, limit=10):
+        query = self.session.query(self.model).filter_by(mid=term)
+        return query.offset(offset).limit(limit).all()
+
+class RecipeArgAdmin(sqla.ModelView):
+    column_list = ('recipe', 'methodarg', 'strvalue')
+    form_ajax_refs = {
+        'methodarg': MethodArgAjaxModelLoader('methodarg', db.session, MethodArg, fields=['methodarg'])
+    }
+    column_editable_list = column_list
+</code></pre>
+
+<p>Then, update Flask-Admin's <code>form.js</code> to get the browser to send you the recipe information instead of the <code>methodArg</code> name that needs to be autocompleted. (or you could send both in <code>query</code> and do some arg parsing in your AjaxLoader since Flask-Admin does no parsing whatsoever on <code>query</code>, expecting it to be a string I suppose <a href="https://github.com/mrjoes/flask-admin/blob/master/flask_admin/model/base.py#L1577" rel="nofollow">[0]</a>. That way, you would keep the auto-completion)</p>
+
+<pre><code>data: function(term, page) {
+    return {
+        query: $('#recipe').val(),
+        offset: (page - 1) * 10,
+        limit: 10
+    };
+},
+</code></pre>
+
+<p>This snippet is taken from Flask-Admin's <code>form.js</code> <a href="https://github.com/flask-admin/flask-admin/blob/master/flask_admin/static/admin/js/form.js#L20" rel="nofollow">[1]</a></p>
+
+<p>Obviously, this needs some tweaking and parametrising (because doing such a hacky solution would block you from using other ajax-populated select in the rest of your app admin + the update on <code>form.js</code> directly like that would make upgrading <code>Flask-Admin</code> extremely cumbersome)</p>
+
+<p>Overall, I am unsatisfied with both solutions and this showcase that whenever you want to go out of the tracks of a framework / tool, you can end up in complex dead ends. This might be an interesting feature request / project for someone willing to contribute a <strong>real</strong> solution upstream to Flask-Admin though.</p>

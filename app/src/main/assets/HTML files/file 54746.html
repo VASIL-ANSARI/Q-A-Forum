@@ -1,0 +1,209 @@
+<p>I basically used a recursive method to go through all nested polygon. OuterBoundary and InnerBoundary elements alternate. I'm sure there is still room for improvement, but the result seems to be the same as with QGIS export (which I found out about afterwards).
+There are issues with unfilled polygons when I use complex data. I added a separate question about this in the <a href="https://gis.stackexchange.com/questions/183697/qgis-kml-export-to-google-earth-has-incorrect-boundaries">GIS</a> StackExchange page: </p>
+
+<pre><code> // A class to hold the inner polygons
+ public class HierarchicalPolygon
+    {
+        private Polygon _polygon;
+        private List&lt;HierarchicalPolygon&gt; _innerPolygons;
+
+        public HierarchicalPolygon(Polygon polygon)
+        {
+            _polygon = polygon;
+        }
+
+        public Polygon MainPolygon { get
+            {
+                return _polygon;
+            }
+            set
+            {
+                _polygon = value;
+            }
+        }
+
+
+        public List&lt;HierarchicalPolygon&gt; InnerPolygons
+        {
+            get
+            {
+                return _innerPolygons;
+            }
+            set
+            {
+                _innerPolygons = value;
+            }
+        }
+
+    }
+
+public class PolygonHelper
+{
+    public static List&lt;HierarchicalPolygon&gt; GeneratePolygonHierachy(Polygons polygons)
+        {
+            // Step 1: get polygons that have no enclosing polygons
+            var outerPolygons = new List&lt;HierarchicalPolygon&gt;();
+            foreach (var polygon in polygons)
+            {
+                var enclosingPolygon = FindEnclosingPolygon((Polygon)polygon, polygons);
+                if (enclosingPolygon == null)
+                {
+                    outerPolygons.Add(new HierarchicalPolygon((Polygon)polygon));
+                }
+            }
+
+            // Step 2: recursively go through all nested polygons
+            // Only two levels are allowed in KML. For example 
+            //  OuterBoundary: country polygon 
+            //  InnerBoundary: lake polygon
+            //  OuterBoundary: island in lake polygon
+            var polygonHierarchy = new List&lt;HierarchicalPolygon&gt;();
+            foreach (var polygon in outerPolygons)
+            {
+                ParsePolygonRecursively(polygon, polygonHierarchy, polygons, true);
+            }
+
+            return polygonHierarchy;
+        }
+
+        private static void ParsePolygonRecursively(HierarchicalPolygon polygonToProcess, List&lt;HierarchicalPolygon&gt; mainList, Polygons allPolygons, bool currentIsOuterBoundary)
+        {
+            var innerPolygons = FindInnerPolygons(polygonToProcess.MainPolygon, allPolygons);
+
+            if (currentIsOuterBoundary)
+            {
+                mainList.Add(polygonToProcess);
+
+                // If OuterBoundary then add the nesteed Polygons the the current polygon
+                if (innerPolygons != null &amp;&amp; innerPolygons.Count &gt; 0)
+                {
+                    polygonToProcess.InnerPolygons = new List&lt;HierarchicalPolygon&gt;();
+                    foreach (var innerPolygon in innerPolygons)
+                    {
+                        var newPolygon = new HierarchicalPolygon((Polygon)innerPolygon);
+
+                        // Not all inner polygons can be added, because they may be nested inside each other
+                        // Adding of all inner polygons would only be possible, if the would not be contained in each other.
+                        var enclosingPolygon = FindEnclosingPolygon((Polygon)innerPolygon, innerPolygons);
+
+                        if (enclosingPolygon == null || enclosingPolygon.Count == 0)
+                        {
+                            polygonToProcess.InnerPolygons.Add(newPolygon);
+                            ParsePolygonRecursively(new HierarchicalPolygon((Polygon)innerPolygon), mainList, allPolygons, false);
+
+                            // don't break there could be multiple inner polygons that have again inner polygons
+                            //break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // If InnerBoundary then don't add another layer but start at the OuterBoundary again
+                foreach (var innerPolygon in innerPolygons)
+                {
+                    var enclosingPolygon = FindEnclosingPolygon((Polygon)innerPolygon, innerPolygons);
+
+                    if (enclosingPolygon == null || enclosingPolygon.Count == 0)
+                    {
+                        ParsePolygonRecursively(new HierarchicalPolygon((Polygon)innerPolygon), mainList, allPolygons, true);
+                    }
+                }
+            }
+        }
+
+        /// &lt;summary&gt;
+        /// Uses IsPointInPolygon Method to check a points of a polygon to all other polygons
+        /// &lt;/summary&gt;
+        /// &lt;param name="insidePolygon"&gt;&lt;/param&gt;
+        /// &lt;param name="polygonList"&gt;&lt;/param&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static Polygon FindEnclosingPolygon(Polygon insidePolygon, Polygons polygonList)
+        {
+            //bool isInside = false;
+            foreach (var polygon in polygonList)
+            {
+                int insidePointCount = 0;
+
+                foreach (var insidePoint in insidePolygon)
+                {
+                    if (IsPointInPolygon(polygon, insidePoint))
+                    {
+                        insidePointCount += 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (insidePointCount == insidePolygon.Count)
+                {
+                    return (Polygon)polygon;
+                }
+            }
+
+            return null;
+        }
+
+    /// &lt;summary&gt;
+    /// Uses IsPointInPolygon Method to check a points of a polygon to all other polygons
+    /// &lt;/summary&gt;
+    /// &lt;param name="insidePolygon"&gt;&lt;/param&gt;
+    /// &lt;param name="polygonList"&gt;&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    public static Polygons FindInnerPolygons(Polygon parentPolygon, Polygons polygonList)
+    {
+        var innerPolygons = new Polygons();
+
+        foreach (var polygon in polygonList)
+        {
+            int insidePointCount = 0;
+
+            foreach (var point in polygon)
+            {
+                if (IsPointInPolygon(parentPolygon, point))
+                {
+                    insidePointCount += 1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (insidePointCount == polygon.Count)
+            {
+                innerPolygons.Add((Polygon)polygon);
+            }
+
+        }
+
+        return innerPolygons;
+    }
+
+        /// &lt;summary&gt;
+        /// Source: https://stackoverflow.com/questions/4243042/c-sharp-point-in-polygon
+        /// &lt;/summary&gt;
+        /// &lt;param name="polygon"&gt;&lt;/param&gt;
+        /// &lt;param name="testPoint"&gt;&lt;/param&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static bool IsPointInPolygon(List&lt;DoublePoint&gt; polygon, DoublePoint testPoint)
+
+            bool result = false;
+            int j = polygon.Count() - 1;
+            for (int i = 0; i &lt; polygon.Count(); i++)
+            {
+                if (polygon[i].Y &lt; testPoint.Y &amp;&amp; polygon[j].Y &gt;= testPoint.Y || polygon[j].Y &lt; testPoint.Y &amp;&amp; polygon[i].Y &gt;= testPoint.Y)
+                {
+                    if (polygon[i].X + (testPoint.Y - polygon[i].Y) / (polygon[j].Y - polygon[i].Y) * (polygon[j].X - polygon[i].X) &lt; testPoint.X)
+                    {
+                        result = !result;
+                    }
+                }
+                j = i;
+            }
+            return result;
+        }
+  }
+</code></pre>

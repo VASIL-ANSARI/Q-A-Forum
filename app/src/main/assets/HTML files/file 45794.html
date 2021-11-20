@@ -1,0 +1,23 @@
+<p>I found the problem finally.
+when I start a download operation and close the application without cancelling the operation the BackgroundDownloader keeps the operation for the next application start.
+when the number of download operations reach the maximum allowed simultaneous operations(I think 5) the next operations will be on the waiting list() till the previous operations finish.
+so I had to stop all the uncompleted operations when the application starts like this:</p>
+
+<pre><code>Task.Run(async () =&gt;
+        {
+            var downloads = await BackgroundDownloader.GetCurrentDownloadsAsync();
+            foreach (var download in downloads)
+            {
+                CancellationTokenSource cts = new CancellationTokenSource();
+                download.AttachAsync().AsTask(cts.Token);
+                cts.Cancel();
+            }
+            var localFolder = ApplicationData.Current.LocalFolder;
+            var files = await localFolder.GetFilesAsync();
+            files = files.Where(x =&gt; x.Name.EndsWith("_")).ToList();
+            foreach (StorageFile file in files)
+            {
+                await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+            }
+        });
+</code></pre>

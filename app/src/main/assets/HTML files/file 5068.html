@@ -1,0 +1,71 @@
+<p>I don't really understand what you're trying to do, but if you want the local name of the tag causing a <code>START_ELEMENT</code> event, you can do it like this:</p>
+
+<pre><code>if (event.getEventType() == START_ELEMENT) {
+    QName qname = event.asStartElement().getName()
+    System.out.println("Start of element " + qname.getLocalPart());
+}
+</code></pre>
+
+<p>Likewise, <a href="http://download.oracle.com/javase/6/docs/api/javax/xml/stream/events/XMLEvent.html#asEndElement()" rel="nofollow"><code>asEndElement</code></a>, <a href="http://download.oracle.com/javase/6/docs/api/javax/xml/stream/events/XMLEvent.html#asCharacters()" rel="nofollow"><code>asCharacters</code></a>, etc provide access to other types of nodes. </p>
+
+<p>Personally, I usually find that the <code>XMLStreamReader</code> is handier for me in most situations, but I suppose that depends on the use case, as well as your own personal preferences. A pro tip is that the stricter the schema, the easier the data is to parse with StAX.</p>
+
+<p>You may also want to look at <a href="http://www.oracle.com/technetwork/articles/javase/index-140168.html" rel="nofollow">JAX-B</a> for automatic XML data binding.</p>
+
+<p><strong>Edit:</strong> Here's a naÃ¯ve recursive descent StAX parser for the XML in the OP:</p>
+
+<pre><code>@Test
+public void recursiveDescentStaxParser( ) throws XMLStreamException,
+        FactoryConfigurationError
+{
+    String msg = "&lt;ns1:Root xmlns:ns1=\"http://rootNameSpace.com/\"&gt;&lt;ns1:A/&gt;&lt;ns1:B&gt;&lt;Book xmlns=\"http://www.myNameSpace.com\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"&gt;&lt;Data&gt;&lt;Author&gt;John&lt;/Author&gt;&lt;Edition&gt;1&lt;/Edition&gt;&lt;PubHouse&gt;Small Publishing House&lt;/PubHouse&gt;&lt;Price&gt;37.8&lt;/Price&gt;&lt;/Data&gt;&lt;/Book&gt;&lt;/ns1:B&gt;&lt;/ns1:Root&gt;";
+    XMLStreamReader reader = XMLInputFactory.newFactory( )
+            .createXMLStreamReader( new StringReader( msg ) );
+
+    reader.nextTag( );
+    readRoot( reader );
+
+}
+
+private void readRoot( XMLStreamReader reader ) throws XMLStreamException
+{
+    while ( reader.nextTag( ) == XMLEvent.START_ELEMENT )
+    {
+        QName name = reader.getName( );
+        if ( "B".equals( name.getLocalPart( ) ) )
+            readBooks( reader );
+        else
+            reader.nextTag( ); // Empty &lt;A&gt;
+
+    }
+}
+
+private void readBooks( XMLStreamReader reader ) throws XMLStreamException
+{
+    while ( reader.nextTag( ) == XMLEvent.START_ELEMENT )
+    {
+        QName name = reader.getName( );
+        if ( !"Book".equals( name.getLocalPart( ) ) )
+            throw new XMLStreamException( name.toString( ) );
+        reader.nextTag( ); // Jump to &lt;Data&gt;
+        readBook( reader );
+        reader.nextTag( ); // Jump to &lt;/B&gt;
+    }
+}
+
+private void readBook( XMLStreamReader reader ) throws XMLStreamException
+{
+    reader.nextTag( ); // Skip to &lt;Author&gt;
+    System.out.println( "Author: " + reader.getElementText( ) );
+    reader.nextTag( ); // Skip to &lt;Edition&gt;
+    System.out.println( "Edition: " + reader.getElementText( ) );
+    reader.nextTag( ); // Skip to &lt;PubHouse&gt;
+    System.out.println( "Publisher: " + reader.getElementText( ) );
+    reader.nextTag( ); // Skip to &lt;Price&gt;
+    System.out.println( "Price: " + reader.getElementText( ) );
+    reader.nextTag( ); // Skip to &lt;/Book&gt;
+
+}
+</code></pre>
+
+<p>Writing stuff like this doesn't only make the code a lot easier to read and reason about, but also the stack traces when errors pop up.</p>

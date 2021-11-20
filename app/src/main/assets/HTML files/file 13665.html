@@ -1,0 +1,58 @@
+<p>Well I seem to have solved it partially myself. I've posted a <a href="http://jsfiddle.net/UVQxc/6/" rel="nofollow">fiddle here</a> and copied the code here.</p>
+
+<pre><code>var data1 = [13, 15, 21, 42, 5, 18],
+    data2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    data = data1, set = 1,
+    format = function() {
+        var text = arguments[0],
+            args = Array.prototype.slice.call(arguments, 1);
+        return text.replace(/{(\d+)}/g, function(match, number) {
+            return typeof args[number] != 'undefined' ? args[number] : match;
+        });
+    };
+
+var width = 400,
+    height = 400,
+    outerRadius = Math.min(width, height) / 2,
+    innerRadius = outerRadius * .6,
+    color = d3.scale.category20(),
+    donut = d3.layout.pie(),
+    arc = d3.svg.arc().innerRadius(innerRadius).outerRadius(outerRadius);
+
+var vis, arcs;
+
+vis = d3.select("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .attr('class', 'pie');
+
+function update(){
+    data = data === data1 ? data2: data1;
+    arcs = vis.selectAll('path')
+        .data(donut(data));
+
+    arcs.enter()
+        .append('svg:path')
+        .attr('transform', format("translate({0}, {0})", outerRadius))
+        .attr('fill', function(d, i) { return color(i); })
+        .attr('d', arc).each(function(d) { this._previous = d; });
+
+    arcs
+        .transition()
+            .duration(750)
+            .attrTween('d', function(a) {
+                var i = d3.interpolate(this._previous, a);
+                this._previous = i(0);
+                return function(t) {
+                    return arc(i(t));
+                };
+            });
+
+    arcs.exit().remove();
+}
+
+update();
+d3.select(window).on('click', function(){
+  update();
+});
+</code></pre>

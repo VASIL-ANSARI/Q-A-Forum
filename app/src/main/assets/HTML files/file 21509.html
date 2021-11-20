@@ -1,0 +1,41 @@
+<p>Yes, that will work, but <code>T</code> is not a type so you can't write the operator like that. <code>T</code> is a template, so the operator would need to be something like</p>
+
+<pre><code>template&lt;typename U&gt;
+  T&lt;U&gt;&amp; operator+=(T&lt;U&gt;&amp;, T&lt;U&gt;&amp;&amp;);
+</code></pre>
+
+<p>A possible implementation would be:</p>
+
+<pre><code>template&lt;typename U&gt;
+  T&lt;U&gt;&amp; operator+=(T&lt;U&gt;&amp; lhs, T&lt;U&gt;&amp;&amp; rvalue)
+  {
+    std::move(rvalue.begin(), rvalue.end(), std::back_inserter(lhs));
+    rvalue.clear();
+    return lhs;
+  }
+</code></pre>
+
+<p>And overloaded for lvalues:</p>
+
+<pre><code>template&lt;typename U&gt;
+  T&lt;U&gt;&amp; operator+=(T&lt;U&gt;&amp; lhs, const T&lt;U&gt;&amp; lvalue)
+  {
+    std::copy(lvalue.begin(), lvalue.end(), std::back_inserter(lhs));
+    return lhs;
+  }
+</code></pre>
+
+<p>To make this work with any type (which I consider a bad idea, it should be constrained to only match the types you want) try this:</p>
+
+<pre><code>template&lt; class T, class U &gt;
+  inline
+  typename std::enable_if&lt; std::is_lvalue_reference&lt; U &gt;::value, T&amp; &gt;::type
+  operator += (T&amp; lhs, U&amp;&amp; lvalue)
+  { /* copy from lvalue */ }
+
+template&lt; class T, class U &gt;
+  inline
+  typename std::enable_if&lt; !std::is_lvalue_reference&lt; U &gt;::value, T&amp; &gt;::type
+  operator += (T&amp; lhs, U&amp;&amp; rvalue)
+  { /* move from rvalue */ }
+</code></pre>

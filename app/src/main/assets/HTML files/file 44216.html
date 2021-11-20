@@ -1,0 +1,27 @@
+<p>Sort each pair; then do <code>INSERT IGNORE</code> to avoid error messages.</p>
+
+<p>You can sort as you insert by doing</p>
+
+<pre><code>INSERT IGNORE INTO tbl (a,b) VALUES (LEAST($a, $b), GREATEST($a, $b));
+</code></pre>
+
+<p>However, in order to do a batch insert, you should probably sort in the client language.</p>
+
+<p>Another issue:  <code>INSERT IGNORE</code> will create an <code>id</code> before it checks for dup.  Therefore, lots of <code>AUTO_INCREMENT</code> values will be 'burned'.</p>
+
+<p>Rather than explaining how to avoid the burning, I will say that there seems to be no good reason for <code>id</code>.  Instead have</p>
+
+<pre><code>PRIMARY KEY(user_id, friend_id)
+</code></pre>
+
+<p>Another issue with the sorting...  <code>SELECT</code> may need to do a <code>UNION</code>:</p>
+
+<pre><code>( SELECT ... WHERE user_id = $x )
+UNION ALL
+( SELECT ... WHERE friend_id = $x )
+</code></pre>
+
+<p>That implies that you need this, too:</p>
+
+<pre><code>INDEX(friend_id, user_id)
+</code></pre>

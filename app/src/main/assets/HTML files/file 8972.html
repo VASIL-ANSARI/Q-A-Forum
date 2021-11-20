@@ -1,0 +1,35 @@
+<p>You don't want to use client side validation for this. Not only JS cannot access the file metadata anyway, but JS can also be turned off or even fully spoofed.</p>
+
+<p>As to the concrete problem, it sounds much like as if you're parsing the uploaded file inside a <a href="http://stackoverflow.com/tags/jsp/info">JSP</a> file instead of a normal Java (<a href="http://stackoverflow.com/tags/servlets/info">Servlet</a>) class. Because JSP is as being a view technology part of the HTTP response, any exception which is been thrown halfway JSP's output, the server cannot change the HTTP response into an error page anymore. The client will most likely end up with a blank page with a halfbaked HTML source because the JSP output was abruptly been aborted.</p>
+
+<p>To fix this, you should be <a href="http://stackoverflow.com/questions/3177733/how-to-avoid-java-code-in-jsp-files">avoiding Java code in JSP files</a> and put Java code in normal Java classes instead. In this particular case, you want to use a <a href="http://stackoverflow.com/tags/servlets/info">servlet</a>. Let the form submit to a <a href="http://stackoverflow.com/tags/servlets/info">servlet</a> instead of a JSP. </p>
+
+
+
+<pre class="lang-xml prettyprint-override"><code>&lt;form action="uploadServlet" method="post"&gt;
+</code></pre>
+
+<p>Here's a kickoff example of how its <code>doPost()</code> method should look like:</p>
+
+<pre><code>@Override
+protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    try {
+        // Parse file upload.
+
+        // At end, forward request/response to JSP to present results in HTML.
+        request.getRequestDispatcher("/WEB-INF/results.jsp").forward(request, response);
+    } catch (FileUploadException e) { // Or whatever exception it is throwing.
+        throw new ServletException("File upload failed", e);
+    }
+}
+</code></pre>
+
+<p>This way the exception will end up in a default HTTP 500 error page which you can customize as follows in <code>web.xml</code> anyway</p>
+
+<pre><code>&lt;error-page&gt;
+    &lt;exception-type&gt;com.something.FileUploadException&lt;/exception-type&gt;
+    &lt;location&gt;/someFileUploadErrorPage.jsp&lt;/location&gt;
+&lt;/error-page&gt;
+</code></pre>
+
+<p>Alternatively, instead of throwing <code>ServletException</code>, you can also just set the error message as an attribute and forward to same JSP and let it display the error in an user friendly manner in the same form. You can get the general idea in our <a href="http://stackoverflow.com/tags/servlets/info">servlet wiki page</a>.</p>

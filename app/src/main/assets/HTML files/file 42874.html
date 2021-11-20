@@ -1,0 +1,61 @@
+<p>You may try this configuration: </p>
+
+<pre><code>server {
+    root     /path/to/root/domain/html;
+    index    index.php;
+    server_name servername.de;
+
+    location / {
+        index index.html index.php;
+        try_files $uri $uri/ @handler;
+        expires 30d;
+    }
+    location @handler { rewrite / /index.php; }
+    location ~* .php/ { rewrite ^(.*.php)/ $1 last; }
+    location ~* .php$ {
+        if (!-e $request_filename) { rewrite / /index.php last; } 
+
+        expires off;
+
+        try_files $uri =404;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        include fastcgi_params;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+        fastcgi_param  MAGE_RUN_CODE default; 
+        fastcgi_param  MAGE_RUN_TYPE store;
+    }
+
+    location ^~ /app/                { deny all; }
+    location ^~ /includes/           { deny all; }
+    location ^~ /lib/                { deny all; }
+    location ^~ /media/downloadable/ { deny all; }
+    location ^~ /pkginfo/            { deny all; }
+    location ^~ /report/config.xml   { deny all; }
+    location ^~ /var/                { deny all; }
+
+    location @handler {
+        rewrite / /index.php;
+    }
+
+    location ~ /\. {
+       deny all;
+       access_log off;
+       log_not_found off;
+    }
+    location = /favicon.ico {
+       log_not_found off;
+       access_log off;
+    }
+    location = /robots.txt {
+       allow all;
+       log_not_found off;
+       access_log off;
+    }
+}
+</code></pre>
+
+<p>Also, for this and related issues, you may check the official Magento guides: <a href="https://www.magentocommerce.com/wiki/1_-_installation_and_configuration/configuring_nginx_for_magento" rel="nofollow">https://www.magentocommerce.com/wiki/1_-_installation_and_configuration/configuring_nginx_for_magento</a></p>

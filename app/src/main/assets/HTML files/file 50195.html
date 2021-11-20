@@ -1,0 +1,61 @@
+<p>First, declare two equality compareres to specify your two conditions like this:</p>
+
+<pre><code>public class MyEqualityComparer1 : IEqualityComparer&lt;SomeType&gt;
+{
+    public bool Equals(SomeType x, SomeType y)
+    {
+        return x.Application == y.Application &amp;&amp; x.ExternalID == y.ExternalID;
+    }
+
+    public int GetHashCode(SomeType obj)
+    {
+        return (obj.Application + obj.ExternalID).GetHashCode();
+    }
+}
+
+public class MyEqualityComparer2 : IEqualityComparer&lt;SomeType&gt;
+{
+    public bool Equals(SomeType x, SomeType y)
+    {
+        return x.Application == y.Application &amp;&amp; x.ExternalDisplayId == y.ExternalDisplayId;
+    }
+
+    public int GetHashCode(SomeType obj)
+    {
+        return (obj.Application + obj.ExternalDisplayId).GetHashCode();
+    }
+}
+</code></pre>
+
+<p>Then, order your list by <code>CreatedDate</code> and then use <code>Distinct</code> to filter your list like this:</p>
+
+<pre><code>var result = xDic
+    .OrderByDescending(x =&gt; x.CreateDate)
+    .Distinct(new MyEqualityComparer1())
+    .Distinct(new MyEqualityComparer2());
+</code></pre>
+
+<p>The <code>Distinct</code> method <a href="http://stackoverflow.com/questions/4734852/does-c-sharp-distinct-method-keep-original-ordering-of-sequence-intact">should remove the later items</a>, so we should be able to depend on the fact that we used <code>OrderByDescending</code> to make sure that <code>Distinct</code> will remove items with the less recent <code>CreatedTime</code>.</p>
+
+<p>However, since the documentation of <code>Distinct</code> do not guarantee this, you can use a custom distinct method like this:</p>
+
+<pre><code>public static class Extensions
+{
+    public static IEnumerable&lt;T&gt; OrderedDistinct&lt;T&gt;(this IEnumerable&lt;T&gt; enumerable, IEqualityComparer&lt;T&gt; comparer)
+    {
+        HashSet&lt;T&gt; hash_set = new HashSet&lt;T&gt;(comparer);
+
+        foreach(var item in enumerable)
+            if (hash_set.Add(item))
+                yield return item;
+    }
+}
+</code></pre>
+
+<p>And use it like this:</p>
+
+<pre><code>var result = xDic
+    .OrderByDescending(x =&gt; x.CreateDate)
+    .OrderedDistinct(new MyEqualityComparer1())
+    .OrderedDistinct(new MyEqualityComparer2());
+</code></pre>

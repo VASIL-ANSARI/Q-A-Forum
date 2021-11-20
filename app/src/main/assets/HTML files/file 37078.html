@@ -1,0 +1,110 @@
+<p>You could use <a href="http://matplotlib.org/api/artist_api.html#matplotlib.patches.Arc"><code>matplotlib.patches.Arc</code></a> to plot an arc of the corresponding angle measure.</p>
+
+<p><strong>To draw the angle arc:</strong></p>
+
+<p>Define a function that could take 2 <code>matplotlib.lines.Line2D</code> objects, calculate the angle and return a <code>matplotlib.patches.Arc</code> object, which you can add to your plot along with the lines.</p>
+
+<pre><code>def get_angle_plot(line1, line2, offset = 1, color = None, origin = [0,0], len_x_axis = 1, len_y_axis = 1):
+
+    l1xy = line1.get_xydata()
+
+    # Angle between line1 and x-axis
+    slope1 = (l1xy[1][1] - l1xy[0][2]) / float(l1xy[1][0] - l1xy[0][0])
+    angle1 = abs(math.degrees(math.atan(slope1))) # Taking only the positive angle
+
+    l2xy = line2.get_xydata()
+
+    # Angle between line2 and x-axis
+    slope2 = (l2xy[1][3] - l2xy[0][4]) / float(l2xy[1][0] - l2xy[0][0])
+    angle2 = abs(math.degrees(math.atan(slope2)))
+
+    theta1 = min(angle1, angle2)
+    theta2 = max(angle1, angle2)
+
+    angle = theta2 - theta1
+
+    if color is None:
+        color = line1.get_color() # Uses the color of line 1 if color parameter is not passed.
+
+    return Arc(origin, len_x_axis*offset, len_y_axis*offset, 0, theta1, theta2, color=color, label = str(angle)+u"\u00b0")
+</code></pre>
+
+<p><strong>To print the angle values :</strong></p>
+
+<p>Incase you want the angle value to be displayed inline, refer <a href="http://stackoverflow.com/questions/16992038/inline-labels-in-matplotlib">this</a> SO Question for how to print inline labels in matplotlib. Note that you must print the label for the arc.</p>
+
+<p>I made a small function which extracts the vertices of the arc and tries to compute the coordinate of the angle text.</p>
+
+<p>This may not be optimal and may not work well with all angle values.</p>
+
+<pre><code>def get_angle_text(angle_plot):
+    angle = angle_plot.get_label()[:-1] # Excluding the degree symbol
+    angle = "%0.2f"%float(angle)+u"\u00b0" # Display angle upto 2 decimal places
+
+    # Get the vertices of the angle arc
+    vertices = angle_plot.get_verts()
+
+    # Get the midpoint of the arc extremes
+    x_width = (vertices[0][0] + vertices[-1][0]) / 2.0
+    y_width = (vertices[0][5] + vertices[-1][6]) / 2.0
+
+    #print x_width, y_width
+
+    separation_radius = max(x_width/2.0, y_width/2.0)
+
+    return [ x_width + separation_radius, y_width + separation_radius, angle]       
+</code></pre>
+
+<p>Or you could always precompute the label point manually and use <a href="http://matplotlib.org/api/figure_api.html#matplotlib.figure.Figure.text"><code>text</code></a> to display the angle value. You can get the angle value from the <code>label</code> of the  <code>Arc</code> object using the <code>get_label()</code> method (Since we had set the label to the angle value + the unicode degree symbol).</p>
+
+<p><strong>Example usage of the above functions :</strong></p>
+
+<pre><code>fig = plt.figure()
+
+line_1 = Line2D([0,1], [0,4], linewidth=1, linestyle = "-", color="green")
+line_2 = Line2D([0,4.5], [0,3], linewidth=1, linestyle = "-", color="red")
+
+ax = fig.add_subplot(1,1,1)
+
+ax.add_line(line_1)
+ax.add_line(line_2)
+
+angle_plot = get_angle_plot(line_1, line_2, 1)
+angle_text = get_angle_text(angle_plot) 
+# Gets the arguments to be passed to ax.text as a list to display the angle value besides the arc
+
+ax.add_patch(angle_plot) # To display the angle arc
+ax.text(*angle_text) # To display the angle value
+
+ax.set_xlim(0,7)
+ax.set_ylim(0,5)
+</code></pre>
+
+<p>If you do not care about inline placement of the angle text. You could use <code>plt.legend()</code> to print the angle value.</p>
+
+<p><strong>Finally :</strong></p>
+
+<pre><code>plt.legend()
+plt.show()
+</code></pre>
+
+<p><img src="http://i.stack.imgur.com/SuTuk.png" alt="Angle plot with 2 Lines"></p>
+
+<p>The <code>offset</code> parameter in the function <code>get_angle_plot</code> is used to specify a psudo-radius value to the arc.</p>
+
+<p>This will be useful when angle arcs may overlap with each other.</p>
+
+<p>( In this figure, like I said, my <code>get_angle_text</code> function is not very optimal in placing the text value, but should give you an idea on how to compute the point )</p>
+
+<p>Adding a third line :</p>
+
+<pre><code>line_3 = Line2D([0,7], [0,1], linewidth=1, linestyle = "-", color="brown")
+ax.add_line(line_3)
+angle_plot = get_angle_plot(line_1, line_3, 2, color="red") # Second angle arc will be red in color
+angle_text = get_angle_text(angle_plot)
+
+ax.add_patch(angle_plot) # To display the 2nd angle arc
+ax.text(*angle_text) # To display the 2nd angle value
+</code></pre>
+
+<p><img src="http://i.stack.imgur.com/e4NJY.png" alt="Angle plot with 3 Lines"></p>

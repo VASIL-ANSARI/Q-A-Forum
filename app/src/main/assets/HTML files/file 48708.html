@@ -1,0 +1,50 @@
+<p>The <code>asyncore</code> loop calls <code>writable()</code> when it is ready to do something with the socket. If the method <code>writable()</code> tells that there is something to write then <code>handle_write()</code> is called. The default <code>writable()</code> always returns <code>True</code>, so in that case there is busy loop calling <code>handle_write()</code> and <code>writable()</code>.</p>
+
+<p>In the above implementation the method <code>writable()</code> is called immediately when the client loop is started. At that moment there is nothing in the buffer, so <code>writable()</code> tells that there is nothing to write.</p>
+
+<p>The <code>asyncore</code> loop calls <code>select()</code>. Now the loop is in "standby" state. It can be wakened only when some data is received by the socket or by timeout event. After any of those events the loop again checks <code>writable()</code>.</p>
+
+<p>The server sends nothing to the client and the client waits for timeout. The default <code>timeout</code> is 30 seconds, so that is why it is needed to wait up to 30 seconds before something is sent. It is possible to reduce the timeout during starting <code>asyncore.loop()</code>:</p>
+
+<pre><code>    asyncore.loop(map = self._thread_sockets, timeout = 0.5)
+</code></pre>
+
+<hr>
+
+<p>Another idea that may come here is to check if the buffer is empty in <code>send()</code> and if it is empty send it immediately. However, it is a bad idea. The <code>send()</code> is called in the main thread, but the socket is managed by the <code>asyncore</code> loop in another thread.</p>
+
+<p>For the same reason it makes sense to protect usage of <code>output_buffer</code> for concurrent access from different threads. The lock object <code>threading.Lock()</code> can be used here:</p>
+
+<pre><code>def __init__(self, host, port):
+    #...
+    self.lock = threading.Lock()
+
+def send(self, msg):
+    self.lock.acquire()
+    try:
+        self.output_buffer.append(msg)
+    finally:
+        self.lock.release()
+
+def writable(self):
+    is_writable = False;
+    self.lock.acquire()
+    try:
+        is_writable = len("".join(self.output_buffer)) &gt; 0
+    finally:
+        self.lock.release()
+
+    return is_writable
+
+def handle_write(self):
+    self.lock.acquire()
+    try:
+        all_data = "".join(self.output_buffer)
+        bytes_sent = self.socket.send(all_data)
+        remaining_data = all_data[bytes_sent:]
+        self.output_buffer = [remaining_data]
+    finally:
+        self.lock.release()
+</code></pre>
+
+<p>There is no thread safe mechanism to waken <code>asyncore</code> from another thread. So, the only solution is to reduce loop timeout, although too small timeout increases CPU usage.</p>

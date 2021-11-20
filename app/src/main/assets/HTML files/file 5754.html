@@ -1,0 +1,98 @@
+<p>This is the best I can come up with. You could probably get pretty elaborate, but (to my knowledge) the greater z-index is always going to capture the event. You CAN, however, work around it but you're probably better off refactoring in to another function with either a supplied (or unsupplied) offset value so you can keep '#region' in mind when the events are transpiring. You can also use e.target to check what is sending you the event (see <a href="http://api.jquery.com/category/events/" rel="nofollow">http://api.jquery.com/category/events/</a> for more properties)</p>
+
+<pre><code>$('#region2').mousemove(function(e){
+  var regionPos = $('#region').position();
+  var region2Pos = $('#region').position();
+  var offset = {
+    left: region2Pos.left - regionPos.left,
+    top: region2Pos.top - regionPos.top
+  };
+
+  var pageCoords = "( " + e.pageX + ", " + e.pageY + " )";
+  var clientCoords = "( " + (e.clientX + offset.left) + ", " + (e.clientY + offset.top) + " )";
+  $("span:first").text("( e.pageX, e.pageY ) - " + pageCoords);
+  $("span:last").text("( e.clientX, e.clientY ) - " + clientCoords);
+});
+</code></pre>
+
+<p><strong>edit</strong>
+second solution:</p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style&gt;
+  #region { width:220px; height:170px; margin;10px; margin-right:50px;
+        background:yellow; border:2px groove; float:right; }
+  #region2 {
+    background-color: white;
+    float:right;
+    position: relative;
+    right: -150px; top: 50px;
+    width: 100px; height: 100px;
+    border: 1px solid
+  }
+
+  #region3 {
+    width:30px;
+    height: 30px;
+    background-color: brown;
+  }
+
+  p { margin:0; margin-left:10px; color:red; width:220px;
+      height:120px; padding-top:70px;
+      float:left; font-size:14px; }
+  span { display:block; }
+  &lt;/style&gt;
+  &lt;script src="http://code.jquery.com/jquery-1.4.4.js"&gt;&lt;/script&gt;
+  &lt;script type="Text/javascript"&gt;
+    jQuery.extend({
+      MousemoveElement: function(needle,onActivation){
+        var elList = needle;
+        $('*').mousemove(function(e){
+          $('#outside').html('&lt;b&gt;Outside:&lt;b/&gt;&lt;br /&gt;target: '+e.target.tagName+' ['+e.target.id+']&lt;br /&gt;client: '+e.clientX+','+e.clientY+'&lt;br /&gt;page: '+e.pageX+','+e.pageY);
+          $('#inside').html('');
+
+          if (onActivation==null)
+            return;// only search if we need to
+
+          $(needle).each(function(){
+            $('#meta').html('outside');
+            var pt = { x: e.pageX, y: e.pageY };
+            var ext = {
+              left: $(this).offset().left,
+              right: ($(this).offset().left + $(this).innerWidth()),
+              top: $(this).offset().top,
+              bottom: ($(this).offset().top + $(this).innerHeight())
+            };
+            $('#meta').html('&lt;b&gt;PT:&lt;/b&gt; '+pt.x+','+pt.y+'&lt;br /&gt;&lt;b&gt;EXT:&lt;/b&gt; ('+ext.left+','+ext.top+';'+ext.right+','+ext.bottom+')');
+            if ((pt.x &gt;= ext.left) &amp;&amp; (pt.x &lt;= ext.right) &amp;&amp; (pt.y &gt;= ext.top) &amp;&amp; (pt.y &lt;= ext.bottom)){
+              $('#meta').html('GOOD');
+              onActivation(e,$(this));
+            }
+          });
+        });
+      }
+    });
+
+    $(document).ready(function(){
+      $.MousemoveElement('#region',function(e,element){
+        $('#inside').html('&lt;b&gt;Inside:&lt;b/&gt;&lt;br /&gt;target: '+element.attr('id')+'&lt;br /&gt;client: '+e.clientX+','+e.clientY+'&lt;br /&gt;page: '+e.pageX+','+e.pageY);
+        $('#outside').html('');
+      });
+    });
+  &lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;p&gt;
+      Try scrolling too.
+      &lt;span id="meta"&gt;Move the mouse over the div.&lt;/span&gt;
+      &lt;span id="outside"&gt;&amp;nbsp;&lt;/span&gt;
+      &lt;span id="inside"&gt;&amp;nbsp;&lt;/span&gt;
+    &lt;/p&gt;
+
+    &lt;div id="region"&gt;&lt;div id="region3"&gt;&lt;/div&gt;&lt;/div&gt;
+    &lt;div id="region2"&gt;&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>

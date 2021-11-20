@@ -1,0 +1,122 @@
+<p>You have two issues here:</p>
+
+<p><strong>First</strong>: PHP cannot process <code>application/json</code> Content-Type as input.</p>
+
+<p>I had the same issue in my code. You have to switch to a <code>application/x-www-form-urlencoded</code> type - don't know why is <code>json</code> the default way of angular serialization for http requests, but PHP -which is the most server side technology used for web pages- does not process that type, and gives empty data for <code>$_GET</code> and <code>$_POST</code>.</p>
+
+<p>So you must pre-process your requests (we'll address this later).</p>
+
+<p><strong>Second</strong>: For your returned data. You are echoing:</p>
+
+<pre><code>'[{"message": "userName not set"}]'
+</code></pre>
+
+<p>Which is an array. So you must access it as:</p>
+
+<pre><code>response.data[0].message
+</code></pre>
+
+<p>instead of </p>
+
+<pre><code>response.data.message
+</code></pre>
+
+<p><strong>and you must ensure the response is json-typed</strong> before echoing, so there's no doubt that angular will treat that as json:</p>
+
+<pre><code>//don't echo anything before this
+header('Content-Type: application/json');
+//... more code here
+if(isset($_POST['userName'])) { // 'userName' is not set
+    echo '[{"message": "userName is '.$_POST['userName'].'"}]';
+}  else {
+    // php current returns this message in the header response
+    // angular is not seeing this message
+    echo '[{"message": "userName not set"}]';
+}
+</code></pre>
+
+<p><strong>Now let's take back what we left for later</strong>: what will we do to send data from Angular to PHP? <strong>Preprocessing</strong>:</p>
+
+<ol>
+<li><p>This is how I setup my module to preprocess <strong>every</strong> request to be in a format compatible with PHP.</p>
+
+<pre><code>var index = angular.module("Application", ['ngRoute', 'ngResource'], ['$httpProvider', function($httpProvider){
+    $httpProvider.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8';
+}]);
+</code></pre></li>
+<li><p>There's a method to install preprocessing of data for each request. However it did not work for me. Instead, I passed to the <code>data</code> argument of <code>$http.post</code> a value converted by the following function (you can take it or must code one that follows your needs):</p>
+
+<pre><code>var phpserializer = {
+    __encode: function(name, value) {
+        return window.encodeURIComponent(name) + '=' + window.encodeURIComponent(value);
+    },
+    __isPrimitive: function(value) {
+        return value instanceof Boolean || value instanceof String || value instanceof Number || !(value instanceof Object);
+    },
+    __isDate: function(value) {
+        return value instanceof Date;
+    },
+    __indexed: function(prefix, property) {
+        return prefix ? (prefix + '[' + property + ']') : property;
+    },
+    __serializeDate: function(value) {
+        return {
+            'day': value.getDay(),
+            'month': value.getMonth(),
+            'year': value.getFullYear(),
+            'hours': value.getHours(),
+            'minutes': value.getMinutes(),
+            'seconds': value.getSeconds(),
+            'milliseconds': value.getMilliseconds(),
+            'timezone': value.getTimezoneOffset()
+        }
+    },
+    __params: function(data, prefix, query) {
+        angular.forEach(data, function (value, index) {
+            var fullIndex = this.__indexed(prefix, index);
+            if (this.__isPrimitive(value)) {
+                //objetos primitivos, valores primitivos (exc. undefined)
+                if (typeof value !== "undefined") query.push(this.__encode(fullIndex, value));
+            } else if (this.__isDate(value)) {
+                //objetos fecha: metemos los componentes
+                //que son relevantes a la fecha
+                this.__params(this.__serializeDate(value), fullIndex, query);
+            } else {
+                //datos tipo objeto o array, ambos iterables en angular
+                this.__params(value, fullIndex, query);
+            }
+        }, this);
+    },
+    params: function(param) {
+        var q = [];
+        if (this.__isPrimitive(param) || this.__isDate(param) || param instanceof Array) {
+            param = {'value': param};
+        }
+        this.__params(param, '', q);
+        return q.join('&amp;');
+    }
+};
+</code></pre>
+
+<p>You must adapt this code to meet your needs (e.g. I use a custom serialization of dates, which will not -perhaps- be useful to you). This function will convert <code>{a: {b: 1, c: 2}, d: 3}</code> to <code>?a[b]=1&amp;a[c]=2&amp;d=3</code></p></li>
+<li><p>Finally, I use an abstraction ober <code>$http</code> to do POST requests:</p>
+
+<pre><code>function ajax_post($http, data, $s, $q, target, params) {
+    cancelCurrent($s);
+    $s.canceller = $q.defer();
+    return $http.post(
+        target,
+        phpserializer.params(data),
+        {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+            },
+            timeout: $s.canceller.promise,
+            params: params || {}
+        }
+    );
+}
+</code></pre>
+
+<p>Which I customize later with the success and error callbacks.</p></li>
+</ol>

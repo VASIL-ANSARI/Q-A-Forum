@@ -1,0 +1,28 @@
+<p>Note that <code>m_isPlayMode</code> is protected by the same mutex, hence can't be updated when the worker is running. Use two separate mutexes for these, or atomics.</p>
+
+<p><strong>Edit:</strong> Fast fix would probably to add a second mutex:</p>
+
+<pre><code>void PlaySlot(bool checked){
+    boost::unique_lock&lt;boost::mutex&gt; lock(m_isPlayModeMutex); // &lt;--
+    // ...
+}
+</code></pre>
+
+<p>worker thread:</p>
+
+<pre><code>for (;;) {
+  boost::unique_lock&lt;boost::mutex&gt; lock(m_mutex);
+  m_event.wait(lock); // wait for next event
+
+  boost::unique_lock&lt;boost::mutex&gt; playModeLock(m_isPlayModeLock);
+  if(m_isPlayMode == true){
+    while(m_frameIndex&lt; totalFrames &amp;&amp; m_isPlayMode){
+      playModeLock.unlock();
+      /// ... (not locked here)
+      playModeLock.lock();
+    }
+    m_isPlayMode = false;
+    emit playEnded(false);
+  }
+}
+</code></pre>

@@ -1,0 +1,136 @@
+<p>I managed to fix it.
+Biggest difference was I used configurations instead of publications when pushing to bintray. Below is the gradle files I setup for it to work.
+Then just run gradlew bintrayUpload. I got some error messages that I did not manage to fix, but they were not necessary to fix as it worked to upload anyway.</p>
+
+<p>in the root build.gradle</p>
+
+<pre><code>plugins {
+    id "com.jfrog.bintray" version "1.7"
+    id "com.github.dcendents.android-maven" version "1.5"
+}
+</code></pre>
+
+<p>in the end of mylib.gradle file</p>
+
+<pre><code>// bintrayUpload config
+apply from: 'bintray-publish.gradle'
+</code></pre>
+
+<p>bintray-publish.gradle</p>
+
+<pre><code>apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
+
+// Maven group id and version for the artifact
+group = LIB_GROUP_ID
+version = LIB_VERSION
+
+install {
+    repositories.mavenInstaller {
+        // This generates POM.xml with proper parameters
+        pom {
+            project {
+                packaging POM_PACKAGING
+                groupId LIB_GROUP_ID
+                artifactId LIB_ARTIFACT_ID
+
+                name LIB_NAME
+                description LIB_DESCRIPTION
+                url LIB_URL
+
+                developers {
+                    developer {
+                        id POM_DEVELOPER_ID
+                        name POM_DEVELOPER_NAME
+                    }
+                }
+
+                scm {
+                    url POM_SCM_URL
+                    connection POM_SCM_CONNECTION
+                    developerConnection POM_SCM_DEV_CONNECTION
+                }
+
+                licenses {
+                    license {
+                        name POM_LICENCE_NAME
+                        url POM_LICENCE_URL
+                        distribution POM_LICENCE_DIST
+                    }
+                }
+            }
+        }
+    }
+}
+
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier = 'sources'
+}
+
+task javadoc(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    // TODO: Java doc generates errors for some reason, disable for now
+    //archives javadocJar
+    archives sourcesJar
+}
+
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
+
+bintray {
+    user = POM_DEVELOPER_ID
+    key = properties.getProperty("bintray.apikey")
+
+    configurations = ['archives']
+    pkg {
+        repo = 'maven'
+        name = BIN_TRAY_NAME
+        desc = LIB_DESCRIPTION
+        licenses = ['Apache-2.0']
+        websiteUrl = LIB_URL
+        vcsUrl = LIB_VCS_URL
+        publish = true
+        dryRun = false
+        version {
+            name = LIB_VERSION
+            desc = LIB_DESCRIPTION
+            released  = new Date()
+        }
+    }
+}
+</code></pre>
+
+<p>gradle.properties</p>
+
+<pre><code>BIN_TRAY_NAME = MyLib
+LIB_VERSION = 1.0.0
+LIB_GROUP_ID = com.xxx.mylib
+
+# The artifact name should be the same as the library module name
+LIB_ARTIFACT_ID = mylib
+
+LIB_NAME = MyLib
+LIB_DESCRIPTION = My desc
+LIB_URL = https://github.com/xxx/mylib
+LIB_VCS_URL = https://github.com/xxx/mylib.git
+
+POM_DEVELOPER_ID = My bintray id
+POM_DEVELOPER_NAME = My bintray name
+POM_SCM_URL = scm:git@github.com/xxx/mylib.git
+POM_SCM_CONNECTION = scm:git@github.com/xxx/mylib.git
+POM_SCM_DEV_CONNECTION = scm:git@github.com/xxx/mylib.git
+POM_LICENCE_NAME = The Apache Software License, Version 2.0
+POM_LICENCE_URL = http://www.apache.org/licenses/LICENSE-2.0.txt
+POM_LICENCE_DIST=repo
+POM_PACKAGING = aar
+</code></pre>

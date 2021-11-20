@@ -1,0 +1,57 @@
+<p>I don't think <code>pyparsing</code> has something like that, but you can recursively create the data structures:</p>
+
+<pre><code>def toDict(lst):
+    if not isinstance(lst[1], list):
+        return lst
+    return [{'name': name, 'args': toDict(args)}
+            for name, args in zip(lst[::2], lst[1::2])]
+</code></pre>
+
+<p>Your example behave differently on the number of <code>args</code> children. If it's only one you just use a <code>dict</code>, otherwise it's a list of dicts. That will lead to a complicated use. It's better to use a list of dicts even when there is a single child. This way you always know how to iterate the children without type-checking.</p>
+
+<h2>Example</h2>
+
+<p>We can use <a href="https://docs.python.org/2/library/json.html#json.dumps" rel="nofollow">json.dumps</a> to pretty print the output (note that here we print <code>parsedict[0]</code> because we know that the root has a single child, but we always return lists as specified before):</p>
+
+<pre><code>import json
+parsed = ['and', ['or', ['eq', ['x', '1'], 'eq', ['x', '2']], 'eq', ['y', '3']]]
+parsedict = toDict(parsed)
+print json.dumps(parsedict[0], indent=4, separators=(',', ': '))
+</code></pre>
+
+<p><em>Output</em></p>
+
+<pre><code>{
+    "name": "and",
+    "args": [
+        {
+            "name": "or",
+            "args": [
+                {
+                    "name": "eq",
+                    "args": [
+                        "x",
+                        "1"
+                    ]
+                },
+                {
+                    "name": "eq",
+                    "args": [
+                        "x",
+                        "2"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "eq",
+            "args": [
+                "y",
+                "3"
+            ]
+        }
+    ]
+}
+</code></pre>
+
+<p><em>To obtain that output I replaced the <code>dict</code> with a <a href="https://docs.python.org/2/library/collections.html#collections.OrderedDict" rel="nofollow">collections.OrderedDict</a> in the <code>toDict</code> functin, just to keep the <code>name</code> before <code>args</code>.</em></p>

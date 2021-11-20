@@ -1,0 +1,73 @@
+<p>Yes, it's the normal behavior.</p>
+
+<p>MySQL has the notion of "matched rows" and "affected rows" which might differ: when a "matched row" would be updated with the values that it already holds, it's not affected.</p>
+
+<p>In PostgreSQL, only the count of "affected rows" comes back to the user, and all "matched rows" are affected.</p>
+
+<hr>
+
+<p>To be complete, strictly speaking, this behavior is amendable in PostgreSQL. Skipping these updates is always possible with a fairly generic trigger.</p>
+
+<p>Example:</p>
+
+<p>First the baseline,default behavior, to compare against:</p>
+
+<pre><code>test=&gt; create table update_test(val text);
+CREATE TABLE
+test=&gt; insert into update_test values('abc');
+INSERT 0 1
+test=&gt; update update_test set val='abc';
+UPDATE 1
+</code></pre>
+
+<p>This <em>UPDATE 1</em> indicates that 1 row was affected, even though the value is the same.</p>
+
+<p>Now let's tell it to skip the rows for which values don't change.</p>
+
+<pre><code>-- generic trigger to void the update of one row
+create function void_update() returns trigger language plpgsql as 
+ 'begin return null; end';
+
+-- trigger affecting unchanged rows in a BEFORE UDPATE event
+create trigger update_trigger 
+  before update on update_test for each row
+  when (old is not distinct from new)
+  execute procedure void_update();
+</code></pre>
+
+<p>Now we get the MySQL-like behavior:</p>
+
+<pre><code>test=&gt; update update_test set val='abc';
+UPDATE 0
+</code></pre>
+
+<p>0 row is affected, because we're updating the only row of the table with a value it already has.</p>
+
+<p>Test again with more data, some rows to skip, other rows to change:</p>
+
+<pre><code>test=&gt; insert into update_test values('def'),('ghi');
+INSERT 0 2
+test=&gt; select * from update_test ;
+ val 
+-----
+ abc
+ def
+ ghi
+(3 rows)
+
+test=&gt; update update_test set val='ghi';
+UPDATE 2
+</code></pre>
+
+<p>Only 2 rows were affected since the last row already contained 'ghi'</p>
+
+<p>Check that the update actually works:</p>
+
+<pre><code>test=&gt; select * from update_test ;
+ val 
+-----
+ ghi
+ ghi
+ ghi
+(3 rows)
+</code></pre>

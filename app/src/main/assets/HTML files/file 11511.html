@@ -1,0 +1,62 @@
+<p>You can use LINQ:</p>
+
+<pre><code>var result = input
+    .Split(new[] { "\r\n" }, StringSplitOptions.None)
+    .Where(x =&gt; !string.IsNullOrWhiteSpace(x))
+    .GroupAdjacent((g, x) =&gt; !char.IsDigit(x[0]))
+    .Select(g =&gt; new
+    {
+        Title = g.First().Trim(),
+        Body = string.Join(" ", g.Skip(1).Select(x =&gt; x.Trim()))
+    })
+    .ToArray();
+</code></pre>
+
+<p><em>Example:</em></p>
+
+<pre><code>string input = @"3 BILL REFERRED TO MAIL COMMITTEE
+Mr Fitzgibbon (Chief Government Whip), by leave, movedâThat the
+Tax Laws Amendment (2011 Measures No. 7) Bill 2011 be referred
+to the Main Committee for further consideration. Questionâput
+and passed.
+
+4 CORPORATIONS AMENDMENT (FUTURE OF FINANCIAL ADVICE) BILL 2011
+Mr Shorten (Minister for Financial Services and Superannuation),
+pursuant to notice, presented a Bill for an Act to amend the law
+in relation to financial advice,and for related purposes. Mr
+Shorten presented an explanatory memorandum to the bill. Bill
+read a first time. Mr Shorten movedâThat the bill be now read
+a second time. Debate adjourned (Mr Randall), and the resumption
+of the debate made an order of the day for the next sitting.
+
+5 TAX LAWS AMENDMENT (2011 MEASURES NO. 8) BILL 2011
+Mr Shorten (Minister for Financial Services and Superannuation)
+presented a Bill for an Act to amend the law relating to
+taxation, and for related purposes.";
+</code></pre>
+
+<p><em>Output:</em></p>
+
+<pre><code>result[0] == { Title = "3 BILL REFERRED ...", Body = "Mr Fitzgibbon ..." }
+result[1] == { Title = "4 CORPORATIONS ...",  Body = "Mr Shorten ..." }
+result[2] == { Title = "5 TAX LAWS ...",      Body = "Mr Shorten ..." }
+</code></pre>
+
+<p><em>Extension Method:</em></p>
+
+<pre><code>public static IEnumerable&lt;IEnumerable&lt;T&gt;&gt; GroupAdjacent&lt;T&gt;(
+    this IEnumerable&lt;T&gt; source, Func&lt;IEnumerable&lt;T&gt;, T, bool&gt; adjacent)
+{
+    var g = new List&lt;T&gt;();
+    foreach (var x in source)
+    {
+        if (g.Count != 0 &amp;&amp; !adjacent(g, x))
+        {
+            yield return g;
+            g = new List&lt;T&gt;();
+        }
+        g.Add(x);
+    }
+    yield return g;
+}
+</code></pre>

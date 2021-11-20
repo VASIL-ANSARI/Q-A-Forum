@@ -1,0 +1,145 @@
+<p>If your server allows execution of shell commands from PHP, and <code>zip</code> is installed, you could generate a zip on the fly with <code>passthru( "zip - directory" )</code>. The <code>-</code> says to write to <em>stdout</em>, which saves you from having to deal with temporary file cleanup.</p>
+
+<p>Here's an outline of such a script:</p>
+
+<pre><code>&lt;?php
+if ( ! $dir = get_my_directory() )
+    die("Illegal call.");
+
+header( 'Content-Type: application/zip' );
+header( 'Content-Disposition: attachment; filename=\"your.zip\"' );
+passthru( 'zip -r - ' . escapeshellarg( $dir ) );
+
+/**
+ * @return false/null or the directory to zip.
+ */
+function get_my_directory() {
+    ....
+    return ....;
+}
+</code></pre>
+
+<p>However you implement <code>get_my_directory()</code>, make sure that it isn't possible for anyone to specify any path on your server!</p>
+
+<p>Also, do not generate any output (no <code>echo</code>/<code>print</code> or warnings), because then either the headers won't be set, or the zip binary data will be corrupt.</p>
+
+<p>Other than that, there are code samples and documentation on PHP's <a href="http://php.net/manual/en/class.ziparchive.php" rel="nofollow">ZipArchive</a> page.</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>(@ OP: I'm not really sure what you're doing implementing PHP solutions if you don't know any PHP. But, let's assume that you want to learn. )</p>
+
+<p>Lets say that you have 3 public directories you would like to offer for download, and that anyone can download them. You would implement as follows:</p>
+
+<pre><code>function get_my_directory() {
+    // list of the directories you want anyone to be able to download.
+    // These are key-value pairs, so we can use the key in our URLs
+    // without revealing the real directories.
+    $my_directories = array(
+       'dir1' =&gt; 'path/to/dir1/',
+       'dir2' =&gt; 'path/to/dir2/',
+       'dir3' =&gt; 'path/to/dir3/'
+    );
+
+    // check if the 'directory' HTTP GET parameter is given:
+    if ( ! isset( $_GET['directory'] ) )
+        return null;               // it's not set: return nothing
+    else
+        $dir = $_GET['directory']; // it's set: save it so we don't have
+                                   // to type $_GET['directory'] all the time.
+
+    // validate the directory: only pre-approved directories can be downloaded
+    if ( ! in_array( $dir, array_keys( $my_directories ) ) )
+       return null;                    // we don't know about this directory
+    else
+       return $my_directories[ $dir ]; // the directory: is 'safe'.
+}
+</code></pre>
+
+<p>And yes, you paste the first and second code sample in one .php file (be sure to replace the first <code>get_my_directory</code> function with the second one), somewhere on your server where it is accessible.</p>
+
+<p>If you call the file 'download-archive.php', and place it in the DocumentRoot,
+you would access it as <code>http://your-site/download-archive.php?directory=dir1</code> etc.</p>
+
+<p>Here are some references:</p>
+
+<ul>
+<li><a href="http://php.net/manual/en/tutorial.php" rel="nofollow">PHP's tutorial</a></li>
+<li><a href="http://php.net/manual/en/language.functions.php" rel="nofollow">functions in general</a></li>
+<li>function <a href="http://php.net/manual/en/function.header.php" rel="nofollow">header</a></li>
+<li>function <a href="http://php.net/manual/en/function.passthru.php" rel="nofollow">passthru</a></li>
+<li>function <a href="http://php.net/manual/en/function.die.php" rel="nofollow">die</a></li>
+<li>function <a href="http://php.net/manual/en/function.in-array.php" rel="nofollow">in_array</a></li>
+<li>function <a href="http://php.net/manual/en/function.array-values.php" rel="nofollow">array_values</a></li>
+</ul>
+
+<p><strong>Update 2</strong></p>
+
+<p>Here's a complete script using ZipArchive. It only adds files in the directory; no subdirectories.</p>
+
+<pre><code>&lt;?php
+if ( ! $dir = get_my_directory() )
+    die("Illegal call.");
+
+$zipfile = make_zip( $dir );
+register_shutdown_function( function() use ($zipfile) {
+    unlink( $zipfile ); // delete the temporary zip file
+} );
+
+header( "Content-Type: application/zip" );
+header( "Content-Disposition: attachment; filename=\"$zipfile\"" );
+readfile( $zipfile );
+
+function make_zip( $dir )
+{
+    $zip = new ZipArchive();
+    $zipname = 'tmp_'.basename( $dir ).'.zip';  // construct filename
+    if ($zip-&gt;open($zipname, ZIPARCHIVE::CREATE) !== true)
+        die("Could not create archive");
+
+
+    // open directory and add files in the directory
+    if ( !( $handle = opendir( $dir ) ) )
+        die("Could not open directory");
+
+    $dir = rtrim( $dir, '/' );      // strip trailing /
+    while ($filename = readdir($handle)) 
+        if ( is_file( $f = "$dir/$filename" ) )
+            if ( ! $zip-&gt;addFile( $f, $filename ) )
+                die("Error adding file $f to zip as $filename");
+
+    closedir($handle);
+
+    $zip-&gt;close();
+
+    return $zipname;
+}
+
+
+/**
+ * @return false/null or the directory to zip.
+ */
+function get_my_directory() {
+    // list of the directories you want anyone to be able to download.
+    // These are key-value pairs, so we can use the key in our URLs
+    // without revealing the real directories.
+    $my_directories = array(
+       'dir1' =&gt; 'path/to/dir1/',
+       'dir2' =&gt; 'path/to/dir2/',
+       'dir3' =&gt; 'path/to/dir3/'
+    );
+
+    // check if the 'directory' HTTP GET parameter is given:
+    if ( ! isset( $_GET['directory'] ) )
+        return null;               // it's not set: return nothing
+    else
+        $dir = $_GET['directory']; // it's set: save it so we don't have
+                                   // to type $_GET['directory'] all the time.
+
+    // validate the directory: only pre-approved directories can be downloaded
+    if ( ! in_array( $dir, array_keys( $my_directories ) ) )
+       return null;                    // we don't know about this directory
+    else
+       return $my_directories[ $dir ]; // the directory: is 'safe'.
+}
+</code></pre>

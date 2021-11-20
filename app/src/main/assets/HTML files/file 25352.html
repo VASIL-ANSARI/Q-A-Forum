@@ -1,0 +1,96 @@
+<p>I would recommend another design.</p>
+
+<p>Define a simple interface that describe a parsing rule (string syntax):</p>
+
+<pre><code>internal interface IParseRule
+{
+    bool Parse(string input, out string errorMessage);
+}
+</code></pre>
+
+<p>Define the parsing rule for a user name (and the other rules that you have):</p>
+
+<pre><code>internal class UserName : IParseRule
+{
+    public bool Parse(string input, out string errorMessage)
+    {
+        // TODO: Do your checks here
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            errorMessage = "User name cannot be empty or consist of white space only.";
+            return false;
+        }
+        else
+        {
+            errorMessage = null;
+            return true;
+        }
+    }
+}
+</code></pre>
+
+<p>Then add a couple of extension methods to that utilize the interface:</p>
+
+<pre><code>internal static class ParseRule
+{
+    public static bool IsValid&lt;TRule&gt;(this string input, bool throwError = false) where TRule : IParseRule, new()
+    {
+        string errorMessage;
+        IParseRule rule = new TRule();
+
+        if (rule.Parse(input, out errorMessage))
+        {
+            return true;
+        }
+        else if (throwError)
+        {
+            throw new FormatException(errorMessage);
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    public static void CheckArg&lt;TRule&gt;(this string input, string paramName) where TRule : IParseRule, new()
+    {
+        string errorMessage;
+        IParseRule rule = new TRule();
+
+        if (!rule.Parse(input, out errorMessage))
+        {
+            throw new ArgumentException(errorMessage, paramName);
+        }
+    }
+
+    [Conditional("DEBUG")]
+    public static void DebugAssert&lt;TRule&gt;(this string input) where TRule : IParseRule, new()
+    {
+        string errorMessage;
+        IParseRule rule = new TRule();
+        Debug.Assert(rule.Parse(input, out errorMessage), "Malformed input: " + errorMessage);
+    }
+}
+</code></pre>
+
+<p>You can now write clean code that verifies syntax of strings:</p>
+
+<pre><code>    public void PublicApiMethod(string name)
+    {
+        name.CheckArg&lt;UserName&gt;("name");
+
+        // TODO: Do stuff...
+    }
+
+    internal void InternalMethod(string name)
+    {
+        name.DebugAssert&lt;UserName&gt;();
+
+        // TODO: Do stuff...
+    }
+
+    internal bool ValidateInput(string name, string email)
+    {
+        return name.IsValid&lt;UserName&gt;() &amp;&amp; email.IsValid&lt;Email&gt;();
+    }
+</code></pre>

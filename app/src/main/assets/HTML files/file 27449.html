@@ -1,0 +1,99 @@
+<blockquote>
+  <p>Can we control the output that is given out by Python compiler, like print some other error message, skip that division by zero operation, and carry on with rest of the instructions?</p>
+</blockquote>
+
+<p>No, you cannot. You can manually wrap every dangerous command with a <code>try...except</code> block, but I'm assuming you're talking about an automatic recovery to specific lines <em>within</em> a <code>try...except</code> block, or even completely automatically.</p>
+
+<p>By the time the error has fallen through such that <code>sys.excepthook</code> is called, or whatever outer scope if you catch it early, the inner scopes are gone. You can change line numbers with <a href="http://docs.python.org/2/library/sys.html#sys.settrace" rel="nofollow"><code>sys.settrace</code></a> in CPython although that is <strong>only an implementation detail</strong>, but since the outer scopes are gone there is no reliable recorvery mechanism.</p>
+
+<p>If you try to use the humorous <code>goto</code> April fools module (that uses the method I just described) to jump blocks <em>even within a file</em>:</p>
+
+<pre><code>from goto import goto, label
+
+try:
+    1 / 0
+    label .foo
+    print("recovered")
+
+except:
+    goto .foo
+</code></pre>
+
+<p>you get an error:</p>
+
+<pre><code>Traceback (most recent call last):
+  File "rcv.py", line 9, in &lt;module&gt;
+    goto .foo
+  File "rcv.py", line 9, in &lt;module&gt;
+    goto .foo
+  File "/home/joshua/src/goto-1.0/goto.py", line 272, in _trace
+    frame.f_lineno = targetLine
+ValueError: can't jump into the middle of a block
+</code></pre>
+
+<p>so I'm pretty certain it's impossible.</p>
+
+<hr>
+
+<blockquote>
+  <p>And also, how can i evaluate the cost of run-time semantic checks?</p>
+</blockquote>
+
+<p>I don't know what that is, but you're probably looking for a <a href="http://pythonhosted.org/line_profiler/" rel="nofollow"><code>line_profiler</code></a>:</p>
+
+<pre><code>import random
+
+from line_profiler import LineProfiler
+profiler = LineProfiler()
+
+def profile(function):
+    profiler.add_function(function)
+    return function
+
+
+@profile
+def foo(a, b, c):
+    if not isinstance(a, int):
+        raise TypeError("Is this what you mean by a 'run-time semantic check'?")
+
+    d = b * c
+    d /= a
+
+    return d**a
+
+profiler.enable()
+for _ in range(10000):
+    try:
+        foo(random.choice([2, 4, 2, 5, 2, 3, "dsd"]), 4, 2)
+    except TypeError:
+        pass
+
+profiler.print_stats()
+</code></pre>
+
+<p>output:</p>
+
+<pre><code>Timer unit: 1e-06 s
+
+File: rcv.py
+Function: foo at line 11
+Total time: 0.095197 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    11                                           @profile
+    12                                           def foo(a, b, c):
+    13     10000        29767      3.0     31.3      if not isinstance(a, int):
+    14      1361         4891      3.6      5.1          raise TypeError("Is this what you mean by a 'run-time semantic check'?")
+    15                                           
+    16      8639        20192      2.3     21.2      d = b * c
+    17      8639        20351      2.4     21.4      d /= a
+    18                                           
+    19      8639        19996      2.3     21.0      return d**a
+</code></pre>
+
+<p>So the "run-time semantic check", in this case would be taking 36.4% of the time of running <code>foo</code>.</p>
+
+<hr>
+
+<p>If you want to time specific blocks manually that are larger than you'd use <code>timeit</code> on but smaller than you'd want for a profiler, instead of using two <code>time.time()</code> calls (which is quite an inaccurate method) I suggest <a href="https://code.google.com/p/my-startup-file/source/browse/timer.py" rel="nofollow">Steven D'Aprano's Stopwatch context manager</a>.</p>

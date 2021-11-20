@@ -1,0 +1,49 @@
+<p>I'm not sure I totally understand your scenario - don't you want these to be playing simultaneously?  (i.e. bass gets layered on top of the drums).</p>
+
+<p>Your current code is trying to concatenate an additional audio file whenever you hit the button for that file.  You can't just concatenate audio files (in their ENCODED form) and then run it through decode - the decodeAudioData method is decoding the first complete sound in the arraybuffer, then stopping (because it's done decoding the sound).</p>
+
+<p>What you should do is change the logic to concatenate the buffer data from the resulting AudioBuffers (see below).  Even this logic isn't QUITE what you should do - this is still caching the encoded audio files, and decoding every time you hit the button.  Instead, you should cache the decoded audio buffers, and just concatenate it.</p>
+
+<pre><code>function startStop(index, name, isPlaying) {
+
+    // Note we're decoding just the new sound
+    context.decodeAudioData( bufferList[index], function(buffer){
+        // We have a decoded buffer - now we need to concatenate it
+        audioBuffer = buffer;
+
+        if(!audioBuffer) {
+            audioBuffer = buffer;
+        }else{
+            audioBuffer = concatenateAudioBuffers(audioBuffer, buffer);
+        }
+
+        play();
+    })
+}
+
+function concatenateAudioBuffers(buffer1, buffer2) {
+    if (!buffer1 || !buffer2) {
+        console.log("no buffers!");
+        return null;
+    }
+
+    if (buffer1.numberOfChannels != buffer2.numberOfChannels) {
+        console.log("number of channels is not the same!");
+        return null;
+    }
+
+    if (buffer1.sampleRate != buffer2.sampleRate) {
+        console.log("sample rates don't match!");
+        return null;
+    }
+
+    var tmp = context.createBuffer(buffer1.numberOfChannels, buffer1.length + buffer2.length, buffer1.sampleRate);
+
+    for (var i=0; i&lt;tmp.numberOfChannels; i++) {
+        var data = tmp.getChannelData(i);
+        data.set(buffer1.getChannelData(i));
+        data.set(buffer2.getChannelData(i),buffer1.length);
+    }
+    return tmp;
+};
+</code></pre>

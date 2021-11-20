@@ -1,0 +1,34 @@
+<p>You could do something funky with <code>UNION ALL</code> but I'd probably keep the three queries separate. </p>
+
+<p>You'll probably want some application code to render the results into a table or graph of some sorts anyway and I'd take the overhead of three calls.</p>
+
+<p>I'd run the queries as follows:</p>
+
+<pre><code>  SELECT COUNT(order.id), 
+         SUM(order.total_amount) 
+    FROM `order` 
+   WHERE payed_at &gt;= :start_date 
+     AND payed_at &lt;  :end_date + INTERVAL 1 DAY
+
+  SELECT DATE(payed_at) payed_date
+         COUNT(order.id), 
+         SUM(order.total_amount) 
+    FROM `order` 
+   WHERE payed_at &gt;= :start_date 
+     AND payed_at &lt;  :end_date + INTERVAL 1 DAY
+GROUP BY payed_date
+
+  SELECT EXTRACT(YEAR_MONTH FROM payed_at) payed_year_month
+         COUNT(order.id), 
+         SUM(order.total_amount) 
+    FROM `order` 
+   WHERE payed_at &gt;= :start_date 
+     AND payed_at &lt;  :end_date + INTERVAL 1 DAY
+GROUP BY payed_year_month
+</code></pre>
+
+<p>I prefer the exact logic of <code>&gt;=</code>/<code>&lt;</code> when querying date ranges over the inclusive <code>BETWEEN</code>.</p>
+
+<p>When grouping by month it is usually important to remember to include the year as well if the range can span a year. Alternatives to <code>EXTRACT</code> include <code>LAST_DAY</code> and <code>DATE_FORMAT</code>.. see <a href="http://dev.mysql.com/doc/refman/5.7/en/date-and-time-functions.html" rel="nofollow">MySQL Date and Time Functions</a>.</p>
+
+<p>Another option is to only run the 2nd query (grouped by date) and roll-up the month and range totals in application code. </p>

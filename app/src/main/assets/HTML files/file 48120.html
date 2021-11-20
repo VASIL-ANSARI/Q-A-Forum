@@ -1,0 +1,48 @@
+<p>One solution is to sidestep the issue (IXmlSerializable.ReadXml looks quite painful anyway, e.g. for collections). What I eventually did is scrap IXmlSerializable, and instead generate a class along the lines of the below. </p>
+
+<p>Please note that whilst this approach works, it's currently quite error prone if the serializable instance is used for anything other than serialization - synchronization is maintained ONLY when <code>SerializationTarget</code> is set or retrieved. When it's set, we convert existing parameters to appropriate instances and add them to a serializable list. When it's retrieved, if it's null, we inflate from whatever was in the current value. </p>
+
+<p>However, if FooContainer changes after the creation of this object, it won't maintain that synchronization and what gets serialized will be out of date. This is largely because I'm lazy and don't want to implement <code>IList&lt;SomeGenericClassBase&gt;</code> again to override the <code>Add</code> and <code>Remove</code> methods (though this would be the more robust approach).</p>
+
+<pre><code>public class FooContainerSerializable
+{
+    public FooContainerSerializable() {}
+    public FooContainerSerializable(FooContainer serializationTarget) 
+    {
+        this.SerializationTarget = serializationTarget;
+    }
+
+    [XmlIgnore]
+    public FooContainer SerializationTarget
+    {
+        get {
+            if (_SerializationTarget == null)
+            {
+                _SerializationTarget = new FooContainer();
+
+                // Copy across extant collection properties here
+                this.Parameters.ForEach(item=&gt;_SerializationTarget.Add(item));
+            }
+            return _SerializationTarget;
+        }
+        set {
+            // Synchronize this entity's entries here
+            _SerializationTarget = value;
+            _SerializationTarget.ForEach(item=&gt;this.Parameters.Add(item.Deflate()));
+        }
+    }
+    private FooContainer _SerializationTarget;
+
+    [XmlElement]
+    public string FooName {
+        get {return this.SerializationTarget.FooName;}
+        set {this.SerializationTarget.FooName = value;}
+    }
+
+    [XmlElement]
+    public List&lt;SomeGenericClassBase&gt; Parameters {
+        get {return _Parameters ?? (_Parameters = new List&lt;SomeGenericClassBase&gt;());}
+        set {_Parameters = value;}
+    }
+}
+</code></pre>

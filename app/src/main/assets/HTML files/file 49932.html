@@ -1,0 +1,46 @@
+<p>Use <strong><a href="https://docs.mongodb.org/v3.0/reference/operator/projection/elemMatch/" rel="nofollow"><code>$elemMatch</code></a></strong> projection to retrieve the array. The mongo query which you want to generate isFinite</p>
+
+<pre><code>db.project.findOne(
+    {"users.id": "58b5eb81-35b2-4719-87ad-e5eea76a478f"},
+    {
+        "_id": 0,
+        "users": {
+            "$elemMatch": { "id": "58b5eb81-35b2-4719-87ad-e5eea76a478f" }
+        }
+    }).users[0]
+</code></pre>
+
+<p>or use the <strong><a href="https://docs.mongodb.org/manual/reference/operator/projection/positional/" rel="nofollow"><code>$ projection</code></a></strong> operator which projects the array elements based on some condition from the query statement. In your case your query statement will use the dot notation to query for the Images array where it has at least an element:</p>
+
+<pre><code>db.project.findOne(
+    {"users.id": "58b5eb81-35b2-4719-87ad-e5eea76a478f"},
+    { "_id": 0, "users.$": 1 }
+).users[0];
+</code></pre>
+
+<p>In Morphia (untested), you may want to try the <strong><a href="https://github.com/mongodb/morphia/wiki/Query#operators" rel="nofollow"><code>elem</code></a></strong> operator</p>
+
+<pre><code>Project project = datastore.createQuery(Project.class)
+                           .filter("users elem", BasicDBObjectBuilder.start("id", "58b5eb81-35b2-4719-87ad-e5eea76a478f"))
+                           .retrievedFields(true, "users.$")
+                           .get();
+</code></pre>
+
+<p>or</p>
+
+<pre><code>Project project = datastore.createQuery(Project.class)
+                           .field("users.id").eq("58b5eb81-35b2-4719-87ad-e5eea76a478f")
+                           .retrievedFields(true, "users.$")
+                           .get();
+</code></pre>
+
+<p>or the fluent interface <strong><a href="https://github.com/mongodb/morphia/wiki/Query#methods" rel="nofollow"><code>hasThisElement()</code></a></strong> method</p>
+
+<pre><code>User user = new User();
+user.setId("58b5eb81-35b2-4719-87ad-e5eea76a478f");    
+
+Query&lt;Project&gt; query = datastore.createQuery(Project.class)
+        //.field("users.id").equal("58b5eb81-35b2-4719-87ad-e5eea76a478f")
+        .field("users").hasThisElement(user)
+        .retrievedFields(true, "users.$");
+</code></pre>

@@ -1,0 +1,58 @@
+<p>Following the inspiration of your code, I created a similar solution that locates the <strong>line end</strong> and <strong>paragraph end</strong> given the starting character of a matched word. Paragraphs are separated by <code>\n\n</code> and lines are ended with <code>\n</code>. The end of your text field will likely need to be handled as a special case.</p>
+
+<p>Note that the <code>.*</code> will match to the end of the line with the given regular expression options. The paragraph ends are located by finding a matching <code>\n\n</code>.</p>
+
+<pre><code>self.myText = @"hello world\n\nthis is a test\nsingle line\n\n";
+
+NSError *error = NULL;
+NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"hello.*"
+                                                                       options:NSRegularExpressionCaseInsensitive
+                                                                         error:&amp;error];
+
+NSArray *matches = [regex matchesInString:self.myText options:0 range:NSMakeRange(0, self.myText.length)];
+
+for (NSTextCheckingResult *match in matches) {
+
+    NSRange lineRange = [match rangeAtIndex:0];
+
+    NSLog(@"match start is %lu", lineRange.location);
+
+    NSLog(@"line end is %lu", lineRange.location + lineRange.length);
+
+    // Find paragraph ends:
+    NSInteger i = lineRange.location;
+    unichar lineSeparator = 0x2028;
+
+    while (i &lt; self.myText.length - 1) {
+        // Case where string uses \n\n to denote a paragraph:
+        NSString *subString = [self.myText substringWithRange:NSMakeRange(i, 2)];
+        if ( [subString isEqualToString:@"\n\n"] ) {
+            NSLog(@"found paragraph end at %ld", (long)i);
+        }
+
+        // Case where text view uses line separator characters:
+        if ([subString characterAtIndex:0] == lineSeparator &amp;&amp; [subString characterAtIndex:1] == lineSeparator) {
+            NSLog(@"found paragraph end at %ld", (long)i);
+        }
+
+        i++;           
+    }
+}
+</code></pre>
+
+<p>In my sample, I get</p>
+
+<pre><code>match start is 0
+line end is 11
+found paragraph end at 11
+found paragraph end at 39
+</code></pre>
+
+<p>Iâve created a little guide to visualize the results:</p>
+
+<pre><code>hello world++this is a test+single line++
+01234567891111111111222222222233333333334
+          0123456789012345678901234567890
+</code></pre>
+
+<p>This could be adapted to a standalone function that should provide the kind of results you are seeking.</p>

@@ -1,0 +1,45 @@
+<p>You have to create an instance of a generic Dao and put in the service layer some decision:</p>
+
+<pre><code> @Repository
+ public class GenericDao implements DaoInterface&lt;T&gt; {
+ //The type must be aquired at runtime,otherwise it may not be thread safe
+
+    @Autowired
+    protected SessionFactory sessionFactory;
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public T findById(int id,Class&lt;?&gt; persistenceClass) {
+        Session session = sessionFactory.getCurrentSession();
+        return (T) session.get(persistenceClass, id);
+    }
+
+    //...more methods...
+}
+</code></pre>
+
+<p>Also if you need a good generic repository layer take a look for <a href="http://projects.spring.io/spring-data-jpa/" rel="nofollow" title="Spring Data Jpa">Spring Data Jpa</a> </p>
+
+<p>This will make <strong>one and only one</strong> instance of the GenericDao.</p>
+
+<p>Next you have 2 choice:</p>
+
+<ol>
+<li>Create a singleton services for all your needs</li>
+<li><p>Create a class service for every entity</p>
+
+<pre><code>abstract class GenericService&lt;T&gt; {
+    @Autowired
+    protected GenericDao dao;
+    @SuppressWarnings("unchecked")
+    protected final Class&lt;T&gt; persistentClass = (Class&lt;T&gt;) ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0];
+
+    @Override
+    public T  findById(int id) {
+        return dao.findById(id,persistenceClass);
+    }   
+}
+</code></pre>
+
+<p>Now every one of your service must extends the GenericService with a supplied persistence type and the job is done.</p></li>
+</ol>

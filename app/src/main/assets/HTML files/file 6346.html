@@ -1,0 +1,45 @@
+<p>Specifying the find type as 'list' is incompatible with the Containable behavior.</p>
+
+<p>Use <strong>joins</strong> instead to accomplish this:</p>
+
+<pre><code>$selectedCategories = $this-&gt;Category-&gt;find('list', array(
+    'joins' =&gt; array(
+        array(
+            'table' =&gt; 'categories_landmarks',
+            'alias' =&gt; 'CategoriesLandmark',
+            'type' =&gt; 'inner',
+            'conditions' =&gt; array("CategoriesLandmark.category_id = Category.id")
+        ),
+        array(
+            'table' =&gt; 'landmarks',
+            'alias' =&gt; 'Landmark',
+            'type' =&gt; 'inner',
+            'conditions' =&gt; array(
+                "CategoriesLandmark.landmark_id = Landmark.id",
+                'Landmark.num' =&gt; 7
+            )
+        ),
+    )
+));
+</code></pre>
+
+<p>I would ideally place this directly into the Category model like so:</p>
+
+<pre><code>function fetchListByLandmarkNum($landmarkNum) {
+    return $this-&gt;find('list', array(
+        'joins' =&gt; ...
+    ));
+}
+</code></pre>
+
+<p>And then call it from the controller:</p>
+
+<pre><code>$selectedCategories = $this-&gt;Category-&gt;fetchListByLandmarkNum(7);
+$this-&gt;set(compact('selectedCategories'));
+</code></pre>
+
+<p>Always make your models fat and your controllers skinny. You can now reuse this function elsewhere. :)</p>
+
+<hr>
+
+<p>The reason why ALL the categories are being returned is that the condition is applied on the related Landmark models. The result of this Containable query would be to fetch all the Categories, and return only those Landmark models which satisfy num = 7. It should NOT be interpreted as returning only those Categories for which the Landmark models satisfy the condition.</p>

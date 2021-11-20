@@ -1,0 +1,41 @@
+<p>Add a signal <code>callback</code> to Worker and pass the pointer to the register function (which will be passed as <code>user_data</code>). </p>
+
+<pre><code>void VRPN_CALLBACK vrpn_analog_callback(void* user_data, vrpn_ANALOGCB analog)
+{
+    for (int i = 0; i &lt; analog.num_channel; i++)
+    {
+        if (analog.channel[i] &gt; 0)
+        {                   
+            Worker* worker = std::reinterpret_cast&lt;Worker&gt;(user_data);
+            worker -&gt;callback(i, analog.channel[i]);
+        }
+
+    }
+}
+
+void Worker::process() {
+
+    /* flag used to stop the program execution */
+    bool running = true;
+
+    /* VRPN Analog object */
+    vrpn_Analog_Remote* VRPNAnalog;
+
+    /* Binding of the VRPN Analog to a callback */
+    VRPNAnalog = new vrpn_Analog_Remote("openvibe_vrpn_analog@localhost");
+    VRPNAnalog-&gt;register_change_handler(this, vrpn_analog_callback);//add the pointer here
+
+    /* The main loop of the program, each VRPN object must be called in order to process data */
+    while (running)
+    {
+        VRPNAnalog-&gt;mainloop();
+    }
+}
+</code></pre>
+
+<p>Then you can connect the callback signal of Worker to whatever you want independent from your main window.</p>
+
+<pre><code>connect(worker, &amp;Worker::callback, this, &amp;MainWindow::nextImage);
+</code></pre>
+
+<p>Having said all that I suggest using a QTimer set to timeout 0 to call <code>VRPNAnalog-&gt;mainloop();</code> so the event loop of worker can run once in a while.</p>

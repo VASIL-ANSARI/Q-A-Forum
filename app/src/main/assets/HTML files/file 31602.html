@@ -1,0 +1,30 @@
+<p>This was really tricky...especially without any auto_incremented unique ID. Here is what I can come up with. I'm not experienced with stored procedures so forgive any flaws. This will only work if the whole table follow exactly the structure you shared.</p>
+
+<p>First, start with inserting all the rows with only the inTime for the new table (and please use an auto_incremented column for this table). This should be every other row starting with the first one.  </p>
+
+<pre><code>INSERT INTO other_table (ID, Name, Date, inTime) SELECT ID, Name, Date, Time 
+FROM (SELECT@row := @row +1 AS rownum, ID, Name, Date, Time FROM 
+(SELECT @row :=0) r, process) r2 WHERE rownum % 2
+</code></pre>
+
+<p>When you have all the new rows you need in other_table (just OutTime missing), you can use the following stored procedure to update the missing values row by row. They should exist on every second row as well in the old table.</p>
+
+<pre><code>DELIMITER $$
+DROP PROCEDURE IF EXISTS `update_other` $$
+CREATE PROCEDURE `update_other` ()
+BEGIN
+    DECLARE row_counter INT;
+    DECLARE what_limit INT;
+    DECLARE stop_row INT;
+    SET row_counter = 1;
+    SET what_limit = 1;
+    SELECT COUNT(*) FROM other_table INTO stop_row;
+
+    WHILE row_counter &lt;= stop_row DO
+       UPDATE other_table SET Outtime = (SELECT Time FROM process LIMIT what_limit,1) WHERE unique_id = row_counter; 
+       SET what_limit = what_limit + 2;
+       SET row_counter = row_counter + 1;
+    END WHILE;
+END $$
+DELIMITER ;
+</code></pre>

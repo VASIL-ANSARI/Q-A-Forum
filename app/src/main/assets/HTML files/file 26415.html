@@ -1,0 +1,15 @@
+<p>If you use the SQL Server Management Studio you can right click on the Table and click on "View Dependencies". When you select "Objects that depend on [TableName]" you will get a list. It can be quite big, if there are a lot of Stored procedures and functions. You will be able to spot the tables very easy, as they have a distinctive "table" icon.</p>
+
+<p>However, if you can't use SSMS, then you will need to run script. This script will list all Foreign keys with child and parent tables:</p>
+
+<pre><code>SELECT     db_name() AS CONSTRAINT_CATALOG, user_name(c_obj.uid) AS CONSTRAINT_SCHEMA, c_obj.name AS CONSTRAINT_NAME, db_name() 
+                      AS TABLE_CATALOG, user_name(t_obj.uid) AS TABLE_SCHEMA, t_obj.name AS TABLE_NAME, 
+                      CASE c_obj.xtype WHEN 'C' THEN 'CHECK' WHEN 'UQ' THEN 'UNIQUE' WHEN 'PK' THEN 'PRIMARY KEY' WHEN 'F' THEN 'FOREIGN KEY' END AS CONSTRAINT_TYPE,
+                       'NO' AS IS_DEFERRABLE, 'NO' AS INITIALLY_DEFERRED,
+mt_obj.name AS ParentTable
+FROM         sysobjects c_obj, sysobjects t_obj, sysforeignkeys sf, sysobjects mt_obj 
+WHERE     permissions(t_obj.id) != 0 AND t_obj.id = c_obj.parent_obj AND c_obj.xtype IN ('F')
+AND sf.constid = c_obj.id AND sf.rkeyid = mt_obj.id
+</code></pre>
+
+<p>BTW, do not rule out the possibility of a TRIGGER</p>

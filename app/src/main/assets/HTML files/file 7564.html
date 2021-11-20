@@ -1,0 +1,69 @@
+<p>To know if you can make a word out of a set of letters [oops, I did it myself -- I meant 'collection'!], you want every letter to occur at least the right number of times, so I think we're going to have to work the counts in there somehow.  By definition, Python sets don't care about the number of elements in a source list.  Maybe something like</p>
+
+<pre><code>from collections import Counter
+
+letters = ['v','r','o','o','m','a','b','c','d']
+words = 'cardboard boom booom'.split()
+letterscount = Counter(letters)
+
+for word in words:
+    wordcount = Counter(word)
+    print word, all(letterscount[c] &gt;= wordcount[c] for c in wordcount)
+</code></pre>
+
+<p>giving</p>
+
+<pre><code>cardboard False
+boom True
+booom False
+</code></pre>
+
+<p>Counter is a handy utility class:</p>
+
+<pre><code>&gt;&gt;&gt; c = Counter(letters)
+&gt;&gt;&gt; c
+Counter({'o': 2, 'a': 1, 'c': 1, 'b': 1, 'd': 1, 'm': 1, 'r': 1, 'v': 1})
+&gt;&gt;&gt; c['o']
+2
+&gt;&gt;&gt; c['z']
+0
+</code></pre>
+
+<p>[DSM: the return!  I removed a community edit which doesn't work because Counter instances aren't hashable.]</p>
+
+<p>If searching speed is a concern, then you can trade off memory and precomputation time:</p>
+
+<pre><code>from collections import defaultdict, Counter
+from itertools import combinations
+
+# precomputations
+allwords = open('/usr/share/dict/words').read().split() 
+allwords = list(w for w in allwords if len(w) &gt;= 3) # hack, /words contains lots of silliness
+allwords_by_count = defaultdict(list)
+for i, word in enumerate(allwords):
+    allwords_by_count[frozenset(word)].append((word, Counter(word)))
+    if i % 1000 == 0:
+        print i, word
+
+
+def wordsfrom(letters, words_by_count):
+    lettercount = Counter(letters)
+    for subsetsize in range(1, len(lettercount)+1):
+        for subset in combinations(lettercount, subsetsize):
+            for possword, posswordcount in words_by_count[frozenset(subset)]:
+                if all(posswordcount[c] &lt;= lettercount[c] for c in posswordcount):
+                    yield possword
+
+&gt;&gt;&gt; wordsfrom('thistles', allwords_by_count)
+&lt;generator object wordsfrom at 0x1032956e0&gt;
+&gt;&gt;&gt; list(wordsfrom('thistles', allwords_by_count))
+['ess', 'sis', 'tit', 'tst', 'hei', 'hie', 'lei', 'lie', 'sie', 'sise', 'tie', 'tite', 'she', 'het', 'teth', 'the', 'els', 'less', 'elt', 'let', 'telt', 'set', 'sett', 'stet', 'test', 'his', 'hiss', 'shi', 'sish', 'hit', 'lis', 'liss', 'sil', 'lit', 'til', 'tilt', 'ist', 'its', 'sist', 'sit', 'shies', 'tithe', 'isle', 'sile', 'sisel', 'lite', 'teil', 'teli', 'tile', 'title', 'seit', 'sesti', 'site', 'stite', 'testis', 'hest', 'seth', 'lest', 'selt', 'lish', 'slish', 'hilt', 'lith', 'tilth', 'hist', 'sith', 'stith', 'this', 'list', 'silt', 'slit', 'stilt', 'liesh', 'shiel', 'lithe', 'shiest', 'sithe', 'theist', 'thesis', 'islet', 'istle', 'sistle', 'slite', 'stile', 'stilet', 'hitless', 'tehsil', 'thistle']
+</code></pre>
+
+<p>[Heh.  I just noticed that 'thistles' itself isn't in the list, but that's because it's not in the words file..]</p>
+
+<p>And yes, the apparent "nonwords" there are really in the words file:</p>
+
+<pre><code>&gt;&gt;&gt; assert all(w in allwords for w in (wordsfrom('thistles', allwords_by_count)))
+&gt;&gt;&gt; 
+</code></pre>

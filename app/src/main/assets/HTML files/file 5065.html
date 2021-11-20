@@ -1,0 +1,51 @@
+<p>There is a golden rule when it comes to Core Data - one Managed Object Context per thread. Managed object contexts are not thread safe so if you are doing work in a background task you either use the main thread to avoid threading conflicts with UI operations, or you create a new context to do the work in. If the work is going to take a few seconds then you should do the latter to stop your UI from locking up.</p>
+
+<p>To do this you create a new context and give it the same persistent store as your main context:</p>
+
+<pre><code>NSManagedObjectContext *backgroundContext = [[[NSManagedObjectContext alloc] init] autorelease];
+[backgroundContext setPersistentStoreCoordinator:[mainContext persistentStoreCoordinator]];
+</code></pre>
+
+<p>Do whatever operations you need to do, then when you save that new context you need to handle the save notification and merge the changes into your main context with the <code>mergeChangesFromContextDidSaveNotification:</code> message. The code should look something like this:</p>
+
+<pre><code>/* Save notification handler for the background context */
+- (void)backgroundContextDidSave:(NSNotification *)notification {
+    /* Make sure we're on the main thread when updating the main context */
+    if (![NSThread isMainThread]) {
+        [self performSelectorOnMainThread:@selector(backgroundContextDidSave:)
+                               withObject:notification
+                            waitUntilDone:NO];
+        return;
+    }
+
+    /* merge in the changes to the main context */
+    [self.managedObjectContext mergeChangesFromContextDidSaveNotification:notification];
+}
+
+/* ... */
+
+/* Save the background context and handle the save notification */
+[[NSNotificationCenter defaultCenter] addObserver:self
+                                         selector:@selector(backgroundContextDidSave:)
+                                             name:NSManagedObjectContextDidSaveNotification
+                                           object:backgroundContext];
+
+[backgroundContext save:NULL];
+
+[[NSNotificationCenter defaultCenter] removeObserver:self
+                                                name:NSManagedObjectContextDidSaveNotification
+                                              object:syncContext];
+</code></pre>
+
+<p>Handling the save notifcation and merging is important otherwise your main UI/context won't see the changes you made. By merging, your main fetchResultsController etc. will get change events and update your UI as you would expect.</p>
+
+<p>Another important thing to note is that NSManagedObject instances can only be used in the context that they were fetched from. If your operation needs a reference to an object then you have to pass the object's <code>objectID</code> to the operation and re-fetch an NSManagedObject instance from the new context using <code>existingObjectWithID:</code>. So something like:</p>
+
+<pre><code>/* This can only be used in operations on the main context */
+MyNSManagedObject *objectInMainContext =
+    [self.fetchedResultsController objectAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+
+/* This can now be used in your background context */
+MyNSManagedObject *objectInBackgroundContext =
+    (MyNSManagedObject *) [backgroundContext existingObjectWithID:[objectInMainContext objectID]];
+</code></pre>

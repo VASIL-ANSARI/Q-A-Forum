@@ -1,0 +1,105 @@
+<p>My simple answer is avoid using the MongoDB Spring Data classes directly for aggregation and use the standard MongoDB Java objects e.g. <code>DBObject / AggregationOutput</code>.  The reason for that is I have lost several hours trying to get anything but basic aggregation queries working in MongoDB Spring data (and that is using the latest which as of today is <em>spring-data-mongodb 1.5.0.RELEASE</em>).</p>
+
+<p>However, constructing aggregation queries using the standard MongoDB Java objects can be a pain (especially if nested / complex) as you end up creating countless <code>DBObject groupFields = new BasicDBObject("_id", null);</code> and the code looks a mess.</p>
+
+<p>I recommend adding the following 3 wrapper methods to your code.</p>
+
+<pre><code>protected DBObject dbObj (String key, Object value) {
+    return new BasicDBObject (key, value);
+}
+
+protected DBObject dbObj (Object ... objs) {
+    DBObject dbObj = new BasicDBObject(); 
+    if (objs.length % 2 == 0) {
+        for (int i = 0; i &lt; objs.length; i+=2) {
+            dbObj.put((String)objs[i], objs[i+1]);          
+        }
+    }
+    return dbObj;
+}
+
+protected DBObject dbList (Object ... objs) {
+    BasicDBList dbList = new BasicDBList();
+    for (Object obj : objs) {
+        dbList.add(obj);
+    }
+    return (DBObject)dbList;
+}
+</code></pre>
+
+<p>This enables easy translation between your JSON based queries and your Java code. e.g. if you had the following complex query (taken from <a href="http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/" rel="nofollow">http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/</a>)</p>
+
+<pre><code>db.zipcodes.aggregate(
+{
+    $group: {
+        _id: { state: "$state", city: "$city" },
+        pop: { $sum: "$pop" }
+    }
+},{
+    $sort: { pop: 1 }
+},{
+    $group: {
+        _id: "$_id.state",
+        biggestCity: { $last: "$_id.city"        },
+        biggestPop: { $last: "$pop"        },
+        smallestCity: { $first: "$_id.city"        },
+        smallestPop: { $first: "$pop" }
+    }
+},{
+    $project: {
+        _id: 0,
+        state: "$_id",
+        biggestCity: {
+            name: "$biggestCity",
+            pop: "$biggestPop"
+        },
+        smallestCity: {
+            name: "$smallestCity",
+            pop: "$smallestPop"
+        }
+    }
+});
+</code></pre>
+
+<p>... then your Java code would look something like this ...</p>
+
+<pre><code>List&lt;DBObject&gt; aggregation = Arrays.asList (
+    dbObj ("$group", dbObj (
+        "_id", dbObj ("state", "$state", "city", "$city"),
+        "pop", dbObj ("$sum", "$post")
+    )),
+    dbObj ("$sort", dbObj ("pop", 1)),
+    dbObj ("$group", dbObj (
+        "_id", "$_id.state",
+        "biggestCity", dbObj ("$last", "$_id.city"), 
+        "biggestPop", dbObj ("$last", "$pop"),
+        "smallestCity", dbObj ("$first", "$_id.city"),
+        "smallestPop", dbObj ("$first", "$pop")
+    )),
+    dbObj ("$project", dbObj (
+        "_id", 0,
+        "state", "$_id",
+        "biggestCity", dbObj ("name", "$biggestCity", "pop", "$biggestPop"), 
+        "smallestCity", dbObj ("name", "$smallestCity", "pop", "$smallestPop")
+    ))
+);
+
+// Run aggregation query
+DBCollection collection = mongoTemplate.getCollection(COLLECTION_NAME);
+AggregationOutput output = collection.aggregate (aggregation);
+</code></pre>
+
+<p>Doing it this way, if it works in your editor (e.g. RoboMongo) it will work in your Java code although you will have to manually convert the objects from the result, which isn't too painful i.e.</p>
+
+<pre><code>List&lt;MyResultClass&gt; results = new ArrayList&lt;MyResultClass&gt;();
+Iterator&lt;DBObject&gt; it = output.results().iterator(); 
+while (it.hasNext()) {
+    DBObject obj = it.next();
+    MyResultClass result = mongoTemplate.getConverter().read(MyResultClass.class, obj);
+    results.add(result);
+}
+</code></pre>
+
+<p>However, you may find the Spring Data Aggregation stuff does work OK for you.  I love Spring and I do use Mongo Spring Data in various parts of my code, it is the aggregation support that lets it down e.g. doing a "$push" inside a "$group" with multiple items doesn't seem to work.  I'm sure it will improve with time (and better documentation). Other people have echoed these thoughts e.g. <a href="http://movingfulcrum.tumblr.com/post/61693014502/spring-data-and-mongodb-a-mismatch-made-in-hell" rel="nofollow">http://movingfulcrum.tumblr.com/post/61693014502/spring-data-and-mongodb-a-mismatch-made-in-hell</a> - see section 4.</p>
+
+<p>Happy coding!</p>

@@ -1,0 +1,21 @@
+<p>I've been facing this same "problem", and one workaround that I found for that was splitting my table in two, resulting in something like this in your case:</p>
+
+<pre class="lang-sql prettyprint-override"><code>CREATE TABLE transactions (
+  id INT NOT NULL AUTO_INCREMENT,
+  description CHAR(100),
+  PRIMARY KEY (id)
+) ENGINE=MyISAM;
+</code></pre>
+
+<p>And the other:</p>
+
+<pre class="lang-sql prettyprint-override"><code>CREATE TABLE transactions_date (
+  id INT NOT NULL,
+  posted DATE
+) ENGINE=MyISAM
+PARTITION BY HASH(MONTH(posted)) PARTITIONS 12;
+</code></pre>
+
+<p>The obvious problem is that you have to add some extra logic to the application, like the need to fetch both tables to retrieve all the data when using <code>SELECT</code> statements. You could probably use <a href="http://dev.mysql.com/doc/refman/5.5/en/triggers.html" rel="nofollow">triggers</a> to help you with the tasks related to <code>INSERT</code>, <code>UPDATE</code> and <code>DELETE</code>.</p>
+
+<p><em><strong>Just a note</strong>: the only functions that can benefit from the use of <a href="http://dev.mysql.com/doc/refman/5.5/en/partitioning-pruning.html" rel="nofollow">partition pruning</a> in <code>DATE</code> or <code>DATETIME</code> columns are: <code>YEAR()</code>, <code>TO_DAYS()</code> and <code>TO_SECONDS()</code> (this last one is only available since MySQL 5.5).</em></p>

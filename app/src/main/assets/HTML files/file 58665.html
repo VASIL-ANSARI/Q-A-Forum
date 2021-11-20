@@ -1,0 +1,99 @@
+<p>You can get all files of a directory and subdirectory with <code>os.walk</code>, which I have included in the <code>get_file_paths()</code> in the code below, here is an example:</p>
+
+<pre><code>import speech_recognition as sr
+import csv
+import os
+
+
+DIRNAME = r'c:\path\to\directory'
+OUTPUTFILE = r'c:\path\to\outputfiledir\outputfile.csv'
+
+def get_file_paths(dirname):
+    file_paths = []  
+    for root, directories, files in os.walk(dirname):
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            file_paths.append(filepath)  
+    return file_paths    
+
+def process_file(file):
+    r = sr.Recognizer()
+    a = ''
+    with sr.AudioFile(file) as source:
+        audio = r.record(source)    
+        try:
+            a =  r.recognize_google(audio)        
+        except sr.UnknownValueError:
+            a = "Google Speech Recognition could not understand audio"
+        except sr.RequestError as e:
+            a = "Could not request results from Google Speech Recognition service; {0}".format(e)  
+    return a
+
+def main():
+    files = get_file_paths(DIRNAME)                 # get all file-paths of all files in dirname and subdirectories
+    for file in files:                              # execute for each file
+        (filepath, ext) = os.path.splitext(file)    # get the file extension
+        file_name = os.path.basename(file)          # get the basename for writing to output file
+        if ext == '.wav':                           # only interested if extension is '.wav'
+            a = process_file(file)                  # result is returned to a
+            with open(OUTPUTFILE, 'a') as f:        # write results to file
+                writer = csv.writer(f)
+                writer.writerow(['file_name','google'])
+                writer.writerow([file_name, a])            
+
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+
+<p>If you want to do multiple recognizers, something like this could work. Please note this is an untested example:</p>
+
+<pre><code>import speech_recognition as sr
+import csv
+import os
+
+
+DIRNAME = r'c:\path\to\directory'
+OUTPUTFILE = r'c:\path\to\outputfiledir\outputfile.csv'
+
+def get_file_paths(dirname):
+    file_paths = []  
+    for root, directories, files in os.walk(dirname):
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            file_paths.append(filepath)  
+    return file_paths    
+
+def recog_multiple(file):
+    r = sr.Recognizer()
+    r_types = ['recognize_google', 'recognize_sphinx']
+    results = []
+    for r_type in r_types:
+        result = ''
+        with sr.AudioFile(file) as source:
+            audio = r.record(source)
+            try:
+                result = r_type + ': ' + str(getattr(r, r_type)(audio))
+            except sr.UnknownValueError:
+                result = r_type + ': Speech Recognition could not understand audio'
+            except sr.RequestError as e:
+                result = r_type + ': Could not request results from Speech Recognition service; {0}'.format(e)        
+        results.append(result)
+    return results
+
+def main():
+    files = get_file_paths(DIRNAME)                 # get all file-paths of all files in dirname and subdirectories
+    for file in files:                              # execute for each file
+        (filepath, ext) = os.path.splitext(file)    # get the file extension
+        file_name = os.path.basename(file)          # get the basename for writing to output file
+        if ext == '.wav':                           # only interested if extension is '.wav'
+            a = recog_multiple(file)                # result is returned to a
+            with open(OUTPUTFILE, 'a') as f:        # write results to file
+                writer = csv.writer(f)
+                writer.writerow(['file_name','results'])
+                writer.writerow([file_name, a])            
+
+
+if __name__ == '__main__':
+    main()
+</code></pre>

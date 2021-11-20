@@ -1,0 +1,33 @@
+<p><code>\b</code> is a zero-width assertion which is fundamentally different from <code>[^A-Za-z]</code>.  Because <code>\b</code> is implemented as an if/then (see tchrist's comment below), it will probably be more work to check that for each letter in each string.  Further, the plus is causing backtracking which would multiply that cost.</p>
+
+<p>Additionally, when you split on word boundaries, you will match on more places than if you just split on <code>[^a-zA-Z]+</code>.  This will cause the allocation of more strings, which will also take more time.
+To see that, try this program:</p>
+
+<pre><code>import java.lang.String;
+
+class RegexDemo {
+    private static void testSplit(String msg, String re) {
+        String[] pieces = "the quick brown fox".split(re);
+        System.out.println(msg);
+        for (String s : pieces) {
+            System.out.println(s);
+        }
+        System.out.println("----");
+    }
+
+    public static void main(String args[]) {
+        testSplit("boundary:", "\\b+");
+        testSplit("not alpha:", "[^A-Za-z]+");
+    }
+}
+</code></pre>
+
+<p>Probably unrelated, when you use String.split(), the regular expression has to be compiled for each usage.
+If you pre-compile the regex as a pattern, e.g.,</p>
+
+<pre><code>Pattern boundary = Pattern.compile("\\b+");
+</code></pre>
+
+<p>and then split using <code>boundary.split(testString)</code>, you will save on the cost of compiling the regex for each test string.  So, conceivably the compilation of "\b+" is slower than the compilation of the other patterns, which you could test by using the precompiled idiom here, though this doesn't seem likely to me as an explanation.</p>
+
+<p>For some more information on regex performance, read these articles by Russ Cox <a href="http://swtch.com/~rsc/regexp/" rel="nofollow">http://swtch.com/~rsc/regexp/</a> and check out <a href="http://www.regular-expressions.info/" rel="nofollow">http://www.regular-expressions.info/</a> too.</p>

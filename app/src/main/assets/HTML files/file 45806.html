@@ -1,0 +1,97 @@
+<p>If you really want to use a hard coded if statement to switch between prod and dev events you could use CDI Qualifiers simply inject the two implementations into a Facade:</p>
+
+<pre><code>@Stateless
+@LocalBean    
+public class ResultEvaluationFacade {
+
+    @Inject
+    @Development
+    private ResultEvalutationInterface dev;
+
+    @Inject
+    @Production
+    private ResultEvalutionInterface prod;
+
+    @Override
+    public void evaluateResults(Event e) {
+        switch (e.getType()) {
+            case Type.Production:
+               prod.evaluteResult(e);
+               break;
+            case Type.Development:
+               dev.evaluteResult(e);
+               break;
+            default:
+               throw new UnsupportedOperationException("Not supported yet.");
+        }
+    }
+
+}
+</code></pre>
+
+<p>And define your two implementations:</p>
+
+<pre><code>@Development
+public class ResultEvaluationDevelopment implements ResultEvaluationInterface {
+   ...
+}
+
+@Production
+public class ResultEvaluationDevelopment implements ResultEvaluationInterface {
+   ...
+}
+</code></pre>
+
+<p>However I would consider using a mock maven project to house the two separate implementations instead.</p>
+
+<p>Alternatively you could use different CDI Event types, something like this.</p>
+
+<pre><code>public void observeDevEvent(@Observe DevEvent event) {
+   //do stuff.
+}
+
+public void observeProdEvent(@Observe ProdEvent event) {
+   //do stuff
+}
+</code></pre>
+
+<p>Firing the event would look something like this:</p>
+
+<pre><code>@Inject
+private Event&lt;ProdEvent&gt; prodEvent;
+
+public void someMethod() {
+   ProdEvent pe = new ProdEvent()
+   // set some data on ProdEvent
+   prodEvent.fire(pe);
+}
+</code></pre>
+
+<p>Note events can also work with Qualifiers, so you could also add a Qualifier annotation to the Event instead of implementing two different types of event.</p>
+
+<pre><code>@Inject
+@Production
+private Event&lt;MyEvent&gt; event;
+</code></pre>
+
+<p>And listen for @Prodcution events;</p>
+
+<pre><code>public void handleProdEvent(@Observer @Production MyEvent myEvent) {
+    // do Stuff.
+}
+</code></pre>
+
+<p>For lazy instantiation of beans you can use CDI Instance injection.</p>
+
+<pre><code>@Inject
+private Instance&lt;BeanA&gt; beanA;
+
+....
+
+public void doStuff(Event e) {
+   ...
+   case Type.Production:
+            //lazily evaluates and instantiatiates bean.
+            beanA.get().evaluateResult(e);
+}
+</code></pre>

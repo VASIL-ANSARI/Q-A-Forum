@@ -1,0 +1,134 @@
+<p>I should start with the words that I'm not angular developer and I have never used popover before. So the code which I post below could be not good enough from the angular point of view. Nevertheless it works and it do what you need. Having <em>working</em> code you can improve it probably.</p>
+
+<p><a href="http://www.ok-soft-gmbh.com/jqGrid/OK/angular-popover-ng-click1.htm" rel="nofollow">The demo</a> display popover on click on the custom button, which stay opened. Additionally <code>alert</code> message will be displayed from the JavaScript function bound using <code>ng-click</code>:</p>
+
+<p><img src="http://i.stack.imgur.com/GF4Pv.png" alt="enter image description here"></p>
+
+<p>It uses the following HTML markup</p>
+
+<pre class="lang-html prettyprint-override"><code>&lt;body ng-app="myApp" ng-controller="MyController"&gt;
+    &lt;ng-jq-grid config="config" data="data"&gt;&lt;/ng-jq-grid&gt;
+&lt;/body&gt;
+</code></pre>
+
+<p>and the following JavaScript code which contains from three parts. In the first one do the standard thing</p>
+
+<pre class="lang-js prettyprint-override"><code>var myApp = angular.module("myApp", ["ui.bootstrap"]);
+</code></pre>
+
+<p>it's important just don't forget to include <code>"ui.bootstrap"</code> module required for <code>popover</code>.</p>
+
+<p>In the second part one use <code>myApp.directive</code> with <code>$compile</code> as parameter, which are used for compiling the grid twice: once before placing an empty <code>&lt;table&gt;</code> on the HTML page (in <code>&lt;ng-jq-grid&gt;...&lt;/ng-jq-grid&gt;</code>) and once more inside of <code>loadComplete</code>:</p>
+
+<pre class="lang-js prettyprint-override"><code>myApp.directive("ngJqGrid", function ($compile) {
+    return {
+        restrict: "E",
+        scope: {
+            config: "=",
+            data: "="
+        },
+        link: function (scope, element, attrs) {
+            var $grid;
+
+            scope.$watch("config", function (newValue) {
+
+                element.children().empty();
+                $grid = angular.element("&lt;table&gt;&lt;/table&gt;");
+                element.append($compile($grid)(scope));
+
+                element.append($grid);
+                angular.extend(newValue, {
+                    autoencode: true,
+                    iconSet: "fontAwesome",
+                    cmTemplate: { autoResizable: true }, 
+                    autoResizing: { compact: true },
+                    autoresizeOnLoad: true,
+                    loadComplete: function () {
+                        $compile(this)(scope);
+                    }
+                });
+
+                angular.element($grid)
+                    .jqGrid(newValue)
+                    .jqGrid("navGrid")
+                    .jqGrid("filterToolbar");
+            });
+            scope.$watch("data", function (newValue, oldValue) {
+                $grid.jqGrid("clearGridData");
+                $grid.jqGrid("setGridParam", {data: newValue});
+                $grid.trigger("reloadGrid");
+            });
+        }
+    };
+});
+</code></pre>
+
+<p>I used <a href="https://github.com/free-jqgrid/jqGrid" rel="nofollow">free jqGrid 4.8</a> in the demo, so one don't need to generate and id for the <code>&lt;table&gt;</code> element. If you have to use an old version of jqGrid then you should replace the line </p>
+
+<pre class="lang-js prettyprint-override"><code>$grid = angular.element("&lt;table&gt;&lt;/table&gt;");
+</code></pre>
+
+<p>to something like</p>
+
+<pre class="lang-js prettyprint-override"><code>$grid = angular.element("&lt;table id='" + $.jgrid.jqID() + "'&gt;&lt;/table&gt;");
+</code></pre>
+
+<p>The options <code>autoResizing</code> and <code>autoresizeOnLoad</code> are specific for free jqGrid and follows setting of the width of the columns based on the width of the data in the column. The options are described in the <a href="https://github.com/free-jqgrid/jqGrid/blob/master/README.md" rel="nofollow">readme</a> and in the <a href="https://github.com/free-jqgrid/jqGrid/wiki/Auto-adjustment-of-the-width-of-column" rel="nofollow">wiki</a>.</p>
+
+<p>In the last part of the code I use <code>myApp.controller</code> to initialize <code>$scope.config</code> and <code>$scope.data</code> with initial data.</p>
+
+<pre><code>myApp.controller("MyController", function ($scope) {
+    $scope.config = {
+        myClick: function (rowid) {
+            alert("Test buton is clicked on rowid=" + rowid);
+        },
+        colNames: ["Client", "", "Date", "Closed", "Shipped via", "Amount", "Tax", "Total", "Notes"],
+        colModel: [
+            { name: "name", align: "center", width: 65, editrules: {required: true},
+                searchoptions: { sopt: ["tcn", "tnc", "teq", "tne", "tbw", "tbn", "tew", "ten"] }},
+            { name: "myLink", align: "center",
+                formatter: function (cellvalue, options, rowObject) {
+                    return "&lt;button class='btn btn-primary' popover-placement='top' popover='" +
+                         rowObject.note + "' ng-click='config.myClick(" + options.rowId + ")'&gt;Test&lt;/button&gt;";
+                }},
+            { name: "invdate", width: 125, align: "center", sorttype: "date",
+                formatter: "date", formatoptions: { newformat: "d-M-Y" },
+                editoptions: { dataInit: initDateEdit },
+                searchoptions: { sopt: ["eq", "ne", "lt", "le", "gt", "ge"], dataInit: initDateSearch } },
+            { name: "closed", width: 70, template: "booleanCheckboxFa" },
+            { name: "ship_via", width: 105, align: "center", formatter: "select",
+                edittype: "select", editoptions: { value: "FE:FedEx;TN:TNT;IN:Intim", defaultValue: "IN" },
+                stype: "select", searchoptions: { sopt: ["eq", "ne"], value: ":Any;FE:FedEx;TN:TNT;IN:IN" } },
+            { name: "amount", width: 75, template: "number" },
+            { name: "tax", width: 52, template: "number", hidden: true },
+            { name: "total", width: 60, template: "number" },
+            { name: "note", width: 60, sortable: false, edittype: "textarea" }
+        ]
+    };
+    $scope.data = [
+        { id: "11",  invdate: "2007-10-01", name: "test",   note: "note",   amount: 0, tax: 0, closed: true,  ship_via: "TN", total: 0 },
+        { id: "21",  invdate: "2007-10-02", name: "test2",  note: "note2",  amount: 351.75, tax: 23.45, closed: false, ship_via: "FE", total: 375.2 },
+        { id: "31",  invdate: "2007-09-01", name: "test3",  note: "note3",  amount: 400, tax: 30, closed: false, ship_via: "FE", total: 430 },
+        { id: "41",  invdate: "2007-10-04", name: "test4",  note: "note4",  amount: 200, tax: 10, closed: true,  ship_via: "TN", total: 210 },
+        { id: "51",  invdate: "2007-10-31", name: "test5",  note: "note5",  amount: 300, tax: 20, closed: false, ship_via: "FE", total: 320 },
+        { id: "61",  invdate: "2007-09-06", name: "test6",  note: "note6",  amount: 400, tax: 30, closed: false, ship_via: "FE", total: 430 },
+        { id: "71",  invdate: "2007-10-04", name: "test7",  note: "note7",  amount: 200, tax: 10, closed: true,  ship_via: "TN", total: 210 },
+        { id: "81",  invdate: "2007-10-03", name: "test8",  note: "note8",  amount: 300, tax: 20, closed: false, ship_via: "FE", total: 320 },
+        { id: "91",  invdate: "2007-09-01", name: "test9",  note: "note9",  amount: 400, tax: 30, closed: false, ship_via: "TN", total: 430 },
+        { id: "101", invdate: "2007-09-08", name: "test10", note: "note10", amount: 500, tax: 30, closed: true,  ship_via: "TN", total: 530 },
+        { id: "111", invdate: "2007-09-08", name: "test10", note: "note11", amount: 500, tax: 30, closed: false, ship_via: "FE", total: 530 },
+        { id: "121", invdate: "2007-09-10", name: "test12", note: "note12", amount: 500, tax: 30, closed: false, ship_via: "FE", total: 530 }
+    ];
+});
+</code></pre>
+
+<p>The custom formatter looks like</p>
+
+<pre><code>formatter: function (cellvalue, options, rowObject) {
+    return "&lt;button class='btn btn-primary' popover-placement='top' popover='" +
+         rowObject.note + "' ng-click='config.myClick(" +
+         options.rowId + ")'&gt;Test&lt;/button&gt;";
+}
+</code></pre>
+
+<p>I hope that I commented the most important parts of the code.</p>

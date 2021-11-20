@@ -1,0 +1,78 @@
+<p>you can use ajax with jQuery and some js effects</p>
+
+<p>EDIT :</p>
+
+<pre><code>(your_page.php)
+&lt;?php
+
+...
+
+if (isset($_POST) &amp;&amp; !empty($_POST))
+{
+    if (array_key_exists('ajaxId', $_POST))
+    {
+         if ((int)$_POST['ajaxId'] &lt;= 0)
+         {
+             throw new Exception("go to hell");
+         }
+
+         $query = "SELECT td.id_resultat as id, email.fld_name_email AS name FROM " . $table_db . " td INNER JOIN " . $table_db_email email ON td.fld_email_id = email.id_email WHERE td.id_email = " . $_POST['ajaxId'];
+         $result = mysql_query($query, $cnx);
+
+         if (mysql_num_rows($result) &gt; 0)
+         {
+              $data = array();
+              while ($row=mysql_fetch_array($result))
+              {
+                   $data[$row["resultat"]] = $row["name"];
+              }
+
+              echo json_encode($data);
+              exit();
+         }
+    }
+
+    if (array_key_exists('select-big-fan', $_POST))
+    {
+        // you've found a big fan selected
+    }
+}
+
+$query = "SELECT DISTINCT id_email AS id, fld_name_email AS name, fld_adresse_email AS email FROM " . $table_db_email . " ORDER BY name";
+$result = mysql_query($query, $cnx);
+
+?&gt;
+&lt;?php if (mysql_num_rows($result) &gt; 0) : ?&gt;
+   &lt;form id="form-fan" method="post" action="&lt;?php echo $_SERVER["PHP_SELF"] ?&gt;"&gt;
+   &lt;select name="select-fan" id="select-fan"&gt;
+   &lt;?php while ($row=mysql_fetch_array($result)) : ?&gt;
+      &lt;option value="&lt;?php echo $row["id"] ?&gt;"&gt;&lt;?php echo $row["name"] ?&gt; - &lt;?php echo $row["email"] ?&gt;&lt;/option&gt;
+   &lt;?php endwhile ?&gt;
+   &lt;/select&gt;
+   &lt;/form&gt;
+   &lt;script type="text/javascript"&gt;
+       jQuery(document).ready(function(){
+           jQuery("#select-fan").change(function(){
+               var fanId = jQuery(this).val();
+               jQuery.ajax(function(){
+                  url: "&lt;?php echo $_SERVER["PHP_SELF"] ?&gt;",
+                  data: {ajaxId: fanId},
+                  success: function(data){
+                       selectBigFan = jQuery('&lt;select&gt;', {name: 'select-bigfan', id: 'select-bigfan'});
+                       jQuery.each(data, function(bigFanId, bigFanText){
+                            optionBigFan = jQuery('&lt;option&gt;' {value: bigFanId, text: bigFanText});
+                            optionBigFan.appendTo(selectBigFan);
+                       });
+                       selectBigFan.insertAfter(jQuery('#select-fan'));
+                       jQuery('&lt;input&gt;', {type: 'submit', value: 'send'});
+                  }
+               });
+           });
+       });
+});
+
+   &lt;/script&gt;
+&lt;?php else : ?&gt;
+   &lt;p&gt;Yup, there's nothing here, do u have beer ?&lt;/p&gt;
+&lt;?php endif ?&gt;
+</code></pre>

@@ -1,0 +1,31 @@
+<p>The question is: how to suppress the _class entry that the spring framework adds to MongoDB objects to support polymorphism.   If you don't need polymorphism support, _class wastes spaces and introduces issues if you refactor your POJO / model classes to different packages.</p>
+
+<p>The above example was close, but has a few errors (e.g. DefaultTypeMapper should be DefaultMongoTypeMapper and typeKey is a constructor-arg, not set as a property). </p>
+
+<p>The following works for me...</p>
+
+<pre><code>&lt;mongo:mongo host="hostname" port="27017"&gt;
+    &lt;mongo:options
+        ...options...
+&lt;/mongo:mongo&gt;
+
+&lt;mongo:db-factory dbname="blee" username="blee" password="blee" mongo-ref="mongo"/&gt;
+
+&lt;bean id="mongoTypeMapper" class="org.springframework.data.mongodb.core.convert.DefaultMongoTypeMapper"&gt;
+    &lt;constructor-arg name="typeKey"&gt;&lt;null/&gt;&lt;/constructor-arg&gt;
+&lt;/bean&gt;
+
+&lt;bean id="mongoMappingContext" class="org.springframework.data.mongodb.core.mapping.MongoMappingContext" /&gt;
+
+&lt;bean id="mongoConverter" class="org.springframework.data.mongodb.core.convert.MappingMongoConverter"&gt;
+  &lt;constructor-arg name="mongoDbFactory" ref="mongoDbFactory" /&gt;
+  &lt;constructor-arg name="mappingContext" ref="mongoMappingContext" /&gt;
+  &lt;property name="typeMapper" ref="mongoTypeMapper"&gt;&lt;/property&gt;
+&lt;/bean&gt;
+
+&lt;bean id="mongoTemplate" class="org.springframework.data.mongodb.core.MongoTemplate"&gt;
+    &lt;constructor-arg name="mongoDbFactory" ref="mongoDbFactory"/&gt;
+    &lt;constructor-arg name="mongoConverter" ref="mongoConverter" /&gt;
+    &lt;property name="writeResultChecking" value="EXCEPTION" /&gt; 
+&lt;/bean&gt;
+</code></pre>

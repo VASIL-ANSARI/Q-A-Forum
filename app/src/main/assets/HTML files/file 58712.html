@@ -1,0 +1,71 @@
+<p>I am the main developer of Tweetinvi.</p>
+
+<p>PLEASE READ THIS POST ENTIRELY so that you have a good understanding of the subject.</p>
+
+<p>Tweetinvi <code>Auth</code> class is storing the credentials as a per thread static variable.</p>
+
+<p>What this mean is that for every Thread in which your application store its own set of credentials. In ASP.NET this mean that every thread from the ThreadPool will use their own set of credentials.</p>
+
+<p>This also mean that each time you create a new Thread it is preferable to manually set the credentials for this thread using <code>Auth.SetUserCredentials</code></p>
+
+<p>To answer your question you have different solutions:</p>
+
+<h2>Send Tweet in same Thread</h2>
+
+<p>You just have to invoke <code>Auth.SetUserCredentials</code> every time you want to switch user.</p>
+
+<pre><code>// creds for user 1
+Auth.SetUserCredentials("CONSUMER_KEY_1", "CONSUMER_SECRET_1", "ACCESS_TOKEN_1", "ACCESS_TOKEN_SECRET_1");
+var tweetPublishedByUser1 = Tweet.PublishTweet("user 1 tweet");
+
+// creds for user 2
+Auth.SetUserCredentials("CONSUMER_KEY_2", "CONSUMER_SECRET_2", "ACCESS_TOKEN_2", "ACCESS_TOKEN_SECRET_2");
+var tweetPublishedByUser2 = Tweet.PublishTweet("user 2 tweet");
+</code></pre>
+
+<h2>Create Credentials and execute operation with it</h2>
+
+<p>You can ask Tweetinvi to run any operation with a specific set of credentials using <code>Auth.ExecuteOperationWithCredentials</code>.</p>
+
+<pre><code>// creds for user 1
+var cred1 = Auth.CreateCredentials("CONSUMER_KEY_1", "CONSUMER_SECRET_1", "ACCESS_TOKEN_1", "ACCESS_TOKEN_SECRET_1");
+var tweetPublishedByUser1 = Auth.ExecuteOperationWithCredentials(cred1, () =&gt;
+{
+    return Tweet.PublishTweet("user 1 tweet");
+});
+
+// creds for user 2
+var cred2 = Auth.CreateCredentials("CONSUMER_KEY_2", "CONSUMER_SECRET_2", "ACCESS_TOKEN_2", "ACCESS_TOKEN_SECRET_2");
+var tweetPublishedByUser2 = Auth.ExecuteOperationWithCredentials(cred2, () =&gt;
+{
+    return Tweet.PublishTweet("user 2 tweet");
+});
+</code></pre>
+
+<h2>AuthenticatedUser</h2>
+
+<p>The <code>AuthenticatedUser</code> simplify your life via the <code>ExecuteAuthenticatedUserOperation</code> method. This solution is quite useful as it allows you to create a collection of <code>AuthenticatedUser</code> and use the one you want when you want.</p>
+
+<pre><code>// creds for user 1
+Auth.SetUserCredentials("CONSUMER_KEY_1", "CONSUMER_SECRET_1", "ACCESS_TOKEN_1", "ACCESS_TOKEN_SECRET_1");
+var authenticatedUser1 = User.GetAuthenticatedUser();
+
+// creds for user 2
+Auth.SetUserCredentials("CONSUMER_KEY_2", "CONSUMER_SECRET_2", "ACCESS_TOKEN_2", "ACCESS_TOKEN_SECRET_2");
+var authenticatedUser2 = User.GetAuthenticatedUser();
+
+
+var tweetPublishedByUser1 = authenticatedUser1.ExecuteAuthenticatedUserOperation(() =&gt;
+{
+    return Tweet.PublishTweet("user 1 tweet");
+});
+
+var tweetPublishedByUser2 = authenticatedUser2.ExecuteAuthenticatedUserOperation(() =&gt;
+{
+    return Tweet.PublishTweet("user 2 tweet");
+});
+</code></pre>
+
+<h2>References</h2>
+
+<p>You can find the documentation of how to use credentials in Tweetinvin here : <a href="https://github.com/linvi/tweetinvi/wiki/Credentials" rel="nofollow">https://github.com/linvi/tweetinvi/wiki/Credentials</a></p>

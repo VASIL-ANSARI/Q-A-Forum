@@ -1,0 +1,34 @@
+<p>PostgreSQL have very nice syntax for this types of queries - <a href="http://www.postgresql.org/docs/current/static/sql-select.html">distinct on</a>:</p>
+
+<blockquote>
+  <p>SELECT DISTINCT ON ( expression [, ...] ) keeps only the first row of
+  each set of rows where the given expressions evaluate to equal. The
+  DISTINCT ON expressions are interpreted using the same rules as for
+  ORDER BY (see above). Note that the "first row" of each set is
+  unpredictable unless ORDER BY is used to ensure that the desired row
+  appears first.</p>
+</blockquote>
+
+<p>So your query becomes:</p>
+
+<pre><code>select distinct on(g.geo_id)
+    g.geo_id, gs.shape_type
+from schema.geo g   
+    join schema.geo_shape gs on (g.geo_id=gs.geo_id)  
+order by g.geo_id, gs.shape_type asc;
+</code></pre>
+
+<p>In general ANSI-SQL syntax for this (in any RDBMS with window functions and common table expression, which could be switched to subquery) would be:</p>
+
+<pre><code>with cte as (
+    select
+        row_number() over(partition by g.geo_id order by gs.shape_type) as rn,
+        g.geo_id, gs.shape_type
+    from schema.geo g   
+        join schema.geo_shape gs on (g.geo_id=gs.geo_id)  
+)
+select
+    geo_id, shape_type
+from cte
+where rn = 1
+</code></pre>

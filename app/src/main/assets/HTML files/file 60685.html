@@ -1,0 +1,101 @@
+<blockquote>
+  <p>How do I remove the object from the array. I have a data-id attribute on the delete link but what can I use to uniquely identify the object.</p>
+</blockquote>
+
+<p>Because you create a new table row you need to:</p>
+
+<ul>
+<li>delegate event (i.e.: $(document).on('click', '.js-delete', function (e) {)</li>
+<li>use the data-id attribute to assign it the value of the index of the current 
+element in array.</li>
+<li>on deleting a row you need to rearrange the values of the data-id </li>
+</ul>
+
+<blockquote>
+  <p>How do I pass this object back to the server </p>
+</blockquote>
+
+<p>You may use an hidden input field and set its value with the array value.</p>
+
+<p>The snippet:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var appointments = [];
+
+//
+// delegated event
+//
+$(document).on('click', '.js-delete', function (e) {
+  e.preventDefault();
+
+  var id = +$(this).attr("data-id");
+  appointments.splice(id, 1);
+  $(this).closest('tr').remove();
+  //
+  // rearrange the values of data-id attributes
+  //
+  $('#dates tr td:nth-child(3) a').each(function(index, element) {
+    var tId = +$(element).attr("data-id");
+    if (tId &gt; id) {
+      $(element).attr("data-id", tId - 1);
+    }
+  });
+});
+
+$(function () {
+  $(".js-add").click(function (e) {
+    e.preventDefault();
+
+    var startDate = $("#StartDate").val();
+    var endDate = $("#EndDate").val();
+
+    // In order to uniquely identify each object you can set the
+    // value of data-id attribute with current array index
+    appointments.push( { startDate: startDate , endDate: endDate });
+
+    $('&lt;tr/&gt;', { html: '&lt;td &gt;' + startDate + '&lt;/td&gt;&lt;td&gt;' + endDate + '&lt;/td&gt;&lt;td&gt;&lt;a class="js-delete" href="" data-id="' + (appointments.length - 1) + '"&gt;delete&lt;/a&gt;&lt;/td&gt;'})
+    .appendTo($('#dates'));
+
+    //
+    // a possible sorting.... Consider to use a date compare
+    // instead of a string compare function.
+    //
+    $.each($('#dates tr').get().sort(function(a, b) {
+      return a.childNodes[0].textContent.localeCompare(b.childNodes[0].textContent);
+    }), function(index, ele) {
+      $('#dates').append(ele);
+    });
+  });
+
+  //
+  // On form submit stringify your array and save it into
+  // an hidden input field
+  //
+  $('input[type="submit"]').on('click', function(e) {
+    e.preventDefault();
+    $('#appointments').val(JSON.stringify(appointments));
+    console.log($('#appointments').val());
+  });
+});</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://code.jquery.com/jquery-1.12.4.min.js"&gt;&lt;/script&gt;
+
+
+&lt;form action="/someaction"&gt;
+    &lt;input id="appointments" type="hidden"&gt;
+    Start Date &lt;input type="text" id="StartDate" name="StartDate"&gt;&lt;br&gt;
+    End Date: &lt;input type="text" id="EndDate" name="EndDate"&gt;&lt;br&gt;
+    &lt;a class="btn btn-default js-add" href="#" role="button"&gt;Add&lt;/a&gt;
+    &lt;table class="table" &gt;
+        &lt;tbody id="dates" &gt;
+
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+
+    &lt;!-- Other form fields --&gt;
+
+    &lt;input type="submit" value="Submit"&gt;
+&lt;/form&gt;</code></pre>
+</div>
+</div>
+</p>

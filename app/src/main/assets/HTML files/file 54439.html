@@ -1,0 +1,43 @@
+<p>The 3rd party package <a href="/questions/tagged/json.net" class="post-tag" title="show questions tagged &#39;json.net&#39;" rel="tag">json.net</a> allows this to be done easily:</p>
+
+<ol>
+<li><p>Parse the JSON into a <a href="http://www.newtonsoft.com/json/help/html/LINQtoJSON.htm" rel="nofollow">LINQ to JSON</a> hierarchy of <a href="http://www.newtonsoft.com/json/help/html/T_Newtonsoft_Json_Linq_JToken.htm" rel="nofollow"><code>JToken</code></a> tokens.</p></li>
+<li><p>Select JSON values to modify via <a href="http://www.newtonsoft.com/json/help/html/QueryJsonSelectTokenJsonPath.htm" rel="nofollow"><code>SelectTokens</code></a> using a query string in <a href="http://goessner.net/articles/JsonPath/" rel="nofollow">JSONPath syntax</a>.</p></li>
+<li><p>Using <a href="http://www.newtonsoft.com/json/help/html/M_Newtonsoft_Json_Linq_JToken_Replace.htm" rel="nofollow"><code>JToken.Replace()</code></a> replace the selected values with the new values.  A new value can be serialized directly to a <code>JToken</code> using <a href="http://www.newtonsoft.com/json/help/html/M_Newtonsoft_Json_Linq_JToken_FromObject.htm" rel="nofollow"><code>JToken.FromObject()</code></a>.</p></li>
+</ol>
+
+<p>Thus:</p>
+
+<pre><code>public static class JsonExtensions
+{
+    public static JToken ReplacePath&lt;T&gt;(this JToken root, string path, T newValue)
+    {
+        if (root == null || path == null)
+            throw new ArgumentNullException();
+
+        foreach (var value in root.SelectTokens(path).ToList())
+        {
+            if (value == root)
+                root = JToken.FromObject(newValue);
+            else
+                value.Replace(JToken.FromObject(newValue));
+        }
+
+        return root;
+    }    
+
+    public static string ReplacePath&lt;T&gt;(string jsonString, string path, T newValue)
+    {
+        return JToken.Parse(jsonString).ReplacePath(path, newValue).ToString();
+    }    
+}
+</code></pre>
+
+<p>Then use it like:</p>
+
+<pre><code>var newJsonAuthorString = JsonExtensions.ReplacePath(jsonString, @"$.store.book[*].author", "NewAuthorSpecifiedByUser");
+</code></pre>
+
+<p>Prototype <a href="https://dotnetfiddle.net/f3q04u" rel="nofollow">fiddle</a>.  If you are going to allow the user to do a series of edits, it will likely be more efficient to keep your JSON in a <code>JToken</code> hierarchy permanently rather that repeatedly converting from and to a string representation.</p>
+
+<p>See also <a href="https://stackoverflow.com/questions/4444903/how-to-install-json-net-using-nuget">How to install JSON.NET using NuGet?</a>.</p>

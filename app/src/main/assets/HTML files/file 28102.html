@@ -1,0 +1,56 @@
+<p>Defining an anonymous type is actually very complicated, and trying to do it just with the names is somewhat challenging. Essentially what you want already exists, but in regular C# - so for a single object:</p>
+
+<pre><code>var obj = new { testObj.StringHere, testObj.ANumber };
+</code></pre>
+
+<p>Or for multiple objects:</p>
+
+<pre><code>var projection = from obj in sequence
+                 select new { obj.StringHere, obj.ANumber };
+</code></pre>
+
+<p>That's about as succinct as you'll get. You could add a generic method that took a <code>Func&lt;,&gt;</code> of some kind, but it wouldn't be any cleaner than the above.</p>
+
+<p>It isn't useful to have:</p>
+
+<pre><code>var obj = SomeMagicMethod(obj, "StringHere", "ANumber");
+</code></pre>
+
+<p>because <code>SomeMagicMethod</code> could only usefully return <code>object</code> - our <code>obj</code> variable would be largely unusable.</p>
+
+<hr>
+
+<p>If you don't need to <em>return</em> the object from the method, then you could use either of:</p>
+
+<pre><code>SomeMagicMethod&lt;T&gt;(T value) {
+   ...
+}
+...
+SomeMagicMethod(new {testObj.StringHere, testObj.ANumber });
+</code></pre>
+
+<p>or:</p>
+
+<pre><code>SomeMagicMethod&lt;TFrom, TTo&gt;(TFrom value, Func&lt;TFrom, TTo&gt; selector)
+{
+    TTo actualVal = selector(value);
+    ...
+}
+...
+SomeMagicMethod(testObj, x =&gt; new {x.StringHere, x.ANumber });
+</code></pre>
+
+<p>Personally, I think the first is easier - the func in the second is overkill.</p>
+
+<p>You could also just use reflection...</p>
+
+<pre><code>SomeMagicMethod(object obj, params string[] names)
+{
+    foreach(var name in names) {
+       object val = obj.GetType().GetProperty(name).GetValue(obj);
+       // ...
+    }
+}
+//...
+SomeMagicMethod(testObj, "StringHere", "ANumber");
+</code></pre>

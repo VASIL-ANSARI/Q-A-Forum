@@ -1,0 +1,26 @@
+<p>Answering your comment: yes, you can fetch tickets from 1st query. This is how to do it, though pagination is run in the context of accounts, so we will skip it and retrieve all the accounts:</p>
+
+<pre><code>// returns Eloquent Collection of Account models
+$accounts = Account::with('tickets')-&gt;where('name','LIKE',"%{$search}%")-&gt;get();
+
+// returns array of Ticket arrays (not models here)
+$tickets = $accounts-&gt;fetch('tickets')-&gt;collapse();
+</code></pre>
+
+<p>As you can see it's possible but a bit cumbersome. Of course you can always prepare a helper method for this, but still you get arrays instead of models etc</p>
+
+<p>So in fact <strong>I suggest using the 2nd solution</strong>, but here I'll give you something to make it nice and easy:</p>
+
+<pre><code>// Ticket model
+public function scopeHasCategoryNameLike($query, $search)
+{
+  $query-&gt;whereHas('categories', function($q) use ($search) {
+    $q-&gt;where('name', 'like', "%{$search}%");
+  });
+}
+</code></pre>
+
+<p>Then it's as simple as this:</p>
+
+<pre><code>$tickets = Ticket::hasCategoryNameLike($search)-&gt;paginate(10);
+</code></pre>

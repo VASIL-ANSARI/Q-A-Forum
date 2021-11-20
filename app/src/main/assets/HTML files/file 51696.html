@@ -1,0 +1,44 @@
+<p>The problem seems to be that you're grouping by year/month and trying to sum values outside that year/month range.  Without sample data, I can't be certain, but it sounds like you want a rolling 12 month sum.  Something like below should get you where you want to go.</p>
+
+<pre><code>;with monthlySubtotal as
+    (
+        select 
+                dateadd(m, 1-datepart(day, p.dt), p.dt) as PeriodMonth
+                ,P.Plant
+                ,Sum(Case When Left(Upper(Material),2) = 'ZZ' then 1 else 0 end) as Stock
+                ,Sum(Case When Left(Upper(Material),2) &lt;&gt; 'ZZ' then 1 else 0 end) as Special
+                ,Count(*) as MonthTotal
+        from 
+                iesaonline.dbo.DS_POs  as P where  
+                                    Plant IN(
+                        Select Client From METRICS.DBO.CO_001_Plants_090_Final
+                                      where CustGrp = 'Hovis'
+                                            )
+        Group by 
+                P.Plant
+                ,dateadd(m, 1-datepart(day, p.dt), p.dt)
+    )
+SELECT 
+    convert(varchar(6),m1.PeriodMonth,112) Period
+    , m1.Plant
+    , m1.Stock
+    , m1.Special
+    , m1.MonthTotal
+    , SUM(m2.monthtotal) 12mototal
+FROM monthlySubtotal m1
+JOIN monthlySubtotal m2
+    ON m2.plant = m1.plant 
+    AND m2.periodmonth BETWEEN dateadd(m, -11, m1.periodmonth)
+        AND m1.periodmonth
+--You may want to filter this
+--WHERE m1.periodmonth &gt;= startdate
+GROUP BY 
+    convert(varchar(6),m1.PeriodMonth,112) 
+    , m1.Plant
+    , m1.Stock
+    , m1.Special
+    , m1.MonthTotal
+ORDER BY 
+    Period
+    , Plant
+</code></pre>

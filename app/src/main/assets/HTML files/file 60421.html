@@ -1,0 +1,40 @@
+<pre><code>from PIL import Image
+import StringIO
+import os
+from django.core.files.uploadedfile import InMemoryUploadedFile
+
+
+class Product(models.Model):
+    pass  # your model description
+
+    def save(self, *args, **kwargs):
+        """Override model save."""
+        if self.product_medium:
+            img = Image.open(self.image)
+            size = (500, 600) # new size
+            image = img.resize(size, Image.ANTIALIAS) #transformation
+            try:
+                path, full_name = os.path.split(self.product_medium.name)
+                name, ext = os.path.splitext(full_name)
+                ext = ext[1:]
+            except ValueError:
+                return super(Product, self).save(*args, **kwargs)
+            thumb_io = StringIO.StringIO()
+            if ext == 'jpg':
+                ext = 'jpeg'
+            image.save(thumb_io, ext)
+
+            # Add the in-memory file to special Django class.
+            resized_file = InMemoryUploadedFile(
+                thumb_io,
+                None,
+                name,
+                'image/jpeg',
+                thumb_io.len,
+                None)
+
+            # Saving image_thumb to particular field.
+            self.product_medium.save(name, resized_file, save=False)
+
+        super(Product, self).save(*args, **kwargs)
+</code></pre>

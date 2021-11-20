@@ -1,0 +1,15 @@
+<p>I'm not exactly sure what would happen if there were two consecutive RESTARTs, but barring such complications I think you might want something like this:</p>
+
+<pre><code>;WITH myTable AS(
+SELECT *,ROW_NUMBER() OVER (PARTITION BY ID ORDER BY [DATE]) AS rn
+FROM OriginalTable
+)
+SELECT this.ID, this.DATE, this.STATUS
+FROM myTable this
+LEFT OUTER JOIN myTable prev ON prev.ID = this.ID and prev.rn = this.rn-1
+LEFT OUTER JOIN myTable nxt ON nxt.ID = this.ID and nxt.rn = this.rn+1
+WHERE NOT ((this.STATUS= 'RESTART' AND prev.STATUS IS NOT NULL)
+           OR (COALESCE(nxt.STATUS,'') = 'RESTART'))
+</code></pre>
+
+<p>I was assuming that your DATE column is of type date or datetime, but if it's a string, you should convert it to a date in the ORDER BY portion of the ROW_NUMBER call.</p>

@@ -1,0 +1,31 @@
+<p>Change the line</p>
+
+<pre><code>if @transaction.status == "authorized" || "submitted_for_settlement"
+</code></pre>
+
+<p>to</p>
+
+<pre><code>@transaction.status == "authorized" || @transaction.status == "submitted_for_settlement"
+</code></pre>
+
+<p>Because <code>==</code> has higher priority than <code>||</code>, <code>@transaction.status == "authorized" || "submitted_for_settlement"</code> is equivalent to <code>(@transaction.status == "authorized") || "submitted_for_settlement"</code>. So if the status is "authorized", this expression returns <code>true</code>, otherwise it returns the string <code>"submitted_for_settlement"</code>, which is also considered truthy in Ruby.</p>
+
+<p>I'd suggest to define some methods to the <code>Braintree::Transaction</code>:</p>
+
+<pre><code>class Braintree::Transaction
+  %w(authorized submitted_for_settlement settled).each do |status|
+    define_method("#{status}?") do
+      self.status == status
+    end
+  end
+end
+</code></pre>
+
+<p>Then in your controller</p>
+
+<pre><code>if @transaction.authorized? || @transaction.submitted_for_settlement?
+  # ...
+elsif @transaction.settled?
+  # ...
+end
+</code></pre>

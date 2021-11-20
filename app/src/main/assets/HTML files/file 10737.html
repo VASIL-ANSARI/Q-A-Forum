@@ -1,0 +1,38 @@
+<p>Most VCL classes <em>do not</em> implement the <code>Assign()</code> or <code>AssignTo()</code> methods at all. Typically, only non-visual utility classes do (<code>TStringList</code>, <code>TFont</code>, <code>TGraphic</code> descendants, etc).  The only way to deep-copy a component, especially a visual one, is to use its RTTI to loop through its properties copying their values from one component instance to another component instace one at a time, recursively if child controls are present.  To help you with that, use the <code>TStream::WriteComponent()</code> and <code>TStream::ReadComponent()</code> methods to save a component and its children to, and read back from, a temporary in-memory DFM.  That way, the RTL handles the RTTI access for you. For example:</p>
+
+<pre><code>CConfigComponentPanel::CConfigComponentPanel( const CConfigComponentPanel&amp; rkConfigComponentPanel )
+    : CConfigComponent( rkConfigComponentPanel ), m_pkPanel( new TPanel(this) ) 
+{ 
+    TMemoryStream *Strm = new TMemoryStream;
+    try
+    {
+        Strm-&gt;WriteComponent( rkConfigComponentPanel.m_pkPanel );
+        Strm-&gt;Position = 0;
+        Strm-&gt;ReadComponent( m_pkPanel );
+    }
+    __finally
+    {
+        delete Strm;
+    }
+} 
+</code></pre>
+
+<p>Or:</p>
+
+<pre><code>CConfigComponentPanel::CConfigComponentPanel( const CConfigComponentPanel&amp; rkConfigComponentPanel )
+    : CConfigComponent( rkConfigComponentPanel ), m_pkPanel( NULL ) 
+{ 
+    TMemoryStream *Strm = new TMemoryStream;
+    try
+    {
+        Strm-&gt;WriteComponent( rkConfigComponentPanel.m_pkPanel );
+        Strm-&gt;Position = 0;
+        m_pkPanel = (TPanel*) Strm-&gt;ReadComponent( NULL );
+        InsertComponent( m_pkPanel );
+    }
+    __finally
+    {
+        delete Strm;
+    }
+}
+</code></pre>

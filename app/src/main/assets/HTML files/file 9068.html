@@ -1,0 +1,63 @@
+<p>Well, as far as I know there's a little hack you can make. 
+You go to the input class (system/core/input.php) and change the default value of the $xss_clean parameter. 
+Natively it is set to FALSE, so that you can choose to change it by passing TRUE to $this->input->post() or get(). </p>
+
+<p>Example with post() (at line 128 of input.php), but you need to apply to the get also.</p>
+
+<pre><code>/**
+    * Fetch an item from the POST array
+    *
+    * @access   public
+    * @param    string
+    * @param    bool
+    * @return   string
+    */
+    function post($index = NULL, $xss_clean = TRUE)   // &lt;-- Here I changed the default from FALSE to TRUE)
+    {
+        // Check if a field has been provided
+        if ($index === NULL AND ! empty($_POST))
+        {
+            $post = array();
+
+            // Loop through the full _POST array and return it
+            foreach (array_keys($_POST) as $key)
+            {
+                $post[$key] = $this-&gt;_fetch_from_array($_POST, $key, $xss_clean);
+            }
+            return $post;
+        }
+
+        return $this-&gt;_fetch_from_array($_POST, $index, $xss_clean);
+    }
+</code></pre>
+
+<p>Now, you turn OFF the global filtering (set it to FALSE). Now, your input will be automaticlaly filtered, unless you specify FALSE as the second parameter of the call, like <code>$this-&gt;input-&gt;post('title',FALSE).</code></p>
+
+<p>You might alternatively (instead of hacking the core) want to <strong>extend</strong> the native input library so that you pass a TRUE instead of FALSE, something along the line of this:</p>
+
+<pre><code>class MY_Input extends CI_Input {
+
+    function __construct()
+    {
+       parent::__construct();
+    }
+
+    //........
+
+    function get($index = NULL, $xss_clean = TRUE)
+    {
+        return parent::get($index, $xss_clean);
+    }
+
+    //...........
+
+    function post($index = NULL , $xss_clean = TRUE)
+    {
+        return parent::post($index, $xss_clean);
+    }
+
+}
+</code></pre>
+
+<p>It should be working in the same way, and you won't need to hack the core file everytime you change it. <br />
+Read the <a href="http://codeigniter.com/user_guide/general/core_classes.html" rel="nofollow">extending the core</a> page on the manual for better infos.</p>

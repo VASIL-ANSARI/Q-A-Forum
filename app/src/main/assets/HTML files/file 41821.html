@@ -1,0 +1,73 @@
+<p>Your class Rows doesn't represent a tree structure, and therefore you don't get a tree. The following couple of classes will marshal closer to what you need, but it's not complete.</p>
+
+<pre><code>@XmlRootElement
+public class Tree {
+    @XmlElement( name = "Row" )
+    private List&lt;Node&gt; node;
+    public Tree(){}
+    public List&lt;Node&gt; getNode(){ 
+        if( node == null ) node = new ArrayList&lt;&gt;();
+        return node; 
+    }
+}
+
+public class Node {
+    private int id;
+    @XmlElement(name="Row")
+    private List&lt;Node&gt; node;
+    public Node( int id ){
+        this.id = id;
+    }
+    @XmlAttribute
+    public int getId(){ return id; }
+    public void setId( int value ){ id = value; }
+    public List&lt;Node&gt; getNode(){ 
+    if( node == null ) node = new ArrayList&lt;&gt;();
+        return node; 
+    }
+}
+</code></pre>
+
+<p>To marshal:</p>
+
+<pre><code>    Tree tree = new Tree();
+    Node n1 = new Node(1);
+    tree.getNode().add( n1 );
+    Node n2 = new Node(2);
+    n1.getNode().add( n2 );
+    Node n3 = new Node(3);
+    n2.getNode().add( n3 );
+    Node n4 = new Node(4);
+    tree.getNode().add( n4 );
+    JAXBContext jc = JAXBContext.newInstance( Tree.class );
+    Marshaller m = jc.createMarshaller();
+    m.marshal( tree, ... );
+</code></pre>
+
+<p>It is, of course, up to you to interpret the id and parent data in your row elements so that the tree is arranged correctly - neither JAXB not I will do this for you ;-)</p>
+
+<p>This is what I get:</p>
+
+<pre><code>&lt;tree&gt;
+    &lt;Row id="1"&gt;
+        &lt;Row id="2"&gt;
+            &lt;Row id="3"/&gt;
+        &lt;/Row&gt;
+    &lt;/Row&gt;
+    &lt;Row id="4"/&gt;
+&lt;/tree&gt;
+</code></pre>
+
+<p><strong>Later</strong></p>
+
+<p>To get the correct linkage according to parentId, you can store all Node objects in an array according to their id-1; let's call this array nodesById. Then:</p>
+
+<pre><code>for( Node node: nodesById ){
+    int pid = node.getParentId();
+    if (pid == 0){
+       tree.getNode().add( node );
+    } else {
+       nodesById[pid-1].getNode().add( node );
+    }
+}
+</code></pre>

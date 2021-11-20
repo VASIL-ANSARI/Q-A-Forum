@@ -1,0 +1,11 @@
+<p>They will both get the job done.  There's just more than one way to skin a pinvoke cat.  Specifically for this example:</p>
+
+<ul>
+<li><p><code>ExactSpelling=true</code> is an optimization, it avoids having the pinvoke marshaller looking for the <code>GetWindowRectA</code> and <code>GetWindowRectW</code> versions.  They don't exist for this particular API function since it doesn't take a string argument.  Seeing an actual difference in run time would be a miracle.</p></li>
+<li><p><code>CharSet=CharSet.Auto</code> is always a good idea since the default (Ansi) is so inefficient.  It just so happens to not make any difference here since the function doesn't take any string arguments.</p></li>
+<li><p><code>[In, Out]</code>  is unnecessary because that's the default for a blittable type.  An expensive word that means that the pinvoke marshaller can directly pass a pointer to the managed memory, no conversion is required.  As efficient as possible.  Same idea as <code>CharSet</code> though, being explicit about it helps to create self-documenting code and to remember to deal with the unusual case.  Being able to only use <code>[In]</code> or <code>[Out]</code> can be a significant optimization, just not here since it is already optimized.  Fwiw, [Out] would have been the correct choice.</p></li>
+<li><p><code>out</code> vs <code>ref</code>, same idea as above.  Using <code>out</code> is more correct since the API doesn't actually use any passed-in values inside the <code>RECT</code>.  It doesn't however make any difference at runtime since the JIT compiler always initializes a struct anyway.</p></li>
+<li><p><code>[return: MarshalAs(UnmanagedType.Bool)]</code> is unnecessary, it is the default marshaling for a Windows <code>BOOL</code>.  Not sure why pinvoke.net always includes it.</p></li>
+</ul>
+
+<p>So in a nutshell, neither is perfect but they both will work.  Such are the hazards of pinvoke.</p>

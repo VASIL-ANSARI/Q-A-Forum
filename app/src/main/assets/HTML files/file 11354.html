@@ -1,0 +1,72 @@
+<p>I know I wrote alot, but I tried to explain the concepts of storage and linkage along side of my explanations of your text.  Hope this helps!</p>
+
+<blockquote>
+  <p>"The general rule in C99 is that if all top-level declarations of a
+  function in a particular file include inline but not extern, then the
+  definition of the function in that file is inline."</p>
+  
+  <p>What is a: "top-level declaration of a function"??</p>
+</blockquote>
+
+<p>The <strong>declaration</strong> of a function is used in similar form to the declaration of a variable.  It's a single statement that declares the name, return type, and parameter types of a function.  A function <strong>definition</strong> is the actual code of the function.</p>
+
+<p>Example declaration:</p>
+
+<pre><code>int foo( int bar );
+</code></pre>
+
+<p>Example definition:</p>
+
+<pre><code>int foo( int bar ){
+    return -bar;
+}
+</code></pre>
+
+<p>A <strong>top-level</strong> function declaration is simply a declaration that's at the <strong>file</strong> scope (i.e., outside of any block).  This is typically where all function declarations are, though it is possible to declare and define functions inside of other functions.</p>
+
+<blockquote>
+  <p>"If the function is used anywhere in the program (including the file
+  that containts its inline declaration), then an external declaration
+  of the function will need to be provided by some other file. When the
+  function is called, the compiler may choose to perform an ordinary
+  call (using the function's external definition) or perform inline
+  expansion (using the function's inline definition). There's no way to
+  tell which choice the compiler will make, so it's crucial that the two
+  definitions be consistent."</p>
+  
+  <p>Huh??? What is he saying here??</p>
+</blockquote>
+
+<p>First of all, what is linkage? The linkage of a variable or function defines how the compiler will treat multiple instances of that object.  Identifiers that have no linkage are always 'individuals'.  That is, multiple declarations of the identifier within the program are always treated as separate/distinct entities.  Function parameters and local variables have no linkage.  All references to an identifier with <strong>external linkage</strong> refer to the same entity.  This is the C keyword 'extern'.  By default, global identifiers have external linkage.  This means that, for example, if you have the global variable "int x;" in two source files of the program, they will be linked together and treated as the same variable.  Internal linkage means that all declarations of the identifier within one source file refer to a single entity, but declarations of the same identifer in other source files refer to different entities.  This is the C way of making things "private" to a file.  This is the C keyword 'static', in the file scope.</p>
+
+<p>Now, back to the paragraph. A function cannot be defined more than once.  So source files that want to use functions from other source files need to include an external declaration (which is the information needed to make the function call).  What this paragraph is explaining is about what happens when a file has an external declaration to an inline function.  The compiler has to choose whether or not it should fetch the inline definition and insert it where the function is being called, or if it should preserve the external linkage, making the execution jump to the code text like normal; and there is no way to predict what choice the compiler will make.</p>
+
+<blockquote>
+  <p>"Variables with static storage duration are a particular problem for
+  inline functions with external linkage"</p>
+  
+  <p>But i thought you couldn't call a function with external linkage! The
+  compiler would give an error: pg 473 "so attempting to call average
+  from another file will be considered an error"</p>
+</blockquote>
+
+<p>If you couldn't call a function that's defined in a different source file (i.e., an externally linked function), C would be a very weak and boring language indeed!</p>
+
+<blockquote>
+  <p>"Consequently, C99 imposes the following restrictions on an inline
+  function with external linkage (but not on one with internal linkage):
+  The function may not define a modifiable static variable. The function
+  may not contain references to variables with internal linkage."</p>
+  
+  <p>Why?? If a function is inline and extern, then even if it does declare
+  a static int i; since the function can't be linked to you can't call
+  it, but won't a static variable be created outside the inline
+  functions stack-frame - so you should be able to link to it? Do inline
+  functions have a stack frame? What's going on here??</p>
+</blockquote>
+
+<p>A <strong>statically stored</strong> variable is one that is not part of the execution stack.  Its space is allocated once, before the program begins to run, and exists throughout the entire execution.  They retain whatever their initial value was until a different value is assigned.  Global variables (file scope) are statically stored by default.  This is in contrast to <strong>automatically stored</strong> variables, which are allocated on the stack just before program execution enters the block in which they are declared, and which are discarded when execution leaves that block.  Local variables (block scope) are automatic by default.</p>
+
+<p>Going back to the question: what's the problem with a statically stored variable inside of an inline function?  A statically stored variable within a function lives under the assumption that there is only one definition of that function, and therefore only one definition of that static variable.  But inlining, by definition, is a repetition of the function definition so that you don't need to jump around the code-text during a function call.  If a static variable existed in the function, then you would have to jump to its storage location, defeating the purpose of inlining, which is to have a copy of everything "right there".  The solution: require that the variable not be modifiable, so that the compiler can inline the permanent value.</p>
+
+<p>On your last question: inline function's do have a stack frame: it's the same stack frame of the calling function, because the inline function's code-text is being copied in order to avoid the standard instruction overhead of normal external function jumping.</p>

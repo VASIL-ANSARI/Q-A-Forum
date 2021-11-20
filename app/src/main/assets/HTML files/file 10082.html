@@ -1,0 +1,23 @@
+<p>So after a lot of searching and thinking about the problem, I redesigned the stored procedures that did the shredding. Instead of shredding a variable being passed into the stored procedure, I just shredded from the XML column itself. This allowed me to shred many XML values at once instead of looping and passing them to a stored procedure one at a time. This gave me the performance boost I was looking for. So instead of something like this...</p>
+
+<pre><code>SET @xmlData = CAST(@xmlMessageData AS XML)
+
+SELECT
+   , row.value('xmlNode1[1]', 'BIT' )                   AS Column1  
+   , row.value('xmlNode2[1]', 'NVARCHAR(255)')          AS Column2
+   , row.value('xmlNode3[1]', 'BIT' )                   AS Column3
+   , row.value('xmlNode4[1]/Name[1]', 'NVARCHAR(255)' ) AS Column4
+FROM @xmlData.nodes('xmlRootNode') AS T1(row)
+</code></pre>
+
+<p>I now do this...</p>
+
+<pre><code>SELECT
+   , row.value('xmlNode1[1]', 'BIT' )                   AS Column1  
+   , row.value('xmlNode2[1]', 'NVARCHAR(255)')          AS Column2
+   , row.value('xmlNode3[1]', 'BIT' )                   AS Column3
+   , row.value('xmlNode4[1]/Name[1]', 'NVARCHAR(255)' ) AS Column4
+FROM [ESBMessagesData] D
+CROSS APPLY
+    [DataItem].nodes('xmlRootNode') AS T1(row)
+</code></pre>

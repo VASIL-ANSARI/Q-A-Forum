@@ -1,0 +1,39 @@
+<pre><code>If Me.RichTextBox1.InvokeRequired Then
+    Me.Invoke(x, New Object() {(text)})
+Else
+    Me.RichTextBox1.Text &amp;= [text]
+End If
+</code></pre>
+
+<p>Your code is doing this:</p>
+
+<p><img src="http://i.stack.imgur.com/v2qyc.png" alt="enter image description here"></p>
+
+<p>This is a <em>firehose</em> problem.  The issue started with the SerialPort.ReadExisting() call.  That normally returns one or two characters, serial ports are pretty slow.  At a common Baudrate setting of 9600 baud, you get 1000 characters per second so you effectively add new text to the RichTextBox about 500 times per second, give or take.</p>
+
+<p>This forces the RichTextBox to re-allocate its internal buffer that stores the text and make room for the extra added characters, then copy all of the existing text from the old buffer into the new buffer and append the new text.  Then update the screen.</p>
+
+<p>This goes pretty smoothly when you first start your program, the RichTextBox doesn't contain much text yet.  But gets progressively more expensive, more and more characters have to be copied.  </p>
+
+<p>Until you reach a critical point where the copying starts to take too much time, more time than the rate at which you call Me.Invoke().  The UI thread now starts to fall behind, never being able to keep up.  Like trying to drink from a fire-hose.  As soon as it is done copying the internal buffer, yet another invoke request needs to be dispatched, forcing the buffer to be reallocated again.</p>
+
+<p>The UI thread now stops taking care of its normal lower-priority duties.  Which includes updating the screen and handling input events.  You notice this from your program acting frozen, as though it has deadlocked.  Windows replaces your main window with the ghost window that says "Not responding" and banging on the mouse or keyboard has no effect.  All you can do is terminate the program with the debugger or Task Manager and restart it.  Which works fine, the RichTextBox again has an empty buffer and copying is cheap again.</p>
+
+<p>Do note how this is a general problem when handling strings.  The .NET Framework has the <em>StringBuilder</em> class to solve it.  That however isn't available for RichTextBox, you need to find a different solution.</p>
+
+<blockquote>
+  <p>so you effectively add new text to the RichTextBox about 500 times per second</p>
+</blockquote>
+
+<p>You need to tackle <em>that</em> problem.  It is pointless to add text to the RTB at that rate, no human can ever observe such a high rate.  Adding text 20 times per second is already plenty fast enough, it starts to look like a blur when you do it faster than that.  Or in other words, right now you doing it 25x faster than necessary.  Giving both the RTB and the UI thread a hard time keeping up with that rate.</p>
+
+<p>Also note that this explain your parsing problem.  You are parsing an <em>incomplete</em> line of text.  So a first-order fix for this is to only invoke when you get a complete line of text from the serial port.  That's very easy to come by:</p>
+
+<pre><code>Private Sub SerialPort1_DataReceived(ByVal sender As Object, ByVal e As System.IO.Ports.SerialDataReceivedEventArgs) Handles sPort.DataReceived
+    ReceivedText(sPort.ReadLine)
+End Sub
+</code></pre>
+
+<p>In other words, you ask the serial port to return an entire line of text instead of just one or two characters.  This automatically greatly lowers the invoke rate and solves your parsing problem.</p>
+
+<p>Two more thing you have to do.  Your program will still hang when it runs long enough.  You really do have to limit the amount of text in the RTB.  Just throw half of it away when it stores more than, say, 65000 characters.  And you have to remove the calls to the Close() method, that's going to cause real deadlock because the port can't be closed if the DataReceived call is still stuck in the ReadLine() call.  Do use BeginInvoke() instead of Invoke(), less danger of deadlock that way.</p>

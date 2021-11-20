@@ -1,0 +1,48 @@
+<p>Could you define the need for using the same <code>SqlDataSource</code>? If they are two different pages and it sounds like two different uses why not use two different <code>SqlDataSource</code>? The pages are separate anyhow, your not going to be able to share an object on one with the other.</p>
+
+<p>I would suggest you look at adding a data layer to your application for database interaction and binding your data to the datagrid at request time. That way you build your database interaction once and reuse that over different pages.</p>
+
+<p>The other option is you simply use two <code>SqlDataSource</code>s and copy/paste them to both the pages. If your trying to make a selection or some sort of criteria apply to your second page then consider using query strings and <code>QueryStringParameter</code>s in your <code>SqlDataSource</code>.</p>
+
+<p>Hope this helps.</p>
+
+<p>Edit: Pop this in App_Code somewhere, pass in your specific usage requirements.</p>
+
+<pre><code>Public Shared Function GetData(connString As String, command As String, Optional params As SqlParameter() = Nothing) As DataTable
+    Dim conn As New SqlConnection(connString)
+    Dim da As New SqlDataAdapter(command, conn)
+    Dim dt As New DataTable
+    da.SelectCommand.CommandType = CommandType.StoredProcedure
+    da.SelectCommand.CommandTimeout = 6000 '6 seconds.
+    If Not IsNothing(params) Then
+        For Each p As SqlParameter In params
+            da.SelectCommand.Parameters.Add(p)
+        Next
+    End If
+    Try
+        conn.Open()
+        da.Fill(dt)
+        Return dt
+    Catch ex As Exception
+        Throw ex
+    Finally
+        conn.Close()
+    End Try
+End Function
+</code></pre>
+
+<p>Then bind the datatable to your gridview, not sure how your outputing to file.</p>
+
+<pre><code>Private Sub BindData(gridview As GridView, data As DataTable)
+    gridview.DataSource = data
+End Sub
+</code></pre>
+
+<p>You can now re-use the database interaction from the code behind:</p>
+
+<pre><code>Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
+   BindData(MyGridView,GetData(ConnectionStrings(connName).ConnectionString, _
+                 "dbo.SomeSprocOrOther", _
+                 New SqlParameter(){New SqlParameter("paramName","paramValue")})
+End Sub
+</code></pre>

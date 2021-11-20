@@ -1,0 +1,254 @@
+<p>First off up-vote for trying to do this with <em>real</em> JavaScript!</p>
+
+<p>Secondly you probably are unaware but you're treating code as text, not as code. Don't use <code>innerHTML</code> and don't use <code>responseText</code>. You need to use a proper DOM method such as <code>appendChild</code> and <code>insertBefore</code> though with AJAX you need to specifically use <code>importNode</code> and <code>responseXML</code>. The XML you load from the server <em>must</em> be served as <code>application/xml</code>, the mime <code>text/xml</code> is invalid.</p>
+
+<p>The code on my site works with older browsers (e.g. IE5/6 if you're that insane at this point). I've been meaning to clean this up. Also it's reusable so you won't need to keep creating new AJAX functions except <code>ajax_post()</code> which if you visit my site and look at the <code>index.js</code> file you're welcome to mess with that.</p>
+
+<p><strong>Super-Bonus:</strong> The <code>ajax_sequel()</code> function can be used to execute whatever you want <em>after</em> the AJAX request has completed in full. I've left the <code>alert</code>s in place for you to mess with the code.</p>
+
+<p>Example execution...</p>
+
+<pre><code>ajax_load_page('?ajax=1&amp;url=mail/sent/','inside','sidebar','sequel-string',id_focus);
+</code></pre>
+
+<p>The first parameter is the AJAX URL, keep in mind you <em>must</em> have a single element that contains <em>everything</em> for the request and no whitespace before or after it. It must <em>also</em> have an XML namespace...</p>
+
+<pre><code>&lt;div xmlns="http://www.w3.org/1999/xhtml"&gt;AJAX stuffs&lt;/div&gt;
+</code></pre>
+
+<p>The second parameter accepts the strings <code>after</code>, <code>before</code>, <code>inside</code>, <code>replace</code> relative to the id of the third parameter.</p>
+
+<p>The fourth parameter I use for the <code>ajax_sequel()</code> function I already mentioned.</p>
+
+<p>The last (fifth) parameter is the ID I want the browser to give focus to (if any).</p>
+
+<p>Strict code is difficult but when you do it the right way things just work so much easier.</p>
+
+<p>Any functions missing can be found in the <code>index.js</code> file of my site, linked from my profile. Here is the main part of what you're looking for...</p>
+
+<pre><code>function ajax_id_duplication_prevention(xml)
+{//alert(typeof xml+'\n\n'+xml.childNodes[0].childNodes.length);
+ var re = true;
+
+ if (option.id_fade &amp;&amp; option.id_fade!='' &amp;&amp; document.getElementById(option.id_fade))
+ {
+  element_del(option.id_fade);
+  option.id_fade = '';
+ }
+
+ if (typeof document.createTreeWalker=='function')
+ {
+  var idz = [];
+  try
+  {
+   var walker = document.createTreeWalker(xml,NodeFilter.SHOW_ELEMENT,null,false);
+
+   while (walker.nextNode())
+   {
+    if (walker.currentNode.id==undefined &amp;&amp; walker.currentNode.nodeName=='parsererror') {alert('Error: a parser error was detected.\n\nThis may or may not afflict the content being loaded.\n\nIf the content does not load correctly reload the entire page.');}
+    else if (walker.currentNode.id==undefined) {alert('walker.currentNode.nodeName = '+walker.currentNode.nodeName+'\n\n'+document.serializeToString(xml));}
+    else if (walker.currentNode.id!='')
+    {
+     var n = document.getElementById(walker.currentNode.id);
+     if (n)
+     {
+      var l = document.getElementById('liquid');
+      for (var i=0; i&lt;l.childNodes.length; i++)
+      {
+       var c = l.childNodes[i];
+
+       if (n.compareDocumentPosition(c)==10)
+       {
+        element_del(c);
+        //Do AJAX report to DB table: id error log
+        break;
+       }
+      }
+
+      //alert('Error: can not import XML.\n\nAn element with the id \''+walker.currentNode.id+'\' already exists in the target application.');
+      //re = false;
+      break;
+     }
+     else if (in_array(walker.currentNode.id,idz))
+     {
+      alert('Error: can not import XML, the id \''+walker.currentNode.id+'\' was detected twice in the layer being imported.\n\nDuplicated ID\'s break expected functionality and are illegal.\n\nWhile the XML content was not imported it is still possible that the related request was successful.');
+      re = false;
+      break;
+     }
+     else {idz.push(walker.currentNode.id);}
+    }
+   }
+  }
+  catch (err) {}//IE9
+ }
+
+ return re;
+}
+
+
+function ajax_load_page(url,id_container_pos,id_container,sequel,id_focus)
+{//alert(url+'\n'+id_container_pos+'\n'+id_container+'\n'+sequel+'\n'+id_focus);
+ if (document.getElementById(id_container) || id_container)
+ {
+  if (window.XMLHttpRequest) {var xmlhttp = new XMLHttpRequest();}
+  else if (window.ActiveXObject) {try {xmlhttp = new ActiveXObject('Msxml2.XMLHTTP');} catch (e) {try {xmlhttp = new ActiveXObject('Microsoft.XMLHTTP');} catch (e) {}}}
+  else {alert('Error: Your browser does not seem to support AJAX.');}
+
+  xmlhttp.open('GET',url,true);
+  xmlhttp.send(null);
+
+  xmlhttp.onreadystatechange=function()
+  {
+   if (xmlhttp.readyState=='4')
+   {
+    if (xmlhttp.status=='200' || xmlhttp.status=='401' || xmlhttp.status=='403' || xmlhttp.status=='404' || xmlhttp.status=='501') {ajax_load_page_import(url,xmlhttp,id_container_pos,id_container,sequel,id_focus);}
+    else if (xmlhttp.status=='404') {alert('HTTP 404: The content was not found.');}
+    else if (xmlhttp.status=='429') {alert('HTTP 429: You are requesting pages too quickly.');}
+    else if (xmlhttp.status=='500')
+    {
+     if (xmlhttp.getResponseHeader('AJAX-HTTP')==null) {alert('HTTP 500: The server encountered an error.');}
+     else
+     {
+      var http = xmlhttp.getResponseHeader('AJAX-HTTP');
+
+      if (http==429) {alert('HTTP 429: You are requesting pages too quickly.');}
+      else {alert('HTTP '+http);}
+     }
+    }
+    else if (xmlhttp.status=='204' || xmlhttp.status=='0' || xmlhttp.status=='1223' || xmlhttp.status==undefined) {if (id_container=='chat_messages') {ajax_sequel(sequel,id_container);}}
+    else if (xmlhttp.status!='204' &amp;&amp; xmlhttp.status!='0' &amp;&amp; xmlhttp.status!='1223') {alert('HTTP '+xmlhttp.status+'\n\nIf you keep encountering this error please contact the webmaster.');}//Opera 204='0' &amp; IE 204='1223'
+   }
+  }
+ }
+ else {alert('Error: '+id_container+' id does not exist!');}
+}
+
+
+function ajax_load_page_import(url,xmlhttp,id_container_pos,id_container,sequel,id_focus)
+{//alert('url = '+url+'\n\nxmlhttp = '+xmlhttp+'\n'+id_container_pos+'\n'+id_container+'\n'+sequel+'\n'+id_focus);
+ if (!document.getElementById('Body') &amp;&amp; xmlhttp.responseXML) {var xmlDoc=xmlhttp.responseXML;}
+ else {var xmlDoc=xmlhttp.responseText;}
+
+ if (!document.ELEMENT_NODE)
+ {
+  document.ELEMENT_NODE = 1;
+  document.ATTRIBUTE_NODE = 2;
+  document.TEXT_NODE = 3;
+  document.CDATA_SECTION_NODE = 4;
+  document.ENTITY_REFERENCE_NODE = 5;
+  document.ENTITY_NODE = 6;
+  document.PROCESSING_INSTRUCTION_NODE = 7;
+  document.COMMENT_NODE = 8;
+  document.DOCUMENT_NODE = 9;
+  document.DOCUMENT_TYPE_NODE = 10;
+  document.DOCUMENT_FRAGMENT_NODE = 11;
+  document.NOTATION_NODE = 12;
+ }
+
+ document._importNode = function(node,allChildren)
+ {
+  switch (node.nodeType)
+  {
+   case document.ELEMENT_NODE:
+   var newNode = document.createElement(node.nodeName);
+   if (node.attributes &amp;&amp; node.attributes.length &gt; 0) {for (var i = 0, il = node.attributes.length; i &lt; il;) {newNode.setAttribute(node.attributes[i].nodeName, node.getAttribute(node.attributes[i++].nodeName));}}
+   if (allChildren &amp;&amp; node.childNodes &amp;&amp; node.childNodes.length &gt; 0) {for (var i = 0, il = node.childNodes.length; i &lt; il;) {newNode.appendChild(document._importNode(node.childNodes[i++], allChildren));}}
+   return newNode;
+   break;
+
+   case document.TEXT_NODE:
+   case document.CDATA_SECTION_NODE:
+   case document.COMMENT_NODE:
+   return document.createTextNode(node.nodeValue);
+   break;
+  }
+  return true;
+ }
+
+ if (xmlhttp.responseXML)
+ {
+  if (ajax_id_duplication_prevention(xmlhttp.responseXML))
+  {
+   if (xmlhttp.responseXML.childNodes.length==0) {alert('Error: no elements were found in the AJAX request!\n\n'+url);}
+   else if (xmlhttp.responseXML.childNodes.length&gt;1) {alert('Error: parse error, AJAX requests can only have a single parent-most element.\n\n'+url+'\n\n'+xmlhttp.responseText);}
+   else
+   {
+    if (document.getElementById(id_container)) {var id_container_obj = document.getElementById(id_container);}
+    else {var id_container_obj = id_container;}
+
+    var id_ajax = xmlhttp.responseXML.childNodes[0].getAttribute('id');
+
+    if (id_container=='prompts_ajax') {ajax_layer_init('prompts_ajax',id_ajax);}
+
+    if (document.importNode &amp;&amp; xmlhttp.responseXML &amp;&amp; document.getElementById('body').style.khtmlMarginBottomCollapse==undefined &amp;&amp; browser!='MSIE')
+    {
+     if (id_container_pos=='after') {id_container_obj.insertBefore(xmlDoc.getElementsByTagName('div')[0],id_container_obj.nextSibling);}
+     else if (id_container_pos=='before')
+     {
+      id_container_obj.parentNode.insertBefore(document.importNode(xmlDoc.getElementsByTagName('div')[0],true),id_container_obj);
+     }
+     else if (id_container_pos=='inside') {id_container_obj.appendChild(document.importNode(xmlDoc.getElementsByTagName('div')[0],true));}
+     else if (id_container_pos=='replace') {var r = id_container_obj.parentNode; r.removeChild(r.getElementsByTagName('div')[0]); r.appendChild(document.importNode(xmlDoc.getElementsByTagName('div')[0],true));}
+     else {alert('Error: unknown position to import data to: '+id_container_pos);}
+    }
+    else if (!document.getElementById('Body') &amp;&amp; xmlhttp.responseXML)//IE8+
+    {
+     if (typeof xmlDoc.getElementsByTagName('div')[0]=='object')
+     {
+      if (id_container_pos=='after') {id_container_obj.parentNode.appendChild(document._importNode(xmlDoc.getElementsByTagName('div')[0],true));}
+      else if (id_container_pos=='before') {id_container_obj.parentNode.insertBefore(document._importNode(xmlDoc.getElementsByTagName('div')[0],true),id_container_obj);}
+      else if (id_container_pos=='inside') {id_container_obj.appendChild(document._importNode(xmlDoc.getElementsByTagName('div')[0],true));}
+      else if (id_container_pos=='replace') {var r = id_container_obj.parentNode; r.removeChild(r.getElementsByTagName('div')[0]); r.appendChild(document._importNode(xmlDoc.getElementsByTagName('div')[0],true));}
+      else {alert('Error: unknown position to import data to: '+id_container_pos);}
+
+      //if (document.getElementById(id_focus)) {document.getElementById(id_focus).focus();}
+     }
+    }
+    else if (document.getElementById('Body') &amp;&amp; xmlhttp.responseXML)// IE 5.0~7
+    {
+     if (document.getElementById('body').currentStyle.scrollbarBaseColor)
+     {
+      //IE 5.5/6/7
+      var id_imported = xmlhttp.responseXML.childNodes[0].getAttribute('id');
+
+      if (!document.getElementById(id_imported))
+      {
+       if (id_container_pos=='after') {id_container_obj.parentNode.appendChild(document._importNode(xmlhttp.responseXML.childNodes[0],true));}
+       else if (id_container_pos=='before') {id_container_obj.parentNode.insertBefore(document._importNode(xmlhttp.responseXML.childNodes[0],true),id_container_obj);}
+       else if (id_container_pos=='inside') {id_container_obj.appendChild(document._importNode(xmlhttp.responseXML.childNodes[0],true));}
+       else if (id_container_pos=='replace') {var r = id_container_obj.parentNode.id; id_container_obj.parentNode.removeChild(id_container_obj.parentNode.getElementsByTagName('div')[0]); if (document.getElementById(r)) {document.getElementById(r).appendChild(document._importNode(xmlhttp.responseXML.childNodes[0],true));}}
+       else {alert('Error: unknown position to import data to: \''+id_container_pos+'\'');}
+      }
+     }
+     var id_ajax = xmlhttp.responseXML.childNodes[0].getAttribute('id');
+    }
+    else if (!id_container_obj) {alert('Error: can not add content to the DOM; the id \''+id_container+'\' does not exist or has not been imported to the DOM yet.');}
+    else {alert('Error: Ajax function did not trigger correctly, try checking content\'s mime?\n\n'+xmlhttp+'\n'+id_container_pos+'\n'+id_container+'\n'+sequel+'\n'+id_focus);}
+
+    ajax_sequel(sequel,id_container,id_ajax,id_focus);
+   }
+  }
+ }
+ else if (xmlhttp.getResponseHeader('Content-Type')=='text/html')
+ {
+  if (!option.th || option.th==2)
+  {
+   ajax_load_page(url,id_container_pos,id_container,sequel,id_focus);
+   option.th = 1;
+  }
+  else if (confirm('Error: unable to load AJAX content.\n\nType: '+xmlhttp.getResponseHeader('Content-Type')+'\n\nInitiating second attempt at request...\n\n'+xmlhttp.responseText))
+  {
+   ajax_load_page(url,id_container_pos,id_container,sequel,id_focus);
+  }
+ }
+ else
+ {
+  alert('Error: unable to load AJAX content.\n\nType: '+xmlhttp.getResponseHeader('Content-Type')+'\n\nresponseText = '+xmlhttp.responseText);
+ }
+}
+
+
+function ajax_sequel(sequel,id_container,id_ajax,id_focus)
+{alert('ajax_sequel()\n\nsequel = '+sequel+'\nid_container = '+id_container+'\nid_ajax = '+id_ajax);
+}
+</code></pre>

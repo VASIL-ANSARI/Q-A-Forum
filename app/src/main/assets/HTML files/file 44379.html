@@ -1,0 +1,46 @@
+<p>I have solved my issue with Documentation from RESTKit itself.
+Maybe it will help to someone else:</p>
+
+<pre><code>    NSData *data = UIImageJPEGRepresentation(imageData, 0.3);
+
+RKObjectMapping* objectMapping = [RKObjectMapping mappingForClass:[UpdateAvatar class]];
+[objectMapping addAttributeMappingsFromDictionary:@{
+                                                    @"message" : @"message"
+                                                    }];
+
+NSIndexSet *successStatusCodes = RKStatusCodeIndexSetForClass(RKStatusCodeClassSuccessful);
+
+RKResponseDescriptor *responseDescriptor = [RKResponseDescriptor responseDescriptorWithMapping:objectMapping
+                                                                                        method:RKRequestMethodPOST
+                                                                                   pathPattern:nil
+                                                                                       keyPath:nil
+                                                                                   statusCodes:successStatusCodes];
+
+RKObjectManager *objectManager = [RKObjectManager managerWithBaseURL:[DataManager defineBaseUrl]];
+[[objectManager HTTPClient] setDefaultHeader:@"device_uid" value:[self getDeviceUid]];
+[objectManager addResponseDescriptor:responseDescriptor];
+
+NSMutableURLRequest *request = [[RKObjectManager sharedManager] multipartFormRequestWithObject:nil method:RKRequestMethodPOST path:@"/api/upload-avatar" parameters:nil constructingBodyWithBlock:^(id&lt;AFMultipartFormData&gt; formData) {
+    [formData appendPartWithFileData:data
+                                name:@"avatar"
+                            fileName:@"image.jpeg"
+                            mimeType:@"image/jpeg"];
+}];
+
+RKObjectRequestOperation *operation = [objectManager objectRequestOperationWithRequest:request success:^(RKObjectRequestOperation *operation, RKMappingResult *mappingResult) {
+
+    for (UpdateAvatar *obj in mappingResult.array) {
+
+        [SVProgressHUD setBackgroundColor:[UIColor colorWithRed:0.31 green:0.31 blue:0.31 alpha:0.5]];
+        [SVProgressHUD setRingThickness:2];
+        [SVProgressHUD setForegroundColor:[UIColor whiteColor]];
+        [SVProgressHUD showSuccessWithStatus:[NSString stringWithFormat:@"Uploading avatar\n %@", obj.message]];
+    }
+
+
+} failure:^(RKObjectRequestOperation *operation, NSError *error) {
+    NSLog(@"Failure");
+}];
+
+[[RKObjectManager sharedManager] enqueueObjectRequestOperation:operation];
+</code></pre>

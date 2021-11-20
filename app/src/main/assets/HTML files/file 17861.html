@@ -1,0 +1,55 @@
+<p>Why a join table where you have a direct relationship? In the end, a program belongs to a subcategory, which in turn belongs to one category. So no join table needed.</p>
+
+<pre><code>class Program &lt; ActiveRecord::Base
+  belongs_to :subcategory   # references the "subcategory_id" in the table
+  # belongs_to :category, :through =&gt; :subcategory
+  delegate :category, :to =&gt; :subcategory
+end
+
+class Subcategory &lt; ActiveRecord::Base
+  has_many :programs
+  belongs_to :category    # references the "category_id" in the table
+end
+
+class Category &lt; ActiveRecord::Base
+  has_many :subcategories
+  has_many :programs, :through =&gt; :subcategories
+end
+</code></pre>
+
+<p>Another point of view is to make categories a tree, so you don't need an additional model for "level-2" categories, you can add as many levels you want. If you use a tree implementation like "closure_tree" you can also get all subcategories (at any level), all supercategories, etc</p>
+
+<p>In that case you skip the Subcategory model, as it is just a category with depth=2</p>
+
+<pre><code>class Program &lt; ActiveRecord::Base
+  belongs_to :category   # references the "category_id" in the table
+
+  scope :in_categories, lambda do |cats|
+    where(:category_id =&gt; cats)  # accepts one or an array of either integers or Categories
+  end
+end
+
+class Category &lt; ActiveRecord::Base
+  acts_as_tree
+  has_many :programs
+end
+</code></pre>
+
+<p>Just an example on how to use a tree to filter by category. Suppose you have a select box, and you select a category from it. You want to retrieve all the object which correspond to any subcategory thereof, not only the category.</p>
+
+<pre><code>class ProgramsController &lt; ApplicationController
+
+  def index
+
+    @programs = Program.scoped
+    if params[:category].present?
+      category = Category.find(params[:category])
+      @programs = @programs.in_categories(category.descendant_ids + [category.id])
+    end
+
+  end
+
+end
+</code></pre>
+
+<p>Tree-win!</p>

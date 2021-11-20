@@ -1,0 +1,52 @@
+<p>There are two problems with your code:</p>
+
+<h3>Creating the line item string</h3>
+
+<p>This raises a syntax error:</p>
+
+<pre><code>item["quantity"] 'x' item["item"]
+</code></pre>
+
+<p>Use string interpolation instead:</p>
+
+<pre><code>"#{item["quantity"]} x #{item["item"]}"
+</code></pre>
+
+<h3>Assigning the string to an attribute</h3>
+
+<p>Your code assigns the string to <code>@order.line_item</code>, i.e. to a <code>line_item</code> attribute. The <code>line_item</code> <em>variable</em> is never used:</p>
+
+<pre><code>line_item = "item_#{x}"
+@order.line_item = ...
+</code></pre>
+
+<p>Use <a href="http://api.rubyonrails.org/classes/ActiveRecord/AttributeMethods.html#method-i-5B-5D-3D" rel="nofollow"><code>ActiveRecord::AttributeMethods#[]=</code></a> instead:</p>
+
+<pre><code>line_item = "item_#{x}"
+@order[line_item] = ...
+</code></pre>
+
+<p>You can get rid of the temporary variable <code>x</code> by using <a href="http://www.ruby-doc.org/core-2.1.0/Enumerator.html#method-i-with_index" rel="nofollow"><code>Enumerator#with_index</code></a>:</p>
+
+<pre><code>@customer_order.each.with_index(1) do |item, index|
+  @order["item_#{index}"] = "#{item["quantity"]} x #{item["item"]}"
+end
+</code></pre>
+
+<p>Note that this will raise a <code>ActiveModel::MissingAttributeError</code> if there are more than 4 items, because there's no <code>item_5</code> attribute. So instead of having a fixed number of <code>item_x</code> attributes, you should create a separate <code>LineItem</code> model and set up an <a href="http://guides.rubyonrails.org/association_basics.html" rel="nofollow">association</a>:</p>
+
+<pre><code>class LineItem &lt; ActiveRecord::Base
+  belongs_to :order
+end
+
+class Order &lt; ActiveRecord::Base
+  has_many :line_items
+end
+</code></pre>
+
+<p>This allows you to assign any number of line items. Assuming <code>LineItem</code> has attributes <code>position</code>, <code>quantity</code> and <code>item</code>, something like this would work:</p>
+
+<pre><code>@customer_order.each.with_index(1) do |item|
+  @order.line_items.create(position: index, quantity: item['quantity'], item: item['item'])
+end
+</code></pre>

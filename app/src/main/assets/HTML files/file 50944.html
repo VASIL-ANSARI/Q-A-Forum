@@ -1,0 +1,61 @@
+<p>So @MadProgrammer was right. I had to look-up and implement a SwingWorker to get the code to execute how I wanted it. It ended up looking like this:</p>
+
+<p><strong>EDIT:</strong> So I didn't know I was committing a crime against humanity by modifying GUI elements outside their original context. I changed my code and now it looks like this.</p>
+
+<pre><code>       for(int i = 0; i &lt; LABELS.length; i++) {
+        menu_a.add(new JButton(LABELS[i]));
+        menu_a.get(i).addActionListener((ActionEvent e) -&gt; {
+            menu_a.stream().forEach((b) -&gt; {b.setEnabled(false);});
+            menu_b.stream().forEach((b) -&gt; {b.setEnabled(false);});
+            menu_c.stream().forEach((b) -&gt; {b.setEnabled(false);});
+            new SwingWorker&lt;Void, Void&gt;() {
+                @Override
+                public Void doInBackground() {
+                    menuActions(menu_a.indexOf(e.getSource()) + 1);
+                    return null;
+                }
+
+                @Override
+                public void done() {
+                    menu_a.stream().forEach((b) -&gt; {b.setEnabled(true);});
+                    menu_b.stream().forEach((b) -&gt; {b.setEnabled(true);});
+                    menu_c.stream().forEach((b) -&gt; {b.setEnabled(true);});
+                }
+            }.execute();
+        });
+        panel_a.add(menu_a.get(i));
+    }
+</code></pre>
+
+<p>I created an anonymous SwingWorker to take care of what I wanted. <s>I ended up having to disable the buttons in the doInBackground() method else it wouldn't disable them, and I was stuck with my original problem.</s> <em>(See edit below)</em> Also, menuActions now refers to a private method within the class, I figured since it's really only called from the GUI I might as well move it in. </p>
+
+<p><strong>EDIT:</strong> So I changed the disabling to happen outside of the SwingWorker and now it's working fine. I'll just blame it one me not saving my changes, perhaps I was recompiling old code. </p>
+
+<p>I also found some more info on the whole SwingWorker and EventDispatchThread business that I feel is relevant and helped me understand things a little better.</p>
+
+<blockquote>
+  <p>Workflow</p>
+  
+  <p>There are three threads involved in the life cycle of a SwingWorker :</p>
+  
+  <p>Current thread: The execute() method is called on this thread. It
+  schedules SwingWorker for the execution on a worker thread and returns
+  immediately. One can wait for the SwingWorker to complete using the
+  get methods.</p>
+  
+  <p>Worker thread: The doInBackground() method is called on this thread.
+  This is where all background activities should happen. To notify
+  PropertyChangeListeners about bound properties changes use the
+  firePropertyChange and getPropertyChangeSupport() methods. By default
+  there are two bound properties available: state and progress.</p>
+  
+  <p>Event Dispatch Thread: All Swing related activities occur on this
+  thread. SwingWorker invokes the process and done() methods and
+  notifies any PropertyChangeListeners on this thread.</p>
+  
+  <p><a href="https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingWorker.html" rel="nofollow">https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingWorker.html</a></p>
+</blockquote>
+
+<p>Thanks again to @MadProgrammer for pointing me in the right direction, and promptly letting me know my original code was atrocious.</p>
+
+<p>Also, I derived the code from this answer: <a href="http://stackoverflow.com/a/782309/1217580">How do I use SwingWorker in Java?</a></p>

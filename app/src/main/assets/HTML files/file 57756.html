@@ -1,0 +1,112 @@
+<p>The following changes are needed so as to make <code>MPI_Recv()</code> successful:</p>
+
+<ul>
+<li><p>In the code you posted, <code>split_vec.size()</code> is 0 in <code>MPI_Recv()</code> since <code>split_vec</code> is not populated yet. Hence, <code>MPI_Recv()</code> will receive a message, but the vector will not be modified.</p></li>
+<li><p><strong>The receive buffer must be allocated first.</strong> In the present case, it means that <code>split_vec.reserve(split_size);</code> must be added prior to the call to <code>MPI_Recv(&amp;split_vec[0],MPI_INT,split_size,...);</code>. Indeed, the method <a href="http://www.cplusplus.com/reference/vector/vector/reserve/" rel="nofollow"><code>vector::reserve(size_type n)</code></a> will increase the capacity of the vector to at least <code>n</code> elements. As noticed by @Zulan , using <a href="http://www.cplusplus.com/reference/vector/vector/resize/" rel="nofollow"><code>split_vec.resize(split_size);</code></a> is more correct as it also updates the size of the vector.</p></li>
+</ul>
+
+<p>Finally, the following code does the trick:</p>
+
+<pre><code>split_vec.resize(split_size);
+MPI_Recv(&amp;split_vec[0],MPI_INT,split_vec.size(),...);
+</code></pre>
+
+<p>Here is a corrected code. Notice that the indexes used to populate the array on rank 0 had to be modified. Compile it by <code>mpiCC main.cpp -o main -std=c++11 -Wall</code></p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include "mpi.h"
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+#include &lt;map&gt;
+#include &lt;random&gt;
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    int rank, size, tag;
+    MPI_Status status;
+    vector&lt;int&gt; vec(100);
+    vector&lt;int&gt; split_vec;
+
+    MPI_Init(&amp;argc, &amp;argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &amp;size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &amp;rank);
+    tag=7;
+
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution&lt;&gt; dis;
+    generate(vec.begin(), vec.end(), [&amp;](){ return dis(gen); });
+    // 100 ints / 5 slave processes
+    int split_size = vec.size() / size;
+    // split_size = size of vector of ints that each slave process should get
+    int offset = 0;
+    if (rank==0) {
+        // master process
+        for (int i=1; i&lt;size; ++i){
+            split_vec.clear();
+            split_vec.reserve(split_size);
+            int j=0; // added j=0
+            while(j &lt; split_size){
+                int elements = j + offset;
+                split_vec.push_back(vec[elements]);
+                j++;
+            }
+            //max =  split_size; 
+            offset = offset + split_size;
+            MPI_Send(&amp;split_vec[0], split_vec.size(), MPI_INT, i, tag, MPI_COMM_WORLD);
+        }
+    }
+    else{
+        // slaves processes
+        split_vec.resize(split_size);
+        MPI_Recv(&amp;split_vec[0], split_vec.size(), MPI_INT, 0, tag, MPI_COMM_WORLD, &amp;status); // until receive is complete, split_vec.size()==0
+    }
+    MPI_Finalize();
+}// main
+</code></pre>
+
+<p>Finally, you are going to enjoy the function <a href="http://mpitutorial.com/tutorials/mpi-scatter-gather-and-allgather/" rel="nofollow"><code>MPI_Scatter()</code></a> which exactly does what you want to do!</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;list&gt;
+#include "mpi.h"
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+#include &lt;map&gt;
+#include &lt;random&gt;
+
+using namespace std;
+
+int main(int argc, char **argv)
+{
+    int rank, size;
+
+    vector&lt;int&gt; vec(100);
+    vector&lt;int&gt; split_vec;
+
+    MPI_Init(&amp;argc, &amp;argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &amp;size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &amp;rank);
+
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution&lt;&gt; dis;
+    generate(vec.begin(), vec.end(), [&amp;](){ return dis(gen); });
+    // 100 ints / 5 slave processes
+    int split_size = vec.size() / size;
+    // split_size = size of vector of ints that each slave process should get
+
+
+    split_vec.resize(split_size);
+    MPI_Scatter(&amp;vec[0],split_size,MPI_INT,&amp;split_vec[0],split_size,MPI_INT,0,MPI_COMM_WORLD);
+
+    MPI_Finalize();
+}// main
+</code></pre>

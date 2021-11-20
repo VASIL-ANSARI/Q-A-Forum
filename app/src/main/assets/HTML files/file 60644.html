@@ -1,0 +1,40 @@
+<p>I believe the issue is that it is possible for <code>theta</code> to be such that the <code>log</code> argument becomes negative. It seems that you have identified this issue, and have <code>goalfun</code> return the tuple <code>(100,100*ones(N))</code> in this case, apparently, as a heuristic attempt to suggest the solver that this "solution" is not <em>preferable</em>. However, a stronger condition must be imposed, i.e., this "solution" is not <em>feasible</em>. Of course, this can be done by providing appropriate constraints. (Interestingly, <code>cvxpy</code> appears to handle this issue automatically.)  </p>
+
+<p>Here is a sample run, without bothering with providing derivatives. Note the use of a feasible initial estimate <code>x0</code>.</p>
+
+<pre><code>np.random.seed(123)
+
+T = 50
+N = 5
+R = np.random.uniform(-1, 1, size=(T, N))
+
+def goalfun(theta, *args):
+    R = args[0]
+    N = R.shape[1]
+    common = (1 + np.sum(theta * R, axis=1))**-1
+
+    return np.sum(np.log(common))
+
+def con_fun(theta, *args):
+    R = args[0]
+
+    return 1+np.sum(theta * R, axis=1)
+
+
+cons = ({'type': 'ineq', 'fun': lambda x: con_fun(x, R)})
+
+x0 = np.zeros(R.shape[1])
+minimize(fun=goalfun, x0=x0, args=R, constraints=cons)
+</code></pre>
+
+<blockquote>
+<pre><code> fun: -5.658334806882614
+ jac: array([ 0.0019, -0.0004, -0.0003,  0.0005, -0.0015,  0.    ])  message: 'Optimization terminated successfully.'
+nfev: 92
+ nit: 12
+njev: 12   status: 0  success: True
+   x: array([-0.8209, -0.3547, -0.4198,  0.6612,  0.4605])
+</code></pre>
+</blockquote>
+
+<p>Note that when I run this, I get an <code>invalid value encountered in log</code> warning, indicating that at some point in the search a value of <code>theta</code> is checked which barely satisfies the constraints. However, the result is reasonably close to that of <code>cvxpy</code>. It would be interesting to check if the <code>cvxpy</code> solution changes when the constraints are explicitly imposed in the <code>cvxpy.Problem</code> formulation.</p>

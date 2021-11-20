@@ -1,0 +1,46 @@
+<p>If you define your form as a service, you could inject the router and use it to generate the path in your form. (This ignores the possibility of setting it in <code>config.yml</code>.)</p>
+
+<pre><code>services:
+    app.form.type.yourformtype:
+        class: AppBundle\Form\YourFormType
+        arguments: [@router]
+        tags:
+            - { name: form.type }
+</code></pre>
+
+<p>Then, in your form:</p>
+
+<pre><code>&lt;?php
+
+namespace AppBundle\Form
+
+use Symfony\Bundle\FrameworkBundle\Routing\Router;
+use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\AbstractType;
+
+class YourFormType extends AbstractType
+{
+    private $router;
+
+    public __construct(Router $router)
+    {
+        $this-&gt;router = $router;
+    }
+
+    public function buildForm(FormBuilderInterface $builder, array $options)
+    {
+        $uploadRouteName = 'app_admin_upload'; // Or whatever maps out to /app/admin, re: your original question
+
+        ...
+
+        $builder-&gt;add('field', 'ckeditor', array(
+            'config' =&gt; array('uploadUrl' =&gt; $this-&gt;router-&gt;generate($uploadRouteName)),
+        ));
+
+        ...
+
+    }
+}
+</code></pre>
+
+<p>To truly do this once for every form you should consider extending the <code>ckeditor</code> formtype and adding your route to <code>uploadUrl</code> in the <code>configureOptions</code> method using the <code>OptionsResolver.</code>. Then update the service definition to inject the router to that class, and in place of <code>ckeditor</code> in the second argument to <code>add</code> methods, use <code>YourCkeditorExtendedType::class</code>, and you won't need to add config each time.</p>

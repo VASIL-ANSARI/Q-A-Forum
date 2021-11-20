@@ -1,0 +1,60 @@
+<p>The PIMPL idiom is probably ideal in this situation, but it is an extra indirection on every access so there is that.</p>
+
+<p>An alternative if you're just after some syntactic sugar might be to take advantage of ADL - it'll at least keep the system name out of the function name:</p>
+
+<pre><code>// publicly shared header file
+namespace one_system
+{
+  struct system;
+  typedef system* system_handle;
+  void do_something(system_handle );
+};
+
+// private implementation
+namespace one_system
+{
+  struct system {};
+  void do_something( system_handle ) { cout &lt;&lt; "one"; }
+};
+
+
+int main() {
+  auto handle = /* SOMETHING TO GET THIS SYSTEM */;
+  do_something(handle); //do_something found by ADL
+  return 0;
+}
+</code></pre>
+
+<p><strong>EDIT</strong>:</p>
+
+<p>I still think PIMPL is ideal. You also don't necessarily need to have an allocation nor any additional overhead compared to what you have already.</p>
+
+<p>In the case where you have a system* and a function declaration (as per your examples), the compiler already has to do an indirection. You'll need a jump to that function (as it is defined in another translation unit) and indirections to access the system within the function (since it is taken as a pointer).</p>
+
+<p>All you really need to do is define an interface for the class like so:</p>
+
+<pre><code>// put this in a namespace or name it according to the system
+class interface
+{
+    system_handle m_system;
+
+    public:
+    interface( system_handle s ) : m_system( s ) {}
+    interface() = delete;
+
+    void do_something();
+};
+</code></pre>
+
+<p>Now in another translation unit, do_something() is defined to perform it's operation on the system. The lib->GetSystem() could return an instance of the interface. The interface can be fully declared in the header file since it only consists of the public functions. The system is still entirely private (in that the user of the lib won't have the header file declaring it's contents).</p>
+
+<p>Furthermore the interface can be trivially copied around by the user. It doesn't care where it's pointer comes from so the library could pass in the address of a static if it wants.</p>
+
+<p>The one downside I can see to this would be that member variables would need to have accessors (and there are many who would argue that every member variable should be private and have public or protected accessors anyway).</p>
+
+<p>Another would be that the *this for interface would be passed into do_something and is probably not needed. This could be solved by having do_something defined in the header file too:</p>
+
+<pre><code>void do_something() { do_something_to_system( m_system ); }
+</code></pre>
+
+<p>Now the compiler should be able to optimize even the *this out since do_something can be inlined and the compiler could easily just insert code to load m_system into a register and call do_something_to_system (which would be similar to what you've mentioned in your examples).</p>

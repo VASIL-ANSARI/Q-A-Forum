@@ -1,0 +1,88 @@
+<p>Try adding <code>OPTION  (MAXRECURSION 0)</code> or recursion limit you wish  at bottom like below..</p>
+
+<p>You also can use a <a href="http://www.sqlservercentral.com/blogs/dwainsql/2014/03/30/calendar-tables-in-t-sql/" rel="nofollow">Calendar table</a> to avoid all these calculations which gives the output you need..</p>
+
+<p>I have a calendar table populated in my database,the output is so easy to calculate like below..I recommend having a table instead of repeated calculations</p>
+
+<pre><code>select distinct month,year from dbo.calendar
+where dAte&gt;=getdate()-200 and date&lt;=getdate()
+</code></pre>
+
+<p><a href="http://i.stack.imgur.com/LUFH8.png" rel="nofollow"><img src="http://i.stack.imgur.com/LUFH8.png" alt="enter image description here"></a></p>
+
+<p>If you wish to go with recursive option ,add <code>option(recursion)</code> like below</p>
+
+<p>--this wont work with inline table valued functions,see below demo
+     Alter FUNCTION [dbo].[fnYearMonth] 
+        (
+            @Initial Datetime,
+            @Final Datetime
+        )
+        RETURNS TABLE 
+        AS
+        RETURN
+        With dateRange as 
+        (
+            select @Initial as statdate
+            union all
+            select dateadd(month, 1, StatDate)
+            from dateRange 
+            where dateadd(month, 1, StatDate) &lt;= CAST(DATEADD(month,DATEDIFF(month,0,@Final)+1,0)-1 as Datetime)
+        )
+        select DATEPART(year, StatDate) AS MyYear, DATEPART(month, StatDate) AS MyMonth
+         From dateRange 
+         where StatDate &lt;= @Final
+          OPTION  (MAXRECURSION 0);</p>
+
+<p><strong>Update:</strong>
+MAX Recursion option doesnt work with Inline table valued functions,it only works with multi table valued functions..</p>
+
+<p><strong>Demo:</strong>  </p>
+
+<pre><code>alter function 
+dbo.getnum_test
+(
+@n int
+)
+returns table
+as return
+With cte as
+(
+select @n as n
+union all
+select @n+1
+from cte
+)
+
+select * from cte
+where  n&lt;1000
+option (maxrecursion 0)
+
+alter function dbo.itvftest
+(
+@n int
+)
+returns
+@numbers table
+(
+n int
+)
+as 
+begin
+
+With cte as
+(
+select @n as n
+union all
+select n+1
+from cte
+where cte.n&lt;10000
+)
+Insert into @numbers
+select * from cte
+where  n&lt;1000
+option (maxrecursion 0)
+
+return
+end
+</code></pre>

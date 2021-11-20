@@ -1,0 +1,105 @@
+<p>You should use a a custom <code>JsonDeserializer</code> and write all your logic there, like this</p>
+
+<p><strong>ApiResult.java</strong></p>
+
+<pre><code>public class ApiResult {
+
+    @SerializedName("status")
+    public String status;
+
+    @SerializedName("data")
+    public Object data; 
+}
+</code></pre>
+
+<p><strong>ApiResultDeserializer.java</strong></p>
+
+<pre><code>import java.lang.reflect.Type;
+import java.util.List;
+
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.reflect.TypeToken;
+
+
+public class ApiResultDeserializer implements JsonDeserializer&lt;ApiResult&gt; {
+
+    private Type listType = new TypeToken&lt;List&lt;NavItem&gt;&gt;(){}.getType();
+
+    @Override
+    public ApiResult deserialize(JsonElement value, Type type,
+            JsonDeserializationContext context) throws JsonParseException {
+
+        final JsonObject apiResultJson = value.getAsJsonObject();
+
+        final ApiResult result = new ApiResult();
+        result.status = apiResultJson.get("status").getAsString();
+
+        JsonElement dataJson = apiResultJson.get("data");
+
+        if(dataJson.isJsonObject()) {
+            result.data = context.deserialize(dataJson, NavItem.class);
+        } else if(dataJson.isJsonPrimitive()) {
+            result.data = context.deserialize(dataJson, String.class);
+        } else if(dataJson.isJsonArray()) {
+            result.data = context.deserialize(dataJson, listType);
+        }
+
+        return result;
+    }
+
+}
+</code></pre>
+
+<p>and try to create different kinds of <code>data</code> (<code>List</code>, <code>Object</code>, or <code>String</code>) as you mentioned</p>
+
+<p><strong>Main.java</strong></p>
+
+<pre><code>Gson gson = new GsonBuilder()
+        .registerTypeAdapter(ApiResult.class, new ApiResultDeserializer())
+        .create();
+
+        List&lt;NavItem&gt; navItems = new ArrayList&lt;NavItem&gt;();
+
+        for(int i = 1 ; i &lt; 6 ; ++i) {
+            navItems.add(new NavItem(i+"", "Name-" + i, "Icon-" + i ));
+        }
+
+        ApiResult result = new ApiResult();
+        result.status = "OK";
+        result.data = navItems;
+
+        // Serialization
+        System.out.println(gson.toJson(result)); // {\"status\":\"OK\",\"data\":[{\"id\":\"1\",\"name\":\"Name-1\",\"icon\":\"Icon-1\"},{\"id\":\"2\",\"name\":\"Name-2\",\"icon\":\"Icon-2\"},{\"id\":\"3\",\"name\":\"Name-3\",\"icon\":\"Icon-3\"},{\"id\":\"4\",\"name\":\"Name-4\",\"icon\":\"Icon-4\"},{\"id\":\"5\",\"name\":\"Name-5\",\"icon\":\"Icon-5\"}]}
+
+        result.data = navItems.get(0);
+
+        System.out.println(gson.toJson(result)); // {\"status\":\"OK\",\"data\":{\"id\":\"1\",\"name\":\"Name-1\",\"icon\":\"Icon-1\"}}
+
+        result.data = "Test";
+
+        System.out.println(gson.toJson(result)); // {\"status\":\"OK\",\"data\":\"Test\"}
+
+
+        // Deserialization
+        String input = "{\"status\":\"OK\",\"data\":[{\"id\":\"1\",\"name\":\"Name-1\",\"icon\":\"Icon-1\"},{\"id\":\"2\",\"name\":\"Name-2\",\"icon\":\"Icon-2\"},{\"id\":\"3\",\"name\":\"Name-3\",\"icon\":\"Icon-3\"},{\"id\":\"4\",\"name\":\"Name-4\",\"icon\":\"Icon-4\"},{\"id\":\"5\",\"name\":\"Name-5\",\"icon\":\"Icon-5\"}]}";
+
+        ApiResult newResult = gson.fromJson(input, ApiResult.class);
+
+        System.out.println(newResult.data); // Array
+
+        input = "{\"status\":\"OK\",\"data\":{\"id\":\"1\",\"name\":\"Name-1\",\"icon\":\"Icon-1\"}}";
+
+        newResult = gson.fromJson(input, ApiResult.class);
+
+        System.out.println(newResult.data); // Object
+
+        input = "{\"status\":\"OK\",\"data\":\"Test\"}";
+
+        newResult = gson.fromJson(input, ApiResult.class);
+
+        System.out.println(newResult.data); // String
+</code></pre>

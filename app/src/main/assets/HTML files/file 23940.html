@@ -1,0 +1,56 @@
+<p>Here is a simple framework for unpacking a tuple and providing its elements as arguments to a given function:</p>
+
+<pre><code>namespace detail
+{
+    template&lt;int... Is&gt;
+    struct seq { };
+
+    template&lt;int N, int... Is&gt;
+    struct gen_seq : gen_seq&lt;N - 1, N - 1, Is...&gt; { };
+
+    template&lt;int... Is&gt;
+    struct gen_seq&lt;0, Is...&gt; : seq&lt;Is...&gt; { };
+
+    template&lt;typename F, typename... Ts, int... Is&gt;
+    void call_with_tuple(F&amp;&amp; f, std::tuple&lt;Ts...&gt; const&amp; t, seq&lt;Is...&gt;)
+    {
+        (std::forward&lt;F&gt;(f))(std::get&lt;Is&gt;(t)...);
+    }
+}
+
+template&lt;typename F, typename... Ts&gt;
+void call_with_tuple(F&amp;&amp; f, std::tuple&lt;Ts...&gt; const&amp; t)
+{
+    detail::call_with_tuple(std::forward&lt;F&gt;(f), t, 
+        detail::gen_seq&lt;sizeof...(Ts)&gt;());
+}
+</code></pre>
+
+<p>Inside your <code>Consume()</code> function you could then just do:</p>
+
+<pre><code>call_with_tuple(handler, mArgs);
+</code></pre>
+
+<p>With some more context:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;functional&gt;
+
+template&lt; typename ... Args &gt;
+class Message {
+public:
+    Message( Args&amp;&amp; ... args ) {
+        mArgs = std::make_tuple( args ...  );
+    }
+
+    std::tuple&lt; Args ... &gt; mArgs;
+    typedef std::function&lt; void ( Args ... ) &gt; HandlerType;
+
+    void Consume( HandlerType handler ) {
+        call_with_tuple(handler, mArgs);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    }
+};
+</code></pre>
+
+<p>And here is a <a href="http://ideone.com/fV4J13"><strong>live example</strong></a>.</p>

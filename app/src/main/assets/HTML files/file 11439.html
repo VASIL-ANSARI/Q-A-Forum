@@ -1,0 +1,112 @@
+<p>If the names in the case statement match with properties in the class, I would change it all to use reflection.</p>
+
+<p>For example, here is a trimmed down version of the core of our base business record, which we use to move data in and out of databases, forms, web services, etc.</p>
+
+<pre><code>    public static void SetFieldValue(object oRecord, string sName, object oValue)
+    {
+        PropertyInfo theProperty = null;
+        FieldInfo theField = null;
+        System.Type oType = null;
+
+        try
+        {
+            oType = oRecord.GetType();
+
+            // See if the column is a property in the record
+            theProperty = oType.GetProperty(sName, BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.Public, null, null, new Type[0], null);
+            if (theProperty == null)
+            {
+                theField = oType.GetField(sName, BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.Public);
+                if (theField != null)
+                {
+                    theField.SetValue(oRecord, Global.ValueFromDB(oValue, theField.FieldType.Name));
+                }
+            }
+            else
+            {
+                if (theProperty.CanWrite)
+                {
+                    theProperty.SetValue(oRecord, Global.ValueFromDB(oValue, theProperty.PropertyType.Name), null);
+                }
+            }
+        }
+        catch (Exception theException)
+        {
+            // Do something useful here
+        }
+   }
+</code></pre>
+
+<p>In the above, Global.ValueFromDB is a big switch statement that safely converts the value to the specified type. Here is a partial version of that:</p>
+
+<pre><code>    public static object ValueFromDB(object oValue, string sTypeName)
+    {
+        switch (sTypeName.ToLower())
+        {
+            case "string":
+            case "system.string":
+                return StrFromDB(oValue);
+
+            case "boolean":
+            case "system.boolean":
+                return BoolFromDB(oValue);
+
+            case "int16":
+            case "system.int16":
+                return IntFromDB(oValue);
+
+            case "int32":
+            case "system.int32":
+                return IntFromDB(oValue);
+</code></pre>
+
+<p>Where the datatype specific FromDBs look something like:</p>
+
+<pre><code>    public static string StrFromDB(object theValue)
+    {
+        return StrFromDB(theValue, "");
+    }
+    public static string StrFromDB(object theValue, string sDefaultValue)
+    {
+        if ((theValue != DBNull.Value) &amp;&amp; (theValue != null))
+        {
+            return theValue.ToString();
+        }
+        else
+        {
+            return sDefaultValue;
+        }
+    }
+    public static bool BoolFromDB(object theValue)
+    {
+        return BoolFromDB(theValue, false);
+    }
+    public static bool BoolFromDB(object theValue, bool fDefaultValue)
+    {
+        if (!(string.IsNullOrEmpty(StrFromDB(theValue))))
+        {
+            return Convert.ToBoolean(theValue);
+        }
+        else
+        {
+            return fDefaultValue;
+        }
+    }
+    public static int IntFromDB(object theValue)
+    {
+        return IntFromDB(theValue, 0);
+    }
+    public static int IntFromDB(object theValue, int wDefaultValue)
+    {
+        if ((theValue != DBNull.Value) &amp;&amp; (theValue != null) &amp;&amp; IsNumeric(theValue))
+        {
+            return Convert.ToInt32(theValue);
+        }
+        else
+        {
+            return wDefaultValue;
+        }
+    }
+</code></pre>
+
+<p>It may not seem like your saving much code in the short term, but you will find many, many uses for this once it is implemented (we certainly have).</p>

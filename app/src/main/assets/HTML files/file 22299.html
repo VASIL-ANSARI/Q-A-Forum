@@ -1,0 +1,31 @@
+<p><strong>EDIT</strong></p>
+
+<p>If you want request to act the exact same, just without the app actually hitting the server of the request then try using <a href="https://github.com/flatiron/nock" rel="nofollow">nock</a> which will intercept requests you define and return data that you define.</p>
+
+<p><br/></p>
+
+<hr>
+
+<p><em>Original Answer:</em></p>
+
+<p>I think what you are looking for is something more like this:</p>
+
+<pre><code>var old_request = http.request;
+
+http.request = function(options, callback){
+    var rule = match_rule(options);
+    if(rule){
+        var res = new events.EventEmitter(),
+            req = new events.EventEmitter();
+        res.headers = rule.headers || {'Content-Type': 'text/html'};
+        req.end = function(){ 
+            if(callback) callback(res);
+            res.emit('data', rule.body || '');
+            res.emit('end'); 
+        };
+        return req;
+    } else {
+        return old_request.call(http, options, callback);
+    }
+};
+</code></pre>

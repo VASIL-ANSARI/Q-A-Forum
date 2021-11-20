@@ -1,0 +1,44 @@
+<p>You can't. First let's slightly desugar the decorator:</p>
+
+<pre><code>let PlayerProfile = withMUI(
+    class PlayerProfile extends React.Component {
+      // ...
+    }
+);
+</code></pre>
+
+<p>withMUI returns a different class, so the PlayerProfile class only exists in withMUI's closure.</p>
+
+<p>This is here's a simplified version:</p>
+
+<pre><code>var withMUI = function(arg){ return null };
+var PlayerProfile = withMUI({functionIWantToTest: ...});
+</code></pre>
+
+<p>You pass the value to the function, it doesn't give it back, you don't have the value.</p>
+
+<p>The solution? Hold a reference to it.</p>
+
+<pre><code>// no decorator here
+class PlayerProfile extends React.Component {
+  // ...
+}
+</code></pre>
+
+<p>Then we can export both the wrapped and unwrapped versions of the component:</p>
+
+<pre><code>// this must be after the class is declared, unfortunately
+export default withMUI(PlayerProfile);
+export let undecorated = PlayerProfile;
+</code></pre>
+
+<p>The normal code using this component doesn't change, but your tests will use this:</p>
+
+<pre><code>import {undecorated as PlayerProfile} from '../src/PlayerProfile';
+</code></pre>
+
+<hr>
+
+<p>The alternative is to mock the withMUI function to be <code>(x) =&gt; x</code> (the identity function). This may cause weird side effects and needs to be done from the testing side, so your tests and source could fall out of sync as decorators are added.</p>
+
+<p>Not using decorators seems like the safe option here.</p>

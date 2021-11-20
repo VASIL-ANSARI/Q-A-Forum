@@ -1,0 +1,98 @@
+<p>Based on the comments to the question, why not simply writing a fixed length template based fuzzer like this:</p>
+
+<pre><code>#! /usr/bin/env python
+"""Minimal template based dict string value fuzzer."""
+from __future__ import print_function
+
+import random
+import string
+
+
+def random_string(rng, length, chars=string.printable):
+    """A random string with given length."""
+    return ''.join(rng.choice(chars) for _ in range(length))
+
+
+def dict_string_template_fuzz_gen(rng, dict_in):
+    """Given a random number generator rng, and starting from
+    template dict_in expected to have only strings as values,
+    this generator function yields derived dicts with random
+    variations in the string values keeping the length of
+    those identical."""
+
+    while True:
+        yield dict((k, random_string(rng, len(v))) for k, v in dict_in.items())
+
+
+def main():
+    """Drive a test run of minimal template fuzz."""
+
+    k1, k2, k3 = 'ka', 'kb', 'kc'
+    template = {k1: "aaa", k2: "bbb", k3: "ccc"}
+
+    print("# Input(template):")
+    print(template)
+
+    rng = random.SystemRandom()
+    print("# Output(fuzz):")
+    for n, fuzz in enumerate(dict_string_template_fuzz_gen(rng,
+                             template), start=0):
+        print(fuzz)
+        if n &gt; 3:
+            break
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+
+<p>On the use case input it might yield this:</p>
+
+<pre><code># Input(template):
+{'kc': 'ccc', 'kb': 'bbb', 'ka': 'aaa'}
+# Output(fuzz):
+{'kc': '6HZ', 'kb': 'zoD', 'ka': '5&gt;b'}
+{'kc': '%&lt;\r', 'kb': 'g&gt;v', 'ka': 'Mo0'}
+{'kc': 'Y $', 'kb': '4z.', 'ka': '0".'}
+{'kc': '^M.', 'kb': 'QY1', 'ka': 'P0)'}
+{'kc': 'FK4', 'kb': 'oZW', 'ka': 'G1q'}
+</code></pre>
+
+<p>So this should give the OP something to start as it might be a bootstrapping problem, where Python knowledge is only starting ...</p>
+
+<p>I just hacked it in - PEP8 compliant though - and it should work no matter if Python v2 or v3.</p>
+
+<p>Many open ends to work on ... but should get one going to evaluate, if a library or some simple enhanced coding might suffice. Only the OP will know but is welcome to comment on this answer proposal or update the question.</p>
+
+<p>Hints: I nearly always use SystemRandom so you can parallelize more robustly. There may be faster ways, but performance was not visible to me in the specification. The print's are of course sprankled in as this is educational at best. HTH</p>
+
+<p><strong>Update</strong>:
+Having read the OP comment on changing only part of the strings to preserve some similarity, one could exchange above fuzzer function by e.g.:</p>
+
+<pre><code>def dict_string_template_fuzz_len_gen(rng, dict_in, f_len=1):
+    """Given a random number generator rng, and starting from
+    template dict_in expected to have only strings as values,
+    this generator function yields derived dicts with random
+    variations in the string values keeping the length of
+    those identical.
+    Added as hack the f_len parameter that counts the
+    characters open to be fuzzed from the end of the string."""
+
+    r_s = random_string  # shorten for line readability below
+    while True:
+        yield dict(
+            (k, v[:f_len + 1] + r_s(rng, f_len)) for k, v in dict_in.items())
+</code></pre>
+
+<p>and then have as sample output:</p>
+
+<pre><code># Input(template):
+{'kc': 'ccc', 'kb': 'bbb', 'ka': 'aaa'}
+# Output(fuzz):
+{'kc': 'cc\t', 'kb': 'bbd', 'ka': 'aa\\'}
+{'kc': 'cc&amp;', 'kb': 'bbt', 'ka': 'aa\\'}
+{'kc': 'ccg', 'kb': 'bb_', 'ka': 'aaJ'}
+{'kc': 'ccc', 'kb': 'bbv', 'ka': 'aau'}
+{'kc': 'ccw', 'kb': 'bbs', 'ka': "aa'"}
+</code></pre>
+
+<p>When calling this function instead of the other.</p>

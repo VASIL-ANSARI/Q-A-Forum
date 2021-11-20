@@ -1,0 +1,15 @@
+<p>I don't believe you necessarily need to use CPU cycles with some always-running background job, but that depends on how powerful you want these notifications to be. If you want them to be real-time, and you plan on using a publisher-subscriber model in the future then I'd <a href="https://github.com/thoughtshop/rails-node-redis-pubsub" rel="nofollow">consider a redis + node server setup.</a></p>
+
+<p>The complexity of websockets means more implementation time. Will that extra time spent really benefit you? If it's very important that your notifications be asynchronous and real-time, like exchanging messages in a chat app or getting pop-up notifications on Facebook, then this is the right choice.</p>
+
+<p>However, if all you really want to do is let users know when their reports are past a certain age, when they request their profile page, a cron that runs every couple of hours will be much easier to implement. You could even use Google Analytics to get a feel for when users are putting the heaviest burden on your app, and schedule the job around that.</p>
+
+<p>First, create a rake task that completes the behavior your described above--check for old reports and create notifications. Put that in your app's <code>lib/tasks</code> directory. And then write a cron job like so:</p>
+
+<p><code>
+$ 0 6,12,18 * * * cd /path/to/app &amp;&amp; bundle exec rake task_name
+</code></p>
+
+<p>This task will run 3x a day, at 6am, 12pm and 6pm.</p>
+
+<p>From there, if you want to create an activity feed for your users, you could also implement a synchronous pub-sub solution pretty simply. E.g., User A subscribes to User B's reports, User B publishes a new report, after_save callback to create a notification for User A. This will be slower, it won't be live, but if it's a small app and this feature isn't a core part, then this makes better use of your time than the other options.</p>

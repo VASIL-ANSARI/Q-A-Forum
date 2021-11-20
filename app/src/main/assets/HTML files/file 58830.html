@@ -1,0 +1,71 @@
+<p>There is currently <a href="http://mail.openjdk.java.net/pipermail/jpms-spec-experts/2016-June/000306.html">a proposal</a> for that exact use case:</p>
+
+<blockquote>
+  <p>Extend the language of module declarations to allow the <code>static</code> modifier to be used on a <code>requires</code> directive, with the following meanings:</p>
+  
+  <ul>
+  <li><p>At compile time, <code>requires static M</code> expresses a mandatory dependence.  It is an error if a suitable module cannot be found amongst the observable modules and resolved.</p></li>
+  <li><p>In phases after compile time, <code>requires static M</code> expresses an optional dependence.  The module system will not search the observable modules for a suitable module during resolution, but if the resulting module graph contains a suitable module then it will add the appropriate readability edge prior to doing the usual post-resolution sanity checks. [...]</p></li>
+  </ul>
+  
+  <p>Thus a hypothetical module declaration of the form</p>
+
+<pre><code>module joda.beans {
+    requires static joda.collect;
+    ...
+}
+</code></pre>
+  
+  <p>would ensure that the <code>joda.collect</code> module is available at compile time, so that code in the <code>joda.beans</code> module that refers to <code>joda.collect</code> can be compiled without any fuss.  It would not, however, guarantee that <code>joda.collect</code> is available at link time or run time.</p>
+</blockquote>
+
+<p>The <a href="https://jdk9.java.net/jigsaw/">current Jigsaw EA build</a> (138) contains this modifier and it works as proposed.</p>
+
+<p>I created <a href="https://github.com/CodeFX-org/demo-jigsaw-advent-calendar/tree/05-optional-dependency">a demo</a> for this. The interesting tidbits are the <code>module-info.java</code> of the module declaring the optional dependencies...</p>
+
+<pre><code>module org.codefx.demo.advent {
+    // list the required modules
+    requires org.codefx.demo.advent.calendar;
+    // with 'static' the factories are only required at compile time;
+    // to be present at run time either other modules most require them
+    // or they must be added with the '--add-modules' command line option
+    requires static org.codefx.demo.advent.factory.chocolate;
+    requires static org.codefx.demo.advent.factory.quote;
+}
+</code></pre>
+
+<p>... and the code within the same module that wants to access types from its optional dependencies. It has to written so that it fails graciously if the types <code>ChocolateFactory</code> and/or <code>QuoteFactory</code> are absent:</p>
+
+<pre><code>private static List&lt;SurpriseFactory&gt; createSurpriseFactories() {
+    return Stream.of(
+            createChocolateFactoryIfAccessible(),
+            createQuoteFactoryIfAccessible())
+            .flatMap(Optional::stream)
+            .collect(toList());
+}
+
+private static Optional&lt;SurpriseFactory&gt; createChocolateFactoryIfAccessible() {
+    try {
+        return Optional.of(new ChocolateFactory());
+    } catch (NoClassDefFoundError er) {
+        return Optional.empty();
+    }
+}
+
+private static Optional&lt;SurpriseFactory&gt; createQuoteFactoryIfAccessible() {
+    try {
+        return Optional.of(new QuoteFactory());
+    } catch (NoClassDefFoundError er) {
+        return Optional.empty();
+    }
+}
+</code></pre>
+
+<p>Finally, the command line can be used to define which modules the app launches with:</p>
+
+<pre><code>$java \
+    --add-modules org.codefx.demo.advent.factory.chocolate,org.codefx.demo.advent.factory.quote \
+    -p mods -m org.codefx.demo.advent
+</code></pre>
+
+<p>It is of course also possible that other modules require them non-optionally, which forces the JVM to include them into the module graph.</p>

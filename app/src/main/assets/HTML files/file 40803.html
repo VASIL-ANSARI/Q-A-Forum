@@ -1,0 +1,104 @@
+<pre><code>dict1 = {1 :["in",1], 2 :["out",1], 3 :["in",1]}
+
+dict2 = {1 :["out",2], 2 :["out",1]}
+vals = []
+# get items from dict1 and common keys with largest values
+for k, v in dict1.iteritems():
+    if k in dict2:
+        if dict2[k][1] &gt; v[1]:
+            vals.append((k, dict2[k]))
+        else:
+            vals.append((k,v))
+    else:
+        vals.append((k,v))
+new_d = {}
+# add all dict2 to a new dict
+new_d.update(dict2) 
+
+# add dict1 items and overwrite common keys with larger value
+for k,v in vals:
+    new_d[k] = v
+print(new_d)
+{1: ['out', 2], 2: ['out', 1], 3: ['in', 1]}
+</code></pre>
+
+<p>You could also copy and delete:</p>
+
+<pre><code>cp_d1 = dict1.copy()
+cp_d2 = dict2.copy()
+
+for k, v in dict1.iteritems():
+    if k in dict2:
+        if dict2[k][1] &gt; v[1]:
+            del cp_d1[k]
+        else:
+            del cp_d2[k]
+cp_d1.update(cp_d2)
+
+print(cp_d1)
+{1: ['out', 2], 2: ['out', 1], 3: ['in', 1]}
+</code></pre>
+
+<p>Some timings shows copy is  the most efficient and using  <code>groupby</code> is the least efficient:</p>
+
+<pre><code>In [9]: %%timeit
+   ...: vals = []
+   ...: cp_d1 = dict1.copy()
+   ...: cp_d2 = dict2.copy()
+   ...: for k, v in dict1.iteritems():
+   ...:     if k in dict2:
+   ...:         if dict2[k][1] &gt; v[1]:
+   ...:             del cp_d1[k]
+   ...:         else:
+   ...:             del cp_d2[k]
+   ...: cp_d1.update(cp_d2)
+   ...: 
+
+1000000 loops, best of 3: 1.61 Âµs per loop
+In [20]: %%timeit
+
+
+ ....: vals = []
+   ....: for k, v in dict1.iteritems():
+   ....:     if k in dict2:
+   ....:         if dict2[k][1] &gt; v[1]:
+   ....:             vals.append((k, dict2[k]))
+   ....:         else:
+   ....:             vals.append((k,v))
+   ....:     else:
+   ....:         vals.append((k,v))
+   ....: new_d = {}
+   ....: new_d.update(dict2)
+   ....: for k,v in vals:
+   ....:     new_d[k] = v
+   ....: 
+100000 loops, best of 3: 2.11 Âµs per loop
+
+
+In [10]: %%timeit                 
+ {k: max(dict1.get(k), dict2.get(k), key=lambda x: x[1] if x else None)
+  for k in dict1.viewkeys() | dict2.viewkeys()}
+   ....: 
+100000 loops, best of 3: 3.71 Âµs per loop
+
+In [22]: %%timeit
+   ....: l=dict2.items() +dict1.items() # if you are in python 3 use : list(dict1.items()) + list(dict2.items())
+   ....: g=[list(g) for k,g in groupby(sorted(l),lambda x : x[0])]
+   ....: dict([max(t,key=lambda x: x[1][1]) for t in g])
+   ....: 
+100000 loops, best of 3: 10.1 Âµs per loop
+
+
+In [61]: %%timeit
+   ....: conflictKeys = set(dict1) &amp; set(dict2)  
+   ....: solvedConflicts = { key: dict1[key] 
+   ....:                       if dict1[key][1] &gt; dict2[key][1] 
+   ....:                       else dict2[key] 
+   ....:                  for key in conflictKeys } 
+   ....: result = dict1.copy()                     
+   ....: result.update(dict2)                       
+   ....: result.update(solvedConflicts)  
+   ....: 
+
+100000 loops, best of 3: 2.34 Âµs per loop
+</code></pre>

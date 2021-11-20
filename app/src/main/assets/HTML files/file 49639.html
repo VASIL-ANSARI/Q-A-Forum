@@ -1,0 +1,64 @@
+<p><code>DataGrid</code> or <code>GridView</code>? In general there is no relation between your <code>TextBox</code> and the header so there is no really elegant way.  </p>
+
+<p>This is the best i've come up with but i doubt that it's more elegant than your approach:</p>
+
+<p><code>GridView</code>:</p>
+
+<pre><code>protected void TextBox_TextChanged(object sender, EventArgs e)
+{
+    TextBox txt = (TextBox)sender;
+    GridViewRow row = (GridViewRow)txt.NamingContainer;
+    GridView grid = (GridView)row.NamingContainer;
+    DataControlField column = grid.Columns.Cast&lt;DataControlField&gt;()
+        .Select((c, Index) =&gt; new { Column = c, Index })
+        .Where(x =&gt; row.Cells[x.Index].GetControlsRecursively().Contains(txt))
+        .Select(x =&gt; x.Column)
+        .FirstOrDefault();
+    if (column != null)
+    {
+        string headerText = column.HeaderText;
+    }
+}
+</code></pre>
+
+<p><code>DataGrid</code>:</p>
+
+<pre><code>protected void TextBox_TextChanged(object sender, EventArgs e)
+{
+    TextBox txt = (TextBox)sender;
+    DataGridItem item = (DataGridItem)txt.NamingContainer;
+    DataGrid grid = (DataGrid)item.NamingContainer;
+    DataControlField column = grid.Columns.Cast&lt;DataControlField&gt;()
+        .Select((c, Index) =&gt; new { Column = c, Index })
+        .Where(x =&gt; item.Cells[x.Index].GetControlsRecursively().Contains(txt))
+        .Select(x =&gt; x.Column)
+        .FirstOrDefault();
+    if (column != null)
+    {
+        string headerText = column.HeaderText;
+    }
+}
+</code></pre>
+
+<p>I'm using this extension method to find controls recursively:</p>
+
+<pre><code>public static IEnumerable&lt;Control&gt; GetControlsRecursively(this Control parent)
+{
+    foreach (Control c in parent.Controls)
+    {
+        yield return c;
+
+        if (c.HasControls())
+        {
+            foreach (Control control in c.GetControlsRecursively())
+            {
+                yield return control;
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>This approach uses the <code>gridView.Columns</code> collection as source since you want to find find the column. It needs to find the <code>TextBox</code> via the <code>GridViewRow</code>/<code>DataGridItem</code> and a recursive search in each cell of this item/row. If the reference to the <code>TextBox</code> is found the header is found.</p>
+
+<p>Note that you can't use <code>item.Cells[x.Index].FindControl(txt.ID)</code> since <code>FindControl</code> first tries to find the <code>NamingContainer</code> of the control which is the <code>GridViewRow</code>/<code>DataGridItem</code> so it doesn't help to search the cells.</p>

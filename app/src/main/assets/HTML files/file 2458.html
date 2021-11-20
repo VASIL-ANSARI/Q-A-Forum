@@ -1,0 +1,78 @@
+<p>This link may be useful</p>
+
+<p><a href="http://blog.chinaunix.net/u/9577/showart_1850111.html" rel="nofollow">http://blog.chinaunix.net/u/9577/showart_1850111.html</a></p>
+
+<p>I have not fully implemented it myself but what I have implemented works</p>
+
+<p>Note that it is not fully documented and so is likely to change in future versions of Android</p>
+
+<p>EDIT:</p>
+
+<p>Here is the way I implemented the code myself: </p>
+
+<pre><code>String url = "content://sms/"; 
+        Uri uri = Uri.parse(url); 
+        getContentResolver().registerContentObserver(uri, true, new MyContentObserver(handler)); 
+
+        Uri uriSms = Uri.parse("content://sms/inbox");
+        Cursor c = getContentResolver().query(uriSms, null,null,null,null); 
+
+        Log.d("COUNT", "Inbox count : " + c.getCount());
+
+
+}
+
+class MyContentObserver extends ContentObserver { 
+
+    public MyContentObserver(Handler handler) { 
+
+        super(handler); 
+
+    }
+
+@Override public boolean deliverSelfNotifications() { 
+    return false; 
+    }
+
+@Override public void onChange(boolean arg0) { 
+    super.onChange(arg0);
+
+     Log.v("SMS", "Notification on SMS observer"); 
+
+    Message msg = new Message();
+    msg.obj = "xxxxxxxxxx";
+
+    handler.sendMessage(msg);
+
+    Uri uriSMSURI = Uri.parse("content://sms/");
+    Cursor cur = getContentResolver().query(uriSMSURI, null, null,
+                 null, null);
+    cur.moveToNext();
+    String protocol = cur.getString(cur.getColumnIndex("protocol"));
+    if(protocol == null){
+           Log.d("SMS", "SMS SEND"); 
+           int threadId = cur.getInt(cur.getColumnIndex("thread_id"));
+           Log.d("SMS", "SMS SEND ID = " + threadId); 
+           getContentResolver().delete(Uri.parse("content://sms/conversations/" + threadId), null, null);
+
+    }
+    else{
+        Log.d("SMS", "SMS RECIEVE");  
+         int threadIdIn = cur.getInt(cur.getColumnIndex("thread_id"));
+         getContentResolver().delete(Uri.parse("content://sms/conversations/" + threadIdIn), null, null);
+    }
+
+}
+
+
+} 
+</code></pre>
+
+<p>The code listens for changes in the SMS Content Provider.</p>
+
+<p>This is the line you would be interested in if you wish to delete an SMS</p>
+
+<pre><code>getContentResolver().delete(Uri.parse("content://sms/conversations/" + threadIdIn), null, null);
+</code></pre>
+
+<p>You have to delete an entire conversation to delete the SMS, I haven't been able to just delete the last message of a conversation</p>

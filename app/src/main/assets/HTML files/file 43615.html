@@ -1,0 +1,114 @@
+<p><strong>[Disclaimer]</strong></p>
+
+<p>The synthetic example posted in this question works and the described issue become from specific implementation in production code. Maybe this question should be closed as off topic because the issue is not reproducible.</p>
+
+<hr>
+
+<p><strong>[Note]</strong> For impatient people <em>Solution</em> is at the end of the answer.</p>
+
+<hr>
+
+<p>Anyway that question given to me a good point to thought: how we can patch a method reference when we cannot access to the <em>variable</em> where the reference is?</p>
+
+<p>Lot of times I found some issue like this. There are lot of ways to meet that case and the commons are</p>
+
+<ul>
+<li>Decorators: the instance we would like replace is passed as decorator argument or used in decorator static implementation</li>
+<li>What we would like to patch is a default argument of a method</li>
+</ul>
+
+<p>In both cases maybe refactor the code is the best way to play with that but what about if we are playing with some legacy code or the decorator is a third part decorator?</p>
+
+<p>Ok, we have the back on the wall but we are using python and in python nothing is impossible. What we need is just the reference of the function/method to patch and instead of patching its reference we can patch the <code>__code__</code>: yes I'm speaking about patching the bytecode instead the function.</p>
+
+<p>Get a real example. I'm using default parameter case that is simple, but it works either in decorator case.</p>
+
+<pre><code>def cmd(a):
+    print("ORIG {}".format(a))
+def cmd_fake(a):
+    print("NEW {}".format(a))
+def do_work(a, c=cmd):
+    c(a)
+
+do_work("a")
+cmd=cmd_fake
+do_work("b")
+</code></pre>
+
+<p>Output:</p>
+
+<blockquote>
+<pre><code>ORIG a
+ORIG b
+</code></pre>
+</blockquote>
+
+<p>Ok In this case we can test <code>do_work</code> by passing <code>cmd_fake</code> but there some cases where is impossible do it: for instance what about if we need to call something like that:</p>
+
+<pre><code>def what_the_hell():
+    list(map(lambda a:do_work(a), ["c","d"]))
+</code></pre>
+
+<p>what we can do is patch <code>cmd.__code__</code> instead of <code>_cmd</code> by</p>
+
+<pre><code>cmd.__code__ = cmd_fake.__code__
+</code></pre>
+
+<p>So follow code</p>
+
+<pre><code>do_work("a")
+what_the_hell()
+cmd.__code__ = cmd_fake.__code__
+do_work("b")
+what_the_hell()
+</code></pre>
+
+<p>Give follow output:</p>
+
+<blockquote>
+<pre><code>ORIG a
+ORIG c
+ORIG d
+NEW b
+NEW c
+NEW d
+</code></pre>
+</blockquote>
+
+<p>Moreover if we want to use a mock we can do it by add follow lines:</p>
+
+<pre><code>from unittest.mock import Mock, call
+cmd_mock = Mock()
+def cmd_mocker(a):
+    cmd_mock(a)
+
+cmd.__code__=cmd_mocker.__code__
+what_the_hell()
+cmd_mock.assert_has_calls([call("c"),call("d")])
+print("WORKS")
+</code></pre>
+
+<p>That print out</p>
+
+<blockquote>
+<pre><code>WORKS
+</code></pre>
+</blockquote>
+
+<hr>
+
+<p>Maybe I'm done... but OP still wait for a <em>solution</em> of his <em>issue</em></p>
+
+<pre><code>from mock import patch, Mock
+
+cmd_mock = Mock()
+#A closure for grabbing the right function code
+def cmd_mocker(a):
+    cmd_mock(a)
+
+@patch.object(module._cmd,'__code__', new=cmd_mocker.__code__) 
+test_function():
+   ...
+</code></pre>
+
+<p>Now I should say <strong>never use this trick unless you are with the back on the wall</strong>. Test should be simple to understand and to debug ... try to debug something like this and you will become mad!</p>

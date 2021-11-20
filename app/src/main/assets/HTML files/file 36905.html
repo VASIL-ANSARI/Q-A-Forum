@@ -1,0 +1,30 @@
+<p>Well this is a simple solution, find all procedures that contain the search string, loop through them and replace that string in the definition and run it. This is a very simplistic solution with no error checking or transactions but show what can be done</p>
+
+<pre><code>DECLARE @searchstr VARCHAR(50), @replacestr VARCHAR(50), @str VARCHAR(MAX), @name VARCHAR(40)
+SET @searchstr = '@password varchar(50),'
+SET @replacestr = '@password varchar(100),'
+
+DECLARE test_cursor CURSOR READ_ONLY FOR 
+SELECT name, object_definition(OBJECT_ID)
+FROM sys.objects
+WHERE object_definition(OBJECT_ID) LIKE '%' + @searchstr + '%'
+and type = 'P'
+
+OPEN test_cursor
+
+FETCH NEXT FROM test_cursor INTO @name, @str
+WHILE (@@FETCH_STATUS &lt;&gt; -1)
+BEGIN
+    IF (@@FETCH_STATUS &lt;&gt; -2)
+    BEGIN
+        PRINT @name
+        SET @str = REPLACE(@str, @searchstr, @replacestr)
+        EXEC ('drop proc ' + @name)
+        EXEC (@str)
+    END
+    FETCH NEXT FROM test_cursor INTO @name, @str
+END
+
+CLOSE test_cursor
+DEALLOCATE test_cursor
+</code></pre>

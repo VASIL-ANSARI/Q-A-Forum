@@ -1,0 +1,48 @@
+<p><strong>1. Variant: Nice code but reads all matrices at once</strong></p>
+
+<pre><code>matrixFileCount = 3
+matrices = [np.loadtxt(open("matrix%s.txt" % i ), delimiter=",", skiprows=1) for i in range(1,matrixFileCount+1)]
+allC = itertools.combinations([x for x in range(matrixFileCount)], 2)
+allCMultiply = [np.dot(matrices[c[0]], matrices[c[1]]) for c in allC]
+print  allCMultiply
+</code></pre>
+
+<p><strong>2. Variant: Only load 2 Files at once, nice code but a lot of reloading</strong></p>
+
+<pre><code>allCMulitply = []
+fileList = ["matrix%s.txt" % x for x in range(1,matrixFileCount+1)]
+allC = itertools.combinations(fileList, 2)
+for c in allC:
+    m = [np.loadtxt(open(file), delimiter=",", skiprows=1) for file in c]
+    allCMulitply.append(np.dot(m[0], m[1]))
+print allCMulitply
+</code></pre>
+
+<p><strong>3. Variant: like the second but avoid loading every time. But only 2 matrix at one point in memory</strong></p>
+
+<p>Cause the permutations created with itertools are like <code>(1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)</code> you can avoid somtimes loading both of the 2 matrices.</p>
+
+<pre><code>matrixFileCount = 3
+allCMulitply = []
+mLoaded = {'file' : None, 'matrix' : None}
+fileList = ["matrix%s.txt" % x for x in range(1,matrixFileCount+1)]
+allC = itertools.combinations(fileList, 2)
+for c in allC:
+    if c[0] is mLoaded['file']:
+        m = [mLoaded['matrix'], np.loadtxt(open(c[1]), delimiter=",", skiprows=1)]
+    else:
+        mLoaded = {'file' : None, 'matrix' : None}
+        m = [np.loadtxt(open(file), delimiter=",", skiprows=1) for file in c]
+    mLoaded = {'file' : c[0], 'matrix' : m[0]}
+    allCMulitply.append(np.dot(m[0], m[1]))
+print allCMulitply
+</code></pre>
+
+<p><strong>Performance</strong></p>
+
+<p>If you can load all Matrix at once in the memory, the first part is faster then the second, cause in the second you reload matrices a lot. Third part slower than first, but faster than second, cause it avoids sometimes to reloading matrices.</p>
+
+<pre><code>0.943613052368 (Part 1: 10 Matrices a 2,2 with 1000 executions)
+7.75622487068  (Part 2: 10 Matrices a 2,2 with 1000 executions)
+4.83783197403  (Part 3: 10 Matrices a 2,2 with 1000 executions)
+</code></pre>

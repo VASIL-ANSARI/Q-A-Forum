@@ -1,0 +1,27 @@
+<p>Using thread ID is too low level and brittle. If you decided to use <a href="http://static.springsource.org/spring/docs/current/spring-framework-reference/html/scheduling.html#scheduling-annotation-support-async"><code>@Async</code> annotation</a> (good choice) you can use <a href="http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Future.html"><code>Future&lt;T&gt;</code></a> to control the task execution. Basically your method should return a <code>Future&lt;T&gt;</code> instead of <code>void</code>:</p>
+
+<pre><code>@Async
+public Future&lt;Work&gt; work() //...
+</code></pre>
+
+<p>Now you can <code>cancel()</code> that <code>Future</code> or wait for it to complete:</p>
+
+<pre><code>@ResponseBody
+@RequestMapping("/job/start")
+public String start() {
+    Future&lt;Work&gt; future = asyncWorker.work();
+    //store future somewhere
+    return "start";
+}
+
+@ResponseBody
+@RequestMapping("/job/stop")
+public String stop() {
+    future.cancel();
+    return "stop";
+}
+</code></pre>
+
+<p>The tricky part is to store the returned <code>future</code> object somehow so it is available for subsequent requests. Of course you cannot use a field or <code>ThreadLocal</code>. You can put in session, note however that <code>Future</code> is not serializable and won't work across clusters.</p>
+
+<p>Since <code>@Async</code> is typically backed by thread pool, chances are your tasks didn't even started. Cancelling will simply remove it from the pool. If the task is already running, you can the <code>isInterrupted()</code> thread flag or handle <code>InterruptedException</code> to discover <code>cancel()</code> call.</p>

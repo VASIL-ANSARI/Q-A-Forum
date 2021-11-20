@@ -1,0 +1,50 @@
+<p>Using a recursive CTE:</p>
+
+<pre><code>DECLARE @test TABLE (id INT NOT NULL, ancestor_id INT NULL)
+
+DECLARE
+    @id INT = 1,
+    @i INT = 1,
+    @j INT = 2
+
+INSERT INTO @test (id, ancestor_id)
+VALUES
+    (1, NULL),
+    (2, 1),
+    (3, 1),
+    (4, 3),
+    (5, 3)
+
+;WITH CTE_Tree AS
+(
+    SELECT
+        id,
+        ancestor_id,
+        1 AS lvl,
+        id AS base
+    FROM
+        @test
+    WHERE
+        id = @id
+    UNION ALL
+    SELECT
+        C.id,
+        C.ancestor_id,
+        P.lvl + 1 AS lvl,
+        P.base AS base
+    FROM
+        CTE_Tree P
+    INNER JOIN @test C ON C.ancestor_id = P.id
+    WHERE
+        lvl &lt;= COALESCE(@j, 9999)
+)
+SELECT
+    id,
+    ancestor_id
+FROM
+    CTE_Tree
+WHERE
+    lvl BETWEEN @i AND COALESCE(@j, 9999)
+</code></pre>
+
+<p>This relies on no more than 9999 levels of recursion (actually the default limit on recursion for SQL Server is 100, so more than 100 levels and you'll get an error).</p>

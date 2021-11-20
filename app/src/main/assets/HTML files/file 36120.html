@@ -1,0 +1,69 @@
+<p>Justin, yes, replacing <code>each</code> with <code>any?</code> fixes the problem, but there are a few other problems with your code that you should know about.</p>
+
+<p>Firstly, your two methods are functionally identical.  Yes, you have given the methods and the block variables different names, but they do the same thing. You can confirm that by calling either of them twice, once passing the argument <code>grocery_list</code> and once with argument <code>grocery_cart</code>.</p>
+
+<p>Secondly, you can make your method <code>is_item_on_grocery_list?</code> potentially more versatile by passing the value of <code>@choice</code> as a parameter, rather than hardwiring it in.  So consider writing it like this:</p>
+
+<pre><code>milk    = {:item =&gt; "milk",    :aisle =&gt; 15, :price =&gt; 3.29}
+grapes  = {:item =&gt; "grapes",  :aisle =&gt; 1,  :price =&gt; 7.99}
+eggs    = {:item =&gt; "eggs",    :aisle =&gt; 12, :price =&gt; 1.95}  
+peanuts = {:item =&gt; "peanuts", :aisle =&gt; 17, :price =&gt; 5.98} 
+
+grocery_list = [milk, grapes, eggs]
+grocery_cart = [peanuts]
+
+def item_present?(arr, item)
+  arr.any? do |food|
+    food[:item] == item
+  end
+end
+
+puts "Type an item from your Grocery List to find out what aisle it is on: "
+print "&gt; "
+choice = gets.chomp.downcase.strip
+
+if item_present?(grocery_list, choice)
+  puts "I found your item on the grocery list."
+elsif item_present?(grocery_cart, choice)
+  puts "Your item is already in your cart."
+else puts "Your item is not on either list."
+end 
+</code></pre>
+
+<p>Suppose the user were to enter "eggs".  This would print, "I found your item on the grocery list.", which is fine, but suppose you also wanted to tell the person the aisle that egges are in.  One way you could do that would be to change <code>item_present?</code> to this:</p>
+
+<pre><code>def item_present?(arr, item)
+  arr.any? do |food|
+    (food[:item] == item) ? food[:aisle] : false
+  end
+end
+</code></pre>
+
+<p>That is, rather than returning <code>true</code> or <code>false</code>, it would return either the aisle (which is a truthy value) or <code>false</code>.  This is rather messy, however, so maybe consider using a different data structure.  Here is one possibility:</p>
+
+<pre><code>food = { "milk"    =&gt; { :loc =&gt; :list, :aisle =&gt; 15, :price =&gt; 3.29},
+         "grapes"  =&gt; { :loc =&gt; :list, :aisle =&gt; 1,  :price =&gt; 7.99},
+         "eggs"    =&gt; { :loc =&gt; :list, :aisle =&gt; 12, :price =&gt; 1.95},
+         "peanuts" =&gt; { :loc =&gt; :cart, :aisle =&gt; 17, :price =&gt; 5.98}
+       } 
+
+def item_present?(food, type, item)
+  food.any? { |f| food.key?(item) &amp;&amp; food[item][:loc] == type }
+end
+
+puts "Type an item from your Grocery List to find out what aisle it is on: "
+print "&gt; "
+choice = gets.chomp.downcase.strip
+
+if item_present?(food, :list, choice)
+  puts "I found your item on the grocery list. Try aisle #{food[choice][:aisle]}"
+elsif item_present?(food, :cart, choice)
+  puts "Your item is already in your cart.  Are you blind?"
+else puts "Your item is not on your list or in your cart."
+end
+</code></pre>
+
+<p>Now if the user enters "eggs", the following is printed:</p>
+
+<pre><code>"I found your item on the grocery list. Try aisle 12"
+</code></pre>

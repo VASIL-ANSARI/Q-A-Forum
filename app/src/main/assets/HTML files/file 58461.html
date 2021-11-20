@@ -1,0 +1,39 @@
+<p>It may be a partial answer, you may get some idea based on the query.</p>
+
+<p>Using this query you can create a row number and generate a auto increment id.</p>
+
+<pre><code>SELECT 'a' + REPLICATE('0', 6 - LEN(BranchId)) + CAST(BranchId AS VARCHAR) AS NewBrachId , BranchId
+FROM ( SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) BranchId FROM Branch ) A 
+</code></pre>
+
+<p>Based on that value you can join with the actual branch table and update as per your requirement.</p>
+
+<p>Sample execution with sample data:</p>
+
+<pre><code>CREATE TABLE Branch (
+    BranchId VARCHAR(7) NULL,
+    BranchName VARCHAR (500)
+);
+
+INSERT INTO Branch (BranchName) VALUES
+('Branch 001'), ('Branch 002'), ('Branch 003'), ('Branch 004'), ('Branch 005'), 
+('Branch 006'), ('Branch 007'), ('Branch 008'), ('Branch 009'), ('Branch 010');
+
+CREATE TABLE #Tmp_TableForBranchUpdate (BranchName VARCHAR (500), BranchId INT);
+
+INSERT INTO #Tmp_TableForBranchUpdate (BranchName, BranchId) 
+SELECT BranchName, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) BranchId
+FROM Branch
+
+UPDATE BR SET BranchId = TE.NewBrachId
+FROM Branch BR
+JOIN #Tmp_TableForBranchUpdate UT ON UT.BranchName = BR.BranchName 
+JOIN (
+    SELECT 'a' + REPLICATE('0', 6 - LEN(BranchId)) + CAST(BranchId AS VARCHAR) AS NewBrachId , BranchId
+    FROM ( SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) BranchId FROM Branch ) A 
+    ) TE ON TE.BranchId = UT.BranchId
+
+DROP TABLE #Tmp_TableForBranchUpdate
+
+-- SELECT * FROM Branch
+</code></pre>

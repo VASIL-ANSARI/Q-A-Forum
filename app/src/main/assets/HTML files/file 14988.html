@@ -1,0 +1,48 @@
+<p>When sorting out problems like this, I would do it in two steps:</p>
+
+<ol>
+<li>Sort out the SQL independently of the presentation language (PHP?).</li>
+<li>Sort out the parameterization of the query and the presentation of the results after you know you've got the correct query.</li>
+</ol>
+
+<p>Since this question is tagged 'SQL', I'm only going to address the first question.</p>
+
+<p>The first step is to unclutter the query:</p>
+
+<pre><code>SELECT menucompare,
+       (COUNT(menucompare) * 100 / (SELECT COUNT(menucompare) FROM data WHERE ww = 6))
+          AS percentday
+  FROM data
+ WHERE ww &gt; 0;
+</code></pre>
+
+<p>This removes the <code>$</code> signs from most of the variable bits, and substitutes 6 for the button value.  That makes it a bit easier to understand.</p>
+
+<p>Your desired output seems to need the last four characters of the string held in <code>menucompare</code> for grouping and counting purposes.</p>
+
+<p>The data to be aggregated would be selected by:</p>
+
+<pre><code>SELECT SUBSTR(MenuCompare, -4) AS Last4
+  FROM Data
+ WHERE ww = 6
+</code></pre>
+
+<p>The divisor in the percentage is the count of such rows, but the sub-stringing isn't necessary to count them, so we can write:</p>
+
+<pre><code>SELECT COUNT(*) FROM Data WHERE ww = 6
+</code></pre>
+
+<p>This is exactly what you have anyway.</p>
+
+<p>The divdend in the percentage will be the group count of each substring.</p>
+
+<pre><code>SELECT Last4, COUNT(Last4) * 100.0 / (SELECT COUNT(*) FROM Data WHERE ww = 6)
+  FROM (SELECT SUBSTR(MenuCompare, -4) AS Last4
+          FROM Data
+         WHERE ww = 6
+       ) AS Week6
+ GROUP BY Last4
+ ORDER BY Last4;
+</code></pre>
+
+<p>When you've demonstrated that this works, you can re-parameterize the query and deal with the presentation of the results.</p>

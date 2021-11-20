@@ -1,0 +1,44 @@
+<p>You get an error because the field is a character and you're assuming it's a number. Which, you shouldn't be doing. If you want the field to be numeric then you <em>have</em> to have a numeric field! This is a general rule, all non-character columns should be the correct data-type to avoid this type of problem.</p>
+
+<p>I'm not certain why Oracle doesn't tell you what row caused the error, it may be physically possible using the <a href="http://docs.oracle.com/cd/E11882_01/server.112/e26088/pseudocolumns008.htm#SQLRF00254" rel="nofollow"><code>rowid</code></a> in a simple select as you have here. If you're joining tables or using conversion functions such as <code>to_number</code> it would become a lot more difficult, if possible at all.</p>
+
+<p>I would imagine that Oracle did not want to implement something only partially, especially when this is not an Oracle error but a coding error.</p>
+
+<p>To sort out the problem create the following function:</p>
+
+<pre><code>create or replace function is_number( Pvalue varchar2 
+      ) return number is
+    /* Test whether a value is a number. Return a number
+       rather than a plain boolean so it can be used in
+       SQL statements as well as PL/SQL.
+       */
+
+   l_number number;
+
+begin
+
+   -- Explicitly convert.
+   l_number := to_number(Pvalue);
+
+   return 1;
+
+exception when others then
+   return 0;
+
+end;
+/
+</code></pre>
+
+<p>Run the following to find your problem rows:</p>
+
+<pre><code>SELECT * FROM employeesTbl WHERE is_number(active) = 0
+</code></pre>
+
+<p>Or this to ignore them:</p>
+
+<pre><code>SELECT *
+  FROM ( SELECT *
+           FROM employeesTbl
+          WHERE is_number(active) = 1 )
+WHERE active = 1
+</code></pre>

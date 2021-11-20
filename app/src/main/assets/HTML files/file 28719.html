@@ -1,0 +1,104 @@
+<p><code>move_uploaded_file</code> already does what you want.</p>
+
+<p>The error is most likely caused by the fact that you're writing to an <em>absolute path</em>, i.e., to a directory called "example" in the root of the file system, instead of a subdirectory "example" in the current web server's root.</p>
+
+<p>Also, you could prepare an array of allowed types and check with <code>in_array</code>:</p>
+
+<pre><code>$allowed_types = array('image/gif', 'image/jpeg', ...);
+
+if ((in_array($_FILES['file']['type'], $allowed_types)
+    &amp;&amp; ...) {
+    ...
+</code></pre>
+
+<p>Another thing worth doing is defining some variables so that you can be sure of always using the same values, as you only assign them once. If you make a typo in the variable name you'll get a notice, while if you typo a path or forget to update one of several instances after a modification, you risk a silent and/or difficult-to-diagnose error.</p>
+
+<pre><code>$destination_dir = './example/'; // Also, note the "." at the beginning
+
+// SECURITY: do not trust the name supplied by the user! At least use basename().
+$basename = basename($_FILES["file"]["name"]);
+
+if (!is_dir($destination_dir)) {
+    trigger_error("Destination dir {$destination_dir} is not writeable", E_USER_ERROR);
+    die();
+}
+
+if (file_exists($destination_file = $destination_dir . $basename)) {
+  echo "{$basename} already exists";
+} else {
+  move_uploaded_file($_FILES["file"]["tmp_name"],
+  $destination_file);
+  echo "Stored in: {$destination_file}";
+}
+</code></pre>
+
+<p>In your case you want the picture to be saved <em>in such a way that <code>&lt;?= $c-&gt;username ?&gt;.png</code> loads it back in a browser</em>.</p>
+
+<p>For this you need two things: the file path and the image format, which has to be PNG. Sending a JPEG after telling the browser you're sending a PNG might not work (some browsers will auto-recognize the format, other won't). You might also want to fit the image into a specific size.</p>
+
+<p>So you should do something like this:</p>
+
+<pre><code>// We ignore the $basename supplied by the user, using its username.
+// **I assume that you know how to retrieve $c at this point.**
+$basename = $c-&gt;username . '.png';
+
+$destination_file = $destination_dir . $basename;
+
+if ('image/png' == $_FILES['file']['type']) {
+    // No need to do anything, except perhaps resizing.
+    move_uploaded_file($_FILES["file"]["tmp_name"], $destination_file);
+} else {
+    // Problem. The file is not PNG.
+    $temp_file = $destination_file . '.tmp';
+    move_uploaded_file($_FILES["file"]["tmp_name"], $temp_file);
+    $image_data = file_get_contents($temp_file);
+    unlink($temp_file);
+
+    // Now we have image data as a string.
+    $gd = ImageCreateFromString($image_data);
+
+    // Save it as PNG.
+    ImagePNG($gd, $destination_file);
+    ImageDestroy($gd);
+}
+
+// Optional resize.
+if (false) {
+    list($w, $h) = getImageSize($destination_file);
+
+    // Fit it into a 64x64 square.
+    $W = 64;
+    $H = 64;
+    if (($w != $W) || ($h != $H)) {
+        $bad  = ImageCreateFromPNG($destination_file);
+        $good = ImageCreateTrueColor($W, $H);
+
+        $bgnd = ImageColorAllocate($good, 255, 255, 255); // White background
+        ImageFilledRectangle($good, 0, 0, $W, $H, $bgnd);
+
+        // if the image is too wide, it will become $W-wide and &lt;= $H tall.
+        // So it will have an empty strip top and bottom.
+        if ($w &gt; $W*$h/$H) {
+            $ww = $W;
+            $hh = $ww * $h / $w;
+            $xx = 0;
+            $yy = floor(($H - $hh)/2);
+        } else {
+            // It will be $H tall, and l.o.e. than $W wide
+            $hh = $H;
+            $ww = $hh * $w / $h;
+            $xx = floor(($W - $ww)/2);
+            $yy = 0;
+        }
+        ImageCopyResampled($good, $bad,
+            $xx, $yy, 0, 0,
+           $ww, $hh, $w, $h
+        );
+
+        // Save modified image.
+        ImageDestroy($bad);
+        ImagePNG($good, $destination_file);
+        ImageDestroy($good);
+    }
+}
+</code></pre>

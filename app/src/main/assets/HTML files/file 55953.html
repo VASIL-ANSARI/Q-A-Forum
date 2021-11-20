@@ -1,0 +1,64 @@
+<p><code>struct ethhdr</code> is defined as such:</p>
+
+<pre><code>/*
+ *  This is an Ethernet frame header.
+ */
+
+struct ethhdr {
+    unsigned char   h_dest[ETH_ALEN];   /* destination eth addr */
+    unsigned char   h_source[ETH_ALEN]; /* source ether addr    */
+    __be16      h_proto;        /* packet type ID field */
+} __attribute__((packed));
+</code></pre>
+
+<p><strong>But your code is trying to print that byte array using <code>%x</code>:</strong></p>
+
+<pre><code>printk(KERN_INFO "hdr-&gt;h_dest 0x%x\n", hdr-&gt;h_dest);
+</code></pre>
+
+<p>That makes no sense, and probably causes a compiler warning to be generated. This is kernel code - you <em>are</em> using <code>-Werror</code> and <code>-Wall</code>, <em>right?</em></p>
+
+<hr>
+
+<p>Good news: <code>printk</code> supports printing MAC addresses directly. From <a href="http://lxr.free-electrons.com/source/Documentation/printk-formats.txt?v=4.5#L136" rel="nofollow"><code>documentation/printk-formats.txt</code></a>:</p>
+
+<pre class="lang-none prettyprint-override"><code>MAC/FDDI addresses:
+
+    %pM 00:01:02:03:04:05
+    %pMR    05:04:03:02:01:00
+    %pMF    00-01-02-03-04-05
+    %pm 000102030405
+    %pmR    050403020100
+
+    For printing 6-byte MAC/FDDI addresses in hex notation. The 'M' and 'm' 
+    specifiers result in a printed address with ('M') or without ('m') byte
+    separators. The default byte separator is the colon (':').
+
+    Where FDDI addresses are concerned the 'F' specifier can be used after
+    the 'M' specifier to use dash ('-') separators instead of the default
+    separator.
+
+    For Bluetooth addresses the 'R' specifier shall be used after the 'M' 
+    specifier to use reversed byte order suitable for visual interpretation
+    of Bluetooth addresses which are in the little endian order.
+
+    Passed by reference.
+</code></pre>
+
+<p>So you can just use this:</p>
+
+<pre><code>printk(KERN_INFO "hdr-&gt;h_dest 0x%pM\n", hdr-&gt;h_dest);
+</code></pre>
+
+<p>These format specifiers are provided anywhere <code>vsnprintf</code> is used. Here's <a href="http://lxr.free-electrons.com/source/net/ipv4/netfilter/nf_log_ipv4.c?v=4.5#L290" rel="nofollow">an example</a>:</p>
+
+<pre><code>    switch (dev-&gt;type) {
+    case ARPHRD_ETHER:
+            nf_log_buf_add(m, "MACSRC=%pM MACDST=%pM MACPROTO=%04x ",
+                           eth_hdr(skb)-&gt;h_source, eth_hdr(skb)-&gt;h_dest,
+                           ntohs(eth_hdr(skb)-&gt;h_proto));
+            return;
+    default:
+            break;
+    }
+</code></pre>

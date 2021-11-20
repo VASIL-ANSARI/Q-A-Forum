@@ -1,0 +1,34 @@
+<p>I assume you know how to do the uploading part, so I concentrate on the Excel part.</p>
+
+<p>There are a bunch of 3rd-Party tools to read Excel files in .NET, which in my experience is way more flexible than using the capabilities that .NET has out-of-the-box. However here's one way you can do it:</p>
+
+<pre><code>DbProviderFactory factory = DbProviderFactories.GetFactory("System.Data.OleDb");
+
+using (DbConnection connection = factory.CreateConnection())
+{
+    connection.ConnectionString = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=C:\MyExcel.xls;Extended Properties="Excel 8.0;HDR=Yes;IMEX=1";
+    connection.Open();
+
+    using (DbCommand command = connection.CreateCommand())
+    {
+        command.CommandText = "SELECT * FROM [Sheet1$]";
+
+        using (DbDataReader dr = command.ExecuteReader())
+        {
+            while (dr.Read())
+            {
+                /* read data here */
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>Keep in mind:</p>
+
+<ol>
+<li><p>The Jet OLE DB provider reads a registry key to determine how many rows are to be read to guess the type of the source column. The registry setting is: HKLM\Software\Microsoft\Jet\4.0\Engines\Excel\TypeGuessRows. By default, the value for this key is 8. Hence, the provider scans the first 8 rows of the source data to determine the data types for the columns (see <a href="http://support.microsoft.com/kb/281517" rel="nofollow">http://support.microsoft.com/kb/281517</a>) The valid range of values for the TypeGuessRows key is 0 to 16. However, if the value is 0, the number of source rows scanned is 16384.</p></li>
+<li><p>On 64-bit systems the Microsoft.Jet.OLEDB.4.0 driver is currently not supported.</p></li>
+<li><p>For more info on the parameters used in the connection string see here: <a href="http://www.connectionstrings.com/excel" rel="nofollow">http://www.connectionstrings.com/excel</a></p></li>
+<li><p>"HDR=Yes" in the connection string indicates that the provider will not include the first row of the cell range (which may be a header row) in the RecordSet. So if the header row gives you  information that you need to build the sqlbulkcopy commands you should set it to "HDR=No".</p></li>
+</ol>

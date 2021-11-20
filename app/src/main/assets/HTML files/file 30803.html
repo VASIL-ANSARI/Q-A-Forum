@@ -1,0 +1,31 @@
+<p>Your function is currently returning a VARCHAR(MAX) - and the SELECT statement sets the variable to 1 rows fields (probably the first row).  This will always return 1 varchar field.  If you wish to return all the rows you must either do one of two things (depends on how this fits into your other code as you may need to change the calling procedure):</p>
+
+<p>Option 1: 
+Create a cursor and loop through your SELECT statement and keep appending to the variable @liststr 
+This will then still return one long string</p>
+
+<p>Option 2:
+Change the function to return a table
+eg:</p>
+
+<pre><code>ALTER FUNCTION [dbo].[fnGetTrustNotesByTrustIDForAdminConsole] 
+( @TrustID INT
+)
+RETURNS @Temp TABLE(
+  lstStr varchar(MAX)
+)
+AS
+BEGIN
+
+  INSERT INTO @Temp(lstStr)
+  SELECT @listStr = COALESCE(@listStr + '|' , '') + ltrim(Note.NoteText)
+  FROM   TrustNote
+  JOIN   Note 
+  ON     TrustNote.NoteID = Note.NoteID
+  AND    Note.Archived = 0
+  WHERE  Trustid = @TrustID
+
+  RETURN
+
+END
+</code></pre>

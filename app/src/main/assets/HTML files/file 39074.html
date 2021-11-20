@@ -1,0 +1,54 @@
+<p>PHP is probably improperly filling the <code>$_POST</code> array because it is interpreting the JPEG data as form data which might contain <code>&amp;</code> characters or other things that will confuse it.  If you manually read the input stream instead of relying on <code>$_POST</code>, you should be able to recover your data.</p>
+
+<p>I wrote some quick code to try to reproduce your issue and test this:</p>
+
+<p><strong>client.php</strong></p>
+
+<p>This code emulates your client; it just reads a JPEG file and writes it raw over a POST request.</p>
+
+<pre><code>$url = 'http://localhost/server.php';
+$input = __DIR__ . '/input.jpg';
+
+$parts = parse_url($url);
+$sock = fsockopen($parts['host'], 80);
+
+$out = "POST ".$parts['path']." HTTP/1.1\r\n";
+$out.= "Host: ".$parts['host']."\r\n";
+$out.= "Content-Type: application/x-www-form-urlencoded\r\n";
+$out.= "Content-Length: ".(filesize($input) + strlen("rawImageData="))."\r\n";
+$out.= "\r\n";
+$out.= "rawImageData=";
+
+fwrite($sock, $out);
+$fd = fopen($input, 'r');
+stream_copy_to_stream($fd, $sock);
+fclose($fd);
+fclose($sock);
+</code></pre>
+
+<p><strong>server.php (version 1)</strong></p>
+
+<p>This tries to use the <code>$_POST</code> value as your code does.</p>
+
+<pre><code>$tmp = "/tmp/output.jpg";
+file_put_contents($tmp, $_POST['rawImageData']);
+</code></pre>
+
+<p><strong>server.php (version 2)</strong></p>
+
+<p>This reads the raw input stream from the POST body.</p>
+
+<pre><code>$tmp = "/tmp/output.jpg";
+$fd = fopen('php://input', 'r');
+fread($fd, strlen("rawImageData=")); //throw this data out
+$out = fopen($tmp, 'w');
+stream_copy_to_stream($fd, $out);
+fclose($out);
+fclose($fd);
+</code></pre>
+
+<p>For <code>input.jpg</code> I used an ~10k JPEG file from Wikipedia.</p>
+
+<p><strong>Result</strong></p>
+
+<p>Server version 1 writes only about 50 bytes to output.jpg, and when I try to open it with a viewer, I get a corrupt JPEG error.  Server version 2 writes the full 10k bytes, and my JPEG viewer shows the image just fine.</p>

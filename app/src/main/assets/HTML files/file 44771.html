@@ -1,0 +1,148 @@
+<p>There is no such thing as three way ratios. A ratio has exactly two parties. Now that we have this out of the way, let's split the ratio.</p>
+
+<p>We can define x:y with x number of available threads (CPUs/cores) and y number of PhantomJS processes. Then we can define y:z with z number of <code>page</code> instances.</p>
+
+<h3>Cores vs. processes</h3>
+
+<p>You can run as many PhantomJS processes as you like as long as the hardware supports it (mainly RAM). But for most architectures (all?), you will get a drop in relative performance (<code>y/x</code>) when <code>y &gt; x</code>. When you have many processes and not as many cores then at least two processes must share one core (or thread if you have multi-threading). So those two processes won't be done as fast as the others. This has nothing to do with PhantomJS, but normal multi-process behavior.</p>
+
+<p>If you have <code>y &gt;&gt; x</code> then even context switching of the processes might become a bottleneck and everything will be extremely slow.</p>
+
+<p>Always look to spawn only as many processes as you have cores/threads (maybe even less).</p>
+
+<p>For almost all cases, PhantomJS processes run independently by default. Only if the pages they are running on use localStorage, then you may run into problems. localStorage is always persisted on disk and there is no way to change that.</p>
+
+<h3>PhantomJS process vs. <code>page</code> instances</h3>
+
+<p>PhantomJS runs JavaScript scripts. Since JavaScript is single-threaded as a whole, you cannot get any parallel processing, but you can get concurrency through the normal JavaScript event loop.</p>
+
+<p>PhantomJS supports multiple <code>page</code> instances per process and this works rather well, but of course since JavaScript is single-threaded, the execution of multiple pages is interlaced. This means that opening two pages at the "same time" should result in more or less the same time it would take to open them one after the other.</p>
+
+<p><strong>This is not strictly the case</strong>, because waiting for resources of one page enables other pages to do further processing. When pages are opened sequentially, then the time that one page is waiting for resources to be loaded cannot be used by other pages.</p>
+
+<p>On the other hand one cannot use a large amount of <code>page</code> instances in one process, because the requests of the different pages will hinder each other. HTTP requests run on TCP. If there are multiple TCP which are fighting for the bandwidth then the overall efficiency of the connection is lower. But this should still be faster than the sequential case. This is why HTTP/2 (SPDY) is such a good idea.</p>
+
+<p><strong>The concurrent processing is faster than the sequential way,</strong> but it is harder to program managing multiple <code>page</code> instances per PhantomJS process (maybe even for multiple processes).</p>
+
+<h1>Benchmark: multiple <code>page</code> instances</h1>
+
+<p>This script shows the two versions of requesting sites. The first iteration has largely differing results, because the cache is not filled yet. The cache cannot be cleared later, so every iteration uses cached resources after the first one.</p>
+
+<pre><code>var urls = [
+    'https://google.com', 
+    'http://stackoverflow.com/contact', 
+    'http://stackoverflow.com/questions?pagesize=15&amp;sort=newest', 
+    'http://www.spiegel.de/'
+];
+
+function sequential(callback) {
+    var copiedUrls = JSON.parse(JSON.stringify(urls)),
+        page = require('webpage').create(),
+        start = (new Date()).getTime();
+    function sequentialHelper(){
+        //console.log("seqHelp " + copiedUrls.length);
+        if (copiedUrls.length == 0) {
+            start = (new Date()).getTime() - start;
+            page.close();
+            callback(start);
+            return;
+        }
+        page.open(copiedUrls.shift(), function(s){
+            sequentialHelper();
+        });
+    }
+    sequentialHelper();
+}
+
+function parallel(callback) {
+    var copiedUrls = JSON.parse(JSON.stringify(urls)),
+        max = copiedUrls.length,
+        pages = [], 
+        start;
+    function checkFin(){
+        max--;
+        //console.log("parCheck " + max);
+        if (0 === max) {
+            start = (new Date()).getTime() - start;
+            pages.forEach(function(page){
+                page.close();
+            });
+            callback(start);
+        }
+    }
+    start = (new Date()).getTime();
+    copiedUrls.forEach(function(url){
+        var page = require('webpage').create();
+        pages.push(page);
+        page.open(url, function(s){
+            checkFin();
+        });
+    });
+}
+
+var repeat = 5,
+    current = 0,
+    times = [];
+
+function repeater(){
+    if (current === repeat) {
+        console.log(JSON.stringify(times, undefined, 4));
+        phantom.exit();
+    }
+    console.log("repeated: " + (current+1));
+
+    var t = {
+        par: (new Date()).getTime()
+    };
+    parallel(function(innerTime){
+        t.par = (new Date()).getTime() - t.par;
+        t.pari = innerTime;
+        t.seq = (new Date()).getTime();
+        sequential(function(innerTime){
+            t.seq = (new Date()).getTime() - t.seq;
+            t.seqi = innerTime;
+            times.push(t);
+            repeater();
+        });
+    });
+    current++;
+}
+
+repeater();
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>[
+    {
+        "par": 10653,
+        "pari": 10652,
+        "seq": 5304,
+        "seqi": 5301
+    },
+    {
+        "par": 2936,
+        "pari": 2936,
+        "seq": 5224,
+        "seqi": 5219
+    },
+    {
+        "par": 3167,
+        "pari": 3167,
+        "seq": 4478,
+        "seqi": 4474
+    },
+    {
+        "par": 2506,
+        "pari": 2506,
+        "seq": 6868,
+        "seqi": 6862
+    },
+    {
+        "par": 2479,
+        "pari": 2479,
+        "seq": 3753,
+        "seqi": 3749
+    }
+]
+</code></pre>

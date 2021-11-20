@@ -1,0 +1,56 @@
+<p>I have worked out the following solution.</p>
+
+<p>I'm not particularly happy with aspects of it (for example, having to unsubscribe ALL interest in 'process_action.action_controller'), and I'll certainly accept a better answer.</p>
+
+<p>We add the following as <code>config/initializers/custom_ac_log_subscriber.rb</code></p>
+
+<pre><code>module MyApp
+  class CustomAcLogSubscriber &lt; ActiveSupport::LogSubscriber
+    INTERNAL_PARAMS = ActionController::LogSubscriber::INTERNAL_PARAMS
+
+    #Do your custom stuff here. (The following is much simplified).
+    def start_processing(event)
+      payload = event.payload
+      params  = payload[:params].except(*INTERNAL_PARAMS)
+      info "Processing #{payload[:controller]}##{payload[:action]} (...)"
+      info "  Parameters: #{params.inspect}" unless params.empty?
+    end
+
+    def process_action(event)
+      payload   = event.payload
+      message = "Completed in %.0fms [#{payload[:path]}]" % event.duration
+      info(message)
+    end
+
+    def logger
+      ActionController::Base.logger
+    end
+  end
+end
+
+#Prevent ActionController::LogSubscriber from also acting on these notifications
+#Note that the following undesireably unregisters *everyone's*
+#interest in these.  We can't target one LogSubscriber, it seems(?)
+%w(process_action start_processing).each do |evt|
+  ActiveSupport::Notifications.unsubscribe "#{evt}.action_controller"
+end
+
+#Register our own interest
+MyApp::CustomAcLogSubscriber.attach_to :action_controller
+</code></pre>
+
+<p><strong>Notes on aborted initial approach:</strong></p>
+
+<p>I initially attempted an approach of unregistering the default LogSubscriber, with the intention that our custom one would inherit and do all the work (without having to reimpl).</p>
+
+<p>However, there are a number of problems.</p>
+
+<p>1) It's not enough to remove the LogSubscriber as follows:</p>
+
+<pre><code>ActiveSupport::LogSubscriber.log_subscribers.delete_if{ |ls| 
+  ls.instance_of? ActionController::LogSubscriber } 
+</code></pre>
+
+<p>As the request for notifications remains registered.</p>
+
+<p>2) Further, when you inherit a LogSubscriber and register it, it appears any non-overridden methods will not be called using the inherited implementation.</p>

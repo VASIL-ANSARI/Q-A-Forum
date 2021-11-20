@@ -1,0 +1,53 @@
+<p>What's at:</p>
+
+<pre><code>at MyDeliveryExtension.MailDelivery.SendMail(SubscriptionData data, Stream reportStream, String reportName, String smptServerHostname, Int32 smtpServerPort) 
+  in C:\inetpub\wwwroot\CustomReporting\MyDeliveryExtension\MailDelivery.cs:line 48 
+
+at MyDeliveryExtension.MyDelivery.Deliver(Notification notification) 
+  in C:\inetpub\wwwroot\CustomReporting\MyDeliveryExtension\MyDelivery.cs:line 153
+</code></pre>
+
+<p>Also you seem to be disposing the report stream, but that should be done by whatever opened that stream, not your method (it won't be obvious that attaching a stream disposes it).</p>
+
+<p>You're losing part of your stack trace due to how you re-throw exceptions. Don't throw the ex variable, just throw is enough.</p>
+
+<p>Try this tweak:</p>
+
+<pre><code>public static List&lt;string&gt; SendMail(SubscriptionData data, Stream reportStream, string reportName, string smptServerHostname, int smtpServerPort)
+{
+  List&lt;string&gt; failedRecipients = new List&lt;string&gt;();
+
+  MailMessage emailMessage = new MailMessage(data.ReplyTo, data.To) {
+      Priority = data.Priority,
+      Subject = data.Subject,
+      IsBodyHtml = false,
+      Body = data.Comment
+  };
+
+  if (reportStream != null)
+    emailMessage.Attachments.Add(new Attachment(reportStream, reportName));
+
+  try
+  {
+      SmtpClient smtp = new SmtpClient(smptServerHostname, smtpServerPort);
+
+      // Send the MailMessage
+      smtp.Send(emailMessage);
+  }
+  catch (SmtpFailedRecipientsException ex)
+  {
+    // Delivery failed for the recipient. Add the e-mail address to the failedRecipients List
+    failedRecipients.Add(ex.FailedRecipient);
+
+    //are you missing a loop here? only one failed address will ever be returned
+  }
+  catch (SmtpFailedRecipientException ex)
+  {
+    // Delivery failed for the recipient. Add the e-mail address to the failedRecipients List
+    failedRecipients.Add(ex.FailedRecipient);
+  }
+
+  // Return the List of failed recipient e-mail addresses, so the client can maintain its list.
+  return failedRecipients;
+}
+</code></pre>

@@ -1,0 +1,63 @@
+<p>Firstly, don't do <code>FROM sometable1 AS t1, sometable2 AS t2</code>. Always join explicitly. Secondly, from the way your case looks, some variant of <code>APPLY</code> would suit nicely.</p>
+
+<p>Here's my version:</p>
+
+<pre><code>SELECT a.Order_no
+      ,a.Customer_no
+      ,a.BILL_LAST_NAME
+      ,a.BILL_FIRST_NAME
+      ,b.email
+      ,a.BILL_ADDRESS1
+      ,a.BILL_ADDRESS2
+      ,a.BILL_CITY
+      ,a.BILL_STATE
+      ,a.BILL_POSTAL_CODE
+      ,a.BILL_COUNTRY
+      ,b.Address_Type
+      ,a.BILL_PHONE
+      ,a.BILL_PHONE_EXT
+      ,a.Order_Date
+      ,a.billing_status
+      ,a.PO_Number
+      ,a.Customer_comments
+      ,a.ShipMethodShipperDesc
+      ,a.ShipRate
+      ,a.CouponDiscountCode
+      ,a.CouponDiscount
+      ,a.CustomerDiscount
+      ,a.CustomerDiscountPercent
+      ,a.SalesTaxTotal
+      ,a.Payment_Method
+      ,a.Credit_Card_Type
+      ,a.Credit_Card_Number
+      ,a.Order_Date
+      ,a.BILL_TYPE
+      ,a.Order_Net
+      ,li.SHIP_ADDRESS1
+      ,li.SHIP_ADDRESS2
+      ,li.SHIP_CITY
+      ,li.SHIP_STATE
+      ,li.SHIP_POSTAL_CODE
+      ,li.SHIP_COUNTRY
+FROM Orders AS a
+INNER JOIN Customers AS b
+    ON a.customer_no = b.customer_no
+CROSS APPLY
+(
+    SELECT TOP 1 c.SHIP_ADDRESS1
+                ,c.SHIP_ADDRESS2
+                ,c.SHIP_CITY
+                ,c.SHIP_STATE
+                ,c.SHIP_POSTAL_CODE
+                ,c.SHIP_COUNTRY 
+    FROM LineItems c
+    WHERE c.ORDER_NO = a.ORDER_NO
+    ORDER BY c.Id -- or whatever
+) AS li
+WHERE a.AccountName = 'mywebaccount'
+AND a.billing_status &lt;&gt; 'Canceled'
+AND a.transferred = 0
+AND a.order_status &lt;&gt; 'Canceled'
+-- no need for that exists since CROSS APPLY works like INNER JOIN
+ORDER BY a.order_date,a.order_no
+</code></pre>

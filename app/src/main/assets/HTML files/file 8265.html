@@ -1,0 +1,49 @@
+<p>One option is to make each of your models implement the same interface:</p>
+
+<pre><code>interface IViewModel
+{
+    int AccountId { get; }
+}
+
+class AccountViewModel : IViewModel
+{
+    ...
+}
+</code></pre>
+
+<p>And then you can pass any viewmodel implementing this interface to your <code>UpdateAccount</code> method:</p>
+
+<pre><code>public void UpdateAccount(IViewModel model)
+{
+    var _currentData = (from data in db.Accounts
+                        where data.AccountId == model.AccountId
+                        select data).Single();
+    Mapper.Map(model, _currentData);
+    Save();
+
+}
+</code></pre>
+
+<p>Or you could define it as:</p>
+
+<pre><code>public void UpdateAccount&lt;TViewModel&gt;(TViewModel model) 
+    where TViewModel: IViewModel { ... }
+</code></pre>
+
+<p>However, this means you will also have to change the definition of <code>Mapper.Map(...)</code> method to accept your new interface: <code>Mapper.Map(IViewModel model, ...)</code>.</p>
+
+<p><strong>Edit</strong>: Just saw each viewmodel has a different <em>data key</em> (property?), perhaps this is a better solution:</p>
+
+<pre><code>public void UpdateAccount&lt;T&gt;(T model, Func&lt;T, int&gt; dataKeySelector)
+{
+    var _currentData = (from data in db.Accounts
+                        where data.AccountID == dataKeySelector(model)
+                        select data).Single();
+    Mapper.Map(model, _currentData);
+    Save();
+}   
+</code></pre>
+
+<p>Which can be called by <code>UpdateAccount(model, m =&gt; m.AccountID);</code>.</p>
+
+<p>Hope this helps.</p>

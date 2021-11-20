@@ -1,0 +1,25 @@
+<p>You should find that 6/7 (i.e. 85%) of your operations should continue to operate at the same performance. However the 15% of operations which are directed at the vbuckets owned by the now downed node will never complete and likely timeout, and so depending on how your application is handling these timeouts you may see a greater performance drop overall.</p>
+
+<p>How are you benchmarking / measuring the performance?</p>
+
+<p><em>Update: OP's extra details</em></p>
+
+<blockquote>
+  <p>I wrote a tool to load test use spymemcached. This tool create multi-thread to connect to Couchbase cluster. Each thread Set a key and Get this key to check immediately, if success it continues Set/Get another key. If fail, it retry Set/Get and by pass this key if fail in 5 times.</p>
+</blockquote>
+
+<p>The Java SDK is designed to make use of async operations for maximum performance, and this is particularly true when the cluster is degraded and some operations will timeout. I'd suggest starting running in a single thread but using <code>Futures</code> to handle the get after the set. For example:</p>
+
+<pre><code>client.set("key", document).addListener(new OperationCompletionListener() {
+    @Override
+    public void onComplete(OperationFuture&lt;?&gt; future) throws Exception {
+        System.out.println("I'm done!");    
+    }
+});
+</code></pre>
+
+<p>This is an extract from the <a href="http://docs.couchbase.com/couchbase-sdk-java-1.4/index.html#understanding-and-using-asynchronous-operations" rel="nofollow">Understanding and Using Asynchronous Operations</a> section of the Java Developer guide. </p>
+
+<p>There's essentially no reason why given the right code your performance with 85% of nodes up shouldn't be close to 85% of the maximum for a short downtime. </p>
+
+<p>Note that if a node is down for a long time then the replication queues on the other nodes will start to back up and that can impact performance, hence the recommendation of using auto-failover / rebalance to get back to 100% active buckets and re-create replicas to ensure any further node failures don't cause data loss.</p>

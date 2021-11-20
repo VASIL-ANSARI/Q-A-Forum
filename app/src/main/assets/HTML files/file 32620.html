@@ -1,0 +1,39 @@
+<p>I have had a look through the source and do not see anywhere where you can use a predicate to delete. However the following extension method should provide the functionality that you are looking for:</p>
+
+<pre><code>using System.Linq.Expressions;
+using SQLite;
+using System.Collections.Generic;
+
+public static class DeleteExtensions
+{
+    public static int Delete&lt;T&gt;(this TableQuery&lt;T&gt; tableQuery, Expression&lt;Func&lt;T, bool&gt;&gt; predExpr)
+    {
+        BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        Type type = tableQuery.GetType();
+        MethodInfo method = type.GetMethod("CompileExpr", flags);
+
+        if (predExpr.NodeType == ExpressionType.Lambda) {
+            var lambda = (LambdaExpression)predExpr;
+            var pred = lambda.Body;
+
+            var args = new List&lt;object&gt; ();
+
+            var w = method.Invoke(tableQuery, new object[] {pred, args});
+            var compileResultType = w.GetType();
+            var prop = compileResultType.GetProperty("CommandText");
+            string commandText = prop.GetValue(w, null).ToString();
+
+            var cmdText = "delete from \"" + tableQuery.Table.TableName + "\"";
+            cmdText += " where " + commandText;
+            var command = tableQuery.Connection.CreateCommand (cmdText, args.ToArray ());
+
+            int result = command.ExecuteNonQuery();
+            return result;
+        } else {
+            throw new NotSupportedException ("Must be a predicate");
+        }
+    }
+}
+</code></pre>
+
+<p>However, I am not sure how predictable this would be by using the TableQuery class and I assume thats why you are currently forced to do the delete and updates manually. So test and use at your own risk :)</p>

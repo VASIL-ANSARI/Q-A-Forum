@@ -1,0 +1,51 @@
+<p>Do not return the underlying connection object, but another object which wraps it. Within that object (using some kind of private property) store the state of that object; is it still available for use, or has it been invalidated by being returned to the pool or some other condition like being timed out). Then you can intercept any method call that attempts to use it and check against its state. If it is no longer available for use, throw an exception.</p>
+
+<p>The wrapped connection object will also need to be private, so that the client cannot access it directly.</p>
+
+<p>You will have one wrapper per client, but two or more wrappers may share the underlying connection object. But because you are storing state per client, only one client can use the object at one time.</p>
+
+<p><strong>Edited to include an untested example - which now shows a big problem with my approach.</strong></p>
+
+<p>Assuming you are returning something which implements java.sql.Connection, you could return instances of the below class.</p>
+
+<pre><code>package same.package.as.your.pool; // so your pool has access to set isValidConnection
+
+import java.sql.Connection;
+
+class MyConnection implements Connection {
+    private Connection actualConnection;
+    private boolean isValidConnection = false;
+
+    MyConnection(Connection conn) {
+       // package acccess for pool class to create connection
+       actualConnection = conn;
+       isValidConnection = true;
+    }
+
+    public boolean getIsValidConnection() {
+       return isValidConnection;
+    }
+
+    void setIsValidConnection(boolean isValid) {
+       // pool class can call this to invalidate when returned to pool or timed out
+       isValidConnection = isValid;
+    }
+
+    // intercept java.sql.Connection methods, checking if connection is still valid first
+    // for example
+    PreparedStatement prepareStatement(String sql) {
+       if (! isValidConnection) {
+            // WHAT TO DO HERE?
+       }
+       return actualConnection.prepareStatement(sql);
+
+    }
+
+    // ... and the rest
+</code></pre>
+
+<p>First big problem is that - ideally you would throw an Exception from the methods like prepareStatement when the connection is no longer valid because it's been returned to the pool. But because you are constrained by the caught exceptions of the original interface (in this case, throws SQLException) you'd either need to throw an SQLException (yuk, it isn't really an SQLException) or an uncaught exception (yuk - client code would probably want to catch the case where the pooled connection is not longer valid) or something else :-)</p>
+
+<p>Two other issues with the code above - package access to protect the methods meant to be only available to your pool code is not very robust. Maybe you could create the MyConnection code as some kind of inner class within your pool code. Finally, having to override <em>all</em> java.sql.Connection interface would be a pain. </p>
+
+<p>}</p>

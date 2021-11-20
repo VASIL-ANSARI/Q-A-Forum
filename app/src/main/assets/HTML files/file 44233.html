@@ -1,0 +1,96 @@
+<p>Managed to fix the issue myself. For anyone that maybe stack with a similar problem, the issue was the way I defined the class that holds the data, which later will be displayed in the DataGrid.</p>
+
+<p>Once I changed the string Sources within the first class to a List, I was able to retrieve the list of alarms per person.</p>
+
+<pre><code>    public class EmailNotificationClass
+{
+    //EN = EmailNotification OI in the XML document       
+    public string EN_NotificationName { get; set; }
+    public string EN_EmailAddress { get; set; }
+    public string EN_EmailSubject { get; set; }
+    public string EN_NotificationText { get; set; }
+    public string EN_Status { get; set; }
+    public string EN_FilterType { get; set; }
+    public List&lt;EN_F_SourceClass&gt; Sources { get; set; }
+
+}
+
+
+public class EN_F_SourceClass
+{
+    public string FilterSource { get; set; }
+}
+</code></pre>
+
+<p>I then modified the code behind as followed</p>
+
+<pre><code>List&lt;EmailNotificationClass&gt; NotificationList =
+                (
+
+                from n in XDocument.Load(str_XMLFilePath).Root.Descendants("ExportedObjects").Descendants("OI").Descendants("OI")
+                where (string)n.Attribute("TYPE") == "notification.EmailNotification"                                       
+
+                let attrib_NAME = n.Attribute("NAME")
+
+                let attrib_EMAIL = n.XPathSelectElement("./PI[@Name='EmailAddress']").Attribute("Value")
+                let attrib_SUBJECT = n.XPathSelectElement("./PI[@Name='EmailSubject']").Attribute("Value")
+                let attrib_NotificationText = n.XPathSelectElement("./PI[@Name='NotificationText']").Attribute("Value")
+                let attrib_Status = n.XPathSelectElement("./PI[@Name='Status']").Attribute("Value")
+
+
+                select new EmailNotificationClass
+                {
+                    EN_NotificationName = attrib_NAME.Value,
+                    EN_EmailAddress = attrib_EMAIL.Value,
+                    EN_EmailSubject = attrib_SUBJECT.Value,
+                    EN_NotificationText = attrib_NotificationText.Value,
+                    EN_Status = attrib_Status.Value,
+
+                    Sources = 
+                    (
+                    from source in n.XPathSelectElements("OI/OI[@NAME='Source']/OI/PI[@Name='Value']")
+                    select new EN_F_SourceClass
+                    {
+                        FilterSource = (string)source.Attribute("Value")
+                    }).ToList()
+
+                }
+                ).ToList();
+
+
+            //Set DataGrid source
+            DG_Notifications.ItemsSource = NotificationList;
+
+        }
+        else
+        {
+            MessageBox.Show("Please load XML file from the import tab first");
+        }            
+</code></pre>
+
+<p>The xalm part was easy. Just added a RowDeetailsTemplate as follow</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;DataGrid.RowDetailsTemplate&gt;
+  &lt;DataTemplate&gt;
+    &lt;Grid MaxHeight="100"&gt;
+      &lt;ScrollViewer&gt;
+        &lt;Border BorderThickness="0" Background="#FFB8E8A1" Padding="5"&gt;
+          &lt;DataGrid ItemsSource="{Binding Sources}" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow" AutoGenerateColumns="False"&gt;
+            &lt;DataGrid.Columns&gt;
+              &lt;DataGridTextColumn Width="400" Header="Alarms" Binding="{Binding FilterSource}"&gt;&lt;/DataGridTextColumn&gt;
+            &lt;/DataGrid.Columns&gt;
+          &lt;/DataGrid&gt;
+        &lt;/Border&gt;
+      &lt;/ScrollViewer&gt;
+    &lt;/Grid&gt;
+  &lt;/DataTemplate&gt;
+&lt;/DataGrid.RowDetailsTemplate&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<p>Thanks for reading,</p>
+
+<p>Alain</p>

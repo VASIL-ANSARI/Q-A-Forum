@@ -1,0 +1,58 @@
+<p>Your timeline should not be trying to refer to the document Class. The document Class should control everything. There are several ways to know when an object has been added to the stage and is ready to be addressed (such as listening for added to stage). Once you know the object has been added and you <em>also</em> know your xml has returned, you can then populate a variable on the child object that you've exposed in <em>its</em> document Class.  For more on this, check out this blog post <a href="http://www.developria.com/2010/04/combining-the-timeline-with-oo.html" rel="nofollow">http://www.developria.com/2010/04/combining-the-timeline-with-oo.html</a> , and the accompanying code here <a href="http://flexdiary.blogspot.com/2010/04/sample-code-for-oop-timeline-insideria.html" rel="nofollow">http://flexdiary.blogspot.com/2010/04/sample-code-for-oop-timeline-insideria.html</a> .</p>
+
+<p>EDITED to show code:</p>
+
+<p>The code for it might look something like this:</p>
+
+<pre><code>package {
+   public class Main extends MovieClip {
+      private var _stageInstance:StageInstance;
+      private var _score:String;
+      private var _loader:URLLoader;//hold loader in memory so it doesn't gc before it returns
+      //by using a getter/setter pair, we know when Flash has added the instance to the stage
+      public function get stageInstance():StageInstance{
+          return _stageInstance;
+      }
+      public function set stageInstance(value:StageInstance):void {
+         _stageInstance = value;
+         if (_stageInstance != null &amp;&amp; _score != null) {
+             _stageInstance.score = _score;
+         }
+      }
+      public function onScoreLoaded(e:Event):void {
+         myXML = new XML(e.target.data);
+         var qName1:QName = new QName("http://www.w3.org/2005/Atom", "score1");
+         _score = myXML.descendants(qName1)[0].toString();
+         if (stageInstance != null) {
+            stageInstance.score = _score;
+         }
+      }
+      public function Main() {
+         _loader = new URLLoader();
+         _loader.addEventListener(Event.COMPLETE, onScoreLoaded);
+         _loader.load(new URLRequest('pathToXML'));
+      }
+   }
+
+}
+
+package {
+   public Class StageInstance extends MovieClip {
+       pubic var score1TextField:TextField;//populated by Flash Player
+       private vare _score:String;
+       //note how the setter here is doing something useful, not just passing through the value
+       public function get score():String {
+          return _score;
+       }
+       public function set score(value:String):void {
+          _score=value;
+          score1TextField.text=score;
+       }
+       public function StageInstance() {
+          super();
+       }
+
+   }
+
+}
+</code></pre>

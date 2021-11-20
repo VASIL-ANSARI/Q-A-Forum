@@ -1,0 +1,33 @@
+<p>It turns out that I was overthinking this quite a bit and the solution is actually quite simple. The following links were extremely helpful:</p>
+
+<p><a href="http://iamacamera.org/default.aspx?section=develop/code%20snippets&amp;id=76" rel="nofollow">http://iamacamera.org/default.aspx?section=develop/code%20snippets&amp;id=76</a>
+<a href="http://msdn.microsoft.com/en-us/library/ms973825.aspx" rel="nofollow">http://msdn.microsoft.com/en-us/library/ms973825.aspx</a></p>
+
+<p>Before querying the database I set the following variables:</p>
+
+<pre><code>DateTime utcBeginDateTime = DateTime.UtcNow.Date.AddHours(8);
+DateTime utcEndDateTime = utcBeginDateTime.AddDays(1);
+</code></pre>
+
+<p>Which gives me <strong>UTC</strong> time of <strong>5/10/2012 8:00:00 AM to 5/11/2012 8:00:00 AM</strong>. Converting this to EST is rather simple:</p>
+
+<pre><code>TimeZoneInfo estZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+DateTime cstTime = TimeZoneInfo.ConvertTimeFromUtc(utcBeginDateTime, estZone);
+</code></pre>
+
+<p>This will give me <strong>EST</strong> time of <strong>5/10/2012 4:00:00 AM</strong>.</p>
+
+<hr>
+
+<p>Using this in my LINQ query:</p>
+
+<pre><code>var timeQuery = from p in db.cl_contact_event
+                where p.time_of_contact &gt;= utcBeginDateTime &amp;&amp; p.time_of_contact &lt; utcEndDateTime
+                select new
+                {
+                    time = TimeZoneInfo.ConvertTimeFromUtc(p.time_of_contact.Value, estZone),
+                    id = p.id
+                };
+</code></pre>
+
+<p>It's worth nothing that <strong>TimeZoneInfo.ConvertTimeFromUtc()</strong> will probably not work unless you run the query on the client using .AsEnumerable(). I know it definitely doesn't work with our version of Sybase. Thus, I'm forced to filter the results as much as I can, call .AsEnumerable(), and then do the time zone conversion/other logic.</p>

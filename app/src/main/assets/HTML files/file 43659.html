@@ -1,0 +1,110 @@
+<p>I use <a href="https://github.com/CEWendel/SWTableViewCell">SWTableViewCell</a> to achieve those actions in my own apps.  Give it a look its great!</p>
+
+<p>You can use this class like this:</p>
+
+<p><strong>1. Import The SWTableViewCell Classes</strong></p>
+
+<p>Follow the link above or simply search for SWTableViewCell on github.  Download the zip (or use cocoa pods, if you are familiar with them).</p>
+
+<p>Open the unzipped directory and find the PodsFile directory.  Drag the contents of this directory into your project. Doing this should cause Xcode to ask to create the bridging header.  Agree to it and then add </p>
+
+<pre><code>#import "SWTableViewCell.h"
+</code></pre>
+
+<p>to that bridging header file.  If you compile you will get some <em>Parse issue errors: expected type</em>.  To fix these simply add</p>
+
+<pre><code>#import &lt;UIKit/UIKit.h&gt;
+</code></pre>
+
+<p>to NSMutableArray+SWUtilityButtons.h.  Now we are ready to rock and roll.</p>
+
+<p><strong>2. Create An SWTableViewCell Subclass</strong></p>
+
+<p>OK, you could use the cell as is, but most likely you would like to spiff up the cell beyond the simple default cell looks.  If so create a new cocoa touch class (in swift) and make your cell a subclass of <code>SWTableViewCell</code>.  It should look like this:</p>
+
+<pre><code>import UIKit
+
+class MySWCell: SWTableViewCell {
+
+}
+</code></pre>
+
+<p>If you are using storyboard you can make your cells in your tableview of this class, hook up any outlets/actions etc.  All the lovely things you need to do to make the cell just like you need it.</p>
+
+<p><strong>3. Use Your Subclass In a TableView</strong></p>
+
+<p>For this example I just started with the Master-Detail base project.  You change your <code>cellForRowAtIndexPath</code> method to use your new custom cell:</p>
+
+<pre><code>override func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -&gt; UITableViewCell {
+    let cell = tableView.dequeueReusableCellWithIdentifier("Cell", forIndexPath: indexPath) as MySWCell
+
+    let object = objects[indexPath.row] as NSDate
+    cell.textLabel!.text = object.description  
+    return cell
+}
+</code></pre>
+
+<p>While this is great, you probably want to add right/left utility buttons, it is the reason we are doing all of this:</p>
+
+<p><strong>4. Add the Utility Buttons</strong></p>
+
+<p>You can do this in <code>cellForRowAtIndexPath</code>, but prefer to put this in a separate function:</p>
+
+<pre><code>func getRightUtilityButtonsToCell()-&gt; NSMutableArray{
+    var utilityButtons: NSMutableArray = NSMutableArray()
+
+    utilityButtons.sw_addUtilityButtonWithColor(UIColor.redColor(), title: NSLocalizedString("Delete", comment: ""))
+    utilityButtons.sw_addUtilityButtonWithColor(UIColor.blueColor(), title: NSLocalizedString("Email", comment: ""))
+    return utilityButtons
+}
+</code></pre>
+
+<p>Now use this method in your <code>cellForRowAtIndexPath</code>:</p>
+
+<pre><code>cell.rightUtilityButtons = self.getRightUtilityButtons();
+</code></pre>
+
+<p>If you were to swipe left on the cell, you would have two buttons:</p>
+
+<p><img src="http://i.stack.imgur.com/XKiyD.png" alt="What it should look like"></p>
+
+<p>However, these buttons don't do very much.  We need to conform to the delegate.  </p>
+
+<p><strong>5. Respond The Buttons</strong></p>
+
+<p>First, tell the cell that you are its delegate.  Again, in <code>cellForRowAtIndexPath</code> add this line:</p>
+
+<pre><code>cell.delegate = self;
+</code></pre>
+
+<p>Then adjust the class definition to this:</p>
+
+<pre><code>class MasterViewController: UITableViewController, SWTableViewCellDelegate
+</code></pre>
+
+<p><code>MasterViewController</code> will be replaced with the name of the class you have handling your tableview datasource/delegate.</p>
+
+<p>Now implement the <code>didTriggerRightUtilityButtonWithIndex</code> function:</p>
+
+<pre><code>func swipeableTableViewCell(cell: SWTableViewCell!, didTriggerRightUtilityButtonWithIndex index: Int) {
+    if index == 0 {
+        println("delete button")
+    }else {
+        println("print button")
+    }
+}
+</code></pre>
+
+<p>Now you are set to go!  You can also tell the cell to do cool things like hide the buttons after one is selected using the <code>hideUtilityButtonsAnimated</code> method inside of the <code>didTriggerRightUtilityButtonWithIndex</code> method:</p>
+
+<pre><code>cell.hideUtilityButtonsAnimated(true);
+</code></pre>
+
+<p>This function will hide the cells when the tableview scrolls:</p>
+
+<pre><code>func swipeableTableViewCellShouldHideUtilityButtonsOnSwipe(cell: SWTableViewCell!) -&gt; Bool {
+    return true
+}
+</code></pre>
+
+<p>Have fun, its a great set of classes!</p>

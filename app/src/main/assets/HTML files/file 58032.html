@@ -1,0 +1,43 @@
+<p>Without access to the full code it is tricky to give you an answer but</p>
+
+<pre><code>Ticket = act.ExecuteTicket(httpUrl, "Ticket");
+</code></pre>
+
+<p>this line has the potential to take a while to complete if it performs network operations and probably runs in a background thread not to freeze the UI.</p>
+
+<p>Presumably when you get to</p>
+
+<pre><code>    // this.RunOnUiThread(() =&gt; setTicket(true));setStatus(" Ticket : Success", true);
+ setTicket(true);
+</code></pre>
+
+<p>the act.ExecuteTicket call might not have finished </p>
+
+<p>also if there are async operations taking place in</p>
+
+<pre><code>Job = act.executeJob(httpUrl, Ticket);
+</code></pre>
+
+<p>it could take a while to complete</p>
+
+<p>All taken into consideration, you could probably be getting to</p>
+
+<pre><code>setTicket(false);
+setStatus("File Retrieval : Success", false);
+</code></pre>
+
+<p>before the first calls finish</p>
+
+<p>It could be worth checking</p>
+
+<p>ANSWER UPDATE after discussion in comments:</p>
+
+<p>Since your problem is that your asynchronous calls are taking a long time and you are experiencing "race conditions" because of it (your UI thread is proceeding with the updates on the TextViews before it should), you can solve the situation by changing your button click <code>delegate</code> to an <code>async delegate</code>, and forcing an <code>await</code> on the long operations' result before proceeding.</p>
+
+<pre><code>bClick.Click += async delegate {
+
+               //...
+               Job = await act.executeJob(httpUrl, Ticket);
+               //...
+    }
+</code></pre>

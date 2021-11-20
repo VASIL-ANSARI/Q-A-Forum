@@ -1,0 +1,37 @@
+<p>You can write maintainable queries that additionally are fast by using the pg/temporal extension:</p>
+
+<p><a href="https://github.com/jeff-davis/PostgreSQL-Temporal" rel="nofollow">https://github.com/jeff-davis/PostgreSQL-Temporal</a></p>
+
+<pre><code>create index on events using gist(period(start_date, end_date));
+
+select *
+from events
+where period(start_date, end_date) @&gt; :date;
+
+select *
+from events
+where period(start_date, end_date) &amp;&amp; period(:start, :end);
+</code></pre>
+
+<p>You can even use it to disallow overlaps as a table constraint:</p>
+
+<pre><code>alter table events
+add constraint overlap_excl
+exclude using gist(period(start_date, end_date) WITH &amp;&amp;);
+</code></pre>
+
+<hr>
+
+<blockquote>
+  <p>write all possible from, to and day/month/year combinations - not maintable</p>
+</blockquote>
+
+<p>It's actually more maintainable than you might think, e.g.:</p>
+
+<pre><code>select *
+from events
+join generate_series(:start_date, :end_date, :interval) as datetime
+on start_date &lt;= datetime and datetime &lt; end_date;
+</code></pre>
+
+<p>But it's much better to use the above-mentioned period type.</p>

@@ -1,0 +1,68 @@
+<p>You will want to use</p>
+
+<pre><code>bigint&amp; array
+</code></pre>
+
+<p>to take the value by <em>reference</em> (or you couldn't possibly insert the digits read into it).</p>
+
+<p>Also, you will want to use</p>
+
+<pre><code>char ch;
+in &gt;&gt; ch;
+</code></pre>
+
+<p>instead of <code>in &lt;&lt; get()</code> (which doesn't compile). Better yet, add error handling:</p>
+
+<pre><code>if (!(in &gt;&gt; ch))
+{
+    // we're in trouble (in.rdstate(), in.eof(), in.fail() or in.bad() to know more)
+}
+</code></pre>
+
+<p>If you wanted to use <a href="http://en.cppreference.com/w/cpp/io/basic_istream/get" rel="nofollow"><code>in.get()</code></a>, you should be prepared to skip your own whitespace (including newlines). I'd prefer <code>std::istream_iterator</code> here, because it will automatically do so (if the <code>std::ios::skipws</code> flag is in effect, which it is, by default).</p>
+
+<p>So here's a simplist approach (that mostly assumes input data is valid and whitespace ignorable):</p>
+
+<pre><code>#include &lt;vector&gt;
+#include &lt;istream&gt;
+#include &lt;iterator&gt;
+
+struct bigint
+{
+    std::vector&lt;char&gt; v; // or whatever representation you use (binary? bcd?)
+};
+
+std::istream&amp; operator&gt;&gt;(std::istream&amp; in, bigint&amp; array)
+{
+    for (std::istream_iterator&lt;char&gt; f(in), l; f != l; ++f) {
+        if (*f&gt;='0' &amp;&amp; *f&lt;='9')
+            array.v.push_back(*f - '0');
+        else if (*f==';')
+            break;
+        else
+            throw "invalid input";
+    }
+
+    return in;
+}
+
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+
+int main()
+{
+    std::istringstream iss(
+            "10000000000000000000000000000000000345;\n"
+            "299793000000\n"
+            "00000000000000000000067;\n"
+            "4208574289572473098273498723475;\n"
+            "28375039287459832728745982734509872340985729384750928734590827098752938723;\n"
+            "99999999;  99999999;\n");
+
+    bigint value;
+    while (value.v.clear(), iss &gt;&gt; value)
+        std::cout &lt;&lt; "read " &lt;&lt; value.v.size() &lt;&lt; " digits\n";
+}
+</code></pre>
+
+<p>See it <strong><a href="http://coliru.stacked-crooked.com/a/2e56a89a09d1a5bd" rel="nofollow">Live on Coliru</a></strong></p>

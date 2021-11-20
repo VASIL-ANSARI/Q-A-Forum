@@ -1,0 +1,53 @@
+<p>The subquery also needs to be a JOIN of the two tables to allow you to get the preceding date in CONFIG for each PROD. Then include that subquery in a join with the tables again to find the <code>sett</code> value.</p>
+
+<p>Something like this:</p>
+
+<pre><code>SELECT p2.idMachine, p2.production, c2.sett, p2.date
+FROM PROD AS p2
+INNER JOIN
+   (SELECT p.idMachine, p.`date` AS prodDate, MAX(c.`date`) AS prev
+    FROM PROD AS p 
+    INNER JOIN CONFIG AS c 
+       ON p.idMachine = c.idMachine AND p.`date` &gt;= c.`date`
+    GROUP BY p.idMachine, prodDate
+) AS prevs
+   ON p2.idMachine = prevs.idMachine AND p2.`date` = prevs.prodDate
+INNER JOIN CONFIG AS c2
+   ON prevs.idMachine = c2.idMachine AND prevs.prev = c2.`date`
+</code></pre>
+
+<p>If you have a <code>WHERE</code> clause to filter the PROD records you care about, you'll probably want to put it in both the subquery and main query... wait a sec...</p>
+
+<hr>
+
+<p>Depending on how your data is "shaped" this version with one less join <em>may</em> be better.</p>
+
+<pre><code>SELECT p2.idMachine, p2.production, c2.sett, p2.date
+FROM (SELECT p.idMachine, p.production, p.`date`, MAX(c.`date`) AS prevConfigDate
+    FROM PROD AS p 
+    INNER JOIN CONFIG AS c 
+       ON p.idMachine = c.idMachine AND p.`date` &gt;= c.`date`
+    GROUP BY p.idMachine, p.production, p.`date`
+) AS p2
+INNER JOIN CONFIG AS c2
+   ON p2.idMachine = c2.idMachine AND p2.prevConfigDate = c2.`date`
+</code></pre>
+
+<p>However, the subquery here calculates the MAX for every PROD, instead of just every (idMachine, date); so it may cost more than the extra join did. In this case though, the redundant <code>WHERE</code> clauses are not needed (just one copy in the subquery).</p>
+
+<hr>
+
+<p>And on I go... there is also a correlated subquery version, though I am not fond of them...</p>
+
+<pre><code>SELECT p.*
+    , (SELECT sett 
+       FROM CONFIG AS c 
+       WHERE c.idMachine = p.idMachine 
+          AND c.date &lt;= p.date 
+       ORDER BY c.date DESC LIMIT 1
+      ) AS sett
+FROM PROD AS p
+;
+</code></pre>
+
+<p><strong>Also note that in all these I compared the dates with <code>&gt;=</code> or <code>&lt;=</code>, not <code>&lt;</code> or <code>&gt;</code>; you may need to adjust according to your actual data/logic.</strong></p>

@@ -1,0 +1,76 @@
+<p>Here we are..</p>
+
+<p>This is a simple example of doing an Undo &amp; Redo buffer, and using a function closure to handle the redo..</p>
+
+<p>This is of course a very simple example, so that it is hopefully easy too follow, but there is no reason this technique can't be used to undo/redo anything.  Anything, you pass to a function closure can be captured, and then made to play back.</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var e = {}; //lets store references to the dom elemements
+Array.prototype.slice.call(document.querySelectorAll("[id]")).
+  forEach(function (el) { e[el.id] = el; });
+
+var stack = [],
+    stackPos = 0,
+    names = [];
+
+function showNames() {
+  e.lbNames.textContent = names.join(', ');
+  e.btUndo.disabled =  stackPos &lt;= 0;
+  e.btRedo.disabled = stackPos &gt;= stack.length;
+  e.lbBuffer.textContent = stack.length;
+}
+
+btAdd.onclick = function () {
+  if (!ipName.value) return alert("Please enter some text");
+  //a function closure to capture the name
+  function add(name) {
+    return function () {
+      e.ipName.value = '';
+      e.ipName.focus();
+      names.push(name);
+      stackPos ++;
+      showNames();
+    }
+  }
+  //no need for closure here, as were just going to pop the
+  //last one of the names, and shift the undo-pos back
+  function undo() {
+    stackPos --;
+    names.pop(); 
+    showNames();
+  }
+  //now lets add our do &amp; undo proc
+  var doadd = add(ipName.value);
+  stack.splice(stackPos);
+  stack.push({
+    do: doadd,
+    undo: undo
+  });
+  //lets now do our inital do
+  doadd();
+};
+
+btUndo.onclick = function () {
+  var p = stack[stackPos - 1];
+  p.undo();
+};
+
+btRedo.onclick = function () {
+  var p = stack[stackPos];
+  p.do();
+};
+
+showNames();</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;form onsubmit="return false"&gt;
+  name: &lt;input id="ipName"&gt;
+  &lt;br&gt;&lt;br&gt;
+  &lt;button type="submit" id="btAdd" &gt;Add&lt;/button&gt;
+  &lt;button id="btUndo"&gt;Undo&lt;/button&gt;
+  &lt;button id="btRedo"&gt;Redo&lt;/button&gt;
+  Buffer = &lt;span id="lbBuffer"&gt;&lt;/span&gt;
+  &lt;pre id="lbNames"&gt;&lt;/pre&gt;
+&lt;/form&gt;</code></pre>
+</div>
+</div>
+</p>

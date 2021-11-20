@@ -1,0 +1,13 @@
+<p>It is not the best way to utilize tasks that represent thread pool execution units:</p>
+
+<ol>
+<li>Because each such task will block one thread from the thread pool, and ASP.NET uses <a href="http://stackoverflow.com/questions/6697583/using-tasks-threadpool-on-iis-application-asp-net/6697692#6697692">the same thread pool</a> as the tasks, you will reduce the amount of concurrent requests by a factor of five. </li>
+<li>Utilizing thread pool threads for database(I/O) bound code <a href="http://blog.stephencleary.com/2013/11/taskrun-etiquette-examples-dont-use.html" rel="nofollow">is ineffective</a>, because thread pool threads will just sit idle, so use <a href="http://stackoverflow.com/questions/20851843/what-is-the-benefit-to-using-await-with-an-async-database-call">async code</a> for database calls.</li>
+<li>But it is not the last problem - <code>foreach (var action in list.Select(t =&gt; t.Result))</code> will block the execution till it gets the <code>Result</code> from each task sequentially. It means that returned actions will not be executed as soon as they are ready to execute, they will be executed in the same order as they were added to the list negating any potential advantage that could have been gained had we executed them as soon as they are ready.</li>
+</ol>
+
+<p>So, as a conclusion: </p>
+
+<p>Such code just starts 4 database calls in the least resource-effective way, and then squanders 4 <s>mis</s>used thread pool threads executing their "continuation" on the original thread in an order that doesn't utilize the possibility that 4 task may execute in arbitrary order.</p>
+
+<p><strong>P.S.:</strong> And even when you really need to do CPU-intensive processing do not use Factory.StartNew - use Task.Run. It is not the actual error, because they basically do the same thing, but rather <a href="http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx" rel="nofollow">a good recommendation</a>.</p>

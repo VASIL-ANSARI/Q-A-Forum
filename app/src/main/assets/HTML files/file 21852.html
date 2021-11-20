@@ -1,0 +1,119 @@
+<p>This should work. First you can define your XSLT like this:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:output method="html" indent="yes" omit-xml-declaration="yes"/&gt;
+  &lt;xsl:param name="selected" /&gt;
+
+  &lt;xsl:template match="/*" priority="2"&gt;
+    &lt;xsl:apply-templates select="*[not($selected)] | //*[@entity_id = $selected]/*" /&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="*[*]"&gt;
+    &lt;span onclick="displayResult('{@entity_id}');"&gt;
+      &lt;xsl:call-template name="ItemText" /&gt;
+    &lt;/span&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="*" name="ItemText"&gt;
+    &lt;xsl:value-of select="concat(@value, '&amp;#xA0;')"/&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>When it is run without any parameters, it produces a list of the top level items, with onclick handlers to call a JavaScript function with its own <code>entity_id</code>:</p>
+
+<pre><code>&lt;span onclick="displayResult('1');"&gt;AsiaÂ &lt;/span&gt;
+</code></pre>
+
+<p>and when it is run with an <code>entity_id</code> as the value for the <code>selected</code> parameter, it returns a list of the children of the item with that entity id:</p>
+
+<pre><code>&lt;span onclick="displayResult('3');"&gt;GujaratÂ &lt;/span&gt;
+&lt;span onclick="displayResult('4');"&gt;RajshthanÂ &lt;/span&gt;
+</code></pre>
+
+<p>Then, you can write your HTML page like this:</p>
+
+<pre><code>&lt;!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" 
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+&lt;html xmlns="http://www.w3.org/1999/xhtml"&gt;
+&lt;head&gt;
+    &lt;title&gt;Untitled Page&lt;/title&gt;
+    &lt;script&gt;
+        var xml = loadXMLDoc("final.xml");
+        var xsl = loadXMLDoc("books05.xsl");
+
+        function loadXMLDocActiveX(location) {
+            var doc = new ActiveXObject("MSXML2.FreeThreadedDOMDocument");
+            doc.async = false;
+            doc.load(location);
+            return doc;
+        }
+
+        function loadXMLDocOther(location) {
+            xhttp = new XMLHttpRequest();
+            xhttp.open("GET", location, false);
+            xhttp.send("");
+            return xhttp.responseXML;
+        }
+
+        function loadXMLDoc(dname) {
+            if (window.ActiveXObject) {
+                return loadXMLDocActiveX(dname);
+            }
+            else if (window.XMLHttpRequest) {
+                return loadXMLDocOther(dname);
+            }
+        }
+
+        function transformActiveX(xml, xsl, target, selected) {
+            var transform = new ActiveXObject("MSXML2.XSLTemplate");
+            transform.stylesheet = xsl;
+            var processor = transform.createProcessor();
+            processor.input = xml;
+
+            if (selected) {
+                processor.addParameter("selected", selected);
+            }
+
+            processor.transform();
+            target.innerHTML = processor.output;
+        }
+
+        function transformOther(xml, xsl, target, selected) {
+            var xsltProcessor = new XSLTProcessor();
+            xsltProcessor.importStylesheet(xsl);
+
+            if (selected) {
+                xsltProcessor.setParameter(null, "selected", selected);
+            }
+
+            var resultDocument = xsltProcessor.transformToFragment(xml, document);
+            target.innerHTML = "";
+            target.appendChild(resultDocument);
+        }
+
+        function displayResult(selected) {
+            var targetElement = document.getElementById("load");
+
+            // code for IE
+            if (window.ActiveXObject) {
+                transformActiveX(xml, xsl, targetElement, selected);
+            }
+            // code for Mozilla, Firefox, Opera, etc.
+            else if (document.implementation &amp;&amp; 
+                     document.implementation.createDocument) {
+                transformOther(xml, xsl, targetElement, selected);
+            }
+        }
+    &lt;/script&gt;
+&lt;/head&gt;
+&lt;body onload="displayResult()"&gt;
+    &lt;div id="load"&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>Notice how the <code>displayResult()</code> function now has a parameter, and when this parameter has a value, it passes this value to the XSLT as an XSLT parameter.</p>
+
+<p>That should do it!</p>

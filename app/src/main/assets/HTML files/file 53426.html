@@ -1,0 +1,61 @@
+<p>Got it.</p>
+
+<p>This wasn't working:</p>
+
+<pre><code>@Transactional
+public MatchResponse myMatcherMethod(MatchCriteria criteria) {
+    TransactionStatus transactionStatus = TransactionAspectSupport.currentTransactionStatus();
+    transactionStatus.setRollbackOnly();
+    saveMatchCriteria(criteria);
+
+    MatchResponse matches = getMatches();
+    return matches;
+}
+</code></pre>
+
+<p>It was giving me no matches.  Tomas asked my to post my code (thanks! +1) so I decided that I'd add a couple of extra lines to show that the criteria weren't being saved:</p>
+
+<pre><code>@Transactional
+public MatchResponse myMatcherMethod(MatchCriteria criteria) {
+    TransactionStatus transactionStatus = TransactionAspectSupport.currentTransactionStatus();
+    transactionStatus.setRollbackOnly();
+    saveMatchCriteria(criteria);
+
+    //Added these lines:
+    MatchCriteria savedCriteria = getMatchCriteria();
+    System.out.println("# of criteria: " + savedCriteria.getIdentifiers().size());
+
+    MatchResponse matches = getMatches();
+    return matches;
+}
+</code></pre>
+
+<p>..but at that point it started working!</p>
+
+<p>So I guessed that my test query was causing a flush.  So I tried:</p>
+
+<pre><code>@Transactional
+public MatchResponse myMatcherMethod(MatchCriteria criteria) {
+    TransactionStatus transactionStatus = TransactionAspectSupport.currentTransactionStatus();
+    transactionStatus.setRollbackOnly();
+    saveMatchCriteria(criteria);
+
+    // Replaced with:
+    transactionStatus.flush();
+
+    MatchResponse matches = getMatches();
+    return matches;
+}
+</code></pre>
+
+<p>..and it worked.</p>
+
+<p>It seems obvious in hindsight:</p>
+
+<ul>
+<li>Repository.save -> JVM memory</li>
+<li>flush() -> Runs insert statement</li>
+<li>End transaction -> Commit</li>
+</ul>
+
+<p>Looks like I need to brush up on my JPA life-cycle!</p>

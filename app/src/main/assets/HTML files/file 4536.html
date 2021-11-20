@@ -1,0 +1,12 @@
+<p>Well, an access violation (<code>0xC0000005</code>) means you accessed memory that you shouldn't have. In this case it says you were trying to write to <code>0x0000000c</code>. Since you (your debugger?) say that the assignment to <code>z</code> causes it, may we see the definition of that symbol, please? Also, is it really <code>z = -14</code> or <code>z -= 14</code>?</p>
+
+<p>Edit: I think you need to replace <code>((CREATESTRUCT *)lParam)-&gt;lpCreateParams</code> with a valid pointer to an instance of <code>class Window</code>.</p>
+
+<p>Edit #2: What happens is this: On <code>WM_CREATE</code>, you set <code>GWLP_USERDATA</code> to a value that happens to be equal to <code>NULL</code>. Subsequently, you read that value and treat it as a valid pointer to a <code>Window</code> by invoking a non-static member function on that pointer. Class member functions are <em>implemented</em> by the compiler a lot like so</p>
+
+<pre><code>LRESULT CALLBACK &lt;mangled_name ("Window::WndProc")&gt; (Window * const this, HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    // ...
+}
+</code></pre>
+
+<p>That is the reason that you can actually invoke a member function on a <code>NULL</code> pointer. However, once you access a member variable, like <code>z</code>, this breaks. The compiler inserted code similar to this <code>*((int*) (this + 0xc)) = -14</code>, (which BTW means that <code>z</code> lies 0xc bytes into your <code>Window</code> instance), which, since <code>this == NULL</code>, broke.</p>

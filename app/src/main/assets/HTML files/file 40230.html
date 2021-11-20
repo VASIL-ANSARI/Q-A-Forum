@@ -1,0 +1,34 @@
+<p>Your file may appear to be in ISO-8859-1, but it's actually not. It's simply broken.</p>
+
+<p>Your file contains byte <code>A9</code>, which is the lower byte of UTF-8 representation of <code>Ã©</code>.</p>
+
+<p>When you wrote <code>'Ã©'</code>, the compiler should have warned you:</p>
+
+<pre><code> aaa.c:4:38: warning: multi-character character constant [-Wmultichar]
+     char buffer[] = { 'x' , 'y' , 'z' ,'Ã©' };
+                                         ^
+</code></pre>
+
+<p><code>char</code> is not a type for a character, it's a type for one byte. GCC treats multibyte character literals as big-endian integers. Here, you cast it immediately to <code>char</code>, leaving the lowest byte: <code>A9</code></p>
+
+<p>(BTW, <code>Ã©</code> in ISO-8859-1 is <code>E9</code>, not <code>A9</code>)</p>
+
+<p>You open your file with an encoding, but then you save <strong>bytes</strong> into it. The bytes correspond to ISO-8859-1 characters <code>xyzÂ©</code>.</p>
+
+<p>If you want to write characters, not bytes, then use <code>wchar_t</code> instead of <code>char</code> and <code>fputws</code> instead of <code>fwrite</code></p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;wchar.h&gt;
+
+int main ()
+{
+  FILE * pFile;
+  // note final zero and L indicating wchar_t literal
+  wchar_t buffer[] = { 'x' , 'y' , 'z' , L'Ã©' , 0};
+  // note no space before ccs
+  pFile = fopen ("myfile", "wt,ccs=UTF-8");
+  fputws(buffer, pFile);
+  fclose (pFile);
+  return 0;
+}
+</code></pre>

@@ -1,0 +1,81 @@
+<p>Here's a proposed solution involving <code>SharedPreferences</code>:</p>
+
+<ul>
+<li><p>First, add a <code>String[]</code> instance variable to your Adapter class. This will contain what you want to save(the fields inside your TextViews. Initialize this your constructor.  </p>
+
+<pre><code>public NoteAdapter(Note note, String[] saved, String[] prgmNameList, int[] prgmImages) {
+  result=prgmNameList;
+  context=note;
+  imageId=prgmImages;
+  inflater = ( LayoutInflater )context.
+         getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+
+  /**********INSERTED CODE********/
+  if(saved == null) {
+    savedEntries = new String[result.length];`
+    Arrays.fill(savedEntires, "");
+  }
+  else
+    savedEntries = saved;
+  /****************************/
+
+
+}
+</code></pre></li>
+<li><p>Also modify your overriden <code>getItem()</code> method to return the appropriate element in savedEntires:</p>
+
+<pre><code>@Override
+public Object getItem(int position) {
+ return savedEntries[position];
+}
+</code></pre></li>
+<li><p>Whenever you update a TextView, update the list accordingly:</p>
+
+<pre><code>@Override
+public void onClick(View v) {
+
+  String data = txtMode.getText().toString();
+  holder.text.setText(data);
+
+  /***INSERTED CODE****/  
+  savedEntries[position] = data;
+  /*******************/
+
+  dialog.dismiss();
+  Log.d("data", data);
+
+}
+</code></pre></li>
+<li><p>We will save this array in SharedPreferences using a String-String pair. Since Strings can potentially contain any character, it is difficult/inefficient to find a single delimiter. I implemented a class called EncodeDecode that can encode a String array into a single formatted String, and decode it back to a String array here: <a href="https://gist.github.com/liangricha/10759438" rel="nofollow">https://gist.github.com/liangricha/10759438</a>. I'll be using this class to convert/unconvert <code>savedEntries</code>.</p></li>
+<li><p>Whenever you want to save <code>savedEntries</code>(in <code>onStop()</code>), simply execute this code:</p>
+
+<pre><code>ListView lv = //... get reference
+NoteAdapter adapter = (NoteAdapter)lv.getAdapter();
+
+//Variable is public for clarity.
+String toSave = EncodeDecode.encode(adapter.savedEntries);
+SharedPreferences.Editor editor = getSharedPreferences("LV Data", MODE_PRIVATE).editor();
+editor.putString("TVEntries", toSave);
+editor.commit();
+</code></pre></li>
+<li><p>When you want to retrieve the String array of your TextView entries(in <code>onResume()</code>), execute:</p>
+
+<pre><code>SharedPreferences prefs = getSharedPreferences("LV Data", MODE_PRIVATE);
+String encoded = prefs.getString("TVEntries", "");
+
+String[] entries
+if(encoded.equals(""))
+  entries = null;
+else
+  entries = EncodeDeocde.decode(encoded);
+
+NoteAdapter adapter = (NoteAdapter)lv.getAdapter();
+adapter.savedEntries = entries;
+lv.setAdapter(adapter);
+</code></pre>
+
+<p>Then, in your <code>getView()</code> method of 'NoteAdapter', set the field of the <code>TextView</code> to the appropriate entry in <code>savedEntries</code>:</p>
+
+<pre><code> holder.text.setText(savedEntries[position]);
+</code></pre></li>
+</ul>

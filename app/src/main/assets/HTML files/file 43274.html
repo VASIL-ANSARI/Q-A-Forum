@@ -1,0 +1,81 @@
+<p>Consider the following</p>
+
+<pre><code>mysql&gt; create table test (id int ,product_id int);
+Query OK, 0 rows affected (0.14 sec)
+
+mysql&gt; insert into test values (1,1),(2,1),(3,1),(4,2),(5,2);
+</code></pre>
+
+<p>Now lets create the order </p>
+
+<pre><code>select 
+product_id,
+`order` from ( 
+  select 
+  product_id, 
+  @rn:= if(@prev = product_id,@rn:=@rn+1,1) as `order`,
+  @prev:=product_id from test,(select @rn:=0,@prev:=0)r
+  order by product_id,id 
+)x ;
+</code></pre>
+
+<p>This will give you something as</p>
+
+<pre><code>+------------+-------+
+| product_id | order |
++------------+-------+
+|          1 |     1 |
+|          1 |     2 |
+|          1 |     3 |
+|          2 |     1 |
+|          2 |     2 |
++------------+-------+
+</code></pre>
+
+<p>Now lets use in update command, but before that lets add the column (in your case its already there)</p>
+
+<pre><code>mysql&gt; alter table test add column `order` int ;
+Query OK, 5 rows affected (0.29 sec)
+
+mysql&gt; select * from test ;
++------+------------+-------+
+| id   | product_id | order |
++------+------------+-------+
+|    1 |          1 |  NULL |
+|    2 |          1 |  NULL |
+|    3 |          1 |  NULL |
+|    4 |          2 |  NULL |
+|    5 |          2 |  NULL |
++------+------------+-------+
+5 rows in set (0.00 sec)
+</code></pre>
+
+<p>Finally the update command </p>
+
+<pre><code>update test t 
+join (
+ select 
+ id,
+ product_id,
+ `order` from  ( 
+    select id,
+    product_id, 
+    @rn:= if(@prev = product_id,@rn:=@rn+1,1) as `order`,
+    @prev:=product_id 
+    from test,(select @rn:=0,@prev:=0)r
+    order by product_id,id 
+   )x
+)t1 on t1.id=t.id set t.`order` = t1.`order`
+
+mysql&gt; select * from test ;
++------+------------+-------+
+| id   | product_id | order |
++------+------------+-------+
+|    1 |          1 |     1 |
+|    2 |          1 |     2 |
+|    3 |          1 |     3 |
+|    4 |          2 |     1 |
+|    5 |          2 |     2 |
++------+------------+-------+
+5 rows in set (0.00 sec)
+</code></pre>

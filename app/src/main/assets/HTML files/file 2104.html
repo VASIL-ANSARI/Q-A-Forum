@@ -1,0 +1,37 @@
+<p>You're getting the shifting all wrong.</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+int main (int argc, char * const argv[]) {
+   long data = 0x12345678;
+   int shift = (sizeof(long) - 1) * 8
+   const unsigned long mask = 0xff;
+   char byte = 0;
+
+   for (long i = 0; i &lt; sizeof(long); i++, shift -= 8) {
+      byte = (data &amp; (mask &lt;&lt; shift)) &gt;&gt; shift;
+   }
+   return 0;
+}
+</code></pre>
+
+<p>Now, I wouldn't recommend you do things this way.  I would recommend instead writing some nice conversion functions.  Many compilers have these as builtins.  So you can write your functions to do it the hard way, then switch them to just forward to the compiler builtin when you figure out what it is.</p>
+
+<pre><code>#include &lt;tr1/cstdint&gt; // To get uint16_t, uint32_t and so on.
+
+inline uint16_t to_bigendian(uint16_t val, char bytes[2])
+{
+    bytes[0] = (val &gt;&gt; 8) &amp; 0xffu;
+    bytes[1] = val &amp; 0xffu;
+}
+
+inline uint32_t to_bigendian(uint32_t val, char bytes[4])
+{
+   bytes[0] = (val &gt;&gt; 24) &amp; 0xffu;
+   bytes[1] = (val &gt;&gt; 16) &amp; 0xffu;
+   bytes[2] = (val &gt;&gt; 8) &amp; 0xffu;
+   bytes[3] = val &amp; 0xffu;
+}
+</code></pre>
+
+<p>This code is simpler and easier to understand than your loop.  It's also faster.  And lastly, it is recognized by some compilers and automatically turned into the single byte swap operation that would be required on most CPUs.</p>

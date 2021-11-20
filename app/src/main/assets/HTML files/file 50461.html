@@ -1,0 +1,40 @@
+<p>Things are a little easier to understand when you see that there is a special case for the syntax here. <code>std::array</code> is an aggregate, it's a struct that contains a single data member which is the underlying raw array. To initialize one of these you need to uniform-initialize the array (first braces) then initialize the underlying raw array member stored in the <code>std::array</code> (second braces);</p>
+
+<p>So when you have something such as:</p>
+
+<pre><code>array&lt;string, 3&gt; test = {{"a", "b", "c"}};
+</code></pre>
+
+<p>The outermost braces initialize the <code>array</code> itself then the inner part initializes the underlying array. In this case it's clear that this is the way it is working and a special case was made (See the standard: section 8.5 for more) that allows the compiler to accept the other syntax of:</p>
+
+<pre><code>array&lt;string, 3&gt; test = {"a", "b", "c"} ;
+</code></pre>
+
+<p>However in the case of the question it's not of the special-case-form specified in the standard so you need the extra braces (this too caused me confusion when I first encountered it). There is a defect report about this actually <a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3367.html#1270" rel="nofollow">http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2012/n3367.html#1270</a></p>
+
+<p>In more recent c++ standards (see <a href="http://stackoverflow.com/questions/18792731/can-we-omit-the-double-braces-for-stdarray-in-c14">Can we omit the double-braces for std::array in C++14?</a>) this requirement is relaxed.</p>
+
+<p>Because the code in the question does not benefit for the special case of the syntax we need both braces. In this case your initializer is however not of length one:</p>
+
+<pre><code>array&lt;array&lt;string, 10&gt;, 10&gt; cShots = 
+{
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " },
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " }, //extra initializer elements but only one underlying raw array
+    //snip
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " }
+}; 
+</code></pre>
+
+<p>To the compiler it looks like you are trying to initialize multiple members of the <code>std::array</code> class but the problem is that there is only one underlying storage array. Hence the compiler error message you get here. To get this to work you need to be more explicit and add the extra pair of braces to get an initializer of length one passed to the outer <code>std::array</code>. You then initialize the underlying raw array which contains the other arrays:</p>
+
+<pre><code>array&lt;array&lt;string, 10&gt;, 10&gt; cShots = 
+{{
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " },
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " },
+    //snip
+    { " ", " ", " ", " ", " ", " ", " ", " ", " ", " " }
+}}; 
+</code></pre>
+
+<p>For a proof of concept see this: <a href="http://coliru.stacked-crooked.com/a/4c57a7193629931f" rel="nofollow">http://coliru.stacked-crooked.com/a/4c57a7193629931f</a>
+(Note the nested arrays here <em>do</em> benefit from the syntatical special case)</p>

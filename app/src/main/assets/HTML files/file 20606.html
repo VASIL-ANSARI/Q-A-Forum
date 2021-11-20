@@ -1,0 +1,39 @@
+<p>One idea would be to use the <code>Row_Number()</code> as your joining field.  Something like this:</p>
+
+<pre><code>SELECT T.Account, T.Description, T1.Value_1, T2.Value_2, T3.Value_3, T4.Value_4
+From 
+  (
+      SELECT Account, Description, Value_1, Value_2, Value_3, Value_4, 
+           Row_number() OVER (ORDER BY (SELECT 0)) rn
+      FROM YourTable
+  ) T
+  LEFT JOIN (
+        SELECT Account, Value_1, Row_number() OVER (ORDER BY (SELECT 0)) rn
+        FROM YourTable
+        WHERE Value_1 &lt;&gt; '') T1 ON T.Account = T1.Account AND T.rn = T1.rn
+  LEFT JOIN (
+        SELECT Account, Value_2, Row_number() OVER (ORDER BY (SELECT 0)) rn
+        FROM YourTable 
+        WHERE Value_2 &lt;&gt; ''
+  ) T2 ON T.Account = T2.Account AND T.rn = T2.rn
+  LEFT JOIN (
+        SELECT Account, Value_3, Row_number() OVER (ORDER BY (SELECT 0)) rn 
+        FROM YourTable 
+        WHERE Value_3 &lt;&gt; ''
+  ) T3 ON T.Account = T3.Account AND T.rn = T3.rn
+  LEFT JOIN (
+        SELECT Account, Value_4, Row_number() OVER (ORDER BY (SELECT 0)) rn 
+        FROM YourTable 
+        WHERE Value_4 &lt;&gt; ''
+  ) T4 ON T.Account = T4.Account AND T.rn = T4.rn
+WHERE T1.Value_1 IS NOT NULL 
+  OR T2.VALUE_2 IS NOT NULL 
+  OR T3.VALUE_3 IS NOT NULL 
+  OR T4.VALUE_4 IS NOT NULL 
+</code></pre>
+
+<p>If your values are stored as blanks, then this should work.  If they are stored as NULLs, replace &lt;> '' with IS NOT NULL.</p>
+
+<p>Here is a <a href="http://sqlfiddle.com/#!3/a1613/1" rel="nofollow">SQL Fiddle</a>.</p>
+
+<p>Good luck.</p>

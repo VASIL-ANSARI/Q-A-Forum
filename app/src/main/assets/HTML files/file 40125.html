@@ -1,0 +1,51 @@
+<p>I ended up figuring it out. Basically the first place I should have looked was <a href="http://nbviewer.ipython.org/github/mwaskom/seaborn/blob/master/examples/timeseries_plots.ipynb">here</a> in the section titled, "Specifying input data with long-form DataFrames". What I had to do was this:</p>
+
+<pre><code>data.reset_index(inplace=True)
+data.columns = np.arange(len(data.columns))
+melted = pd.melt(data, id_vars=0)
+</code></pre>
+
+<p>The first line moves the DatetimeIndex into its own column and sets a default integer index inplace. Second line does the same for the headers except drops them out (I needed to do this because it doesn't seem to be possible to do the grouping with a multiindex). Finally we melt the data creating DataFrame that looks like this:</p>
+
+<pre><code>In [120]:
+
+melted
+Out[120]:
+0   variable    value
+0   1990-01-01  1   1
+1   1990-01-02  1   2
+2   1990-01-03  1   3
+3   1990-01-04  1   4
+4   1990-01-05  1   5
+5   1990-01-01  2   6
+6   1990-01-02  2   7
+7   1990-01-03  2   8
+8   1990-01-04  2   9
+9   1990-01-05  2   1
+10  1990-01-01  3   2
+11  1990-01-02  3   3
+12  1990-01-03  3   4
+13  1990-01-04  3   5
+14  1990-01-05  3   6
+15  1990-01-01  4   7
+16  1990-01-02  4   8
+17  1990-01-03  4   9
+18  1990-01-04  4   1
+19  1990-01-05  4   2
+</code></pre>
+
+<p>Now after the DataFrame is ready I can use tsplot like so:</p>
+
+<pre><code>sns.tsplot(melted, time=0, unit='variable', value='value')
+</code></pre>
+
+<p>Which in my case is pretty much the same as if I did:</p>
+
+<pre><code>sns.tsplot(data.T.values, idx)
+plt.xlabel('0')
+plt.ylabel('value')
+</code></pre>
+
+<p>except if I added any conditions then tsplot would plot the other series and make a legend for me.</p>
+
+<p>It would be nice is <code>tsplot</code> could at least plot dates as timestamps given the nature of the function. I think using the transposed array is going to be a much easier option for my application instead of using a DataFrame directly.</p>

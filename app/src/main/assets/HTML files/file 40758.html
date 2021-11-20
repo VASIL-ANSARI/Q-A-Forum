@@ -1,0 +1,48 @@
+<p>Unfortunately your table is not normalized :(
+<br><br>
+In this case a possible solution is to unpivot the table using a query like this:</p>
+
+<pre><code>CREATE VIEW unpivoted AS
+SELECT id, 'col1' colname, col1 as value FROM Table1
+UNION ALL
+SELECT id, 'col2' colname, col2 FROM Table1
+UNION ALL
+SELECT id, 'col3' colname, col3 FROM Table1
+UNION ALL
+SELECT id, 'col4' colname, col4 FROM Table1
+UNION ALL
+SELECT id, 'col5' colname, col5 FROM Table1
+UNION ALL
+SELECT id, 'col6' colname, col6 FROM Table1
+UNION ALL
+SELECT id, 'col7' colname, col7 FROM Table1
+</code></pre>
+
+<p>and then use a query like the below to find 3 minimum values and then pivot results back:</p>
+
+<pre><code>SET @x = 0;
+Set @lastid = -999;
+
+SELECT id,
+       min( IF( x = 0, colname, null )) As Colname1,
+       min( IF( x = 0, value, null )) As value1,
+       min( IF( x = 1, colname, null )) As Colname2,
+       min( IF( x = 1, value, null )) As value2,
+       min( IF( x = 2, colname, null )) As Colname3,
+       min( IF( x = 2, value, null )) As value3
+FROM (
+  SELECT id, colname, value,
+         IF( @lastid = id, @x:=@x+1,
+             IF( (@lastid:=id), @x:=0, @x:=0 ) 
+         ) As x
+  FROM unpivoted
+  ORDER BY id, value
+) q
+WHERE x &lt; 3
+GROUP BY id
+</code></pre>
+
+<p>Demo: <a href="http://sqlfiddle.com/#!2/f20ee4/5" rel="nofollow">http://sqlfiddle.com/#!2/f20ee4/5</a>
+<br>
+But the speed of these queries will be <strong>horribly slow</strong>, don't even try them on a big table.<br>
+You need to normalize the table.</p>

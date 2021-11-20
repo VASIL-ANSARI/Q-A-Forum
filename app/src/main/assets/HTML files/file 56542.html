@@ -1,0 +1,41 @@
+<p>The intent of the <code>{propertyName}Specified</code> pattern is documented in <a href="https://msdn.microsoft.com/en-us/library/zds0b35c.aspx" rel="nofollow">XML Schema Binding Support: MinOccurs Attribute Binding Support</a>.  It was added to support an XSD schema element in which:</p>
+
+<ul>
+<li>The <strong><code>&lt;element&gt;</code></strong> element is involved.</li>
+<li><strong>minOccurs</strong> is zero.</li>
+<li>The <strong>maxOccurs</strong> attribute dictates a single instance.</li>
+<li>The data type converts to a value type. </li>
+</ul>
+
+<p>In this case, <a href="https://msdn.microsoft.com/en-us/library/x6c1kb0s.aspx" rel="nofollow">xsd.exe</a> will automatically generate (or you can manually generate) a property with the same name as the schema element and a <code>{propertyName}Specified</code> boolean get/set property <em>that tracks whether the element was encountered in the XML</em>.  If the element is encountered, <code>{propertyName}Specified</code> is set to <code>true</code>, otherwise <code>false</code>.  Thus the deserialized instance can determine whether the property was unset, or explicitly set to its default value, during deserialization.</p>
+
+<p>Note that, while xsd.exe is documented only to generate automatically a <code>{propertyName}Specified</code> property for value type properties, the same pattern can be used manually for reference type properties.</p>
+
+<p>You might ask, why does xsd.exe not bind to a nullable in this case?  Perhaps because:</p>
+
+<ul>
+<li>Nullables are used to support the <a href="https://www.w3.org/TR/xmlschema-1/#xsi_nil" rel="nofollow"><code>xsi:nil="true"</code></a> attribute instead.  See <a href="https://msdn.microsoft.com/en-us/library/ybce7f69.aspx" rel="nofollow">Xsi:nil Attribute Binding Support</a>.</li>
+<li>Nullables were not introduces until .Net 2.0, so maybe it was to late to use them for this purpose?</li>
+</ul>
+
+<p>You need to be aware of this pattern because xsd.exe will sometimes generate it for you automatically, however the interaction between a property and its <code>Specified</code> property is weird and liable to produce bugs.  You can fill up all the properties in your class, then serialize to XML and lose <em>everything</em> because you didn't also set set the corresponding <code>Specified</code> properties to <code>true</code>.  This "gotcha" comes up here from time to time here, see e.g. <a href="https://stackoverflow.com/questions/9776592/why-is-my-type-not-being-serialized-correctly-by-the-xmlserializer">this question</a> or <a href="https://stackoverflow.com/questions/36900089/is-having-minoccurs-0-sufficient-to-cause-net-to-create-a-xxxspecified-field">this one also</a>.</p>
+
+<p>Another "gotcha" with this pattern is that, if you need to serialize your type with a serializer that does not support this pattern, you <strong>may</strong> want to manually suppress output of this property during serialization, and <strong>probably will</strong> need to manually set it during deserialization.  Since each serializer may have its own custom mechanism for suppressing properties (or no mechanism at all!), doing this can become more and more burdensome over time.</p>
+
+<p>(Finally, I'm a little surprised that your <code>MyPropertySpecified</code> works successfully without a setter.  I seem to recall a version of .Net 2.0 in which a missing <code>{propertyName}Specified</code> setter would cause an exception to be thrown.  But it's no longer reproducible on later versions, and I don't have 2.0 to test.  So that might be a third gotcha.)</p>
+
+<p>Support for the <code>ShouldSerialize{PropertyName}()</code> method is documented in <a href="https://msdn.microsoft.com/en-us/library/53b8022e.aspx" rel="nofollow">Properties in Windows Forms Controls: Defining Default Values with the ShouldSerialize and Reset Methods</a>.  As you can see the documentation is in the Windows Forms section of MSDN not the <code>XmlSerializer</code> section, so it is, in fact, semi-hidden functionality.  I have no idea why support for this method and the <code>Specified</code> property both exist in <code>XmlSerializer</code>.  <code>ShouldSerialize</code> was introduced in <a href="https://msdn.microsoft.com/en-us/library/53b8022e%28v=vs.71%29.aspx" rel="nofollow">.Net 1.1</a> and I <em>believe</em> that MinOccurs binding support was added in <a href="https://msdn.microsoft.com/en-us/library/zds0b35c%28v=vs.80%29.aspx" rel="nofollow">.Net 2.0</a>, so perhaps the earlier functionality didn't quite meet the needs (or taste) of the xsd.exe development team?</p>
+
+<p>Because it is a method not a property, it lacks the "gotchas" of the <code>{propertyName}Specified</code> pattern.  It also seems to be more popular in practice, and has been adopted by other serializers including:</p>
+
+<ul>
+<li><a href="http://www.newtonsoft.com/json/help/html/conditionalproperties.htm" rel="nofollow">Json.NET</a></li>
+<li><a href="https://github.com/mgravell/protobuf-net" rel="nofollow">protobuf-net</a> (which claims to <a href="https://stackoverflow.com/questions/10190167/protobuf-net-conditional-serialization">supports both patterns</a>.)</li>
+</ul>
+
+<p>So, which pattern to use?  </p>
+
+<ol>
+<li><p>If xsd.exe generates a <code>{propertyName}Specified</code> property for you automatically, or your type needs to track whether a specific element appeared or not in the XML file, use this pattern and watch out for the "gotchas".</p></li>
+<li><p>Otherwise, use the <code>ShouldSerialize{PropertyName}()</code> pattern.  It has fewer gotchas and may be more widely supported.</p></li>
+</ol>

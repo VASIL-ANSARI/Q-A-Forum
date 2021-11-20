@@ -1,0 +1,64 @@
+<p>Ok, I figured out why this behavior was going on:</p>
+
+<p>I am capturing some URLs from the webView and I am pushing a new ViewController in the method:</p>
+
+<pre><code>BOOL)webView:(UIWebView*)webView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
+</code></pre>
+
+<p>I was not checking properly for the URLs I only wanted reloaded, as opposed to pushed. So everytime the method above was called it pushed a new ViewController with the URL.</p>
+
+<p>I went in and got a substring of the URL I did not want being pushed into another view:</p>
+
+<pre><code>- (BOOL)homeURL:(NSString *)url
+{
+    BOOL match = NO;
+    url = [self urlType:url];
+
+    if ((url) &amp;&amp; ((NSOrderedSame == [url compare:subtring])))
+    {
+        match = YES;
+    }
+
+    return match;
+}
+
+- (NSString *)urlType:(NSString *)url
+{
+    NSRange beginSubstring = [url rangeOfString:@"com/"];
+    NSString *val = url;
+
+    if (url)
+    {
+        val = [val substringWithRange:NSMakeRange((beginSubstring.location + 4), substring.length)];
+    }
+
+    return val;
+}
+</code></pre>
+
+<p>Then I fixed the method above to catch the substring:</p>
+
+<pre><code>//capture URL
+- (BOOL)webView:(UIWebView*)webView shouldStartLoadWithRequest:(NSURLRequest*)request navigationType:(UIWebViewNavigationType)navigationType
+{
+
+    if (!viewLoading)
+    {
+        if ([self homeURL:request.URL.absoluteString])
+        {
+            return YES;
+        }
+        else
+        {
+            ViewController *newPage = [[ViewController alloc] initWithNibName:@"ViewController" request:request home:NO bundle:nil];
+            [self.navigationController pushViewController:newPage animated:YES];
+            return NO;
+        }
+    }
+
+
+    return YES;
+}
+</code></pre>
+
+<p>Seems to work well now!</p>

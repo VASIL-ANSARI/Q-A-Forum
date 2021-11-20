@@ -1,0 +1,40 @@
+<p>Might be easier to create a <a href="http://msdn.microsoft.com/en-us/library/ms187956.aspx" rel="nofollow">View</a> <code>vwInvMarketGroup</code> inside your database using that query:</p>
+
+<pre><code>CREATE VIEW vwInvMarketGroup AS
+    With cte As
+(SELECT [marketGroupID]
+      ,[parentGroupID]
+      ,[marketGroupName]
+      ,[description]
+      ,[iconID]
+      ,[hasTypes]
+      , 0 As Level
+  FROM [Eve_Retribution_1.0.7].[dbo].[invMarketGroups]
+  WHERE [parentGroupID] IS NULL
+  UNION All
+  Select mg.marketGroupID
+    ,mg.parentGroupID
+    ,mg.marketGroupName
+    ,mg.description
+    ,mg.iconID
+    ,mg.hasTypes
+    ,c.Level + 1 As Level
+  FROM [Eve_Retribution_1.0.7].dbo.invMarketGroups mg
+  Inner Join cte c On mg.parentGroupID = c.marketGroupID
+  WHERE mg.marketGroupID &lt;&gt; mg.parentGroupID
+)
+  SELECT marketGroupID
+    ,parentGroupID
+    ,marketGroupName
+    ,description
+    ,iconID
+    ,hasTypes
+    , Level
+  FROM cte
+GO
+</code></pre>
+
+<p>Then you can use this:</p>
+
+<pre><code>IEnumerable&lt;invMarketGroup&gt; results = context.ExecuteQuery&lt;invMarketGroup&gt;(@"SELECT * FROM vwInvMarketGroup");
+</code></pre>

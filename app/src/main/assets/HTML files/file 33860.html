@@ -1,0 +1,20 @@
+<p>I took a quick look at the source code, and it looks like the Parser object's state could easily get trashed if two threads are running parser.parse() at the same time. Here is what Parser.parse looks like:</p>
+
+<pre><code> def parse(self, text, html=True):
+        '''Parse the text and return a ParseResult instance.'''
+        self._urls = []
+        self._users = []
+        self._lists = []
+        self._tags = []
+
+        reply = REPLY_REGEX.match(text)
+        reply = reply.groups(0)[0] if reply is not None else None
+
+        parsed_html = self._html(text) if html else self._text(text)
+        return ParseResult(self._urls, self._users, reply,
+                           self._lists, self._tags, parsed_html)
+</code></pre>
+
+<p>The first thing the method does is clear a bunch of internal lists that contain parsed results. If you were to call parse() in one thread, and half-way through that being complete (so a few of those internal lists are populated, but work is still being done), you call self.parse() in another thread, all those lists will get cleared, which would trash the first thread's results. You'd end up with a mix of results from each thread being returned to both the first and second thread.</p>
+
+<p>I think you'll need to create a Parser() instance for each thread.</p>

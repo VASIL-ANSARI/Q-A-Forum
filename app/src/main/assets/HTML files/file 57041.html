@@ -1,0 +1,18 @@
+<p>The working SQL is pretty much:</p>
+
+<pre><code>select task_id, id from TaskRevisions where (
+   select count(*) from TaskRevisions as t
+   where t.task_id = TaskRevisions.task_id and t.id &lt;= TaskRevisions.id
+) &lt;= 2
+</code></pre>
+
+<p>After much work, this is the answer in  SQLAlchemy:</p>
+
+<pre><code>tr = aliased(TaskRevision)
+q = s.query(TaskRevision.task_id, TaskRevision.id, TaskRevision.title).filter(
+        s.query(func.count(tr.id)) \
+            .filter(tr.id &gt;= TaskRevision.id) \
+            .filter(tr.task_id == TaskRevision.task_id) \
+            .as_scalar() &lt;= 2) \
+    .order_by(TaskRevision.task_id).all()
+</code></pre>

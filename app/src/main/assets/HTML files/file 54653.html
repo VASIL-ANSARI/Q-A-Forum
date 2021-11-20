@@ -1,0 +1,87 @@
+<p>OK, I think this is very specific to TestNG configurations, since all of the JUnit examples work 'out of the box'! </p>
+
+<p>Read through <a href="https://github.com/jayway/powermock/wiki/TestNG_usage" rel="nofollow">this</a> link from the PowerMock GitHub site which describes further detail on how to use TestNG together with PowerMock.  Exactly your scenario of verifying calls to mocked <code>static</code> methods is described there using this example code:</p>
+
+<blockquote>
+<pre><code>@PrepareForTest(IdGenerator.class)
+public class MyTestClass {
+
+   @Test
+   public void demoStaticMethodMocking() throws Exception {
+      mockStatic(IdGenerator.class);
+      when(IdGenerator.generateNewId()).thenReturn(2L);       
+      new ClassUnderTest().methodToTest();
+
+      // Optionally verify that the static method was actually called
+      verifyStatic();
+      IdGenerator.generateNewId();
+   }
+
+}
+</code></pre>
+</blockquote>
+
+<p>Which is then followed by this nugget of information:</p>
+
+<blockquote>
+  <p>For this to work you need to tell TestNG to use the PowerMock object factory</p>
+</blockquote>
+
+<p>This is done using either TestNG XML config, or in the test's code itself. For completeness I've copied below the options given at the above URL. FWIW I extended <code>PowerMockTestCase</code> and the verification worked as you expect.</p>
+
+<p>Finally, don't forget to <code>@PrepareForTest</code> the correct class - i.e. the class containing the <code>static</code> methods which you want to mock, as @Bax pointed out <a href="http://stackoverflow.com/a/35801671/993262">here</a>.</p>
+
+<p>As a further hint (which you probably already know about, but worth mentioning here anyway) since you aren't using Mockito to mock objects, <code>MockitoAnnotations.initMocks(this)</code> can be safely deleted.</p>
+
+<p>Once you've got all this working, you might also like to consider whether the use of <a href="http://martinfowler.com/articles/modernMockingTools.html" rel="nofollow">'Black Magic'</a> tools like Powermock is actually exposing <a href="http://martinfowler.com/bliki/CodeSmell.html" rel="nofollow">code smells</a> in your design?  Especially since it looks like the classes containing <code>static</code> methods are under your ownership.  This means you could use an alternative design that doesn't use <code>static</code>s.  I highly recommend Michael Feathers' book <a href="http://www.goodreads.com/book/show/44919.Working_Effectively_with_Legacy_Code" rel="nofollow">Working Effectively with Legacy Code</a>, it might just change your whole approach to software design and testing...</p>
+
+<p>Good luck!</p>
+
+<blockquote>
+  <h1>Configure TestNG to use the PowerMock object factory</h1>
+  
+  <h2>Using suite.xml</h2>
+  
+  <p>In your suite.xml add the following in the suite tag: 
+  <code>object-factory="org.powermock.modules.testng.PowerMockObjectFactory"</code> e.g. </p>
+
+<pre><code>&lt;suite name="dgf" verbose="10"
+    object-factory="org.powermock.modules.testng.PowerMockObjectFactory"&gt;
+    &lt;test name="dgf"&gt;
+        &lt;classes&gt;
+            &lt;class name="com.mycompany.Test1"/&gt;
+            &lt;class name="com.mycompany.Test2"/&gt;
+        &lt;/classes&gt;
+    &lt;/test&gt; 
+</code></pre>
+  
+  <p> </p>
+  
+  <p>If you're using Maven you may need to point out the file to Surefire:</p>
+
+<pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;
+    &lt;configuration&gt;
+        &lt;suiteXmlFiles&gt;
+        &lt;suiteXmlFile&gt;suite.xml&lt;/suiteXmlFile&gt;
+        &lt;/suiteXmlFiles&gt;
+    &lt;/configuration&gt; 
+&lt;/plugin&gt; 
+</code></pre>
+  
+  <h2>Programmatically</h2>
+  
+  <p>Add a method like this to your test class:</p>
+
+<pre><code>@ObjectFactory public IObjectFactory getObjectFactory() {
+     return new org.powermock.modules.testng.PowerMockObjectFactory(); 
+} 
+</code></pre>
+  
+  <p>or to be on the safe side you can also extend from the <code>PowerMockTestCase</code>:</p>
+
+<pre><code>@PrepareForTest(IdGenerator.class) 
+public class MyTestClass extends PowerMockTestCase { ... }
+</code></pre>
+</blockquote>

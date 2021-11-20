@@ -1,0 +1,33 @@
+<p>this might be hard to do, unless you're absolutely sure the two links return nothing when nothing's found. If either of the two locations return something like a 404 your script will interpret the 404 as actual content and redirect there... You might need to look for an alternative way of determining if a site "has content or not"</p>
+
+<p>You could check the header for a 200 like this:</p>
+
+<pre><code>$header=get_headers($url,true);
+</code></pre>
+
+<p>and then test $header[0] to have "200" in it... it makes it dodgy code though. If at any time one of the URL's returns any unexpected output with HTTP/1.1 200 OK in the header your script will think it's all ok</p>
+
+<p>There's also a lot of redundancy in your code. Right now $location_url2 is downloaded even if there's content in $location_url, which is only burning resources and makes your scripting slower than needed... </p>
+
+<p>I would go somewhere alongs the lines of this: (keep in mind, you're highly depending on what the url's return):</p>
+
+<pre><code>&lt;?
+
+$search_text=filter_input(INPUT_POST,"search",FILTER_SANITIZE_ENCODED);
+
+if($search_text!=""){
+    $location_url = "http://cydia.saurik.com/package/{$search_text}/";
+    $location_url2 = "http://rpetri.ch/cydia/{$search_text}/";
+
+    $content=@file_header($location_url,true);
+    if(strpos($content,"200 OK")!==false) 
+        header("Location: {$location_url}");
+    else{
+        $content=@file_header($location_url2,true);
+        if(strpos($content,"200 OK")!==false)
+            header("Location: {$location_url2}");
+        else
+            header("Location: http://www.amazingjokes.com");
+    }
+}
+</code></pre>

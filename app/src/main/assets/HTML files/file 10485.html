@@ -1,0 +1,25 @@
+<p>It's unnecessarily complex, the simplest 'safe' way to do DCL is like so:</p>
+
+<pre><code>class Foo {
+  private volatile Helper helper = null;
+  private final Object mutex = new Object(); 
+  public Helper getHelper() {
+    if (helper == null) {
+        synchronized(mutex) {
+            if (helper == null) {
+                helper = new Helper();
+            }
+        }
+    }
+    return helper;
+  }
+}
+</code></pre>
+
+<p>The key points here being:</p>
+
+<ul>
+<li>In the 'happy' case we expect helper to already be assigned, so if it is we can just return it without having to enter a synchronized block.  </li>
+<li>Helper is marked as volatile to let the compiler know that helper can be read from / written to by any thread at any time and it's important that read / writes are not re-ordered.  </li>
+<li>The synchronized block uses a private final variable to synchronize on to avoid a potential performance hit in the case of another area of code synchronizing on the <code>this</code> instance.</li>
+</ul>

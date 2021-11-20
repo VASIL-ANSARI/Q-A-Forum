@@ -1,0 +1,7 @@
+<p>Nope, [size_is] is an attribute that only midl.exe knows how to use.  It does so when it generates the proxy/stub for the interface, something that's used when you want to make the call across process boundaries.</p>
+
+<p>It isn't otherwise expressible in a type library.  The argument gets emitted as "pointer to BSTR" which could either indicated a BSTR passed by reference or an array of BSTRs.  Tlbimp.exe can't tell the difference, it picks the former.  It has to, it cannot reasonably infer the array size.  You get junk at runtime because the CLR interop layer only passes a single element of the array.  Any COM client has a big problem using this method, it isn't .NET specific.  The .NET pinvoke marshaller has a workaround for this problem, note the SizeParamIndex property of the [MarshalAs] attribute. </p>
+
+<p>If you cannot modify the C++ code then you'll need to edit the interop library by hand to inject that [MarshalAs] attribute.  That's quite fugly, you have to decompile the library with ildasm.exe, edit the .il and put it back together with ilasm.exe.  You don't want to do that often.</p>
+
+<p>If you can then you should use the Automation compatible way to pass arrays.  Use a SAFEARRAY.  This is fully supported by type libraries and the CLR interop plumbing, no work on your end is needed on the managed side.  Also note that you now no longer need the <em>number</em> argument, safe arrays know how long they are.  Not unlike managed arrays.</p>

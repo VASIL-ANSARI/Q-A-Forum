@@ -1,0 +1,47 @@
+<p>Generally it is not possible nor desirable to extract the object used as an argument to <code>boost::bind</code> (or <code>std::bind</code>) back from the result of the bind. The way the resulting object is stored is implementation specific.</p>
+
+<p>Observe how it is defined as <strong>unspecified</strong> in the documentation (see link below):</p>
+
+<pre><code>// one argument
+template&lt;class R, class F, class A1&gt; unspecified-3 bind(F f, A1 a1);
+</code></pre>
+
+<p>To illustrate further, take a look at this paragraph, on the same page:</p>
+
+<blockquote>
+  <p>The function objects that are produced by boost::bind do not model the
+  STL Unary Function or Binary Function concepts, even when the function
+  objects are unary or binary operations, <strong>because the function object
+  types are missing public typedefs</strong> result_type and <strong>argument_type</strong> or
+  first_argument_type and second_argument_type. In cases where these
+  typedefs are desirable, however, the utility functionmake_adaptable
+  can be used to adapt unary and binary function objects to these
+  concepts.</p>
+</blockquote>
+
+<p><a href="http://www.boost.org/doc/libs/1_55_0/libs/bind/bind.html#CommonDefinitions" rel="nofollow">http://www.boost.org/doc/libs/1_55_0/libs/bind/bind.html#CommonDefinitions</a></p>
+
+<p>The library developers explicitly tell you that the type that's returned is opaque, won't give you back the type of the arguments you've passed in, and don't intend for you to obtain the objects from within the opaque bind return type.</p>
+
+<p>However, when you call bind() it is you who supplies the argument, so you can just store them aside and use them later. Alternatively, as suggested in the comments you can just use <code>*this</code> as a reference to the callee when the bound method is invoked.</p>
+
+<pre><code>#include &lt;boost/bind.hpp&gt;
+#include &lt;iostream&gt;
+
+struct Foo {
+    void f() const {
+       const Foo&amp; myObj = *this;
+       std::cout &lt;&lt; "Invoked  instance: " &lt;&lt; std::hex &lt;&lt; &amp;myObj &lt;&lt; std::endl;
+    }
+};
+
+int main() {
+    Foo foo;
+    std::cout &lt;&lt; "Invoking instance: " &lt;&lt; std::hex &lt;&lt; &amp;foo &lt;&lt; std::endl;
+    boost::bind(&amp;Foo::f, boost::ref(foo))();
+    return 0;
+}
+/* Output:
+Invoking instance: 0x7fff4381185f
+Invoked  instance: 0x7fff4381185f */
+</code></pre>

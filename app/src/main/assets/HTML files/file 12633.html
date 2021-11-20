@@ -1,0 +1,54 @@
+<p>Ok, so at the moment my solution is to have something like this:</p>
+
+<pre><code>   interface Thing {
+       String getCategory();
+   }
+</code></pre>
+
+<p>and then:</p>
+
+<pre><code>            List&lt;Thing&gt; thingList = service.getThings();
+    DropDownChoice&lt;Thing&gt; dropDownChoice = new DropDownChoice&lt;Thing&gt;("select",
+            thingList) {
+        private static final long serialVersionUID = 1L;
+        private Thing last;
+
+        private boolean isLast(int index) {
+            return index - 1 == getChoices().size();
+        }
+
+        private boolean isFirst(int index) {
+            return index == 0;
+        }
+
+        private boolean isNewGroup(Thing current) {
+            return last == null
+                    || !current.getCategory().equals(last.getCategory());
+        }
+
+        private String getGroupLabel(Thing current) {
+            return current.getCategory();
+        }
+
+        @Override
+        protected void appendOptionHtml(AppendingStringBuffer buffer,
+                Thing choice, int index, String selected) {
+            if (isNewGroup(choice)) {
+                if (!isFirst(index)) {
+                    buffer.append("&lt;/optgroup&gt;");
+                }
+                buffer.append("&lt;optgroup label='");
+                buffer.append(Strings.escapeMarkup(getGroupLabel(choice)));
+                buffer.append("'&gt;");
+            }
+            super.appendOptionHtml(buffer, choice, index, selected);
+            if (isLast(index)) {
+                buffer.append("&lt;/optgroup&gt;");
+            }
+            last = choice;
+
+        }
+    };
+</code></pre>
+
+<p>This requires that <code>thingList</code> is already sorted based on the category.</p>

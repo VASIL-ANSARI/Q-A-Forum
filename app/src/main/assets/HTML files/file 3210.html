@@ -1,0 +1,58 @@
+<p>Ok so if your using 4.0 custom workflows and not 3.0 callouts, you should add a workflow assembly, and use the Context service and executing context of your workflow to pull the values from the new note.</p>
+
+<p>See the example below on how to access a record using the context service and the ID of your current context of execution (that should be your note)</p>
+
+<pre><code>    /// &lt;summary&gt;
+    /// The Execute method is called by the workflow runtime to execute an activity.
+    /// &lt;/summary&gt;
+    /// &lt;param name="executionContext"&gt; The context for the activity&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    protected override ActivityExecutionStatus Execute(ActivityExecutionContext executionContext)
+    {
+
+        // Get the context service.
+        IContextService contextService = (IContextService)executionContext.GetService(typeof(IContextService));
+        IWorkflowContext context = contextService.Context;
+
+        // Use the context service to create an instance of CrmService.
+        ICrmService crmService = context.CreateCrmService(true);
+        BusinessEntity newNote = GetNote(crmService, context.PrimaryEntityId);
+
+        string noteAttrib;
+
+         noteAttrib = newNote.Properties.Contains("AnnotationId") ? ((Lookup)newNote.Properties["annotationid"]).name.ToString() : null;
+
+        return ActivityExecutionStatus.Closed;
+    }
+</code></pre>
+
+<p>GetNotes method would be a standard query for notes by Id through a CRM service call,
+here is an example slightly modified from MSDN to return a note:</p>
+
+<pre><code>private BusinessEntity getNote(ICrmService service, guid noteid)
+{
+  // Create the column set object that indicates the fields to be retrieved.
+  ColumnSet cols = new ColumnSet();
+
+  // Set the columns to retrieve, you can use allColumns but its good practice to specify:
+  cols.Attributes = new string [] {"name"};
+
+  // Create the target object for the request.
+  TargetRetrieveAnnotation target = new TargetRetrieveAnnotation();
+
+  // Set the properties of the target object.
+  // EntityId is the GUID of the record being retrieved.
+  target.EntityId = noteid;
+
+  // Create the request object.
+  RetrieveRequest retrieve = new RetrieveRequest();
+
+  // Set the properties of the request object.
+  retrieve.Target = target;
+  retrieve.ColumnSet = cols;
+
+  // Execute the request.
+  RetrieveResponse retrieved = (RetrieveResponse)service.Execute(retrieve);
+  return RetrieveResponse;
+}
+</code></pre>

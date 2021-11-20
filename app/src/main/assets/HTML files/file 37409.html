@@ -1,0 +1,87 @@
+<p>So...</p>
+
+<h1>Lesson 1</h1>
+
+<p>Please post a complete compilable example. In this case, you didn't provide enough information for us to easily debug your code.</p>
+
+<p>For your particular problem, that code would probably look something like this:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;set&gt;
+using namespace std;
+
+class user {
+    public:
+        user(int id = 0): id(id) {}
+        int id;
+};
+
+class dbase {
+    public:
+        set&lt;user&gt; users;
+};
+
+bool operator&lt;(user const &amp; lhs, user const &amp; rhs) {
+    return lhs.id &lt; rhs.id;
+}
+
+ostream&amp; operator&lt;&lt; (ostream &amp;out, user &amp; user) {
+    return out &lt;&lt; "user(" &lt;&lt; user.id &lt;&lt; ")";
+}
+
+ostream&amp; operator&lt;&lt; (ostream &amp;out, dbase &amp;db) {
+    set&lt;user&gt;::iterator it;
+    user u;
+    for(it=db.users.begin(); it!=db.users.end(); it++)
+        cout&lt;&lt;*it&lt;&lt;endl;
+    return out;
+}
+
+int main() {
+    dbase db;
+    db.users.emplace(3);
+    db.users.emplace(4);
+    cout &lt;&lt; db &lt;&lt; endl;
+}
+</code></pre>
+
+<h1>Lesson 2</h1>
+
+<p>Please post the <strong>entire</strong> error message that your compiler reports. In this case, it would actually be:</p>
+
+<pre><code>se.cc: In function âstd::ostream&amp; operator&lt;&lt;(std::ostream&amp;, dbase&amp;)â:
+se.cc:28:16: error: cannot bind âstd::ostream {aka std::basic_ostream&lt;char&gt;}â lvalue to âstd::basic_ostream&lt;char&gt;&amp;&amp;â
+         cout&lt;&lt;*it&lt;&lt;endl;
+                ^
+In file included from /opt/gcc/4.8.1/include/c++/4.8.1/iostream:39:0,
+                 from se.cc:1:
+/opt/gcc/4.8.1/include/c++/4.8.1/ostream:602:5: error:   initializing argument 1 of âstd::basic_ostream&lt;_CharT, _Traits&gt;&amp; std::operator&lt;&lt;(std::basic_ostream&lt;_CharT, _Traits&gt;&amp;&amp;, const _Tp&amp;) [with _CharT = char; _Traits = std::char_traits&lt;char&gt;; _Tp = user]â
+     operator&lt;&lt;(basic_ostream&lt;_CharT, _Traits&gt;&amp;&amp; __os, const _Tp&amp; __x)
+     ^
+</code></pre>
+
+<p>Note that I haven't edited the error message in any way. It's possible that there is additional information in the message that you're missing that could be helpful to people trying to answer your question.</p>
+
+<h1>Lesson 3</h1>
+
+<p>Instead of:</p>
+
+<pre><code>ostream&amp; operator&lt;&lt; (ostream &amp;out, user &amp; user) { ... }
+</code></pre>
+
+<p>Do:</p>
+
+<pre><code>ostream&amp; operator&lt;&lt; (ostream &amp;out, user const &amp; user) { ... }
+</code></pre>
+
+<h1>Lesson 4</h1>
+
+<p>When overloading the stream exaction or stream insertion operators, you should probably never use <code>cout</code> or <code>cerr</code>. Instead, you've passed a stream object into your function. In your case, you've named it with the typical (expected) argument name of <code>out</code>.</p>
+
+<p>So, your two stream insertion operators should have every instance of <code>cout</code> replaced with <code>out</code>.</p>
+
+<p>This will cause your code to work <strong>correctly</strong> when you extend it to use things like writing the user database to a file using a fstream, or if you wanted to print a message to <code>cerr</code> as well.</p>
+
+<h1>Lesson 5</h1>
+
+<p>Just to note. This is an issue because <code>*it</code> returns a reference to a <code>const User</code>. So your existing <code>operator&lt;&lt;</code> overload doesn't match, because it wants a non-const version of a User.</p>

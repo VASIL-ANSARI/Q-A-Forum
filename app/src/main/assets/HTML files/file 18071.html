@@ -1,0 +1,104 @@
+<p>You're really making life very difficult for yourself.  The Java Graphics API has a number of classes specifically suited for solving this problem.</p>
+
+<p>As a general rule of thumb. NEVER override any of the <code>paint</code> methods of top level containers.  Use an appropriate component, such as <code>JPanel</code> or <code>JComponent</code>.</p>
+
+<p>Where possible, override the <code>paintComponent</code> method instead.</p>
+
+<p>As HoverCraft has pointed out, DON'T modify the UI from within the <code>paint</code> methods, this includes adding listeners.  The <code>paint</code> method will get called lots of times, meaning each time it's called, you will register yet ANOTHER listener...</p>
+
+<p>You will want to start by having a read through the <a href="http://docs.oracle.com/javase/tutorial/2d/index.html" rel="nofollow">2D Graphics</a> trail and the <a href="http://docs.oracle.com/javase/tutorial/uiswing/painting/" rel="nofollow">Performing Custom Painting</a> trail</p>
+
+<p>While the example below uses a <code>JFrame</code>, the basic principles apply.</p>
+
+<pre><code>public static void main(String[] args) {
+
+    EventQueue.invokeLater(new Runnable() {
+
+        @Override
+        public void run() {
+
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (ClassNotFoundException ex) {
+            } catch (InstantiationException ex) {
+            } catch (IllegalAccessException ex) {
+            } catch (UnsupportedLookAndFeelException ex) {
+            }
+
+            JFrame frame = new JFrame();
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setLayout(new BorderLayout());
+            frame.setSize(200, 200);
+            frame.add(new HousePane());
+            frame.setVisible(true);
+            frame.setLocationRelativeTo(null);
+
+        }
+    });
+
+}
+
+public static class HousePane extends JPanel {
+
+    private List&lt;Rectangle2D&gt; parts = new ArrayList&lt;Rectangle2D&gt;(25);
+    private List&lt;Rectangle2D&gt; selected = new ArrayList&lt;Rectangle2D&gt;(25);
+
+    public HousePane() {
+
+        parts.add(new Rectangle2D.Float(10, 10, 50, 50));
+        parts.add(new Rectangle2D.Float(60, 10, 50, 50));
+        parts.add(new Rectangle2D.Float(10, 60, 50, 50));
+        parts.add(new Rectangle2D.Float(60, 60, 50, 50));
+
+        addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                selected.clear();
+                for (Rectangle2D rect : parts) {
+                    if (rect.contains(e.getPoint())) {
+                        selected.add(rect);
+                    }
+                }
+
+                // You could require the user to click the shape again
+                // to deselect by doing something like...
+                //for (Rectangle2D rect : parts) {
+                //    if (rect.contains(e.getPoint())) {
+                //        if (selected.contains(rect)) {
+                //            selected.remove(rect);
+                //        } else {
+                //            selected.add(rect);
+                //        }
+                //    }
+                //}
+                repaint();
+            }
+
+        });
+
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+
+        super.paintComponent(g);
+
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setColor(Color.BLUE);
+        for (Rectangle2D rect : selected) {
+
+            g2d.fill(rect);
+
+        }
+        g2d.setColor(Color.BLACK);
+        for (Rectangle2D rect : parts) {
+
+            g2d.draw(rect);
+
+        }
+
+    }
+
+}
+</code></pre>

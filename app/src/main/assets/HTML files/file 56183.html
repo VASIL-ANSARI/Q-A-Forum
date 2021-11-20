@@ -1,0 +1,56 @@
+<p>As far as I can tell, a single <code>Manager</code> instance can manage multiple independent <code>dict</code>.  Here's a simple example:</p>
+
+<pre><code>from multiprocessing import Process, Manager
+
+def f(x, d1, d2):
+    if x == 1:
+        d1['foo'] = 'bar'
+    if x == 2:
+        d2['bar'] = 'foo'
+    print x, d1, d2
+    return x*x
+
+if __name__ == '__main__':
+    manager = Manager()
+    d1 = manager.dict()
+    d2 = manager.dict()
+    p1 = Process(target=f, args=(1, d1, d2))
+    p2 = Process(target=f, args=(2, d1, d2))
+    p3 = Process(target=f, args=(3, d1, d2))
+    processes = [p1, p2, p3]
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
+</code></pre>
+
+<p>I get the following output:</p>
+
+<pre><code>3 {'foo': 'bar'} {}
+1 {'foo': 'bar'} {}
+2 {'foo': 'bar'} {'bar': 'foo'}
+</code></pre>
+
+<p>There is variation depending on which process gets to the dict's lock the fastest:</p>
+
+<pre><code>mgilson:$ python ~/sandbox/test.py
+3 {'foo': 'bar'} {}
+1 {'foo': 'bar'} {}
+2 {'foo': 'bar'} {'bar': 'foo'}
+mgilson:$ python ~/sandbox/test.py
+1 {'foo': 'bar'} {'bar': 'foo'}
+2 {'foo': 'bar'} {'bar': 'foo'}
+3 {'foo': 'bar'} {'bar': 'foo'}
+mgilson:$ python ~/sandbox/test.py
+1 {'foo': 'bar'} {'bar': 'foo'}
+3 {'foo': 'bar'} {'bar': 'foo'}
+2 {'foo': 'bar'} {'bar': 'foo'}
+mgilson:$ python ~/sandbox/test.py
+1 {'foo': 'bar'} {}
+2 {'foo': 'bar'} {'bar': 'foo'}
+3 {'foo': 'bar'} {'bar': 'foo'}
+</code></pre>
+
+<p>but it is obvious that in each case, the dictionaries are distinct (they have different keys).</p>
+
+<p>FWIW, I'm using OS-X.  There are some subtleties in how <code>multiprocessing</code> works on windows vs other *Nix systems that may come into play here...</p>

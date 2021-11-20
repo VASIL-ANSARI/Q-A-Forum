@@ -1,0 +1,71 @@
+<p>Since you are using SQL Server 2008, you can use the <a href="http://msdn.microsoft.com/en-us/library/ms177410%28v=sql.105%29.aspx" rel="nofollow"><code>PIVOT</code></a> function to get the result.  This function will convert your rows of data into columns through the use of an aggregate function.  Since your data is a string, then you will be limited to using either the <code>max</code> or <code>min</code> aggregate functions.</p>
+
+<p>If you have a limited number of columns, then you can hard-code your query.  The basic syntax will be:</p>
+
+<pre><code>select name,
+  [father' name], 
+  [favorite fruit],
+  [first teacher]
+from
+(
+  select q.question,
+    a.answer,
+    s.name
+  from student s
+  left join answers a
+    on s.student_code = a.student_code
+  left join question q
+    on a.question_code = q.question_code 
+) d
+pivot
+(
+  max(answer)
+  for question in ([father' name], [favorite fruit],
+                   [first teacher])
+) piv;
+</code></pre>
+
+<p>See <a href="http://sqlfiddle.com/#!3/1dee6/6" rel="nofollow">SQL Fiddle with Demo</a>. </p>
+
+<p>But if you have an unknown number of questions, then you will need to use dynamic SQL to generate the result.  This will create a list of the questions that you want to have in the final result and you will create a sql string that will be executed. The code will be similar to:</p>
+
+<pre><code>DECLARE @cols AS NVARCHAR(MAX),
+    @query  AS NVARCHAR(MAX)
+
+select @cols = STUFF((SELECT ',' + QUOTENAME(question) 
+                    from question
+                    group by question_code, question
+                    order by question_code
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)') 
+        ,1,1,'')
+
+set @query = N'SELECT name, ' + @cols + N' 
+            from 
+            (
+              select q.question,
+                a.answer,
+                s.name
+              from student s
+              left join answers a
+                on s.student_code = a.student_code
+              left join question q
+                on a.question_code = q.question_code 
+            ) x
+            pivot 
+            (
+                max(answer)
+                for question in (' + @cols + N')
+            ) p '
+
+execute sp_executesql @query;
+</code></pre>
+
+<p>See <a href="http://sqlfiddle.com/#!3/1dee6/8" rel="nofollow">SQL Fiddle with Demo</a>.  Both will give a result:</p>
+
+<pre><code>|  NAME | FATHER' NAME | FAVORITE FRUIT | FIRST TEACHER |
+|-------|--------------|----------------|---------------|
+| katia |        katia |         banana |        (null) |
+|   ken |       (null) |         (null) |        (null) |
+| roger |          ken |         (null) |        (null) |
+</code></pre>

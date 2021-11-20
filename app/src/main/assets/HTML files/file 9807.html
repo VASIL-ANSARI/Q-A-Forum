@@ -1,0 +1,69 @@
+<blockquote>
+  <p>Is there a way to sort this in the query?</p>
+</blockquote>
+
+<p>View models of course:</p>
+
+<pre><code>public class CategoryViewModel
+{
+    public string Title { get; set; }
+    public IEnumerable&lt;ProductViewModel&gt; Products { get; set; }
+}
+
+public class ProductViewModel
+{
+    public string Description { get; set; }
+}
+</code></pre>
+
+<p>and in your controller action do the necessary to fill this view model:</p>
+
+<pre><code>public ActionResult Index()
+{
+    var categories = 
+        (from category in context.Categories
+         orderby category.SortOrder ascending
+         select new CategoryViewModel
+         {
+             Title = category.Title,
+             Products = category
+                 .Products
+                 .OrderBy(p =&gt; p.SortOrder)
+                 .Select(p =&gt; new ProductViewModel
+                 {
+                     Description = p.Description
+                 })
+             }).ToList(); 
+        ).ToList();
+    return View(categories);
+}
+</code></pre>
+
+<p>and in the <code>Index.cshtml</code> view you can get rid of ugly loops and use display templates:</p>
+
+<pre><code>@model IEnumerable&lt;CategoryViewModel&gt;
+&lt;ul&gt;
+    @Html.DisplayForModel()
+&lt;/ul&gt;
+</code></pre>
+
+<p>and inside the display template for a category (<code>~/Views/Shared/CategoryViewModel.cshtml</code>)</p>
+
+<pre><code>@model CategoryViewModel
+&lt;li&gt;
+    @Html.DisplayFor(x =&gt; x.Title)
+    &lt;ul&gt;
+        @Html.DisplayFor(x =&gt; x.Products)
+    &lt;/ul&gt;
+&lt;/li&gt;
+</code></pre>
+
+<p>and inside the display template for a product (<code>~/Views/Shared/ProductViewModel.cshtml</code>)</p>
+
+<pre><code>@model ProductViewModel
+&lt;li&gt;
+    @Html.DisplayFor(x =&gt; x.Description)
+&lt;/li&gt;
+</code></pre>
+
+<p>As a further improvement to the controller action you could use <a href="http://automapper.codeplex.com/">AutoMapper</a> to map between your domain models (EF objects) and your view models which should be passed to a view.</p>

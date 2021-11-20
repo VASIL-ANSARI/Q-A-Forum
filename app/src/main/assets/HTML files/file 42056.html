@@ -1,0 +1,108 @@
+<p>You have different number of columns indeed. The last <code>UNION</code> number of column is only one column seleccted, where the first select you had selected 5 as following:</p>
+
+<pre><code>INSERT INTO email_queues (queueid, queuetype, ownerid, processed, recipient)
+    SELECT DISTINCT 323,                -- These are five columns
+                    'export',
+                    1,
+                    0,
+                    subscriberid
+    FROM
+    (
+       ....
+    ) AS T1
+    WHERE subscriberid NOT IN (... )
+    UNION
+    SELECT DISTINCT subscribers.subscriberid AS subscriberid -- This where is the error, only one column selected
+    FROM email_list_subscribers AS subscribers
+    JOIN email_lists AS lists ON lists.listid = subscribers.listid
+    AND lists.listid IN (33)
+    WHERE subscribers.listid IN (33)
+      AND ((subscribers.emailaddress LIKE '%v%'))
+</code></pre>
+
+<p>You have to modify it like this in order to make it works:</p>
+
+<pre><code>INSERT INTO email_queues (queueid, queuetype, ownerid, processed, recipient)
+SELECT DISTINCT 323,                -- These are five columns
+                'export',
+                1,
+                0,
+                subscriberid
+FROM
+(
+   SELECT DISTINCT subscribers.subscriberid AS subscriberid
+   FROM email_list_subscribers AS subscribers
+   JOIN email_lists AS lists ON lists.listid = subscribers.listid AND lists.listid IN (34)
+   WHERE subscribers.listid IN (34)
+     AND ((subscribers.emailaddress LIKE '%a%'))
+   UNION SELECT DISTINCT subscribers.subscriberid AS subscriberid
+   FROM email_list_subscribers AS subscribers
+   JOIN email_lists AS lists ON lists.listid = subscribers.listid AND lists.listid IN (37)
+   WHERE subscribers.listid IN (37)
+     AND ((subscribers.emailaddress LIKE '%kim%'))
+) AS T1
+WHERE subscriberid NOT IN (SELECT DISTINCT subscribers.subscriberid AS subscriberid
+                           FROM email_list_subscribers AS subscribers
+                           JOIN email_lists AS lists 
+                             ON lists.listid = subscribers.listid  
+                            AND lists.listid IN (37, 34)
+                           WHERE subscribers.listid IN (37, 34)
+                             AND ((subscribers.emailaddress LIKE '%a%'
+                                  OR subscribers.emailaddress LIKE '%kim%'))
+                          )
+UNION
+SELECT DISTINCT -- You have to add these in order to make the query works
+  323,              
+  'export',
+  1,
+  0,
+  subscribers.subscriberid AS subscriberid -- this is only one column you selected
+FROM email_list_subscribers AS subscribers
+JOIN email_lists AS lists ON lists.listid = subscribers.listid
+AND lists.listid IN (33)
+WHERE subscribers.listid IN (33)
+  AND ((subscribers.emailaddress LIKE '%v%'))
+</code></pre>
+
+<hr>
+
+<p><strong>UPDATE</strong>: You can also move that query inside the subquery, something like this</p>
+
+<pre><code>INSERT INTO email_queues (queueid, queuetype, ownerid, processed, recipient)
+SELECT DISTINCT 323,                -- These are five columns
+                'export',
+                1,
+                0,
+                subscriberid
+FROM
+(
+   SELECT DISTINCT subscribers.subscriberid AS subscriberid
+   FROM email_list_subscribers AS subscribers
+   JOIN email_lists AS lists ON lists.listid = subscribers.listid AND lists.listid IN (34)
+   WHERE subscribers.listid IN (34)
+     AND ((subscribers.emailaddress LIKE '%a%'))
+   UNION SELECT DISTINCT subscribers.subscriberid AS subscriberid
+   FROM email_list_subscribers AS subscribers
+   JOIN email_lists AS lists ON lists.listid = subscribers.listid AND lists.listid IN (37)
+   WHERE subscribers.listid IN (37)
+     AND ((subscribers.emailaddress LIKE '%kim%'))
+
+  UNION
+
+  SELECT DISTINCT subscribers.subscriberid AS subscriberid -- this is only one column you selected
+FROM email_list_subscribers AS subscribers
+JOIN email_lists AS lists ON lists.listid = subscribers.listid
+AND lists.listid IN (33)
+WHERE subscribers.listid IN (33)
+  AND ((subscribers.emailaddress LIKE '%v%')) 
+) AS T1
+WHERE subscriberid NOT IN (SELECT DISTINCT subscribers.subscriberid AS subscriberid
+                           FROM email_list_subscribers AS subscribers
+                           JOIN email_lists AS lists 
+                             ON lists.listid = subscribers.listid  
+                            AND lists.listid IN (37, 34)
+                           WHERE subscribers.listid IN (37, 34)
+                             AND ((subscribers.emailaddress LIKE '%a%'
+                                  OR subscribers.emailaddress LIKE '%kim%'))
+                          )
+</code></pre>

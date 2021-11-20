@@ -1,0 +1,77 @@
+<p>I did something very similar and it worked out just fine. I realize your question is about why RKObjectSerializer isn't working the way you expect, but maybe it is something else with your setup. I'm posting my code to give a clean example of something that does work. That said, after reading the RKObjectSerializer documentation, I don't see why you couldn't initialize your RKParams that way instead of setting them directly as I do in my example.</p>
+
+<p><strong>Router setup:</strong></p>
+
+<pre><code>RKObjectManager *objectManager = [RKObjectManager objectManagerWithBaseURL:kApiUrlBase];
+[objectManager.router routeClass:[PAPetPhoto class] toResourcePath:@"/pet/uploadPhoto" forMethod:RKRequestMethodPOST];
+</code></pre>
+
+<p><strong>Mapping setup:</strong></p>
+
+<pre><code>RKObjectMapping *papetPhotoMapping = [RKObjectMapping mappingForClass:[PAPetPhoto class]];
+[papetPhotoMapping mapKeyPath:@"id" toAttribute:@"identifier"];
+[papetPhotoMapping mapAttributes:@"accountId", @"petId", @"photoId", @"filename", @"contentType", nil];
+[objectManager.mappingProvider addObjectMapping:papetPhotoMapping];
+[objectManager.mappingProvider setSerializationMapping:[papetPhotoMapping inverseMapping] forClass:[PAPetPhoto class]];
+[objectManager.mappingProvider setMapping:papetPhotoMapping forKeyPath:@"petPhoto"];
+</code></pre>
+
+<p><strong>The post:</strong> (notice since I built up all my params in the block my object is just a dummy instance to trigger the proper routing and mapper).</p>
+
+<pre><code>    PAPetPhoto *photo = [[PAPetPhoto alloc] init];
+    [[RKObjectManager sharedManager] postObject:photo delegate:self block:^(RKObjectLoader *loader){
+
+        RKParams* params = [RKParams params];
+        [params setValue:pet.accountId forParam:@"accountId"];
+        [params setValue:pet.identifier forParam:@"petId"];
+        [params setValue:_photoId forParam:@"photoId"];
+        [params setValue:_isThumb ? @"THUMB" : @"FULL" forParam:@"photoSize"];
+        [params setData:data MIMEType:@"image/png" forParam:@"image"];
+
+        loader.params = params;
+    }];
+</code></pre>
+
+<p><strong>Server endpoint</strong> (Java, Spring MVC)</p>
+
+<pre><code>    @RequestMapping(value = "/uploadPhoto", method = RequestMethod.POST)
+    @ResponseBody
+    public Map&lt;String, Object&gt; handleFormUpload(@RequestParam("accountId") String accountId,
+                                    @RequestParam("petId") String petId,
+                                    @RequestParam("photoId") String photoId,
+                                    @RequestParam("photoSize") PhotoSizeEnum photoSize,
+                                    @RequestParam("image") Part image) throws IOException {
+
+        if (log.isTraceEnabled()) 
+            log.trace("uploadPhoto. accountId=" + accountId + " petId=" + petId + " photoId=" + photoId + " photoSize=" + photoSize);
+
+        PetPhoto petPhoto = petDao.savePetPhoto(accountId, petId, photoId, photoSize, image);
+
+        Map&lt;String, Object&gt; map = GsonUtils.wrapWithKeypath(petPhoto, "petPhoto");
+        return map;
+    }
+</code></pre>
+
+<p><strong>Server response JSON</strong> (note the keyPath of "petPhoto" that corresponds to the mapping setup):</p>
+
+<pre><code>{
+    petPhoto =     {
+        accountId = 4ebee3469ae2d8adf983c561;
+        contentType = "image/png";
+        filename = "4ebee3469ae2d8adf983c561_4ec0983d036463d900841f09_3FED4959-1042-4D8B-91A8-76AA873851A3";
+        id = 4ee2e80203646ecd096d5201;
+        petId = 4ec0983d036463d900841f09;
+        photoId = "3FED4959-1042-4D8B-91A8-76AA873851A3";
+    };
+}
+</code></pre>
+
+<p><strong>Delegate:</strong></p>
+
+<pre><code>- (void) objectLoader:(RKObjectLoader*)objectLoader didLoadObject:(id)object {
+
+    if ([objectLoader wasSentToResourcePath:@"/pet/uploadPhoto"]) {
+       PAPetPhoto *photo = (PAPetPhoto*)object;
+    }
+}
+</code></pre>

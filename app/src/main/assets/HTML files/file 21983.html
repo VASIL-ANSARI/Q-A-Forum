@@ -1,0 +1,55 @@
+<p>If you want to create a stored proc, you'll need to use the proper syntax.</p>
+
+<p>See: <a href="http://dev.mysql.com/doc/refman/5.5/en/create-procedure.html" rel="nofollow">http://dev.mysql.com/doc/refman/5.5/en/create-procedure.html</a><br>
+Note that inside the proc body you'll need to terminate each and every statement with a <code>;</code>.</p>
+
+<p>Because you'll need to let MySQL know when the body proc ends and you'll need to redeclare the delimiter into something that not a <code>;</code>.
+This will prevent MySQL from interpreting your stored proc after the first ';', but instead listen all the way up to the <code>$$</code>.</p>
+
+<p>Don't forget to revert the delimiter back to the default after you're done inputting the function.</p>
+
+<pre><code>SET DELIMITER $$
+
+CREATE PROCEDURE QueryCustomerMenu(IN zipcode VARCHAR(30), IN radius VARCHAR(30))
+BEGIN
+
+DECLARE somevar VARCHAR(20);
+SET somevar = '456';
+
+SELECT C.CustomerName, C.MenuId
+FROM Customers C
+INNER JOIN (
+  SELECT ZIPCODE, ( 3959 * ACOS( COS( RADIANS( (
+    SELECT Z.LAT
+    FROM ZipCodes Z
+    WHERE Z.ZIPCODE =zipcode
+    LIMIT 0 , 1
+    ) ) ) * COS( RADIANS( LAT ) ) * COS( RADIANS( LNG ) - RADIANS( (
+
+      SELECT Z.LNG
+      FROM ZipCodes Z
+      WHERE Z.ZIPCODE =zipcode
+      LIMIT 0 , 1
+    ) ) ) + SIN( RADIANS( (
+
+    SELECT Z.LAT
+    FROM ZipCodes Z
+    WHERE Z.ZIPCODE =zipcode
+    LIMIT 0 , 1
+  ) ) ) * SIN( RADIANS( LAT ) ) ) ) AS distance
+  FROM ZipCodes
+  HAVING distance &lt;radius
+  ORDER BY distance
+) AS RelevantCodes ON ( C.ZIPCODE = RelevantCodes.ZIPCODE );
+
+END $$
+
+SET DELIMITER ;
+</code></pre>
+
+<p>Now you can call the stored proc with:</p>
+
+<pre><code>CALL QueryCustomerMenu('09210','20');
+</code></pre>
+
+<p>And it will return a resultset with the <code>CustomerName</code> and <code>MenuID</code>'s.</p>

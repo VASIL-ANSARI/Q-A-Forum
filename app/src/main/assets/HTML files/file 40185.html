@@ -1,0 +1,90 @@
+<p>I had a  long running service for that, I have given a basic idea below. Use it as per your requirements. </p>
+
+<ol>
+<li>I made a structure of the progress arguments <code>ProgressArgs</code></li>
+<li>In the long running service LongRunningProcess(), updated the progress values at regular interval and saved in JSON format in the database</li>
+<li>Created a Action method <code>getProgress()</code> which will return a JSON string progress by ajax.</li>
+<li>Created a function Javascript <code>getProgress()</code> function which once started will call the server at regular intervals for progress till the process is completed.</li>
+</ol>
+
+<p>I have given a rough example to implement it. Hope it may help you.</p>
+
+<p>The class for progress arguments structure</p>
+
+<pre><code>public class ProgressArgs
+{
+    public int Completed { get; set; }
+    public int Total { get; set; }
+    public int Percentage { get; set; }
+    public string Status { get; set; }
+}
+</code></pre>
+
+<p>In the Process I kept on updating the stats in the database</p>
+
+<pre><code>    public void LongRunningProcess()
+    {
+
+        ProgressArgs result = new ProgressArgs();
+        result.Completed = 0;
+        result.Total = userList.Count;
+        foreach (var item in itemList)
+        {
+           //Do Some processing which u want to do
+
+            result.Total++;
+            result.Percentage = (result.Completed * 100) / result.Total;
+            result.Status = "Processing";
+            string strToSave = Newtonsoft.Json.JsonConvert.SerializeObject(result);
+            //update the strToSave to the database somewhere.
+        }
+
+        //after completing of processing
+        result.Total++;
+        result.Percentage = (result.Completed * 100) / result.Total;
+        result.Status = "Completed";
+        string strToSave = Newtonsoft.Json.JsonConvert.SerializeObject(result);
+        //update the strToSave to the database somewhere.
+
+    }
+</code></pre>
+
+<p>The C# Action to get the progress by ajax </p>
+
+<pre><code>    public string getProgress()
+    {    
+        string strJSON = config.GetValue("progress");  //Get stats from the database which is saved in json
+        return strJSON;
+    }
+</code></pre>
+
+<p>The Javascript Code</p>
+
+<pre><code>//Ajax Get Progress function
+    function getProgress() {
+        var dataToSend = '';
+        $.ajax({
+            url: '@Url.Action("getProgress")', //Link to the action method
+            type: 'POST',
+            contentType: 'application/json; charset=utf-8',
+            data: dataToSend,
+            success: function (response) {
+                console.log(response);
+                if (response != null) {
+                    data = JSON.parse(response);
+                    console.log(data);
+                    //update the progressbar
+                    progressbar.progressbar("value", data.Percentage);
+                    //When the jobalert status is completed clear the interval
+                    if (data.Status == 0) {
+                        setTimeout(getProgress, 800); //TImout function to call the respective function at that time
+                    }
+                    serviceCompleted(data); function to call after completing service
+                }
+            },
+            error: function (xhr) {
+                alert('Error: There was some error while posting question. Please try again later.');
+            }
+        });
+    }
+</code></pre>

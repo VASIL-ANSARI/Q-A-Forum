@@ -1,0 +1,30 @@
+<p>The <code>Activity</code> instances in your app are regularly destroyed and new ones are created for example when rotating the display.</p>
+
+<p>Now what should happen in that case is that the old instance is garbage collected and only the new one exists. If you keep the old one around you have created a leak.</p>
+
+<p>Since <code>Handler</code> are not garbage collectable until they have no more messages (?) they can live longer than the <code>Activity</code> in witch they were created, which usually leads to leaking the old <code>Activity</code> (until the <code>Handler</code> can be collected) since <code>Handler</code> usually have a strong reference to their <code>Activity</code>.</p>
+
+<p>The <code>WeakReference</code> way in your code get's rid of that problem by keeping just a weak link to the <code>Activity</code> that does not prevent garbage collection.</p>
+
+<p>The problem is that you use the <code>get()</code> method the wrong way: <code>get()</code> will only return the original object while it exists. When it's gone you get <code>null</code>. Here: the <code>Activity</code> will exists while it is still the active one (determined by the system).</p>
+
+<p>The <code>null</code> is also not a big problem: when you get <code>null</code> your <code>Activity</code> instance is no longer alive (maybe a new one was created, maybe it's completely gone) so you can't do anything useful with it anymore. Animation would not show even if you had still a reference.</p>
+
+<p>Basically do it like below and your problem is solved</p>
+
+<pre><code>@Override
+public void handleMessage(Message msg) {
+    super.handleMessage(msg);
+    MainActivity main = wMain.get();
+
+    // message arrived after activity death
+    if (main == null) return;
+
+    int what = msg.what;
+    if(what == MSG_PULLED) {
+        main.startAnim();
+    } 
+}
+</code></pre>
+
+<p>The <code>WeakReference</code> itself (<code>wMain</code>) is not null because it is itself strongly references as a member variable. Just the content inside it can / will be <code>null</code> at some point.</p>

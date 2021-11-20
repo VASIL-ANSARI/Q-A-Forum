@@ -1,0 +1,65 @@
+<p>I had the same problem with you,   in my previous <a href="http://stackoverflow.com/questions/17476364/jquery-ajax-request-not-found-servicestack-cross-domain-solved">question</a></p>
+
+<p>You can read very helpful   answers of  #mythz  <a href="http://stackoverflow.com/questions/13741397/servicestack-cors-feature/13750561#13750561">here</a>  and <a href="http://stackoverflow.com/questions/8211930/servicestack-rest-api-and-cors">here</a> .</p>
+
+<p>The code I use in the AppHost</p>
+
+<pre><code>          using System.Web;
+          using ServiceStack.WebHost.Endpoints.Extensions;  // for  httpExtensions methods  
+    //  =&gt; after  v.3.9.60,  =&gt;using ServiceStack;
+</code></pre>
+
+<p>and </p>
+
+<pre><code>          public override void Configure(Container container)
+          {   
+
+                SetConfig(new ServiceStack.WebHost.Endpoints.EndpointHostConfig
+                {
+                 DefaultContentType = ContentType.Json,
+                  ReturnsInnerException = true,
+                  WsdlServiceNamespace = "http://www.servicestack.net/types"
+                });
+
+             Plugins.Add(new CorsFeature()); 
+             this.RequestFilters.Add((httpReq, httpRes, requestDto) =&gt;
+             {
+                //Handles Request and closes Responses after emitting global HTTP Headers
+                   if (httpReq.HttpMethod == "OPTIONS")
+                           httpRes.EndServiceStackRequest();  //httpExtensions method
+               //  =&gt;after  v.3.9.60, =&gt; httpRes.EndRequestWithNoContent(); 
+              });
+
+            Routes
+             .Add&lt;TestRequest&gt;("/TestAPI/Reservation", "POST, OPTIONS");   // OPTIONS is mandatory for CORS
+          }
+</code></pre>
+
+<p>and in JavaScript  like you </p>
+
+<pre><code>  jQuery.support.cors = true;
+
+    function TestRequestCall() {
+       var  TestRequest = new Object();                
+           TestRequest.Id = 11111;
+           TestRequest.City = "New York";
+
+
+
+      $.ajax({
+          type: 'Post',
+          contentType: 'application/json',         
+          url: serverIP +'/TestAPI/Reservation',
+          data: JSON.stringify( TestRequest ),
+          dataType: "json",
+          success: function (TestResponse, status, xhr) {
+
+                 if(TestResponse.Accepted)  doSomething();
+
+           },
+           error: function (xhr, err) {
+              alert(err);
+           }
+      });
+   }
+</code></pre>

@@ -1,0 +1,45 @@
+<h2>What memory is allocated when you run the line <code>A a = new A();</code>?</h2>
+
+<p>Firstly, consider that this is an implementation detail, and that it could change, and I am probably missing, oversimplifying, and misunderstanding parts of the following, but for a reference type (<code>class</code>):</p>
+
+<ul>
+<li>There is memory allocated for having referenced the <code>A</code> type (metadata)</li>
+<li>There is memory allocated for the jitted code of the <code>A</code> static and class constructors</li>
+<li>Once the static constructor runs, there is memory allocated for any static members (on the heap)</li>
+</ul>
+
+<p>The <code>A a = new A();</code> line breaks down into a couple of instructions in MSIL:</p>
+
+<pre><code>.method public hidebysig static void  Main(string[] args) cil managed
+{
+  .entrypoint
+  .maxstack  1
+  .locals init (class Test.A V_0)
+  IL_0001:  newobj     instance void Test.A::.ctor()
+  IL_0006:  stloc.0
+  IL_0007:  ret
+}
+</code></pre>
+
+<p>of particular note: </p>
+
+<ol>
+<li><code>.locals init (class Test.A V_0)</code><br/>
+We start out by allocating a local on the stack for the reference we will receive to the new instance of <code>A</code></li>
+<li><code>newobj     instance void Test.A::.ctor()</code><br/> call the constructor, allocating the object instance on the heap and putting the reference on the stack  </li>
+<li><code>stloc.0</code> <br/>store the first item on the stack (the reference to the new instance of <code>A</code>) to the 0th local</li>
+<li><code>ret</code><br/>Upon return from this method, the stack space consumed by the local is reclaimed.  Since there are no references to the instance of <code>A</code> we created, it is now eligible for garbage collection, to be reclaimed later.</li>
+</ol>
+
+<h2>When does memory referenced by static members get reclaimed</h2>
+
+<p>Never.</p>
+
+<p>Ok... not really never, but close to it.  Typically, an application will only have a single appdomain running user code, but Asp.Net and other hosting applications may have many.  All type information is maintained per app domain, so when you throw away an app domain, you throw away the statics that go along with it.</p>
+
+<p>Further learning:</p>
+
+<ul>
+<li><a href="http://msdn.microsoft.com/en-us/magazine/cc188935.aspx" rel="nofollow">Basic Instincts: Objects and Values, Part 2: Memory Management</a></li>
+<li>And if you really want to have some idea of the huge amount of work going on behind the scenes to make sure you don't have to care where your memory is allocated, take a look at <a href="http://callvirt.net/blog/files/Shared%20Source%20CLI%202.0%20Internals.pdf" rel="nofollow">Shared Source CLI Essentials</a>.  They talk about memory starting on page 240.</li>
+</ul>

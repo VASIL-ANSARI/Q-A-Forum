@@ -1,0 +1,33 @@
+<p>The easiest (though probably not the fastest) solution(*) is to use scikit-learn's <code>DictVectorizer</code>. First, read in each sample with Python's <code>csv</code> module, and build a <code>dict</code> containing <code>(feature, value)</code> pairs, while keeping the priority separate:</p>
+
+<pre><code># UNTESTED CODE, may contain a bug or two; also, you need to decide how to
+# implement split_words
+datareader = csv.reader(csvfile)
+dicts = []
+y = []
+
+for row in datareader:
+    y.append(row[-1])
+    d = {"From": row[0]}
+    for word in split_words(row[1]):
+        d["Subject_" + word] = 1
+    for word in split_words(row[2]):
+        d["Body_" + word] = 1
+    # etc.
+    dicts.append(d)
+
+# vectorize!
+vectorizer = DictVectorizer()
+X_train = vectorizer.fit_transform(dicts)
+</code></pre>
+
+<p>You now have a sparse matrix <code>X_train</code> that, together with <code>y</code>, you can feed to a scikit-learn classifier.</p>
+
+<p>Be aware:</p>
+
+<ol>
+<li><p>When you want to make predictions on unseen data, you must apply the same procedure and <em>the exact same <code>vectorizer</code></em> object to it. I.e. you have to build a <code>test_dicts</code> object using the loop above, then do <code>X_test = vectorizer.transform(test_dicts)</code>.</p></li>
+<li><p>I've assumed you want to predict the priority directly. Predicting the "rank" instead would be a regression problem, rather than a classification one. Some scikit-learn classifiers have a <code>predict_proba</code> method which will produce the probability that email are important, but you can't train those on the ranks.</p></li>
+</ol>
+
+<p>(*) I am the author of scikit-learn's <code>DictVectorizer</code>, so this is not unbiased advice. It is from the horse's mouth, though :)</p>

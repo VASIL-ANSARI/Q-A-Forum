@@ -1,0 +1,54 @@
+<p>You need a third model to associate between movies and lists, since this is a many-to-many relationship. Here are how the model relationships might look:</p>
+
+<pre><code>class List &lt; ActiveRecord::Base
+  has_many :list_movies
+  has_many :movies, through: :list_movies
+end
+
+class ListMovie &lt; ActiveRecord::Base
+  belongs_to :list
+  belongs_to :movie
+end
+
+class Movie &lt; ActiveRecord::Base
+  has_many :list_movies
+  has_many :lists, through: :list_movies
+end
+</code></pre>
+
+<p>And the migration to add the join table between lists and movies:</p>
+
+<pre><code>class CreateAppointments &lt; ActiveRecord::Migration
+  def change     
+    create_table :list_movies do |t|
+      t.belongs_to :lists, index: true
+      t.belongs_to :movies, index: true
+      t.timestamps null: false
+    end
+  end
+end
+</code></pre>
+
+<p>With the structure properly established, you will be able to add and delete movie's from a user's list, because they are referenced as list_movies. A list_movie simply associates a particular movie to a particular list. Only the list_movie records will actually be added or deleted when making changes to the list, not an actual movie record.</p>
+
+<p>If you want to remove an actual movie, and you want all instances of that movie in user's lists to also be removed, you may want to add dependent destroy to the model, i.e. , "dependent: :destroy" and same for lists:</p>
+
+<pre><code>class List &lt; ActiveRecord::Base
+  has_many :movies, through: :list_movies, dependent: :destroy
+end 
+class Movie &lt; ActiveRecord::Base
+  has_many :lists, through: :list_movies, dependent: :destroy
+end
+</code></pre>
+
+<p>Then add the appropriate routes.</p>
+
+<p>Finally, in your view you will be able to do something like this:</p>
+
+<pre><code>&lt;% @list.movies.each do |movie| %&gt;
+  &lt;h3&gt;&lt;%= movie.title %&gt;&lt;/h3&gt;
+  &lt;%= link_to 'Destroy', movie, method: :delete, data: { confirm: 'Are you sure?' } %&gt;
+&lt;% end %&gt;
+</code></pre>
+
+<p>More information about associations in Rails is available here: <a href="http://guides.rubyonrails.org/association_basics.html#the-has-many-through-association" rel="nofollow">http://guides.rubyonrails.org/association_basics.html#the-has-many-through-association</a></p>

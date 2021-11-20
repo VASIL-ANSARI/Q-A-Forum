@@ -1,0 +1,37 @@
+<p>Since this is probably homework, rather than give you a direct answer, what I'm going to do is show you <em>the C program that does what you thought your program would do,</em> and how it behaves when fed over-length input.</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+int main(void)
+{
+  struct {
+    char buff[20];
+    volatile unsigned int x;
+  } S;
+  S.x = 0;
+  gets(S.buff);
+  if (S.x == 1337)
+    puts("Congrats");
+  else
+    printf("Wrong: %08x\n", S.x);
+  return 0;
+}
+</code></pre>
+
+<p>The key difference is that I am forcing the compiler to lay out the stack frame a particular way.  I am also printing the value of <code>x</code> in hexadecimal.  This makes the output both more predictable, and easier to interpret.</p>
+
+<pre><code>$ printf 'xxxxxxxxxxxxxxxxxxxxABCD' | ./a.out
+Wrong: 44434241
+
+$ printf 'xxxxxxxxxxxxxxxxxxxxABC' | ./a.out
+Wrong: 00434241
+
+$ printf 'xxxxxxxxxxxxxxxxxxxxAB' | ./a.out
+Wrong: 00004241
+
+$ printf 'xxxxxxxxxxxxxxxxxxxxA' | ./a.out
+Wrong: 00000041
+</code></pre>
+
+<p>Everything that confused you is caused by one or more of: the compiler <em>not</em> laying out the stack frame the way you expected, the ordering of bytes within an <code>int</code> not being what you expected, and the conversion from binary to decimal obscuring the data in RAM.</p>
+
+<p>Exercise for you: Compile both my program and your original program in <code>-S</code> mode, which dumps out the generated assembly language.  Read them side by side.  Figure out what the differences mean.  That should tell you what input (if any -- it might not be possible!) will get your program to print 'Congrats'.</p>

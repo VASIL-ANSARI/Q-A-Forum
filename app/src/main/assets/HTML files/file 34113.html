@@ -1,0 +1,41 @@
+<p>Yes and no. If the event occures on the same thread one runs after each other, but if e.g. every device runs on its own thread the event handlers can also execute in paralell.</p>
+
+<p>Events are not different in that matter than normal methods. If you want to make shure they are NOT executed in paralell either use locking:</p>
+
+<pre><code>private void m_SomeDataReceived(object sender, DataEventArgs e)
+{
+    lock (SyncRoot)
+    {
+        ... //handling received data
+    }
+}
+</code></pre>
+
+<p>Or bring them on the same thread:</p>
+
+<pre><code>protected virtual void OnSomeDataReceived(DataEventArgs e)
+{
+    EventHandler handler = SomeDataReceived;
+    if (handler != null)
+    {
+        CONTEXT.Invoke(() =&gt; handler(this, e)); // context can e.g. be a Dispatcher from a WPF control
+    }
+}
+</code></pre>
+
+<p>In this case it still CAN HAPPEN that the second call starts before the first one finishes if the handling gives up the thread (e.g. <code>Application.DoEvents()</code> or <code>await Task.Delay()</code>)!</p>
+
+<p>If the events are generated in the same thread and you want them to be executed in paralell you can do something like the following:</p>
+
+<pre><code>public static void RaiseAsync&lt;T&gt;(this EventHandler&lt;EventArgs&lt;T&gt;&gt; theEvent, object sender, T args)
+{
+    if (theEvent != null)
+    {
+        var eventArgs = new EventArgs&lt;T&gt;(args);
+        foreach (EventHandler&lt;EventArgs&lt;T&gt;&gt; action in theEvent.GetInvocationList())
+            action.BeginInvoke(sender, eventArgs, null, null);
+    }
+}
+</code></pre>
+
+<p>Then instead of calling <code>OnSomeDataReceived</code> you can simply call <code>SomeDataReceived.RaiseAsync(this, args)</code>.</p>

@@ -1,0 +1,39 @@
+<p>In Python, unless you specify otherwise (with a <code>global</code> statement, or a <code>nonlocal</code> statement in 3.0+), a variable is in <code>locals</code> if you modify it (assign to it, <code>del</code> it, etc.) anywhere in the function.*</p>
+
+<p>In the first snippet, you never modify <code>x</code>, or even access it, so it's not local. In fact, it doesn't even exist. That's easy.</p>
+
+<p>The second version is the tricky one. <code>x</code> is not local to <code>inner</code>, because you don't modify it in <code>inner</code>. So, Python goes looking for it, moving outward scope by scope, until it finds it a scope that has that variable. And it finds it as a local variable in <code>outer</code>. Which means it's a <em>closure variable</em> or <em>free variable</em> in <code>inner</code>. Since the <a href="http://docs.python.org/2/library/functions.html#locals" rel="nofollow"><code>locals</code></a> function includes closure variables as well as local variables, you see it.</p>
+
+<p>The third version, by doing <code>del x</code>, makes <code>x</code> local to <code>inner</code>.** So, it appears in <code>locals</code>. However, you try to <code>print</code> it without having ever assigned anything to it, so there is no value yet. So you get an <code>UnboundLocalError</code>.</p>
+
+<p>Generally, once you understand the basic idea Python is trying to accomplish here, it's usually obvious what kind of variable you have. But if it's ever unclear, the detailed rules  are defined in <a href="http://docs.python.org/2/reference/executionmodel.html#naming-and-binding" rel="nofollow">Naming and Binding</a>.</p>
+
+<hr>
+
+<p>If you want to understand how closures work under the covers, you can start by inspecting the function objects. Try this:</p>
+
+<pre><code>def outer():
+    x = 1
+    def inner():
+        print x
+        print "Local variables: %s" % locals()
+    return inner
+inner = outer()
+print inner.func_closure
+print inner.func_code.co_freevars
+print outer.func_code.co_cellvars
+</code></pre>
+
+<p>The <a href="http://docs.python.org/2/library/inspect.html" rel="nofollow"><code>inspect</code></a> module docs list all of the important members of <code>function</code>, <code>code</code>, and other "under the covers" objects.</p>
+
+<p>Using the <a href="http://docs.python.org/2/library/dis.html" rel="nofollow"><code>dis</code></a> module to look at the bytecode for <code>outer</code> and <code>inner</code> may also be helpful.*** For example, if you run <a href="http://pastebin.com/RgVQXe0v" rel="nofollow">this code</a>, you'll see a <code>LOAD_FAST</code> for the local, <code>LOAD_DEREF</code> for the cell, and <code>LOAD_GLOBAL</code> for the global.</p>
+
+<p>But if you really want to understand how all of this really works, the series of articles on <a href="http://eli.thegreenplace.net/2010/09/18/python-internals-symbol-tables-part-1/" rel="nofollow">symbol tables</a> at Eli Bendersky's "Python internals" blog covers just about everything very nicely. (Thanks to Ashwini Chaudhary for locating it and pointing it out in a comment.)</p>
+
+<hr>
+
+<p>* This is checked at compile time, not execution time, so trying to confuse it with, e.g., <code>exec</code> can successfully confuse both Python and yourself.</p>
+
+<p>** Note that <code>del</code> counts as both an modification and an access. This can be surprising, but you can see that <code>def foo(): del x</code> will raise an <code>UnboundLocalError</code> because the <code>del</code> makes <code>x</code> local, and the very same <code>del</code> fails to find a value.</p>
+
+<p>*** â¦ assuming you're using a Python implementation that uses CPython-style bytecode, like CPython itself (of course) or PyPy.</p>

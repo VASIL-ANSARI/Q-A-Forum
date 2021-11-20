@@ -1,0 +1,36 @@
+<p>It looks like you're not getting any results in your cursor, and <code>mCursor.moveToFirst();</code> is returning false in this case.</p>
+
+<p>Typically you would want to check the result of <code>mCursor.moveToFirst();</code>, as if it returns false, you know that you have an empty cursor.  </p>
+
+<p>The empty cursor is a separate issue, it's hard to tell why that would happen from this code.</p>
+
+<p>In order to get rid of your <code>CursorIndexOutOfBoundsException</code> when the Cursor is empty, this is one way to fix it:</p>
+
+<p>You can do a check to <code>getCount()</code> on your cursor to make sure it's greater than zero.
+Also make sure to close the cursor, otherwise you will have a memory leak.</p>
+
+<pre><code>private void setUpMap()  {
+    DatabaseHandler db = new DatabaseHandler(this);
+    Cursor c  = db.fetchAllAddresses();
+
+    //check for empty cursor
+    if (c.getCount() &gt; 0){
+      String place = c.getString(c.getColumnIndex("name"));
+      Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+      List&lt;android.location.Address&gt; addresses = new ArrayList();
+      try {
+         addresses = geocoder.getFromLocationName(place,1);
+      } catch (IOException e) {
+         e.printStackTrace();
+      }
+
+      android.location.Address add = addresses.get(0);
+      double lat = add.getLatitude();
+      double lng = add.getLongitude();
+      mMap.addMarker(new MarkerOptions().position(new LatLng(lat,lng)).title("Marker"));
+    }
+
+    c.close();  //get rid of memory leak!
+
+ }
+</code></pre>

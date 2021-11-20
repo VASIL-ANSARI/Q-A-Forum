@@ -1,0 +1,40 @@
+<p>One of the options would be creating some helper class which would remember previously used vector and based on it calculate difference between it and current vector. This class could look like </p>
+
+<pre><code>class DistanceHelper {
+    private double sum = 0;
+    private Vector3D first = null;
+    private Vector3D last = null;
+
+    public void add(Vector3D vector3d) {
+        if (first == null)
+            first = vector3d;
+        if (last != null)
+            sum += vector3d.distance(last);
+        last = vector3d;
+    }
+
+    public void combine(DistanceHelper otherHelper) {
+        //add distance of path from current thread with distance of path
+        //from other thread
+        sum += otherHelper.sum;
+        //also add distance between paths handled by separate threads like
+        // when path of Thread1 is A-&gt;B and Thread2 is C-&gt;D then we need to 
+        // include path from `B` to `C`
+        if (this.last!=null &amp;&amp; otherHelper.first!=null)
+            sum += this.last.distance(otherHelper.first);
+        this.last = otherHelper.last;
+    }
+
+    public double getSum() {
+        return sum;
+    }
+}
+</code></pre>
+
+<p>and you can use it for example with <code>combine</code> instead of <code>reduce</code> like</p>
+
+<pre><code>double sum = list
+        .stream()//or parallelStream()
+        .collect(DistanceHelper::new, DistanceHelper::add,
+                DistanceHelper::combine).getSum();
+</code></pre>

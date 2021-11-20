@@ -1,0 +1,41 @@
+<p>You already discovered the solution: add the <code>__stdcall</code> calling convention.  The reason why it works is because the original code did not specify a calling convention, so <code>__cdecl</code> gets used instead.  When using <code>extern "C"</code>, the <code>__cdecl</code> calling convention exports the function name as <code>"_show_m"</code> (unless you use a .def file to change that), which is why <code>GetProcAddress()</code> does not find it.  When using <code>__stdcall</code> instead, the exported function name is <code>"show_m"</code> as expected.  Don't forget to change your Delphi code to use <code>stdcall</code> instead of <code>cdecl</code> for your <code>show_m1</code> variable:</p>
+
+<pre><code>#include &lt;vcl.h&gt;
+#include &lt;windows.h&gt;
+#pragma hdrstop
+
+#pragma hdrstop
+#pragma argsused
+
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fwdreason, LPVOID lpvReserved)
+{
+
+    return TRUE;
+}
+//---------------------------------------------------------------------------
+
+extern "C" __declspec(dllexport) void __stdcall show_m(void)
+{
+    MessageBox(NULL, "MSG", "COTI DLL", MB_OK | MB_ICONINFORMATION);
+}
+</code></pre>
+
+<p>.</p>
+
+<pre><code>procedure TForm1.Button1Click(Sender: TObject);
+var
+  DLL : THandle;
+  show_m1 : procedure; stdcall;
+begin
+  DLL := LoadLibrary('mylib.dll');
+  if DLL &lt;&gt; 0 then
+  try
+    @show_m1 := GetProcAddress(DLL, 'show_m');
+    if Assigned(show_m1) then
+      show_m1;
+  finally
+    FreeLibrary(DLL);
+  end;
+end;
+</code></pre>

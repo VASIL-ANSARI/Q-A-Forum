@@ -1,0 +1,56 @@
+<p>I've run accross a similar problem and solved it as below, I believe it should do the trick.</p>
+
+<p>What you want is to have the Settings as inlines in your Car changeform and a M2M field pointing toward Options in the Setting Inline, overriding its widget to display it as checkboxes.</p>
+
+<p>In your models.py:</p>
+
+<pre><code>class Option(models.Model):
+    name = models.CharField(max_length=255)
+
+    def __unicode__(self):
+        return self.name
+
+class Car(models.Model):
+    hsn = models.PositiveIntegerField("HSN", max_length=4)
+    tsn = models.PositiveIntegerField("TSN", max_length=3)
+    mileage = models.PositiveIntegerField("Kilometerstand")
+
+    def __unicode__(self):
+        return self.hsn
+
+
+class Setting(models.Model):
+    name = models.CharField(max_length=255)
+    options = models.ManyToManyField(Option, blank=True, null=True)
+    car = models.ForeignKey(Car, blank=True, null=True)
+
+    def __unicode__(self):
+        return self.name
+</code></pre>
+
+<p>In your admin.py :</p>
+
+<pre><code>from django.forms import CheckboxSelectMultiple
+
+class OptionAdmin(admin.ModelAdmin):
+    pass
+
+admin.site.register(Option, OptionAdmin)
+
+class SettingInline(admin.TabularInline):
+
+    model = Setting
+    formfield_overrides = {
+        models.ManyToManyField: {'widget': CheckboxSelectMultiple},
+    }
+
+
+class CarAdmin(admin.ModelAdmin):
+    inlines = [
+        SettingInline
+    ]
+
+admin.site.register(Car, CarAdmin)
+</code></pre>
+
+<p>There might be some caveats with this solution, such as common options for every setting or misplaced help text below checkboxes, I've not looked further but it should be fixable.</p>

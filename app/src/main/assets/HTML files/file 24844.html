@@ -1,0 +1,28 @@
+<p>This will compile:</p>
+
+<pre><code>@SuppressWarnings("unchecked") // this is okay because [insert reasoning here]
+private LinkedListDemo&lt;S, T&gt;[] table =
+        (LinkedListDemo&lt;S, T&gt;[]) new LinkedListDemo&lt;?, ?&gt;[10];
+</code></pre>
+
+<p>The reason your code errors is because an <code>Object[]</code> is not a <code>LinkedListDemo[]</code>, similarly to how an <code>Object</code> is not a <code>LinkedListDemo</code>.</p>
+
+<p>The earlier unchecked casts work because <code>S[]</code> and <code>T[]</code> have been <a href="http://docs.oracle.com/javase/tutorial/java/generics/erasure.html" rel="nofollow"><em>erased</em></a> to <code>Object[]</code> at runtime.</p>
+
+<p>In general, arrays of parameterized types are discouraged because their very existence is unsafe. This is because:</p>
+
+<ul>
+<li>Arrays are covariant - a <code>LinkedListDemo&lt;S, T&gt;[]</code> <em>is</em> an <code>Object[]</code>. So one could assign <code>table</code> to an <code>Object[]</code> variable and then assign a <code>String</code> as an element - this would be legal at compile time but would at least fail at runtime with an <code>ArrayStoreException</code>, since arrays do runtime type checking.</li>
+<li>Generic type information is not available at runtime because it's been erased by the compiler. One could once again assign <code>table</code> to an <code>Object[]</code> variable but this time assign a <code>LinkedListDemo&lt;String, Integer&gt;</code> as an element. At runtime, the array would only see that a plain <code>LinkedListDemo</code> had been added, so it would <em>not</em> fail right away if the generic types were wrong. This might lead to unexpected <code>ClassCastException</code>s at some later time.</li>
+</ul>
+
+<p>See my answer <a href="http://stackoverflow.com/questions/15957325/generic-types-in-an-array-for-a-tree-with-more-than-one-child/15962718#15962718">here</a> for a fuller explanation and example of this issue. See also this great explanation by Angelika Langer's Generics FAQ: <a href="http://www.angelikalanger.com/GenericsFAQ/FAQSections/ParameterizedTypes.html#Can%20I%20create%20an%20array%20whose%20component%20type%20is%20a%20concrete%20instantiation%20of%20a%20parameterized%20type?" rel="nofollow">Can I create an array whose component type is a concrete parameterized type?</a></p>
+
+<p>The takeaway is that it will be much easier and safer to simply use a <code>List&lt;LinkedListDemo&lt;S, T&gt;&gt;</code> instead. If you ultimately decide to stick to using <code>LinkedListDemo&lt;S, T&gt;[]</code>, make sure that it is carefully hidden as an implementation detail and stay cognizant about how it can be misused.</p>
+
+<p>A couple of other misc notes:</p>
+
+<ul>
+<li><code>@SuppressWarnings("unchecked")</code> doesn't <em>do</em> anything but suppress the unchecked cast compiler warning. It's essentially saying "trust me I know what I'm doing" - but you still need to be careful that an unchecked cast isn't being misused. See this post for more info: <a href="http://stackoverflow.com/questions/509076/how-do-i-address-unchecked-cast-warnings">How do I address unchecked cast warnings?</a></li>
+<li>Like all core API classes, the <a href="http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/7-b147/java/util/HashMap.java" rel="nofollow">source for <code>HashMap</code></a> is available so you should feel free to look over it if you want to understand its inner workings better.</li>
+</ul>

@@ -1,0 +1,63 @@
+<p><em>Updated answer</em></p>
+
+<p>You told me in the comments that you don't have to use NSXMLParser.</p>
+
+<p>In this case, I have an easy solution for your parsing: use <a href="https://github.com/lobodart/CheatyXML" rel="nofollow">CheatyXML</a>, a very simple library.</p>
+
+<p>First, follow the easy <a href="https://github.com/lobodart/CheatyXML#installation" rel="nofollow">install intructions</a>.</p>
+
+<p>Then make a parser with your URL:</p>
+
+<pre><code>import CheatyXML
+
+let feedUrl = NSURL(string: "https://www.ruralfire.qld.gov.au/bushfirealert/bushfireAlert.xml")!
+let parser = XMLParser(contentsOfURL: feedUrl)
+</code></pre>
+
+<p>And safely unwrap all values as if you were subscripting dictionaries, and use the <code>.string</code> property to get the string fields contents.</p>
+
+<p>Like this:</p>
+
+<pre><code>if let parser = parser,
+    channel = parser["channel"],
+    title = channel["title"].string,
+    link = channel["link"].string,
+    description = channel["description"].string,
+    docs = channel["docs"].string,
+    generator = channel["generator"].string {
+        print(title)
+        print(link)
+        print(description)
+        print(docs)
+        print(generator)
+}
+</code></pre>
+
+<p>Result:</p>
+
+<blockquote>
+  <p>QFES Current Incidents<br>
+  <a href="http://bneags01.desqld.internal/publicfeed/PublicRssFeed.aspx" rel="nofollow">http://bneags01.desqld.internal/publicfeed/PublicRssFeed.aspx</a><br>
+  QFES Current Incidents<br>
+  <a href="http://www.rssboard.org/rss-specification" rel="nofollow">http://www.rssboard.org/rss-specification</a><br>
+  Argotic Syndication Framework   </p>
+</blockquote>
+
+<p>Now instead of my series of <code>print</code> you call a method of yours to populate your variables and then you reload the table view, and you're set.</p>
+
+<hr>
+
+<p><em>Old answer</em></p>
+
+<p>NSXMLParser works asynchronously, so when you reload your table in <code>beginParsing()</code>, the data is not parsed <em>yet</em>.</p>
+
+<p>You need to reload the table <em>when the parser has finished parsing</em>.</p>
+
+<p>Luckily, there's a callback for that. </p>
+
+<p>Remove <code>tbData!.reloadData()</code> from <code>beginParsing()</code> and add this delegate method to your view controller instead:</p>
+
+<pre><code>func parserDidEndDocument(parser: NSXMLParser) {
+    tbData!.reloadData()
+}
+</code></pre>

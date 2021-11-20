@@ -1,0 +1,47 @@
+<h1>Do everything in <code>Foo</code> constructor(s)!</h1>
+
+<p>Do all construction and initialisation in constructors! This is known as <a href="https://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization" rel="nofollow">RAII: resource acquisition is initialisation</a>. Allocating a resource, in this case a <code>Foo</code> should initialise the resource as well. This also makes your interface easy to use: <code>Foo</code> <strong>cannot</strong> be used without first at least constructing a <code>Foo</code>. Once constructed, assuming it initialises everything in its constructor, it's ready to use. If you expect callers to also have to call an <code>Initialize</code> or <code>Set</code> function, you are making your class interface hard to use. How will <code>Foo</code> respond to function calls if <code>Initialize</code> hasn't first been called? Suddenly each function would need to have the following:</p>
+
+<pre><code>bool Foo::SomeFunction()
+{
+    if (!mBar-&gt;isInitialized())
+        return false;
+
+    // Do what we came here to do
+    return true;
+}
+</code></pre>
+
+<p>Now callers constantly have to check the return value of your functions. What if a function needed to return a value, but then had to indicate an error because <code>mBar</code> wasn't initialised?</p>
+
+<p>You can see the rabbit hole goes quite deep once move away from RAII: resource allocation <strong>is</strong> initialisation!</p>
+
+<p>From <a href="http://www.aristeia.com/books.html" rel="nofollow">Effective C++ Third Edition - Scott Myers</a>:</p>
+
+<blockquote>
+  <p><strong>Item 4: Make sure that objects are initialized before they're used</strong><br>
+  ...<br>
+  the responsibility for initialization falls on constructors. The rule there is simple: make sure that all constructors initialize everything in the object</p>
+</blockquote>
+
+<h1>Other advice</h1>
+
+<p>You should also prefer to use your constructors initializer list for constructing members:</p>
+
+<pre><code>Foo::Foo() : mBar(new mBar("some", "required", "members"))
+{
+}
+</code></pre>
+
+<p>Otherwise you will be making unnecessary copies. I also assume you have a great reason to be using a pointer. As @Niels van Eldik points out in the comments, you should use objects unless you truly need to use a pointer, and in that case you should be using whatever smart pointer best fits your needs (in this case I would verge a guess and say <a href="http://en.cppreference.com/w/cpp/memory/unique_ptr" rel="nofollow"><code>std::unique_ptr</code></a>:</p>
+
+<pre><code>class Foo
+{
+public:
+    Foo() : mBar(std::make_unique&lt;Bar&gt;("some", "required", "members"))
+    {
+    }
+private:
+    std::unique_ptr&lt;Bar&gt; mBar;
+};
+</code></pre>

@@ -1,0 +1,44 @@
+<p>If the two arrays DO have the same number of rows you can use <code>np.lexsort()</code> which will probably give you a bettter performace, where you could simply do:</p>
+
+<pre><code>a = np.loadtxt('file1.txt')
+b = np.loadtxt('file2.txt')
+
+aind = np.lexsort((a[:,1], a[:,0]))    
+bind = np.lexsort((b[:,1], b[:,0]))
+
+a = a[aind]
+b = b[bind]
+</code></pre>
+
+<p>and here the new <code>a</code> can be compared with the new <code>b</code>... </p>
+
+<hr>
+
+<p>EDIT:
+I've removed the distance-based approach after doing some tests with huge files, where it requires enormous amounts of memory... an alternative approach is to use <code>np.in1d()</code> in order to identify which values of array <code>b</code> are contained in array <code>a</code>... which is much more efficient. For a general case where the <code>x</code> and <code>y</code> columns to be compared are not necessarily the two first columns:</p>
+
+<pre><code>import numpy as np
+
+xcol_a = 6
+ycol_a = 7
+xcol_b = 0
+ycol_b = 1
+a = np.loadtxt('file1.txt')
+b = np.loadtxt('file2.txt')
+
+check_x = np.in1d(a[:, xcol_a], b[:, xcol_b])
+check_y = np.in1d(a[:, ycol_a], b[:, ycol_b])
+check = (check_x &amp; check_y)
+non_existing_indices = np.where(np.logical_not(check))[0]
+non_existing_values = a[non_existing_indices]
+
+a = a[check] # taking only the values of a that where also found in b
+aind = np.lexsort((a[:, ycol_a], a[:, xcol_a]))
+orig_order = np.argsort(aind)
+bind = np.lexsort((b[:, ycol_b], b[:, xcol_b]))
+
+a = a[aind][orig_order]
+b = b[bind][orig_order]
+</code></pre>
+
+<p>Now the <code>b</code> array is sorted according to array <code>a</code>, and following the original order of array <code>a</code>.</p>

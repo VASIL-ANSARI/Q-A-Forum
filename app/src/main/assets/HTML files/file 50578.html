@@ -1,0 +1,50 @@
+<p>This line in insertTask:</p>
+
+<pre><code>return $taskObj;
+</code></pre>
+
+<p>Has no connection to what is happening in updateTaskDefectTaskIds because you're not modifying $taskObj at all, you're just passing an id value, then updating defect objects via DQL.</p>
+
+<p>If you'd like $taskObj to reflect your defect additions  from insertTask you would do something like this:</p>
+
+<pre><code>public function insertTask($information)
+{
+    ...
+
+    $entityManager = $this-&gt;getEntityManager();
+    $entityManager-&gt;persist($taskObj);
+    $entityManager-&gt;flush();
+
+    // Update the task defects for this task
+    $this-&gt;updateTaskDefectTaskIds($taskObj, $task['defects']);
+
+    return $taskObj;
+}
+
+
+private function updateTaskDefectTaskIds($taskObj, $defects)
+{
+    foreach ($defects as $defect)
+    {
+        $defect = $this-&gt;getEntityManager()-&gt;getRepository('YourBundle:Defect')-&gt;find(intval($defect['taskDefectId']));
+
+        if ($defect instanceof Defect) {
+
+            $defect-&gt;setTaskObj($taskObj);
+            $this-&gt;getEntityManager()-&gt;persist($defect);
+            $taskObj-&gt;addDefect($defect);
+        }
+    }
+
+    $this-&gt;getEntityManager()-&gt;persist($taskObj);
+    $this-&gt;getEntityManager()-&gt;flush();
+}
+</code></pre>
+
+<p>Or, if you don't mind an extra db call just refresh $taskObj in insertTask like this:</p>
+
+<pre><code>$this-&gt;getEntityManager()-&gt;refresh($taskObj);
+return $taskObj;
+</code></pre>
+
+<p>Also, doctrine loves to cache what you have in memory, so if it doesn't have any reason to check the db (in your code example it can't know about your change) then it will just happily serve you up the stale object when you fetch the entity by id.</p>

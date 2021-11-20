@@ -1,0 +1,38 @@
+<p>A custom class without an <a href="https://docs.python.org/3/reference/datamodel.html#object.__eq__" rel="nofollow"><code>__eq__</code> method</a> defaults to testing for <em>identity</em>. That is to say, two references to an instance of such a class are only equal if the reference they exact same object.</p>
+
+<p>You'll need to define a custom <code>__eq__</code> method that returns <code>True</code> when two instances contain the same time:</p>
+
+<pre><code>def __eq__(self, other):
+    if not isinstance(other, Clock):
+        return NotImplemented
+    return (self.h, self.m, self.adl) == (other.h, other.m, other.adl)
+</code></pre>
+
+<p>By returning the <code>NotImplemented</code> singleton for something that is not a <code>Clock</code> instance (or a subclass), you let Python know that the <code>other</code> object could also be asked to test for equality.</p>
+
+<p>However, your code accepts values greater than the normal hour and minute ranges; rather than store hours and minutes, store seconds and normalise that value:</p>
+
+<pre><code>class Clock:
+    def __init__(self, h, m):
+        # store seconds, but only within the range of a day
+        self.seconds = (h * 3600 + m * 60) % 86400
+        self.adl = 0
+
+    def make_time(self):
+        s = self.esconds
+        if self.adl: s += self.adl
+        s %= 86400
+        if s == 0:
+            return '00:00'
+
+        s, h = s % 3600, s // 3600
+        m = s // 60
+        return '{:02d}:{:02d}'.format(h, m)
+
+    def __eq__(self, other):
+        if not isinstance(other, Clock):
+            return NotImplemented
+        return (self.seconds, self.adl) == (other.seconds, other.adl)
+</code></pre>
+
+<p>Now your two clock instances will test equal because internally they store the exact same time in a day. Note that I used the <code>%</code> modulus operator rather than a <code>while</code> loop and subtracting.</p>

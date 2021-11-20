@@ -1,0 +1,41 @@
+<p>There's a flicker on the page when you navigate, so angular is noticing the change and trying to update the page. </p>
+
+<p>The problem looks like your directives.js which adds a listener on the $location.path()</p>
+
+<pre><code>scope.$watch('location.path()', function (newPath) {...});
+</code></pre>
+
+<p>According to the discussion <a href="http://docs.angularjs.org/guide/dev_guide.services.%24location#comment-587323848" rel="nofollow">here</a>, you want to use</p>
+
+<pre><code>$scope.$watch(function() {return location.path()}, function(path) {...});
+</code></pre>
+
+<p>Probably the call to $location.path() is interfering with the routing.</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>The following might explain it:</p>
+
+<pre><code>services.factory('pageData', ['$resource', '$route',
+   function ($resource, $route) {
+       // this is done so I can run the e2e tests from the :8000 port
+       //debugger;
+       var slug = ($route.current.params.slug || 'home') + '.txt';
+       return $resource('http://arunmahendrakar.com/nsm/data/:slug', { slug: slug });
+   }]);
+
+services.factory('pageDataLoader', ['pageData', '$q',
+  function (pageData, $q) {
+      return function () {
+          var delay = $q.defer();
+          pageData.query(function (pData) {
+              delay.resolve(pData);
+          }, function () {
+              delay.reject('Unable to fetch data');
+          });
+          return delay.promise;
+      };
+  }]);
+</code></pre>
+
+<p>The pageData factory returns a $resource object. This is only called once, when the page loads. The pageDataLoader factory returns a function. This function is invoked each time a pageDataLoader is instantiated. </p>

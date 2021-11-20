@@ -1,0 +1,44 @@
+<blockquote>
+  <p>What kind of magic is going on here?</p>
+</blockquote>
+
+<p>This is mostly the magic of ELF symbol versioning. The best reference I've seen on this is <a href="http://www.akkadia.org/drepper/dsohowto.pdf">How to Write Shared Libraries</a> by Ulrich Drepper, specifically section 3.</p>
+
+<blockquote>
+  <p>How could they provide a gcc 4.4.7 that links against an older version of libstdc++? I thought it was not possible.</p>
+</blockquote>
+
+<p>The libstdc++ developers are careful about ABI compatibility. This makes it fairly straightforward to see what are the new symbols introduced between two different versions of libstdc++.</p>
+
+<p>Looking at libstdc++'s <a href="http://gcc.gnu.org/onlinedocs/libstdc++/manual/abi.html">ABI compatibility page</a>, you can see that GCC 4.1's libstdc++ has GLIBCXX_3.4.8 and the stock (FSF release) of GCC 4.4 has GLIBCXX_3.4.13. It's then possible to look at the <a href="http://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2B%2B-v3/config/abi/pre/gnu.ver;hb=master">libstdc++ version scripts</a> to see which symbols were added between these two versions.</p>
+
+<p>A more empirical route for looking at symbol versions is to use a tool like readelf. E.g. on my Ubuntu system <code>readelf --dyn-syms --wide /usr/lib/x86_64-linux-gnu/libstdc++.so.6 | c++filt</code> shows output like this (just a couple of selected shortish lines):</p>
+
+<pre><code>223: 000000000006dbe0  2121 FUNC    GLOBAL DEFAULT   12 std::ios_base::Init::Init()@@GLIBCXX_3.4
+...
+226: 00000000002ed920     1 OBJECT  GLOBAL DEFAULT   27 std::adopt_lock@@GLIBCXX_3.4.11
+</code></pre>
+
+<p>Note the symbol versions at the end of the symbol name, after the <code>@@</code>.</p>
+
+<blockquote>
+  <p>what is this stdc++_nonshared library?</p>
+</blockquote>
+
+<p>Joining the dots from the above paragraph, stdc++_nonshared is a static library which contains the symbols which would be in the stock libstdc++.so.6.0.13 but not in libstdc++.so.6.0.8.</p>
+
+<blockquote>
+  <p>I didn't know a .so file could contain that text. Who parses it (dynamic linker I guess) and what are its specifications and consequences?</p>
+</blockquote>
+
+<p>The regular linker parses this, not the runtime linker. See the binutils documentation for <a href="https://sourceware.org/binutils/docs-2.23.1/ld/File-Commands.html#index-input-files-in-linker-scripts-354">INPUT in a linker script</a>. As a consequence, linking with this special libstdc++.so.6.0.13 will cause the linker to dynamically link against libstdc++.so.6.0.8, and statically link against the library which contains the extra symbols.</p>
+
+<p>The downside of this is that an application compiled this way will be a little more bloated than the same application which is dynamically linked to only a stock libstdc++.so.6.0.13 which contains all the necessary symbols. The upside is that features from the newer standard library can be used on standard installations of older systems, without independent software vendors needing to ship their own copies of libstdc++.</p>
+
+<blockquote>
+  <p>How far can this magic go? Can I use gcc4.7 with libstdc++ 6.0.3? What is the spectrum of compatibility</p>
+</blockquote>
+
+<p>Now that you know what the magic is, probably you can appreciate that this version of GCC 4.4 you have is a special version made just for Centos 5 (well, originally Red Hat 5). So probably you can create a GCC 4.7 which will produce binaries that only require libstdc++ 6.0.3, but it will require a non-trivial amount of work patching your GCC tree to put the correct symbols into stdc++_nonshared.a. You can at least look at the sources for the gcc44 RPM to see how Red Hat did it there.</p>
+
+<p>Red Hat seems to have continued this approach with their <a href="https://access.redhat.com/site/documentation/en-US/Red_Hat_Developer_Toolset/2/html/2.0_Release_Notes/index.html">Red Hat Developer Toolset</a>. At the time of writing, GCC 4.8.1 is the newest compiler which can build binaries for EL5 which still only require libstdc++.so.6.0.8 to be installed on the target system. This is excellent for developers who want to write in C++11, but need to be able to deploy on EL5 or EL6.</p>

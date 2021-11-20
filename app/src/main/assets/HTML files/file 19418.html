@@ -1,0 +1,52 @@
+<p>You are trying to <code>PIVOT</code> the data but MySQL does not have a <code>PIVOT</code> function. Also to make this easier, you will want to partition the data based on the <code>degerAdi</code> value to apply a rownumber.  If you have a known number of columns, then you can use:</p>
+
+<pre><code>select rn,
+  max(case when DEGERADI = 'asd' then DEGER end) asd,
+  max(case when DEGERADI = 'rty' then DEGER end) rty,
+  max(case when DEGERADI = 'hhh' then DEGER end) hhh,
+  max(case when DEGERADI = 'hjh' then DEGER end) hjh,
+  max(case when DEGERADI = 'ffgu' then DEGER end) ffgu,
+  max(case when DEGERADI = 'qwe' then DEGER end) qwe
+from
+(
+  select id, degerAdi, deger,
+   @num := if(@degerAdi = `degerAdi`, @num + 1, 1) as rn,
+   @degerAdi := `degerAdi` as dummy
+  from table1
+) x
+group by rn;
+</code></pre>
+
+<p>See <a href="http://sqlfiddle.com/#!2/50770/12" rel="nofollow">SQL Fiddle With Demo</a></p>
+
+<p>If you have an unknown number of columns then you will want to use prepared statements:</p>
+
+<pre><code>SET @sql = NULL;
+SELECT
+  GROUP_CONCAT(DISTINCT
+    CONCAT(
+      'max(case when degerAdi = ''',
+      degerAdi,
+      ''' then deger end) AS ',
+      degerAdi
+    )
+  ) INTO @sql
+FROM Table1;
+
+SET @sql 
+  = CONCAT('SELECT rn, ', @sql, ' 
+           from
+           (
+             select id, degerAdi, deger,
+              @num := if(@degerAdi = `degerAdi`, @num + 1, 1) as rn,
+              @degerAdi := `degerAdi` as dummy
+             from table1
+           ) x
+           group by rn');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+</code></pre>
+
+<p>See <a href="http://sqlfiddle.com/#!2/50770/9" rel="nofollow">SQL Fiddle with demo</a></p>

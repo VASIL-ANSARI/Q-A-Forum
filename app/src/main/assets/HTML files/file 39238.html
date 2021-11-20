@@ -1,0 +1,44 @@
+<p>watchify is intended for watching changing of files and automatically updating them, it isn't intended for deployment, the paths you are seeing is a result of using <code>watchify.args</code> on this line <code>watchify(browserify('./client/js/index.js', watchify.args));</code> In the arguments passed to browserify it states <code>fullPaths: true</code>, which is part of how watchify is able to speed up the build process on each change of a file. What I'd suggest doing is having the watchify task specifically for watching and browserify for the build process.</p>
+
+<p>This can easily be accomplished by setting up some switch and setting it to true within the watch task (and thus modifying the code).</p>
+
+<p>Something like this:</p>
+
+<pre><code>var gulp = require('gulp');
+var gutil = require('gulp-util');
+var browserify = require('browserify');
+var source = require('vinyl-source-stream');
+var watchify = require('watchify');
+
+// https://github.com/gulpjs/gulp/blob/master/docs/recipes/fast-browserify-builds-with-watchify.md
+gulp.task('build', function(){
+    browserifyfun(false);
+});
+gulp.task('watch', function () {
+    browserifyfun(true);
+});
+function browserifyfun(watch){
+    var b;
+
+    if(watch){
+        b = watchify(browserify('./client/js/index.js', watchify.args));
+        b.on('update', rebundle(b));
+    }else{
+        b = browserify('./client/js/index.js');
+    }
+
+    function rebundle (bundler) {
+        return bundler.bundle()
+            // Log errors if they happen.
+            .on('error', function(e) {
+                gutil.log('Browserify Error', e.message);
+            })
+            .pipe(source('app.js'))
+            .pipe(gulp.dest('./build'));
+    }
+
+    return rebundle(b);
+}
+</code></pre>
+
+<p><a href="http://truongtx.me/2014/08/06/using-watchify-with-gulp-for-fast-browserify-build/">Modified code from here</a></p>

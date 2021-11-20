@@ -1,0 +1,28 @@
+<p>Memory freed with <code>free()</code> is not always returned to the OS when free()d - it may only be made available for allocation <em>within the same process</em>. To confirm this, run your program under a memory leak checker such as valgrind, and see if it reports any leaks when your program exits. Additionally, as <a href="http://stackoverflow.com/a/8425787/36723">Eric points out</a>, you seem to be using the wrong terminating conditions for your deallocation loop.</p>
+
+<p>If you would like to increase the chance that memory can be returned to the OS, try allocating your entire array with a single malloc or calloc call, and dividing it up into all the sub-arrays yourself - large single allocations often get special handling that (as a side effect) makes them easy to return to the OS. You could also flatten your array - that is, allocate one big <code>mx * my * mz</code>-element array, and access elements with e.g. <code>z + mz * (y + my * x)</code> (this will also be significantly faster than using multiple levels of pointers). </p>
+
+<p>I would recommend just using a library that does this kind of contiguous multidimensional array allocation and lookup for you, such as the <a href="http://www.boost.org/doc/libs/1_48_0/libs/multi_array/doc/user.html" rel="nofollow">boost multidimensional array library</a>. It's far less error-prone that way, and it's going to be much faster than doing multi-level pointer lookups.</p>
+
+<p>For reference, here's how using boost multidimensional arrays might look:</p>
+
+<pre><code>class MetaPic {
+  // ...
+  typedef boost::multi_array&lt;Pixel1, 3&gt; array_type;
+  typedef array_type::index index;
+
+  array_type image;
+};
+
+void MetaPic::allocateMetaPic() {
+  image.resize(boost::extents[x][y][z]);
+}
+
+void MetaPic::freeMetaPic() {
+  // this is only needed to try to force the array to be freed early; you can
+  // instead simply allow it to be default-destroyed when MetaPic is destroyed
+  image.resize(boost::extents[1][1][1]);
+}
+</code></pre>
+
+<p>Accessing elements in this <code>image</code> can be done with normal syntax (ie, <code>image[i][j][k]</code>). Note that it's recommended to use the <code>index</code> type for array indices, but you can choose to use regular <code>int</code>s instead if you know they'll be in range.</p>

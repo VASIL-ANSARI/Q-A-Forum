@@ -1,0 +1,29 @@
+<p>Your question is missing some details, but let me try:</p>
+
+<ul>
+<li><p>the first parameter passed to <code>FromCache()</code> is a name of a Beaker cache region, it should match one of the configured regions, which is not the case here. Or perhaps you configure <code>default</code> region in the code (I'd expect <code>BeakerException</code> being thrown if region is unknown)?</p></li>
+<li><p>you need <code>pyramid_beaker</code> module installed and included in Pyramid's project configuration. I suggest you follow <code>pyramid_beaker</code> <a href="http://docs.pylonsproject.org/projects/pyramid_beaker/en/latest/#setup" rel="nofollow">manual's <em>Setup</em> section</a>.</p></li>
+<li><p>you need some extra code in <code>__init__.py</code> of your application in order to propagate <code>.ini</code> file settings to Beaker. This is described in <a href="http://docs.pylonsproject.org/projects/pyramid_beaker/en/latest/#beaker-cache-region-support" rel="nofollow"><em>Beaker cache region support</em></a> section of the manual.</p></li>
+</ul>
+
+<p>And here's a working sample from my current project, configuring both Beaker-based sessions and caching (all irrelevant parts removed):</p>
+
+<pre><code>from pyramid.config import Configurator
+from pyramid_beaker import set_cache_regions_from_settings
+from pyramid_beaker import session_factory_from_settings
+
+def main(global_config, **settings):
+    # Configure Beaker caching/sessions    
+    set_cache_regions_from_settings(settings)
+    session_factory = session_factory_from_settings(settings)
+
+    config = Configurator(settings=settings)
+    config.set_session_factory(session_factory)
+    config.include('pyramid_beaker')
+
+    config.add_static_view('static', 'static', cache_max_age=3600)
+    config.add_route('home', '/')
+
+    config.scan()
+    return config.make_wsgi_app()
+</code></pre>

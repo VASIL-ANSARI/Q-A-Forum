@@ -1,0 +1,33 @@
+<p>In an iOS project, I tried modifying the body font (<code>UIFontTextStyleBody</code>) to include <code>UIFontDescriptorTraitTightLeading</code>. When I read the <code>fontAttributes</code> properties,  it reports the <code>NSFontNameAttribute</code> as <code>.AppleSystemUIShortBody</code> (the original value is <code>.AppleSystemUIBody</code>).</p>
+
+<p>From this, I was able to figure out Apple's terms:</p>
+
+<pre><code>+------------+-----------------------------------+------------------------------+---------------------------------+
+|    Term    |  UIFontDescriptorSymbolicTraits   |     NSFontNameAttribute      |    NSCTFontUIUsageAttribute     |
++------------+-----------------------------------+------------------------------+---------------------------------+
+|            | (none)                            | .AppleSystemUIBody           | UICTFontTextStyleBody           |
+| Italic     | UIFontDescriptorTraitItalic       | .AppleSystemUIItalicBody     | UICTFontTextStyleItalicBody     |
+| Emphasized | UIFontDescriptorTraitBold         | .AppleSystemUIEmphasizedBody | UICTFontTextStyleEmphasizedBody |
+| Short      | UIFontDescriptorTraitTightLeading | .AppleSystemUIShortBody      | UICTFontTextStyleShortBody      |
+| Tall?      | UIFontDescriptorTraitLooseLeading | .AppleSystemUISpliceTallBody | UICTFontTextStyleTallBody       |
++------------+-----------------------------------+------------------------------+---------------------------------+
+</code></pre>
+
+<p>If you attempt to do the same thing with <code>UIFontDescriptorTraitExpanded</code>, <code>UIFontDescriptorTraitCondensed</code>, <code>UIFontDescriptorTraitVertical</code>, <code>UIFontDescriptorTraitUIOptimized</code>, and then read the <code>fontAttributes</code>, it returns the same value as the Body style. If you try the same thing with <code>UIFontDescriptorTraitMonoSpace</code>, it returns a <code>nil</code> dictionary.</p>
+
+<p>Therefore, in an Apple Watch project, you <em>should</em> be able to use the <strong>Body Short Emphasized</strong> font like so:</p>
+
+<pre><code>/*1*/ UIFontDescriptor *fontDescriptor = [UIFontDescriptor preferredFontDescriptorWithTextStyle:UIFontTextStyleBody];
+/*2*/ fontDescriptor = [fontDescriptor fontDescriptorWithSymbolicTraits:UIFontDescriptorTraitTightLeading | UIFontDescriptorTraitBold];
+/*3*/ UIFont *font = [UIFont fontWithDescriptor:fontDescriptor size:0];
+/*4*/ [label setAttributedText:[[NSAttributedString alloc] initWithString:text attributes:@{NSFontAttributeName: font}]];
+</code></pre>
+
+<p>I say "should" because there are two bugs in play here:</p>
+
+<ul>
+<li>On line 2, <code>UIFontDescriptorTraitTightLeading</code> is being specified, yet this trait is ignored on both watch simulators. Bold and italic work just fine.</li>
+<li>On line 3, since <code>size</code> is set to <code>0</code>, it gets its value from the <code>UIFontDescriptorSizeAttribute</code> in <code>fontDescriptor</code> <sup><a href="https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIFont_Class/#//apple_ref/occ/clm/UIFont/fontWithDescriptor:size:" rel="nofollow">[1]</a></sup>. The problem is that on a 38mm device, there is a bug with both <code>+[UIFontDescriptor preferredFontDescriptorWithTextStyle:]</code> and <code>-[UIFont preferredFontForTextStyle:]</code> (used on <strong>line 1</strong>). When the user <a href="http://stackoverflow.com/q/29426178/35690">doesn't customize the font size</a>, both methods return <code>16</code>, when clearly <code>15</code> should be chosen on the 38mm device. (You can verify this by placing a label on a storyboard, assigning it the <strong>Body</strong> size, and visually comparing it to a label that sets its size to 15 manually.)</li>
+</ul>
+
+<p>Note: I am running Xcode 6.2.</p>

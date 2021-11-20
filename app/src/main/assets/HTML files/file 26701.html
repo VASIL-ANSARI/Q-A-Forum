@@ -1,0 +1,48 @@
+<p>First, since you need to follow an extract links, you need a <a href="http://doc.scrapy.org/en/latest/topics/spiders.html#crawlspider">CrawlSpider</a> instead of a <code>BaseSpider</code>. Then, you need to define two rules: one for players with a callback, and one for teams without, to follow. Also, you should start with a URL with list of teams, like <a href="http://esporte.uol.com.br/futebol">http://esporte.uol.com.br/futebol</a>. Here's a complete spider, that returns players from different teams:</p>
+
+<pre><code>from scrapy.contrib.linkextractors.sgml import SgmlLinkExtractor
+from scrapy.contrib.spiders import Rule, CrawlSpider
+from scrapy.item import Item, Field
+from scrapy.selector import HtmlXPathSelector
+
+
+class JogadorItem(Item):
+    nome = Field()
+    time = Field()
+
+
+class MoneyballSpider(CrawlSpider):
+    name = "moneyball"
+    allowed_domains = ["esporte.uol.com.br", "click.uol.com.br", "uol.com.br"]
+    start_urls = ["http://esporte.uol.com.br/futebol"]
+
+    rules = (Rule(SgmlLinkExtractor(allow=(r'.*futebol/clubes/.*?/jogadores/', )), callback='parse_players', follow=True),
+             Rule(SgmlLinkExtractor(allow=(r'.*futebol/clubes/.*', )), follow=True),)
+
+    def parse_players(self, response):
+        hxs = HtmlXPathSelector(response)
+        jogadores = hxs.select('//div[@id="jogadores"]/div/ul/li')
+        items = []
+        for jogador in jogadores:
+            item = JogadorItem()
+            item['nome'] = jogador.select('h5/a/text()').extract()
+            item['time'] = hxs.select('//div[@class="header clube"]/h1/a/text()').extract()
+            items.append(item)
+            print item['nome'], item['time']
+        return items
+</code></pre>
+
+<p>Quote from the output:</p>
+
+<pre><code>...
+[u'Silva'] [u'Vila Nova-GO']
+[u'Luizinho'] [u'Vila Nova-GO']
+...
+[u'Michel'] [u'Guarani']
+[u'Wellyson'] [u'Guarani']
+...
+</code></pre>
+
+<p>This is just hint for you to continue working on the spider, you'll need to tweak the spider further: choose an appropriate start URL depending on your needs etc.</p>
+
+<p>Hope that helps.</p>

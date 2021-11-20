@@ -1,0 +1,23 @@
+<p>The reason you are seeing this seemingly bizarre behavior is because each <code>File</code> object has a <a href="http://ruby-doc.org/core-2.2.0/File/Stat.html" rel="nofollow">File::Stat object</a> to encapsulate common status information about the file that is only updated when some action is taken that triggers an update. In this case the trigger is you calling <code>size</code> on the file. You can examine the <code>stat</code> object to see timestamps.</p>
+
+<p>Here is a fully reproducible example with the <code>stat</code> call thrown in.</p>
+
+<pre><code>irb(main):021:0* f = File.new "out", "w"
+  =&gt; #&lt;File:out&gt;
+irb(main):022:0&gt; f.write "hi"
+  =&gt; 2
+irb(main):023:0&gt; File.zero? f.path
+  =&gt; true
+irb(main):024:0&gt; f.stat
+  =&gt; #&lt;File::Stat dev=0x801, ino=1062714, mode=0100664, nlink=1, uid=1000, gid=1000, rdev=0x0, size=0, blksize=4096, blocks=0, atime=2015-11-05 15:50:25 -0800, mtime=2015-11-05 15:52:08 -0800, ctime=2015-11-05 15:52:08 -0800&gt;
+irb(main):025:0&gt; f.size # triggers an update
+  =&gt; 2
+irb(main):026:0&gt; File.zero? f.path
+  =&gt; false
+irb(main):027:0&gt; f.stat
+  =&gt; #&lt;File::Stat dev=0x801, ino=1062714, mode=0100664, nlink=1, uid=1000, gid=1000, rdev=0x0, size=2, blksize=4096, blocks=8, atime=2015-11-05 15:52:47 -0800, mtime=2015-11-05 15:52:45 -0800, ctime=2015-11-05 15:52:45 -0800&gt;
+</code></pre>
+
+<p>Although, I would think that calling <code>write</code> on a <code>File</code> object should trigger an update.</p>
+
+<p>EDIT: I figured out why <code>write</code> does not trigger an update. <code>write</code> is a method of <code>File</code>'s parent class (<code>IO</code>). But <code>size</code> and <code>stat</code> are both methods of <code>File</code>. Therefore, the <code>write</code> method would have to be implemented in <code>File</code> in order to gain access to (or knowledge of) <code>stat</code>. I suspect that any call to a method implemented in <code>File</code> will update <code>stat</code>.</p>

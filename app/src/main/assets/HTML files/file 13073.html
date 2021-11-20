@@ -1,0 +1,77 @@
+<p>Well, there are two ways you can approach this.  One leverages FitNesse very heavily and another just gets the job done.</p>
+
+<h2>Option 1: Leverage FitNesse Heavily</h2>
+
+<p>Assuming that one of the two CSV files is fixed and always the same, you could create a fixture that can read the file in and then compare the result to a table in your FitNesse test.  This might look something like this:</p>
+
+<pre><code>|Query:list csv data|c:\test\file_to_check.csv|
+|col1       |col2       |col3     |
+|Joe        |12         |red      |
+|Steve      |15         |purple   |
+</code></pre>
+
+<p>When the test runs, it would read in the file and split it into rows and columns, using the header row to connect values with columns.  It then returns the standard Slim (I'm assuming this is using Slim at the moment) List of rows, which themselves are lists of name, value pairs as strings.  If things match, you will see all green.  If they don't match, then you will get failures  indicating the mismatch.  Such a fixture would also identify missing rows or extra rows and you would see them in page.</p>
+
+<h2>Option 2: Just get it done</h2>
+
+<p>The second option, is not going to be as FitNesse friendly, but could work.  This version would push all of the validation into the fixture.  In that case you would write a fixture that could take two filenames as inputs and then do a comparison all inside the fixture code.  Then it would return some indication of the failures.  It could look like this (but there are other designs that could work too:</p>
+
+<pre><code>|compare csv files|
+|file1             |file2             |match?|
+|c:\test_file_1.csv|c:\test_file_1.csv|true  |
+</code></pre>
+
+<p>This would work with some sort of code like the following (you still have to do the hard part of comparing the CSV files):</p>
+
+<pre><code>public class CompareCsvFiles {
+
+    private String filenameForFirstFile = null;
+    private String filenameForSecondFile = null;
+    private String matched = null;
+
+    public void setFile1(String filename){
+        filenameForFirstFile = filename;
+    }
+
+    public void setFile2(String filename){
+        filenameForSecondFile = filename;
+    }
+
+    public String match(){
+        return new CsvCompareTool(filenameForFirstFile, filenameForSecondFile).match();
+    }
+
+    private class CsvCompareTool{
+        private String filename1 = null;
+        private String filename2 = null;
+
+        public CsvCompareTool(String file1, String file2){
+            filename1 = file1;
+            filename2 = file2;
+        }
+
+        public String match(){
+            // create the necessary code to do the comparison here.  
+            // I'll leave that to you.
+            return "Not implemented yet";
+        }
+
+    }
+
+
+}
+</code></pre>
+
+<p>If there is a failure, I would return a string that describes the row that had the failure.</p>
+
+<p>See <a href="http://stackoverflow.com/questions/200609/can-you-recommend-a-java-library-for-reading-and-possibly-writing-csv-files" title="CSV Parser For Java Question">Question about CSV parser for Java</a> for more about parsing CSV files.</p>
+
+<h2>Final Comments</h2>
+
+<p>Personally, I prefer option 1.  It leverages FitNesse for the final validation and shows you the specific failures in page.  But that does require one file to be a consistent expected result.</p>
+
+<p>In either case, I would try to find a library that makes CSV file processing easier, as there are some fun rules about how to escape things to have embedded commas.</p>
+
+<p>You might also be able to build something with the TableTable style table to do this, but I don't recommend it.</p>
+
+<p>If you are using FitLibrary, you should be able to do the same sort of thing as either example, but there would be some differences in the coding.</p>

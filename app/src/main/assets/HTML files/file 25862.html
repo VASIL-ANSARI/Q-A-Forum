@@ -1,0 +1,99 @@
+<p>Your code is essentially correct. The exception raised when a dead lock occurs is a <code>SQLException</code>. The exception's <code>getSQLState()</code> method provides returns an error code that provides <a href="http://dev.mysql.com/doc/connector-j/en/connector-j-reference-error-sqlstates.html">additional information</a> about the actual error.</p>
+
+<p>You should also wait a short amount of time between attemps, so as not to load your server too much.</p>
+
+<p>As you cleverly guessed, set a maximum number of attempts, or you might end-up in an infinite loop.</p>
+
+<p>The final code could look like this:</p>
+
+<pre class="lang-java prettyprint-override"><code>boolean oops;
+int retries = 5;
+Connection c = null;
+Statement s = null;
+ResultSet rs = null;    
+
+do
+{
+    oops = false;
+Â  Â  c = null;
+Â  Â  s = null;
+Â  Â  rs = null;
+    try
+    {
+        c = openConnection();
+        s = c.createStatement();
+        rs = s.executeQuery("SELECT stuff FROM mytable");
+        fiddleWith(rs);
+    }
+    catch (SQLException sqlex)
+    {
+        oops = true;
+        switch(sqlex.getErrorCode()())
+        {
+            case MysqlErrorNumbers.ER_LOCK_DEADLOCK:
+                // deadlock or lock-wait time-out occured
+                break;
+            ...
+        }
+        Thread.sleep(1000); // short delay before retry
+    }
+    finally
+    {
+        if (rs != null) try {
+            rs.close();
+        } catch (SQLException e) {
+            // some error handler here
+        }
+
+        if (s != null) try {
+            s.close();
+        } catch (SQLException e) {
+            // some error handler here
+        }
+
+        if (c != null) try {
+            c.close();
+        } catch (SQLException e) {
+            // some error handler here
+        }
+
+    }
+}
+while (oops == true &amp;&amp; retries-- &gt; 0);
+</code></pre>
+
+<p>Obviously the above code is sub optimal. You may want to differentiate errors taking place at connection time and errors at execution time. You could also detect that after some errors, there is little hope that another attempt will work (eg. wrong credentials or SQL syntax error).</p>
+
+<p>You asked a lot of questions, but I will try to answer them all:</p>
+
+<blockquote>
+  <p>Are there specific exceptions to listen out for?</p>
+</blockquote>
+
+<p>Yes, see above: <code>SQLException</code>'s are the ones, with more information provided by <code>getErrorCode()</code> or <code>getSQLState()</code>.</p>
+
+<blockquote>
+  <p>Is the exception only thrown after I call connection.commit()?</p>
+</blockquote>
+
+<p>A <code>SQLException</code> could be thrown by virtually all methods of all classes from the <code>java.sql</code> package.</p>
+
+<blockquote>
+  <p>Should things be running in a loop with a limit to how many times the loop runs?</p>
+</blockquote>
+
+<p>Yes, see above.</p>
+
+<blockquote>
+  <p>Do I <em>[need to]</em> re-instantiate <code>PreparedStatement</code> objects?</p>
+</blockquote>
+
+<p>Obviously you must not re-create a <code>PreparedStatement</code> between two queries. You just need to set new values to your parameters before calling <code>executeQuery()</code> again. Of course if you need to execute another query, then a new <code>PreparedStatement</code> is required.</p>
+
+<blockquote>
+  <p>Same goes for <code>ResultSet</code> objects too</p>
+</blockquote>
+
+<p>A (new) <code>ResultSet</code> object is returned by <code>Statement.executeQuery()</code>, which represents the result of the query. You never create such an object yourself. Ideally you will call <code>ResultSet.close()</code> as soon as possible to release memory.</p>
+
+<p>I strongly advise you to follow the second chapter of <a href="http://docs.oracle.com/javase/tutorial/jdbc/basics/">this tutorial</a> ("Processing SQL Statements").</p>

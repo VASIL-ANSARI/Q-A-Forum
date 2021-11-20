@@ -1,0 +1,68 @@
+<p>You don't need two MapReduce jobs (or therefore a LinkedList) here. We can instead treat this as a variant of word count, but with a list of movie IDs added into the output.</p>
+
+<p><strong>Map input:</strong></p>
+
+<pre><code>354757\tToys come alive
+432984\tMore toys
+</code></pre>
+
+<p><strong>Map code:</strong></p>
+
+<pre><code>String[] idAndWords = input.split("\\t");
+
+for(String word : idAndWords[1].split(" ")) {
+    //Do whatever cleansing you want here - remove punctuation, lowercase etc.
+    output.write(word,idAndWords[0]);
+}
+</code></pre>
+
+<p><strong>Map output:</strong></p>
+
+<pre><code>("toys","354757")
+("come","354757")
+("alive","354757")
+("more","432984")
+("toys","432984")
+</code></pre>
+
+<p><strong>Reducer code:</strong></p>
+
+<pre><code>//Maps movie IDs to occurrences
+Map&lt;String,Int&gt; movieMap = new HashMap&lt;&gt;();
+//In here is the list of movie IDs for each word
+for(String val : values) {
+    if(!movieMap.contains(val)) {
+        movieMap.put(val,1);
+    } else {
+        movieMap.put(val,movieMap.get(val)+1);
+    }
+}
+output.write(NullWritable.get(),key+"\t"+movieMap);
+</code></pre>
+
+<p><strong>Reducer output:</strong></p>
+
+<pre><code>toys\t[(3547571),(432984,1)]
+come\t[(354757,1)]
+alive\t[(354757,1)]
+more\t[(432984,1)]
+</code></pre>
+
+<p>Now you have no need for a custom <code>Writable</code>, and it's fewer than a dozen lines of logic as opposed to what I think would be a pretty complex set of two chained MR jobs.</p>
+
+<p><strong>Efficiency extension:</strong></p>
+
+<p>You could make it more efficient by adding a count into the mapper output - with the current implementation then the plotline "dog eat dog" would result in the map output:</p>
+
+<pre><code>("dog","354757")
+("eat","354757")
+("dog","354757")
+</code></pre>
+
+<p>whereas you could reduce it to two records by adding a counter and scanning the whole line before outputting:</p>
+
+<pre><code>("dog","354757\t2")
+("eat","354757\t1")
+</code></pre>
+
+<p>I didn't want to make my example more complex and less-readable by including this, but it should be trivial to implement and should give good performance savings.</p>

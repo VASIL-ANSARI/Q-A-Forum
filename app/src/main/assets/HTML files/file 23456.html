@@ -1,0 +1,33 @@
+<p>Your ProtoIncludeAttribute is misplaced. The base-type needs to be told about the derived types, not the other way around.</p>
+
+<p>Add ProtoIncludeAttribute to MessageBase, and remove it from the subclass (unless of course the subclass itself has more subclasses)</p>
+
+<hr>
+
+<p>As explained in comments; if the base-type cannot be edited, it must be configured at runtime. That can be done as follows (see also a test based on the one from the comments):</p>
+
+<pre><code>[Test]
+public void AddSubtypeAtRuntime()
+{
+    var messageBase = RuntimeTypeModel.Default[typeof(MessageBase)];
+    // this could be explicit in code, or via some external config file
+    // that you process at startup
+    messageBase.AddSubType(10, typeof(Echo)); // would need to **reliably** be 10
+    messageBase.AddSubType(11, typeof(Foo));
+    messageBase.AddSubType(12, typeof(Bar)); // etc
+
+    // test it...
+    Echo echo = new Echo { Message = "Some message", ErrorMessage = "XXXXX" };
+    MessageBase echo1;
+    using (var ms = new MemoryStream())
+    {
+        Serializer.NonGeneric.Serialize(ms, echo);
+        ms.Position = 0;
+        echo1 = (MessageBase)Serializer.NonGeneric.Deserialize(
+                                   typeof(MessageBase), ms);
+    }
+    Assert.AreSame(echo.GetType(), echo1.GetType());
+    Assert.AreEqual(echo.ErrorMessage, echo1.ErrorMessage);
+    Assert.AreEqual(echo.Message, ((Echo)echo1).Message);
+}
+</code></pre>

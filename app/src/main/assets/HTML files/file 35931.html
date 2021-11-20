@@ -1,0 +1,121 @@
+<p>Use one of the synchronisation classes that derives from WaitHandle, such as AutoResetEvent or ManualResetEvent, setting the timeout parameter when you call the WaitOne() method.</p>
+
+<p>By calling WaitOne in a loop, you can implement a timer.</p>
+
+<p>You can signal the wait handle derived class to break out of or interrupt the timer.</p>
+
+<p>Note, to change the resolution, you are best off using a helper class that implements IDisposable:</p>
+
+<pre><code>internal sealed class TimePeriod : IDisposable
+{
+    private const string WINMM = "winmm.dll";
+
+    private static TIMECAPS timeCapabilities;
+
+    private static int inTimePeriod;
+
+    private readonly int period;
+
+    private int disposed;
+
+    [DllImport(WINMM, ExactSpelling = true)]
+    private static extern int timeGetDevCaps(ref TIMECAPS ptc, int cbtc);
+
+    [DllImport(WINMM, ExactSpelling = true)]
+    private static extern int timeBeginPeriod(int uPeriod);
+
+    [DllImport(WINMM, ExactSpelling = true)]
+    private static extern int timeEndPeriod(int uPeriod);
+
+    static TimePeriod()
+    {
+        int result = timeGetDevCaps(ref timeCapabilities, Marshal.SizeOf(typeof(TIMECAPS)));
+        if (result != 0)
+        {
+            throw new InvalidOperationException("The request to get time capabilities was not completed because an unexpected error with code " + result + " occured.");
+        }
+    }
+
+    internal TimePeriod(int period)
+    {
+        if (Interlocked.Increment(ref inTimePeriod) != 1)
+        {
+            Interlocked.Decrement(ref inTimePeriod);
+            throw new NotSupportedException("The process is already within a time period. Nested time periods are not supported.");
+        }
+
+        if (period &lt; timeCapabilities.wPeriodMin || period &gt; timeCapabilities.wPeriodMax)
+        {
+            throw new ArgumentOutOfRangeException("period", "The request to begin a time period was not completed because the resolution specified is out of range.");
+        }
+
+        int result = timeBeginPeriod(period);
+        if (result != 0)
+        {
+            throw new InvalidOperationException("The request to begin a time period was not completed because an unexpected error with code " + result + " occured.");
+        }
+
+        this.period = period;
+    }
+
+    internal static int MinimumPeriod
+    {
+        get
+        {
+            return timeCapabilities.wPeriodMin;
+        }
+    }
+
+    internal static int MaximumPeriod
+    {
+        get
+        {
+            return timeCapabilities.wPeriodMax;
+        }
+    }
+
+    internal int Period
+    {
+        get
+        {
+            if (this.disposed &gt; 0)
+            {
+                throw new ObjectDisposedException("The time period instance has been disposed.");
+            }
+
+            return this.period;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Increment(ref this.disposed) == 1)
+        {
+            timeEndPeriod(this.period);
+            Interlocked.Decrement(ref inTimePeriod);
+        }
+        else
+        {
+            Interlocked.Decrement(ref this.disposed);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TIMECAPS
+    {
+        internal int wPeriodMin;
+
+        internal int wPeriodMax;
+    }
+}
+</code></pre>
+
+<p>You can then use:</p>
+
+<pre><code>using (new TimePeriod(1))
+{
+    ////...
+}
+</code></pre>
+
+<p>Nick</p>

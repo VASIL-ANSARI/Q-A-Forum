@@ -1,0 +1,61 @@
+<p>I have rewritten this to make it secure. Check if it works for you:</p>
+
+<pre><code>        &lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;Link Games&lt;/title&gt;
+    &lt;link rel="stylesheet" type="text/css" href="style.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;?php
+    include 'header.php';
+    include 'menu.php';
+    try {
+        $connect = new PDO("mysql:dbhost=localhost;dbname=linkgamesDB", 'username', 'password');
+    } catch (PDOException $e) {
+        echo $e-&gt;getMessage();
+    }
+
+    ?&gt;
+    &lt;div id="content"&gt;
+        &lt;p class="headers"&gt;&lt;strong&gt;Add Order&lt;/strong&gt;&lt;/p&gt;
+        &lt;?php
+        #Check that the form is submitted
+            if (isset($_POST['submitted'])) {
+                #Create then run the query
+                    $query= $connect-&gt;prepare("INSERT INTO tblOrder(orderDate, orderLocation, orderProd, orderSystem) VALUES (?, ?, ?, ?)")
+                    $query-&gt;bindValue(1, $_POST['orderDate']);
+                    $query-&gt;bindValue(2, $_POST['orderLocation']);
+                    $query-&gt;bindValue(3, $_POST['orderProd']);
+                    $query-&gt;bindValue(4, $_POST['orderSystem']);
+                    $query-&gt;execute();
+                    #Check if there is an error in query and display relevant message
+                    if ($query-&gt;rowCount() &gt; 0) {
+                        echo '&lt;p class="records"&gt;Thank you! Record Added.&lt;/p&gt;';
+                    } else {
+                        echo '&lt;p class="records"&gt;Error. No record added.&lt;/p&gt;';
+                    }
+            }
+        ?&gt;
+&lt;form action="addOrder.php" method="post"&gt;&lt;p&gt;
+Order Date*: &lt;input type="text" name="orderDate" maxlength='70' required&gt;&lt;p&gt;
+Order Location*: &lt;input type="text" name="orderLocation" maxlength='255'required&gt;&lt;p&gt;
+Order Product*: &lt;select name='orderProd'&gt;
+        &lt;?php
+            $dropdownsql = $connect-&gt;prepare("SELECT prodID, prodName FROM tblProduct");
+            $dropdownsql-&gt;execute();
+            $r = $dropdownsql-&gt;fetchAll();
+            foreach($r AS $row):
+        ?&gt;
+            &lt;option value="&lt;?php echo $row['prodID'];?&gt;"&gt;&lt;?php echo $row['prodName'];?&gt;&lt;/option&gt;
+        &lt;?php endforeach;?&gt;
+        &lt;/select&gt;
+        &lt;p&gt;
+Order System*: &lt;input type="text" name="orderSystem" required&gt;&lt;p&gt;
+&lt;input type="submit" name="submit" value="Add Order"&gt; * Means that the field is required.
+&lt;input type="hidden" name="submitted" value="TRUE"&gt;
+&lt;/form&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>

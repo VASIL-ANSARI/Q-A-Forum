@@ -1,0 +1,36 @@
+<p><code>va_start</code> initialises the <code>va_list</code> to get arguments after the one specified, since in your example you are only sending one argument to the method, the <code>va_list</code> is empty.</p>
+
+<p>You also need to reinitialise the <code>va_list</code> after calling <code>vsnprintf</code>.</p>
+
+<p>You need to rethink the signature of your method, could do a static function:</p>
+
+<pre><code>class String : public std::string {
+public:
+    String(std::string str) : std::string(str) {}
+
+    String(char *str) : std::string(str) {}
+
+    static String Format(String format, ...) {
+        va_list argList;
+        va_start(argList, format);
+
+        // determine num of chars needed, don't store anything anywhere though!      
+        size_t charsNeeded = vsnprintf(NULL, 0, format.c_str(), argList);
+
+        va_end(argList);
+        va_start(argList, format);
+
+        // print formatted string into buf                                           
+        char buf[charsNeeded];
+        vsprintf(buf, format.c_str(), argList);
+
+        va_end(argList);
+
+        return String(buf);
+    }
+};
+</code></pre>
+
+<p><strong>EDIT:</strong></p>
+
+<p>If you are looking to format strings the best solutions is probably to use a <code>std::stringstream</code>: <a href="http://www.cplusplus.com/reference/sstream/stringstream/stringstream/" rel="nofollow">http://www.cplusplus.com/reference/sstream/stringstream/stringstream/</a></p>

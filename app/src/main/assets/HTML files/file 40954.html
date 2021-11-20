@@ -1,0 +1,39 @@
+<p>In Windows use wide character strings (<sup>1</sup>UTF-16 encoding, <code>wchar_t</code> type) for internal text handling, and preferably UTF-8 for external text files and networking.</p>
+
+<p>Note that Visual C++ will translate narrow text literals from the source encoding to Windows ANSI, which is a platform-dependent usually single-byte encoding (you can check which one via the <code>GetACP</code> API function), i.e., Visual C++ has the platform-specific Windows ANSI as its narrow C++ execution character set.</p>
+
+<p>But also do note that for an app restricted to non-Windows platforms, i.e. Unix-land, it makes practical sense to do everything in UTF-8, based on <code>char</code> type.</p>
+
+<hr>
+
+<p>For the database communication you may need to translate to and from the program's internal text representation.</p>
+
+<p>This depends on what the database interface requires, which is not stated.</p>
+
+<hr>
+
+<p>Example for console output in Windows:</p>
+
+<pre><code>#include &lt;iostream&gt;
+
+#include &lt;fcntl.h&gt;
+#include &lt;io.h&gt;
+
+auto main() -&gt; int
+{
+    _setmode( _fileno( stdout ), _O_WTEXT );
+
+    using namespace std;
+    wcout &lt;&lt; L"ÄÄÄÄÄ®Å Å²ÅªÄÄÄÄÄ¯Å¡Å³Å«" &lt;&lt; endl;
+}
+</code></pre>
+
+<p>To make this compile by default with g++, the source code encoding needs to be UTF-8. Then, to make it produce correct results with Visual C++ the source code encoding needs to be UTF-8 <em>with BOM</em>, which happily is also accepted by modern versions of g++. For otherwise the Visual C++ compiler will assume the Windows ANSI encoding and produce an incorrect UTF-16 string.</p>
+
+<p>Not coincidentally this is the default meaning of <strong>UTF-8</strong> in Windows, e.g. in the Notepad editor, namely UTF-8 with BOM.</p>
+
+<p>But note that while in Windows the problem is that the main system compiler <em>requires</em> a BOM for UTF-8, in Unix-land the problem is the opposite, that many old tools <em>can't handle</em> the BOM (for example, even MinGW g++ 4.9.1 isn't yet entirely up to speed: it sometimes includes the BOM bytes, then incorrectly interpreted, in error messages).</p>
+
+<hr>
+
+<p><sup><sup>1</sup>) On other platforms wide character text can be encoded in other ways, e.g. with UTF-32. In fact the Windows convention is in direct conflict with the C and C++ standards which require that a single <code>wchar_t</code> should be able to encode any character in the extended character set. However, this requirement was, AFAIK, imposed after Windows adopted UTF-16, so the fault probably lies with the politics of the C and C++ standardization process, not yet another Microsoft'ism.</sup></p>

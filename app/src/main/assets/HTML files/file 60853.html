@@ -1,0 +1,44 @@
+<p>First of all, I have next to no experience with Symfony. However, I think you missed a third option there. In Working Effectively with Legacy Code, Michael Feathers outlines a way to isolate dependencies by using inheritance (he calls it "Extract and Override").</p>
+
+<p>It goes like this:</p>
+
+<pre><code>class HiddenEntityType extends AbstractType
+{
+    /* stuff */
+
+    public function buildForm(FormBuilderInterface $builder, array $options)
+    {
+        if ($options['multiple']) {
+            $builder-&gt;addViewTransformer(
+                $this-&gt;createEntitiesToPrimaryKeysTransformer($options)
+            );
+        }
+    }
+
+    protected function createEntitiesToPrimaryKeysTransformer(array $options)
+    {
+        return new EntitiesToPrimaryKeysTransformer(
+            $this-&gt;em-&gt;getRepository($options['class']),
+            $options['get_pk_callback'],
+            $options['identifier']
+        );
+    }
+}
+</code></pre>
+
+<p>Now to test, you create a new class, <code>FakeHiddenEntityType</code>, that extends <code>HiddenEntityType</code>.</p>
+
+<pre><code>class FakeHiddenEntityType extends HiddenEntityType {
+
+    protected function createEntitiesToPrimaryKeysTransformer(array $options) {
+        return $this-&gt;mock;
+    }    
+
+}
+</code></pre>
+
+<p>Where <code>$this-&gt;mock</code> obviously is whatever you need it to be.</p>
+
+<p>The two most prominent advantages are that there are no factories involved, thus complexity is still encapsulated, and there is virtually no chance that this change breaks existing code.</p>
+
+<p>The disadvantage being that this technique requires an extra class. More importantly, it requires a class that knows about the internals of the class under test.</p>

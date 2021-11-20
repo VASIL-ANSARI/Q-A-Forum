@@ -1,0 +1,152 @@
+<pre><code>// MAP CODE
+        $qry_country_map = 'Select name, refugee, lat, lng FROM '.$table_name.' WHERE 1 AND status = 1';
+        $country_data_map = $wpdb-&gt;get_results($qry_country_map , ARRAY_A);
+        //echo "&lt;pre&gt;";print_r($country_data_map);exit;
+        $array_string = "["; 
+        for($m=0;$m&lt;count($country_data_map);$m++) { 
+         $array_string .= "['".$country_data_map[$m]['name']."', '".$country_data_map[$m]['name']."','".$country_data_map[$m]['refugee']."','".$country_data_map[$m]['lat']."', '".$country_data_map[$m]['lng']."'],";
+        }
+        $array_string = substr($array_string, 0,-1);
+        $array_string .= "]";
+        ?&gt;
+        &lt;style&gt;
+          #map{
+            height: 400px;
+          }
+          a[href^="http://maps.google.com/maps"]{display:none !important}
+          .gmnoprint a, .gmnoprint span {
+              display:none;
+          }
+          .gmnoprint div {
+              background:none !important;
+          }
+        &lt;/style&gt;
+        &lt;script src="http://maps.google.com/maps/api/js?sensor=false"&gt;&lt;/script&gt;
+        &lt;div id="map"&gt;&lt;/div&gt;
+        &lt;script type="text/javascript"&gt;
+
+            var marker_image = '&lt;?php echo $plugin_image_url;?&gt;';
+            // Define your locations: HTML content for the info window, latitude, longitude
+            var locations = &lt;?php echo $array_string;?&gt;;
+
+            var map = new google.maps.Map(document.getElementById('map'), {
+              center: new google.maps.LatLng(26.3351, 17.2283),
+                  mapTypeControl: false,
+                  scaleControl: false,
+                  streetViewControl: false,
+                  overviewMapControl: false,
+                  panControl: false,
+                  zoomControl: true,
+                  zoomControlOptions: {
+                    style: google.maps.ZoomControlStyle.SMALL
+                  },
+                  zoom: 2,
+                  mapTypeId: google.maps.MapTypeId.ROADMAP
+            });
+
+            var styles = [
+                    {
+                        featureType: "landscape",
+                        stylers: [
+                            { visibility: "on" },
+                            { color: "#FFFFFF"}
+                        ]
+                    },
+                    {
+                        featureType: "water",
+                        stylers: [
+                            { visibility: "on" },
+                            { color: "#CCCCCC"}
+                        ]
+                    },
+                    {
+                       featureType: "administrative",
+                       elementType: "geometry.fill",
+                       stylers: [
+                          { visibility: "off" }
+                       ]
+                    },
+                    {
+                        featureType: "all",
+                        elementType: "labels",
+                        stylers: [
+                            { visibility: "off" }
+                        ]
+                    }
+                  ];
+                  map.setOptions({styles: styles});
+
+            var infowindow = new google.maps.InfoWindow({
+              maxWidth: 160 
+            });
+
+            var marker;  
+            var markers = new Array();
+
+            // Add the markers and infowindows to the map
+            for (var i = 0; i &lt; locations.length; i++) 
+            {
+                if(locations[i][3]!='' &amp;&amp; locations[i][4]!='' &amp;&amp; locations[i][2]!='')
+                {
+                    var scale;
+                    if(locations[i][2]&lt;100)
+                        scale = locations[i][2];
+                    else if(locations[i][2]&gt;100 &amp;&amp; locations[i][2]&lt;500)
+                        scale = locations[i][2]/25; 
+                    else if(locations[i][2]&gt;500 &amp;&amp; locations[i][2]&lt;1000)
+                        scale = locations[i][2]/60;
+                    else if(locations[i][2]&gt;1000 &amp;&amp; locations[i][2]&lt;10000)
+                        scale = locations[i][2]/275;     
+                    else if(locations[i][2]&gt;10000 &amp;&amp; locations[i][2]&lt;100000)
+                        scale = locations[i][2]/1600;
+                    else if(locations[i][2]&gt;100000 &amp;&amp; locations[i][2]&lt;500000)
+                        scale = locations[i][2]/7500;
+                    else if(locations[i][2]&gt;500000 &amp;&amp; locations[i][2]&lt;1000000)
+                        scale = locations[i][2]/10500;  
+
+                    scale = Math.round(scale);
+                    if(scale!=0)
+                    {
+                        //console.log(scale);
+                        marker = new google.maps.Marker({
+                        position: new google.maps.LatLng(locations[i][3], locations[i][4]),
+                        map: map,
+                        icon: {
+                        url: marker_image,
+                        scaledSize: new google.maps.Size(scale, scale),
+                        size:new google.maps.Size(scale, scale)
+                        }
+                        });
+
+                      //ADD EVENT TO SHOW INFOWINDOW
+                      google.maps.event.addListener(marker, 'mouseover', (function(marker, i) {
+                        return function() {
+                          infowindow.setContent(locations[i][0]);
+                          infowindow.open(map, marker);
+                          //marker.setIcon(new google.maps.MarkerImage('http://192.168.5.33/map-marker-hover.png'));
+                          //marker.icon.scaledSize = new google.maps.Size(scale,scale);
+                          //marker.icon.size = new google.maps.Size(scale,scale);
+                        }
+                      })(marker, i));
+
+                      //ADD EVENT TO HIDE INFOWINDOW
+                      google.maps.event.addListener(marker, 'mouseout', (function(marker, i) {
+                        return function() {
+                          infowindow.close(map, marker);
+                          //marker.setIcon(new google.maps.MarkerImage('http://192.168.5.33/map-marker.png'));
+                          //marker.icon.scaledSize = new google.maps.Size(scale,scale);
+                          //marker.icon.size = new google.maps.Size(scale,scale);
+                        }
+                      })(marker, i));       
+                    }
+                }
+            }
+        &lt;/script&gt; 
+</code></pre>
+
+<p>See the variable named $array_string i have created it in php and then just echo in js to make a js array and then i have looped with the lat and long to display markers.</p>
+
+<p>i have coded some things for the custom marker image and marker size scaling according to value and effect on mouseover and mouseout.</p>
+
+<p>You just need to copy paste this code make minute changes and you are done.
+Let me know if something goes wrong :)</p>

@@ -1,0 +1,59 @@
+<p>Pretty sure a <code>List&lt;SubClass&gt;</code> isn't covariant to <code>List&lt;BaseClass&gt;</code>. <code>IEnumerable&lt;T&gt;</code> maybe, but not List as you can freely add a non-<code>T</code> (but still <code>IDataTransferObjects</code>) which would throw a runtime exception so it's caught at compile time.</p>
+
+<p>While your code might be safe at runtime (as you use keys by type), the compiler doesn't know this.</p>
+
+<pre><code>List&lt;Animal&gt; animalList = new List&lt;Animal&gt;();
+animalList.Add(new Dog()); //ok!
+
+List&lt;Cat&gt; catList = new List&lt;Cat&gt;();
+animalList = catList; //Compiler error: not allowed, but it's what you're trying to do
+animalList.Add(new Dog()) //Bad stuff! Trying to add a Dog to a List&lt;Cat&gt;
+</code></pre>
+
+<p>What you're doing would work if you were trying to treat it as <code>IEnumerable&lt;IDataTransferObject&gt;</code> as those cannot by modified by code (unless you cast it first at which point it would pass/fail if you use a bad type). But <code>List</code> can definitely be altered by compile-time code.</p>
+
+<p>EDIT: If you don't mind casting, and really want a <code>List&lt;T&gt;</code> (so your calling code is typesafe and not adding non-<code>T</code> objects once retrieved) you might do something like this:</p>
+
+<pre><code>private Dictionary&lt;Type, object&gt; dataStore = new Dictionary&lt;Type, object&gt;();
+
+public void Insert&lt;T&gt;(T dto) where T : IDataTransferObject
+{
+    object data;
+    if (!dataStore.TryGetValue(typeof(T), out data))
+    {
+        var typedData = new List&lt;T&gt;();
+        dataStore.Add(typeof(T), typedData);
+        typedData.Add(dto);
+    }
+    else
+    {
+        ((List&lt;T&gt;)data).Add(dto);
+    }
+}
+
+
+//you didn't provide a "getter" in your sample, so here's a basic one
+public List&lt;T&gt; Get&lt;T&gt;() where T : IDataTransferObject
+{
+    object data;
+    dataStore.TryGetValue(typeof(T), out data);
+    return (List&lt;T&gt;)data;
+}
+</code></pre>
+
+<p>Calling code is like:</p>
+
+<pre><code>Insert(new PersonDTO());
+Insert(new OrderDTO());
+Insert(new PersonDTO());
+
+List&lt;PersonDTO&gt; persons = Get&lt;PersonDTO&gt;();
+List&lt;OrderDTO&gt; orders = Get&lt;OrderDTO&gt;();
+
+Console.WriteLine(persons.Count); //2
+Console.WriteLine(orders.Count); //1
+</code></pre>
+
+<p>So from the outside, all API usage is typesafe. Instead of <code>orders</code> being a <code>List&lt;IDataTransferObject&gt;</code> (which means you can add non-<code>OrderDTO</code> objects), it's strongly typed and cannot be mixed and matched.</p>
+
+<p>Of course at this point, there's no real need to constrain to <code>IDataTransferObject</code>, but that's up to you and your API/design/usage.</p>

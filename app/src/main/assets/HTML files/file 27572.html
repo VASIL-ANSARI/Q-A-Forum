@@ -1,0 +1,26 @@
+<p>I don't have an answer as to why GCC is unable to optimize the code the way you want it to, but I have a way to re-organize your code to achieve similar performance. Instead of organizing your code the way you have done so in <code>slow()</code> or <code>fast()</code>, I would recommend that you define an inline function that returns either <code>aa</code> or <code>bb</code> based on <code>mode</code> without needing a branch:</p>
+
+<pre><code>inline int * xx () { static int *xx[] = { bb, aa }; return xx[!!mode]; }
+inline int kwiky(int *xx) { return xx[1] - xx[0]; }
+int kwik() { return kwiky(xx()); }
+</code></pre>
+
+<p>When compiled by GCC 4.7 with <code>-O3</code>:</p>
+
+<pre><code>    movl    mode, %edx
+    xorl    %eax, %eax
+    testl   %edx, %edx
+    setne   %al
+    movl    xx.1369(,%eax,4), %edx
+    movl    4(%edx), %eax
+    subl    (%edx), %eax
+    ret
+</code></pre>
+
+<p>With the definition of <code>xx()</code>, you can redefine <code>auto0()</code> and <code>auto1()</code> like so:</p>
+
+<pre><code>inline int auto0() { return xx()[0]; }
+inline int auto1() { return xx()[1]; }
+</code></pre>
+
+<p>And, from this, you should see that <code>slow()</code> now compiles into code similar or identical to <code>kwik()</code>.</p>

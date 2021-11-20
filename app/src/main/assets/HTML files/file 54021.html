@@ -1,0 +1,68 @@
+<p>I believe the class name is the channel name.</p>
+
+<p>From the <a href="https://github.com/rails/rails/tree/master/actioncable" rel="nofollow">ActionCable</a> docs:</p>
+
+<pre><code># app/channels/appearance_channel.rb
+class AppearanceChannel &lt; ApplicationCable::Channel
+  def subscribed
+    current_user.appear
+  end
+
+  def unsubscribed
+    current_user.disappear
+  end
+
+  def appear(data)
+    current_user.appear on: data['appearing_on']
+  end
+
+  def away
+    current_user.away
+  end
+end
+</code></pre>
+
+<p>And the client subscribes as follows:</p>
+
+<pre><code># app/assets/javascripts/cable/subscriptions/appearance.coffee
+App.cable.subscriptions.create "AppearanceChannel",
+  # Called when the subscription is ready for use on the server
+  connected: -&gt;
+    @install()
+    @appear()
+
+  # Called when the WebSocket connection is closed
+  disconnected: -&gt;
+    @uninstall()
+
+  # Called when the subscription is rejected by the server
+  rejected: -&gt;
+    @uninstall()
+
+  appear: -&gt;
+    # Calls `AppearanceChannel#appear(data)` on the server
+    @perform("appear", appearing_on: $("main").data("appearing-on"))
+
+  away: -&gt;
+    # Calls `AppearanceChannel#away` on the server
+    @perform("away")
+
+
+  buttonSelector = "[data-behavior~=appear_away]"
+
+  install: -&gt;
+    $(document).on "page:change.appearance", =&gt;
+      @appear()
+
+    $(document).on "click.appearance", buttonSelector, =&gt;
+      @away()
+      false
+
+    $(buttonSelector).show()
+
+  uninstall: -&gt;
+    $(document).off(".appearance")
+    $(buttonSelector).hide()
+</code></pre>
+
+<p>If you look closely, client is subscribing to the channel <code>AppearanceChannel</code> which is the name of the class.</p>

@@ -1,0 +1,59 @@
+<p>Check these lines:</p>
+
+<pre><code>NString * selfuserid =[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 1)];//here the code comes again
+NSString * profilepic =[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 2)];
+NSString * username =[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 3)];
+NSString * selectedsports =[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 4)];
+</code></pre>
+
+<p>What happens here that one of the above field is return <code>NULL</code> string. As I guess database design for these fields constrains has property that allow to insert <code>NULL</code> data to these fields.</p>
+
+<p>So you have to check that if any one of these field returns <code>NULL</code> string then appropriately store an empty string.</p>
+
+<p>Do the following for this:</p>
+
+<p>Create one function to validate <code>NULL</code> strings:</p>
+
+<pre><code>- (NSString *) validateNilString:(NSString *)strValue {
+
+    NSString *returnString = @"";
+
+    @try {
+        if (!strValue)
+            return returnString;
+
+        if ([strValue isKindOfClass:[NSNull class]])
+            return returnString;
+
+        if ([strValue isEqualToString:@"&lt;nil&gt;"])
+            return returnString;
+
+        if ([strValue isEqualToString:@"&lt;null&gt;"])
+            return returnString;
+
+        if ([strValue isEqualToString:@"NULL"])
+            return returnString;
+
+        if ([strValue isEqualToString:@"nil"])
+            return returnString;
+
+        if ([strValue isEqualToString:@"(null)"])
+            return returnString;
+
+        return strValue;
+    }
+    @catch (NSException *exception) {
+        NSLog(@"Exception :%@",exception);
+        return returnString;
+    }
+}
+</code></pre>
+
+<p>Check every string using this function for not null value:</p>
+
+<pre><code>NSString * selfuserid = [self validateNilString:[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 1)]];
+//here the code comes again
+NSString * profilepic = [self validateNilString:[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 2)]];
+NSString * username = [self validateNilString:[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 3)]];
+NSString * selectedsports = [self validateNilString:[NSString stringWithUTF8String:(const char *)sqlite3_column_text(stmt, 4)]];
+</code></pre>

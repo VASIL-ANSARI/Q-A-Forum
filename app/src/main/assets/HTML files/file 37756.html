@@ -1,0 +1,90 @@
+<p>You can get the parts as rows with following statements:</p>
+
+<pre><code>Set @x1=    '@@863071010318301,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318302,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0900,#
+             @@863071010318303,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318304,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318305,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318306,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318307,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318308,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318309,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#
+             @@863071010318310,201526,1100.7812,N,07657.7134,E,0.00,060814,A,0,1,0,1,1,0,0799,0800,#';
+
+-- we set the separator strings that mark the begin and the end of the part we want:
+SET @pre = '@@';
+SET @post = ',#';
+
+SELECT CONCAT(@pre, SUBSTRING_INDEX(SUBSTRING_INDEX(@x1, @post, t.n), @pre, -1), @post) FROM (SELECT @x1 as haystack) h
+CROSS JOIN (
+    SELECT 
+        1 + a.N + b.N * 10 + c.N * 100 AS n
+    FROM
+        (SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a
+       ,(SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) b
+       ,(SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) c
+    ORDER BY n
+) t
+WHERE t.n &lt;=
+(
+    (
+        LENGTH(@x1) 
+        - 
+        LENGTH(REPLACE(@x1, @post, ''))
+    ) 
+    / LENGTH(@post)
+);
+</code></pre>
+
+<h1>Explanation</h1>
+
+<p><strong>First step: setting of markers:</strong></p>
+
+<p>We set the separator strings that mark the begin and the end of the part we want:</p>
+
+<pre><code>SET @pre = '@@';
+SET @post = ',#';
+</code></pre>
+
+<p><strong>Second step: getting the needed part</strong></p>
+
+<p>We use an expression similar to yours to get the part we want to have. Because our @pre and @post separators belong to the part we want and SUBSTRING_INDEX eliminates them, we've got to concatenate them afterwards again.</p>
+
+<pre><code>SELECT CONCAT(@pre, SUBSTRING_INDEX(SUBSTRING_INDEX(@x1, @post, t.n), @pre, -1), @post) 
+FROM (SELECT @x1 as haystack) h
+</code></pre>
+
+<p>** Third step: generating numbers**</p>
+
+<p>The trick to fill the part number, here <code>t.n</code> with numbers is to do a cross join with a number generating query:</p>
+
+<pre><code>SELECT 
+    1 + a.N + b.N * 10 + c.N * 100 AS n
+FROM
+    (SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a
+    ,(SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) b
+    ,(SELECT 0 AS N UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) c
+ORDER BY n
+</code></pre>
+
+<p>This kind of query is easily adaptable to get as many numbers as one wants.</p>
+
+<p><strong>Last step: limiting the numbers as needed</strong></p>
+
+<pre><code>WHERE t.n &lt;=
+(
+    (
+        LENGTH(@x1) 
+        - 
+        LENGTH(REPLACE(@x1, @post, ''))
+    ) 
+    / LENGTH(@post)
+);
+</code></pre>
+
+<ul>
+<li>Get the difference in string length by replacing the separator by an empty string</li>
+<li>Divide the result by the length of the separator</li>
+</ul>
+
+<p>You can have a look at <a href="http://sqlfiddle.com/#!2/fe644/1" rel="nofollow">this demo</a></p>

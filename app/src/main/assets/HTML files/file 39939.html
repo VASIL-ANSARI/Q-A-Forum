@@ -1,0 +1,52 @@
+<p>Unfortunately, <a href="http://stackoverflow.com/q/248263/781792">there isn't some sort of <code>virtual static</code></a>, and if you call <code>SomeDataContext.StaticPropertyInBaseClass</code>, it compiles to the same as <code>DataContextBase.StaticPropertyInBaseClass</code>. I think the best you can do is something like this:</p>
+
+<pre><code>// upside: simple SomeDataContext.Instance for external users
+// downside: more code in SomeDataContext
+partial class SomeDataContext : DataContextBase
+{
+    private const string DatabaseFile = "blablabla.mdf";
+    public static SomeDataContext Instance
+    {
+        get
+        {
+            return new SomeDataContext(GetConnectionString(DatabaseFile));
+        }
+    }
+}
+abstract class DataContextBase
+{
+    protected static string GetConnectionString(string databaseFile)
+    {
+        return string.Format(@"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename={0};Integrated Security=True", databaseFile);
+    }
+}
+// e.g. using (var context = SomeDataContext.Instance)
+</code></pre>
+
+<p>Or</p>
+
+<pre><code>// upside: just one line in child class
+// downside: a little harder for external callers, with a little less type safety
+// downside: as written, requires child class to have parameterless constructor
+partial class SomeDataContext : DataContextBase
+{
+    protected override string DatabaseFileInternal { get { return "blablabla.mdf"; } }
+}
+abstract class DataContextBase
+{
+    protected abstract string DatabaseFileInternal { get; }
+    private string ConnectionString
+    {
+        get
+        {
+            return string.Format(@"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename={0};Integrated Security=True", DatabaseFileInternal);
+        }
+    }
+    public static T GetInstance&lt;T&gt;() where T : DataContextBase, new()
+    {
+        using (var tInst = new T())
+            return (T)Activator.CreateInstance(typeof(T), tInst.ConnectionString);
+    }
+}
+// e.g. using (var context = DataContextBase.GetInstance&lt;SomeDataContext&gt;())
+</code></pre>

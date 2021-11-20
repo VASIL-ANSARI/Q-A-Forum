@@ -1,0 +1,42 @@
+<p>The syntax of your last query doesn't work, you can't introduce multiple columns via subquery in the <code>SELECT</code> list like that, so I'd suggest sticking with fixing your <code>JOIN</code> query.  </p>
+
+<p>Since you need the <code>SUM()</code> across multiple records without grouping, you'll need to window the sum via <code>OVER()</code>:</p>
+
+<pre><code>SELECT  sls.sal_ipk
+      , sls.sal_cisbn
+      , sls.sal_cruletype
+      , sls.sal_country
+      , sls.sal_nqty
+      , sls.sal_namtusd
+      , sls.sal_nlistprusd
+      , sal1.nLTDAmt
+      , sal1.nLTDUnt
+      , sal1.nYTDAmt
+      , sal1.nYTDUnt
+      , sal1.ttl_cisbn13
+FROM    sales sls
+INNER JOIN (SELECT    t.ttl_cisbn13
+                    , ISNULL(SUM(s.slh_iltd_units) OVER(), 0) AS 'nLTDUnt'
+                    , ISNULL(SUM(s.slh_iltd_amt) OVER(), 0) AS 'nLTDAmt'
+                    , ISNULL(SUM(s.slh_iytd_units) OVER(), 0) AS 'nYTDUnt'
+                    , ISNULL(SUM(s.slh_iytd_amt) OVER(), 0) AS 'nYTDAmt'
+            FROM    title t
+            LEFT JOIN salehist s 
+               ON t.ttl_cisbn13 = s.slh_cisbn
+            WHERE   TTL_CSTATUS &lt;&gt; 'D'
+              AND ttl_ctitleid+ttl_ceditionno= (SELECT ttl_ctitleid+ttl_ceditionno 
+                                                FROM title 
+                                                WHERE ttl_cisbn13 =  sls.sal_cisbn)
+            ) AS sal1 
+  ON sal1.ttl_cisbn13 = sls.sal_cisbn
+LEFT JOIN ruletype r 
+   ON sls.sal_cruletype = r.rut_crultype
+WHERE   sls.sal_acctmonth = 6
+        AND sls.sal_acctyear = 2012
+        AND sls.sal_ernipk IS NULL
+        AND sls.sal_lclientle = 0
+        AND r.rut_lignore &lt;&gt; 1
+        AND sal_corigen &lt;&gt; 'UK'
+        AND sls.sal_cisbn = '9780203005309'
+ORDER BY sls.sal_cisbn 
+</code></pre>

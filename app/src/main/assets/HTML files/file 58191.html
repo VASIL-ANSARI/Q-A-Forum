@@ -1,0 +1,56 @@
+<p>The webform seems to behave normally without mucking with the user agent.  This retrofit request returns a valid response:</p>
+
+<pre><code>D/TAG: currency_converter_result&gt;5 GBP = &lt;span class=bld&gt;6.3645 USD
+</code></pre>
+
+<p>Retrofit request:</p>
+
+<pre><code>      final Map&lt;String,String&gt; fieldMap = new HashMap&lt;&gt;();
+
+      fieldMap.put("a","5");
+      fieldMap.put("from","GBP");
+      fieldMap.put("to","USD");
+
+      RequestBody requestBody = RequestBody.create(MediaType.parse("text/plain"), "");
+      final Retrofit retrofit = new Retrofit.Builder()
+               .baseUrl("https://www.google.co.uk")
+               .build();
+
+         final ConversionService wService = retrofit.create(ConversionService.class);
+         Call&lt;ResponseBody&gt; data  = wService.convertCurrency(fieldMap);
+
+         data.enqueue(new Callback&lt;ResponseBody&gt;() {
+            @Override
+            public void onResponse(Call&lt;ResponseBody&gt; call, Response&lt;ResponseBody&gt; response) {
+               String resp = "";
+
+               if ( response.body() != null ) {
+                  try {
+                     resp = response.body().string();
+                     int index = resp.indexOf("currency_converter_result" );
+                     int end = resp.indexOf("&lt;/span&gt;", index );
+                     String result = resp.substring(index, end);
+                     Log.d("TAG", result);
+                  } catch ( IOException e) {
+                  }
+               }
+            }
+
+            @Override
+            public void onFailure(Call&lt;ResponseBody&gt; call, Throwable t) {
+
+               Log.e(TAG,"Failure");
+            }
+         });
+
+   }
+</code></pre>
+
+<p>ConversionService.java</p>
+
+<pre><code>public interface ConversionService {
+
+   @GET("/finance/converter")
+   Call&lt;ResponseBody&gt; convertCurrency(@QueryMap Map&lt;String,String&gt; queryMap);
+}
+</code></pre>

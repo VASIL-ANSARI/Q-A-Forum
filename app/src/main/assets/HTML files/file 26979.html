@@ -1,0 +1,60 @@
+<p>You can use  <code>PropertyNamingStrategy</code> class to override class property. See simple implementation of this class:</p>
+
+<pre><code>class ReplaceNamingStrategy extends PropertyNamingStrategy {
+
+    private static final long serialVersionUID = 1L;
+
+    private Map&lt;String, String&gt; replaceMap;
+
+    public ReplaceNamingStrategy(Map&lt;String, String&gt; replaceMap) {
+        this.replaceMap = replaceMap;
+    }
+
+    @Override
+    public String nameForGetterMethod(MapperConfig&lt;?&gt; config, AnnotatedMethod method, String defaultName) {
+        if (replaceMap.containsKey(defaultName)) {
+            return replaceMap.get(defaultName);
+        }
+
+        return super.nameForGetterMethod(config, method, defaultName);
+    }
+}
+</code></pre>
+
+<p>Example program could look like this:</p>
+
+<pre><code>import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
+
+public class JacksonProgram {
+
+    public static void main(String[] args) throws IOException {
+        Msg msg = new Msg();
+        msg.setCode(42);
+        msg.setData("Are you suggesting coconuts migrate?");
+
+        System.out.println(convert(msg, "test"));
+        System.out.println(convert(msg, "toto"));
+        System.out.println(convert(msg, "groovy"));
+    }
+
+    public static String convert(Msg msg, String name) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setPropertyNamingStrategy(new ReplaceNamingStrategy(Collections.singletonMap("data", name)));
+        return mapper.writeValueAsString(msg);
+    }
+}
+</code></pre>
+
+<p>Above program prints:</p>
+
+<pre><code>{"code":42,"test":"Are you suggesting coconuts migrate?"}
+{"code":42,"toto":"Are you suggesting coconuts migrate?"}
+{"code":42,"groovy":"Are you suggesting coconuts migrate?"}
+</code></pre>

@@ -1,0 +1,133 @@
+<p>So it might go like this.</p>
+
+<pre><code>@using (Html.BeginForm("StoreName","TreeviewController",FormMethod.Post, new {id="frmStoreDetails"}))
+{
+    @Html.AntiForgeryToken()
+
+    &lt;div class="form-horizontal"&gt;
+        &lt;h4&gt;TestEmployee&lt;/h4&gt;
+        &lt;hr /&gt;
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        &lt;div class="form-group"&gt;
+            @Html.LabelFor(model =&gt; model.Forename, htmlAttributes: new { @class = "control-label col-md-2" })
+            &lt;div class="col-md-10"&gt;
+                @Html.EditorFor(model =&gt; model.Forename, new { htmlAttributes = new { @class = "form-control", id="txtForeName" } })
+                @Html.ValidationMessageFor(model =&gt; model.Forename, "", new { @class = "text-danger" })
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="form-group"&gt;
+            @Html.LabelFor(model =&gt; model.Surname, htmlAttributes: new { @class = "control-label col-md-2" })
+            &lt;div class="col-md-10"&gt;
+                @Html.EditorFor(model =&gt; model.Surname, new { htmlAttributes = new { @class = "form-control", id="txtSurName" } })
+                @Html.ValidationMessageFor(model =&gt; model.Surname, "", new { @class = "text-danger" })
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="form-group"&gt;
+            &lt;div class="col-md-offset-2 col-md-10"&gt;
+                &lt;input type="submit" value="Create" onclick="javascript:SubmitForm();" class="btn btn-default" /&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+}
+</code></pre>
+
+<p><strong>Note:</strong> In the Html.BeginForm I have mentioned <code>ControllerName</code>, Please change it to whatever controllerName where you are going to Write <code>StoreName</code> Action.</p>
+
+<p>This will be in your controller:</p>
+
+<p><strong>Note:</strong> I assume that in your session you are storing FirstName and LastName and so in the model, assuming that your model will contain FirstName and LastName attribute, I will just bind FirstName and LastName and send it through ajax to your JsonResult action</p>
+
+<pre><code>[HttpPost]
+public JsonResult StoreName(UserDataModel model)
+{
+     bool valid=false; //Just for safety check
+    if(ModelState.IsValid)
+    {
+        var sessionValues = new MySessionValues();
+        sessionValues.Employee = model.FirstName;
+        Session["MySessionValues"] = sessionValues;
+        valid=true;
+    }
+    return Json(new {result=valid});
+}
+</code></pre>
+
+<p>Write your form Submit in js as below:</p>
+
+<pre><code>function SubmitForm()
+{
+      var valid=false;
+      $("#frmStoreDetails").on("submit",function(e){
+            e.preventDefault();
+
+            if($("#txtForeName").val()!="" &amp;&amp; $("#txtSurName").val()!="")//Validation
+            {
+                 valid=true;
+            }
+            if(valid)
+            {
+                   model : {
+                         'FirstName':$("#txtForeName").val(),
+                         'LastName':$("#txtSurName").val()
+
+                   };
+                   $.ajax({
+                       url:'/TreeviewController/StoreName',
+                       type: 'POST',
+                       dataType:'JSON',
+                       contentType: "application/json; charset=utf-8",
+                       data:JSON.stringify(model),
+                       success:function(data){
+                              if(data.result)
+                              {
+                                  $('#detailView').load("/TreeviewController/GetNewEmpSecond");
+                              }
+                              else
+                              { 
+                                  //display Error in some div
+                              }
+                       },
+                       error:function(data){
+                              //display error
+                       }
+                  });
+            }
+            $("#" + form).unbind('submit');
+            return false;
+      });
+}
+</code></pre>
+
+<p>Write One more <code>PartialViewResult</code> Action in your controller with name <code>GetNewEmpSecond</code> as below</p>
+
+<pre><code>[HttpGet]
+public PartialViewResult GetNewEmpSecond()
+{
+        //do whatever you want here
+        return PartialView('_NewEmpSecond');
+}
+</code></pre>
+
+<p>That's it.. It will load your partial view in specified div.</p>
+
+<p>Let me know if any doubts.</p>
+
+<p><strong>EDIT:</strong></p>
+
+<p>As per your comments <strong>The _NewEmpSeconed which I want to load next uses model @model OrwellFrontEnd.NewEmp.Second</strong> I believe that you need to pass your model back to calling partial view and that is why you are getting that exception. So just make changes in <code>GetNewEmpSecond()</code> PartialViewResult Action as below"</p>
+
+<pre><code>[HttpGet]
+public PartialViewResult GetNewEmpSecond()
+{
+        //do whatever you want here
+        OrwellFrontEnd.NewEmp.Second model = new OrwellFrontEnd.NewEmp.Second();
+
+        //Fill model values
+        return PartialView('_NewEmpSecond',model); //Send your model with partial view. I hope you are receiving it in the Partial View.
+}
+</code></pre>
+
+<p><strong>Note</strong>: I've changed the controllerName wherever required as given by you.
+and regarding your further steps you can just follow the same process to load other partial views. Hope it is cleared.</p>

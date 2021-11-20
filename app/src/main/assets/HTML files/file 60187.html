@@ -1,0 +1,58 @@
+<p>Thank you all, below is the solution suggested by you experts:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;ifaddrs.h&gt;
+#include &lt;string.h&gt;
+#include &lt;arpa/inet.h&gt;
+#include &lt;net/if.h&gt;
+#include &lt;net/route.h&gt; // struct rtentry
+#include &lt;sys/ioctl.h&gt;
+#include &lt;sys/socket.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+
+int 
+set_addr (const char *name, const char *ip, unsigned long request)
+{
+  struct ifreq ifr;
+  struct sockaddr_in *addr;
+  int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+
+  strncpy(ifr.ifr_name, name, IFNAMSIZ);
+  ifr.ifr_addr.sa_family = AF_INET;
+  addr = (struct sockaddr_in*)&amp;ifr.ifr_addr;
+
+  // inet_pton() returns 1 on success
+  // network address was successfully converted
+  int s;
+  s = inet_pton(AF_INET, ip, &amp;addr-&gt;sin_addr);
+  if (s &lt;= 0) {
+    if (s == 0)
+      fprintf(stderr, "Set IP %s not in presentation format\n", ip);
+    else
+      perror ("inet_pton");
+    exit (EXIT_FAILURE);
+  }
+
+  if (ioctl(fd, request, &amp;ifr) != 0) { // SIOCSIFADDR
+    perror ("ioctl");
+    exit (EXIT_FAILURE);
+  }
+
+  ioctl(fd, SIOCGIFFLAGS, &amp;ifr);
+
+  strncpy(ifr.ifr_name, name, IFNAMSIZ);
+  ifr.ifr_flags |= (IFF_UP | IFF_RUNNING);
+  ioctl(fd, SIOCSIFFLAGS, &amp;ifr);
+  return 0;
+}
+</code></pre>
+
+<p>Don't forget to grant your program with root privilege using following commands in your Makefile or command line:</p>
+
+<pre><code>$ sudo chown root your_program
+$ sudo comod a+xs your_program
+</code></pre>
+
+<p>Otherwise, you will get a error message <code>ioctl: Operation not permitted</code></p>

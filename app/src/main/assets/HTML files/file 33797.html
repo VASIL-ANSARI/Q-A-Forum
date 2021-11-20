@@ -1,0 +1,40 @@
+<p>I'm not quite sure yet, whether you need to only provide a single value of <code>InterruptTime</code> or if you need to buffer those values as they are generated for the user-space code to retrieve later. Without the extra effort of buffering and for simplicity, I'd suggest something along these lines:</p>
+
+<pre><code>ssize_t dev_read(struct file *filp,const char *buf,size_t count,loff_t *offset)
+{
+
+  if ( count &lt; sizeof(InterruptTime) ) {
+    // Not enough space provided.
+    return 0; // Or some error code maybe.
+  }
+
+  if (copy_to_user(buf,&amp;InterruptTime,sizeof(InterruptTime)) {
+    return -EFAULT;
+  } else {
+    return sizeof(InterruptTime); // Number of bytes we copied.
+  }
+
+}
+</code></pre>
+
+<p>(Note that this is not very clean and should be improved by buffering data to allow for reads of arbitrary size, correct error handling, &amp;c.)</p>
+
+<p>Then, in user-space, you'd do something like</p>
+
+<pre><code>#include &lt;fcntl.h&gt;
+...
+
+int fd = open("/proc/...", O_RDONLY);
+
+double timestamp;
+
+loff_t dummyOffset;
+
+if ( read( fd, &amp;timestamp, sizeof(timestamp) ) != sizeof(timestamp) ) {
+  // Failure.
+} else {
+  // Use value in timestamp...
+}
+
+...
+</code></pre>

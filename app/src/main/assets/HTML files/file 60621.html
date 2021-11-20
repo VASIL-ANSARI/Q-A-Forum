@@ -1,0 +1,94 @@
+<p>Ok. Instead of fighting this and trying to make it work inside DotNetNuke, I took a different approach.</p>
+
+<p>The ultimate goal behind this was to have an asynchronous file upload function in DNN so the user had some sort of feedback while a file was being uploaded. These are fairly big files -- 50-200mb -- and without feedback, especially on a slower link, the user did not know what was going on.</p>
+
+<p>So, what I did was...</p>
+
+<p>On my DNN server, I added a new site *outside of the dnn site * -- upload.mydomain.com, for instance -- and created an IIS application pointing to my MVC. The application simply provides asynchronous file uploads. It works great as a standalone so onto step 2.</p>
+
+<p>I had to integrate it into DNN. So, I created a virtual directory in the upload.mydomain.com pointing to my DNN portals folder where the users upload their files into their own portals.</p>
+
+<p>I created a DNN module called MyUpload and in the view.ascx of that module, I put in an iframe pointing to my upload application url. </p>
+
+<p>In the script in the upload application view page (shown in my question), I added a couple of parent.PostMessage functions -- one when the download is in progress and one when the download has finished.</p>
+
+<p>On the DNN module side, I write a listener that monitors the iframe post messages. </p>
+
+<p>When the user clicks the upload button in the iframe (the MVC upload app), the listener in the module gets a "status" response and does a couple of things. The upload starts and the progress bar is displayed so the user gets some feedback. When the upload is finished uploading the file to the appropriate portal and folder (the upload MVC app has access to the DNN portals folder and subfolder because of the virtual directory), the MVC posts another message back to the parent with a status of "success".</p>
+
+<p>The parent gets that message and goes on from there, processing the uploaded file in the appropriate manner. </p>
+
+<p>That's essentially it. </p>
+
+<p>-- MVC Script --</p>
+
+<pre><code>@section scripts{
+&lt;script src="http://malsup.github.com/jquery.form.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+    function parentExists() {
+        return (parent.location == window.location) ? false : true;
+    }
+    (function () {
+        var bar = $('.progress-bar');
+        var percent = $('.progress-bar');
+        var status = $('#status');
+        var running = false;
+
+        $('form').ajaxForm({
+            beforeSend: function () {
+                status.empty();
+                var percentValue = '0%';
+                bar.width(percentValue);
+                percent.html(percentValue);
+            },
+            uploadProgress: function (event, position, total, percentComplete) {
+                if (running === false) {
+                    running = true;
+                    parent.postMessage("status|running","*");
+                }
+                var percentValue = percentComplete + '%';
+                bar.width(percentValue);
+                percent.html(percentValue);
+            },
+            success: function (d) {
+                var percentValue = '100%';
+                bar.width(percentValue);
+                percent.html(percentValue);
+                alert(d);
+                //alert($('#fu1').val());
+                parent.postMessage("status|success|filename|" + $('#fu1').val(), "*");
+                $('#fu1').val('');
+            },
+            complete: function (xhr) {
+                status.html(xhr.responseText);
+            }
+        });
+    })();
+&lt;/script&gt;
+}
+</code></pre>
+
+<p>--Module listener --</p>
+
+<pre><code>&lt;script type="text/javascript"&gt;
+    handleStatusResponse = function (e) {
+        var response = e.data.split('|');
+        var action = response[0];
+        if (action === 'status') {
+            var status = response[1];
+            if (status === "success") {
+                var filename = response[3].split('\\')[2];
+                $('#hfFilename').val(filename);
+                $('#btnCreateAlbum').click();
+            }
+            else if (status === "running") {
+                ShowProgress();
+            }
+            else {
+                console.log("Unknown message: " + e.data);
+            }
+        }
+    }
+    addEventListener('message', handleStatusResponse, false);
+&lt;/script&gt;
+</code></pre>

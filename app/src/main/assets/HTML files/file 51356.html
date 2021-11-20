@@ -1,0 +1,38 @@
+<p>The problem with your file is that it isn't simply the SpreadsheetML format, it's corrupted.</p>
+
+<p>Opening the file in a text editor, I can see that the http response headers are also included in the file</p>
+
+<pre><code>HTTP/1.1 200 OK
+Date: Fri, 13 Nov 2015 09:55:31 GMT
+Server: Apache-Coyote/1.1
+Content-Disposition: inline; filename="sdp_daily_app_revenue_report.xls"
+Content-Type: application/vnd.ms-excel
+Transfer-Encoding: chunked
+
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;?mso-application progid="Excel.Sheet"?&gt;
+
+&lt;Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40"&gt;
+....
+&lt;/Workbook&gt;
+</code></pre>
+
+<p>This makes it unreadable..... the file should contain nothing but the actual xml content</p>
+
+<p>I don't know how you're acquiring it, but you need to ensure that the http response headers aren't echoed out into the file. PHPExcel should read it without issue if everything before the <code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;</code> was stripped out</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>It's also defined without a <code>Default</code> style, which is mandatory for SpreadsheetML format.... if you want to hack the code of the Excel2003XML Reader a bit around lines 413-417, change</p>
+
+<pre><code>if ($styleID == 'Default') {
+    $this-&gt;styles['Default'] = array();
+} else {
+    $this-&gt;styles[$styleID] = $this-&gt;styles['Default'];
+}
+</code></pre>
+
+<p>to </p>
+
+<pre><code>$this-&gt;styles[$styleID] = (isset($this-&gt;styles['Default'])) ? $this-&gt;styles['Default'] : array();
+</code></pre>

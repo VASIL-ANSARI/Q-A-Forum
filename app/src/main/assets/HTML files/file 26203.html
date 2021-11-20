@@ -1,0 +1,65 @@
+<p>Finally, I've found the following to be working best for my app.
+In my application, I add the ViewFinderViewController now as child view controller:</p>
+
+<pre><code>- (void)viewWillAppear:(BOOL)animated;
+{
+    if ([self.childViewControllers containsObject:self.viewfinderViewController] == NO) {
+        [self addChildViewController:self.viewfinderViewController];
+        self.viewfinderViewController.view.frame = self.view.bounds;
+        [self.view addSubview:self.viewfinderViewController.view];
+        [self.viewfinderViewController didMoveToParentViewController:self];
+    }
+}
+</code></pre>
+
+<p>This way, the willAnimateRotationToInterfaceOrientation: method will be called automatically, which I previously forwarded from the view controller that added the viewfinder's view as it's subview.</p>
+
+<p>Furthermore, I update the previewLayer size in this method of ViewfinderViewController:</p>
+
+<pre><code>- (void)viewWillLayoutSubviews;
+{
+    self.previewLayer.frame = self.view.bounds;
+}
+</code></pre>
+
+<p>I handle rotation of the previewLayer by implementing these two methods:</p>
+
+<pre><code>- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+    [CATransaction begin];
+    [CATransaction setAnimationDuration:duration];
+    [CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut]];
+    [self updatePreviewLayerForOrientation:toInterfaceOrientation];
+    [CATransaction commit];
+}
+
+- (void)updatePreviewLayerForOrientation:(UIInterfaceOrientation)interfaceOrientation;
+{
+    // correct position of previewLayer
+    CGSize newSize = self.view.bounds.size;
+    self.previewLayer.position = CGPointMake(0.5 * newSize.width, 0.5 * newSize.height);
+
+    // rotate the previewLayer, in order to have camera picture right
+    switch (interfaceOrientation) {
+        case UIInterfaceOrientationPortrait:
+            [self.previewLayer setAffineTransform:CGAffineTransformMakeRotation(0)];
+            break;
+
+        case UIInterfaceOrientationLandscapeLeft:
+            [self.previewLayer setAffineTransform:CGAffineTransformMakeRotation(M_PI/2)];
+            break;
+
+        case UIInterfaceOrientationLandscapeRight:
+            [self.previewLayer setAffineTransform:CGAffineTransformMakeRotation(-M_PI/2)];
+            break;
+
+        case UIDeviceOrientationPortraitUpsideDown:
+            [self.previewLayer setAffineTransform:CGAffineTransformMakeRotation(M_PI)];
+            break;
+
+        default:
+            break;
+    }
+}
+</code></pre>
+
+<p>I hope this helps everybody who is adding AVCaptureVideoPreviewLayer as a sublayer and has problems with resizing and orientation when it comes to interface rotation.</p>

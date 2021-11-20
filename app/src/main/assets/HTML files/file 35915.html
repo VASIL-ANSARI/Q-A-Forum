@@ -1,0 +1,71 @@
+<p>You seem to have two checkboxes?? Or you are trying to make your own checkbox alongside a jelly checkbox.</p>
+
+<p>You have this entire section in the <code>config.jelly</code>:</p>
+
+<pre><code>&lt;f:entry title="Start?" field="isstart"&gt;
+&lt;select name="isStart"&gt;
+  &lt;option value="true" selected="${it.isstart}"&gt;Yes&lt;/option&gt;
+  &lt;option value="false" selected="${!it.isstart}"&gt;No!&lt;/option&gt;
+&lt;/select&gt;
+&lt;/f:entry&gt;
+</code></pre>
+
+<p>but this doesn't even show up on the UI.</p>
+
+<hr>
+
+<p>This should work for you: Change <code>config.jelly</code> to:</p>
+
+<pre><code>&lt;j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form"&gt;
+&lt;!--
+   This jelly script is used for per-project configuration.
+
+   See global.jelly for a general discussion about jelly script.
+--&gt;
+
+&lt;!--
+   Creates a text field that shows the value of the "name" property.
+   When submitted, it will be passed to the corresponding constructor parameter.
+--&gt;
+&lt;f:entry title="Key" field="key"&gt;
+  &lt;f:textbox /&gt;
+&lt;/f:entry&gt;
+
+&lt;f:entry title="Starting point?" field="start" description="If checked, this will be the starting point."&gt;
+  &lt;f:checkbox/&gt;
+&lt;/f:entry&gt;
+&lt;/j:jelly&gt;
+</code></pre>
+
+<p>As you can see, I removed the useless section in the middle, and changed the way you define the checkbox.</p>
+
+<p>Then change your LogInfoBuilder to:</p>
+
+<pre><code>public class LogInfoBuilder extends Builder {
+    private final TimerSettings settings = new TimerSettings();
+
+    private final List&lt;String&gt; infoCollection = new ArrayList&lt;String&gt;();
+
+    // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
+    @DataBoundConstructor
+    public LogInfoBuilder(String key, boolean start) {
+        settings.setKey(key);
+        settings.setIsStart(start);
+    }
+
+    /**
+     * We'll use this from the &lt;tt&gt;config.jelly&lt;/tt&gt;.
+     */
+    public String getKey() {
+        return settings.getKey();
+    }
+
+    public boolean isStart()
+    {
+        return settings.getIsStart();
+    }
+
+    ...
+</code></pre>
+
+<p>These changes simply include changing the name of the variable to suit the name given in config.jelly.</p>

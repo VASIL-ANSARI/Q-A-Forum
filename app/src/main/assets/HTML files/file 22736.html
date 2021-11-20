@@ -1,0 +1,50 @@
+<p>Thread-safety in MPI doesn't work out of the box. First, you have to ensure that your implementation actually supports multiple threads making MPI calls at once. With some MPI implementations, for example Open MPI, this requires the library to be configured with special options at build time. Then you have to tell MPI to initialise at the appropriate thread support level. Currently the MPI standard defines four levels of thread support:</p>
+
+<ul>
+<li><code>MPI_THREAD_SINGLE</code> - means that the user code is single threaded. This is the default level at which MPI is initialised if <code>MPI_Init()</code> is used;</li>
+<li><code>MPI_THREAD_FUNNELED</code> - means that the user code is multithreaded, but only the main thread makes MPI calls. The main thread is the one which initialises the MPI library;</li>
+<li><code>MPI_THREAD_SERIALIZED</code> - means that the user code is multithreaded, but calls to the MPI library are serialised;</li>
+<li><code>MPI_THREAD_MULTIPLE</code> - means that the user code is multithreaded and all threads can make MPI calls at any time with no synchronisation whatsoever.</li>
+</ul>
+
+<p>In order to initialise MPI with thread support, one has to use <code>MPI_Init_thread()</code> instead of <code>MPI_Init()</code>:</p>
+
+<pre><code>int provided;
+
+MPI_Init_thread(&amp;argc, &amp;argv, MPI_THREAD_MULTIPLE, &amp;provided);
+if (provided &lt; MPI_THREAD_MULTIPLE)
+{
+    printf("ERROR: The MPI library does not have full thread support\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
+</code></pre>
+
+<p>Equivalent code with the <strong>obsoleted</strong> (and removed from MPI-3) C++ bindings:</p>
+
+<pre><code>int provided = MPI::Init_thread(argc, argv, MPI::THREAD_MULTIPLE);
+if (provided &lt; MPI::THREAD_MULTIPLE)
+{
+    printf("ERROR: The MPI library does not have full thread support\n");
+    MPI::COMM_WORLD.Abort(1);
+}
+</code></pre>
+
+<p>Thread support levels are ordered like this: <code>MPI_THREAD_SINGLE</code> &lt; <code>MPI_THREAD_FUNNELED</code> &lt; <code>MPI_THREAD_SERIALIZED</code> &lt; <code>MPI_THREAD_MULTIPLE</code>, so any other provided level, different from <code>MPI_THREAD_MULTIPLE</code> would have lower numerical value - that's why the <code>if (...)</code> code above is written so.</p>
+
+<p><code>MPI_Init(&amp;argc, &amp;argv)</code> is equivalent to <code>MPI_Init_thread(&amp;argc, &amp;argv, MPI_THREAD_SINGLE, &amp;provided)</code>. Implementations are not required to initialise exactly at the requested level - rather they could initialise at any other level (higher or lower), which is returned in the <code>provided</code> output argument.</p>
+
+<p>For more information - see Â§12.4 of the MPI standard, freely available <a href="http://www.mpi-forum.org/docs/">here</a>.</p>
+
+<p>With most MPI implementations, the thread support at level <code>MPI_THREAD_SINGLE</code> is actually equivalent to that provided at level <code>MPI_THREAD_SERIALIZED</code> - exactly what you observe in your case.</p>
+
+<p>Since you've not specified which MPI implementation you use, here comes a handy list.</p>
+
+<p>I've already said that Open MPI has to be compiled with the proper flags enabled in order to support <code>MPI_THREAD_MULTIPLE</code>. But there is another catch - it's InfiniBand component is not thread-safe and hence Open MPI would not use native InfiniBand communication when initialised at full thread support level.</p>
+
+<p>Intel's MPI comes in two different flavours - one with and one without support for full multithreading. Multithreaded support is enabled by passing the <code>-mt_mpi</code> option to the MPI compiler wrapper which enables linking with the MT version. This option is also implied if OpenMP support or the autoparalleliser is enabled. I am not aware how the InfiniBand driver in IMPI works when full thread support is enabled.</p>
+
+<p>MPICH(2) does not support InfiniBand, hence it is thread-safe and probably most recent versions provide <code>MPI_THREAD_MULTIPLE</code> support out of the box.</p>
+
+<p>MVAPICH is the basis on which Intel MPI is built and it supports InfiniBand. I have no idea how it behaves at full thread support level when used on a machine with InfiniBand.</p>
+
+<p>The note about multithreaded InfiniBand support is important since lot of compute clusters nowadays use InfiniBand fabrics. With the IB component (<code>openib</code> BTL in Open MPI) disabled, most MPI implementations switch to another protocol, for example TCP/IP (<code>tcp</code> BTL in Open MPI), which results in much slower and more latent communication.</p>

@@ -1,0 +1,43 @@
+<p>The behavior you are seeing is likely an edge case bug or may even be correct, if unintuitive.  Normally when you invoke an async method synchronously, it wraps a task around to execute and since there is no one waiting on the task to finish, the exception never makes it to the main thread. If you were to call Main directly it would succeed, but then your runtime would see an exception of "success" on another thread.</p>
+
+<p>Since main is the entrypoint of your application, it is invoked synchronously and likely as the entrypoint doesn't trigger the Task wrapping behavior, so that await isn't run properly and the TaskEx.Run throws on its own thread, which shows up in the runtime as an exception being thrown on another thread.</p>
+
+<p>If you were to run main as an <code>async</code> method, i.e. returning a <code>Task</code> (since an <code>async</code> that returns <code>void</code> can only really be called via <code>await</code>) and blocking on it from your synchronous main context, you would get the appropriate behavior as the below test illustrates:</p>
+
+<pre><code>static async Task Main() {
+    try {
+        await TaskEx.Run(() =&gt; { throw new Exception("failure"); });
+    } catch(Exception) {
+        throw new Exception("success");
+    }
+}
+
+static async Task Main2() {
+    await Main();
+}
+
+[Test]
+public void CallViaAwait() {
+    var t = Main2();
+    try {
+        t.Wait();
+        Assert.Fail("didn't throw");
+    } catch(AggregateException e) {
+        Assert.AreEqual("success",e.InnerException.Message);
+    }
+    }
+
+
+[Test]
+public void CallDirectly() {
+    var t = Main();
+    try {
+        t.Wait();
+        Assert.Fail("didn't throw");
+    } catch(AggregateException e) {
+        Assert.AreEqual("success", e.InnerException.Message);
+    }
+}
+</code></pre>
+
+<p>I.e. the Task faults with an <code>AggregateException</code> which contains the <strong>success</strong> exception as it's inner exception.</p>

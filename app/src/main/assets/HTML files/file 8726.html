@@ -1,0 +1,67 @@
+<p>You are right, by creating object manually you are not letting Spring to perform autowiring. Consider managing your services by Spring as well:</p>
+
+<pre><code>@Component
+public class MyServiceFactory {
+
+    @Autowired
+    private MyServiceOne myServiceOne;
+
+    @Autowired
+    private MyServiceTwo myServiceTwo;
+
+    @Autowired
+    private MyServiceThree myServiceThree;
+
+    @Autowired
+    private MyServiceDefault myServiceDefault;
+
+    public static MyService getMyService(String service) {
+        service = service.toLowerCase();
+
+        if (service.equals("one")) {
+            return myServiceOne;
+        } else if (service.equals("two")) {
+            return myServiceTwo;
+        } else if (service.equals("three")) {
+            return myServiceThree;
+        } else {
+            return myServiceDefault;
+        }
+    }
+}
+</code></pre>
+
+<p>But I would consider the overall design to be rather poor. Wouldn't it better to have one general <code>MyService</code> implementation and pass <code>one</code>/<code>two</code>/<code>three</code> string as extra parameter to <code>checkStatus()</code>? What do you want to achieve?</p>
+
+<pre><code>@Component
+public class MyServiceAdapter implements MyService {
+
+    @Autowired
+    private MyServiceOne myServiceOne;
+
+    @Autowired
+    private MyServiceTwo myServiceTwo;
+
+    @Autowired
+    private MyServiceThree myServiceThree;
+
+    @Autowired
+    private MyServiceDefault myServiceDefault;
+
+    public boolean checkStatus(String service) {
+        service = service.toLowerCase();
+
+        if (service.equals("one")) {
+            return myServiceOne.checkStatus();
+        } else if (service.equals("two")) {
+            return myServiceTwo.checkStatus();
+        } else if (service.equals("three")) {
+            return myServiceThree.checkStatus();
+        } else {
+            return myServiceDefault.checkStatus();
+        }
+    }
+}
+</code></pre>
+
+<p>This is <strong>still</strong> poorly designed because adding new <code>MyService</code> implementation requires <code>MyServiceAdapter</code> modification as well (SRP violation). But this is actually a good starting point (hint: map and Strategy pattern).</p>

@@ -1,0 +1,95 @@
+<p>While I'd thoroughly advise you to use <a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlparameter(v=vs.110).aspx" rel="nofollow">parameterized queries</a>, this should work for you (perhaps with minor adjustments as I can't see the entirety of your code, of course)</p>
+
+<p>This method should generate a valid where clause.  You can use this method in the various <code>OnSelectedIndexChanged</code> methods in your code-behind to prevent a lot of copy/pasted code.</p>
+
+<pre><code>public string GenerateWhereClause()
+{
+    List&lt;String&gt; conditions = new List&lt;String&gt;();
+
+    conditions.Add("(CT.ACTIVESTATUS = 0)");
+
+    if (ddlTaskName.SelectedIndex &gt; 0)
+    {
+        string strText = ddlTaskName.SelectedItem.Text;
+        conditions.Add(String.Format("(CT.ATTR2739 = '{0}')", strText));
+    }
+
+    if (ddlService.SelectedIndex &gt; 0)
+    {
+        string strText = ddlService.SelectedItem.Text;
+        conditions.Add(String.Format("(CT.ATTR2846 = '{0}')", strText));
+    }
+
+    if (ddlStatus.SelectedIndex &gt; 0)
+    {
+        string strText = ddlStatus.SelectedItem.Text;
+        conditions.Add(String.Format("(CT.ATTR2812 = '{0}')", strText));
+    }
+
+    if (ddlDueDate.SelectedIndex &gt; 0)
+    {
+        string strText = ddlDueDate.SelectedItem.Text;
+        conditions.Add(String.Format("(CONVERT(VARCHAR(14), CT.ATTR2752, 110) = '{0}')", strText));
+    }
+
+    if (ddlOwner.SelectedIndex &gt; 0)
+    {
+        string strText = ddlOwner.SelectedItem.Text;
+        conditions.Add(String.Format("(UA.REALNAME = '{0}')", strText));
+    }
+
+    if (ddlClient.SelectedIndex &gt; 0)
+    {
+        string strText = ddlClient.SelectedItem.Text;
+        conditions.Add(String.Format("(CT.ATTR2799 = '{0}')", strText));
+    }
+
+    // You can add additional filters here.  This isn't the cleanest way of doing it, but it's fairly quick and easy as long as you don't intend to add many more filters.
+
+    string conditionsJoined = String.Join(" AND ", conditions);
+    string whereClause = String.Format(" WHERE {0}", conditionsJoined);
+    return whereClause;
+}
+</code></pre>
+
+<p>And this is a modified version of your <code>PullData</code> method. (note that I've only changed the top portion where it creates the conditional statement.</p>
+
+<pre><code>public void PullData(string sortExp, string sortDir)
+{
+    string query = String.Format("{0}{1}", strMainQuery, GenerateWhereClause());
+    DataTable taskData = new DataTable();
+    connString = ""; //the connection string is here
+
+    using (SqlConnection conn = new SqlConnection(connString))
+    {
+        try
+        {
+            SqlCommand cmd = new SqlCommand(query, conn);
+
+            // create data adapter
+            SqlDataAdapter da = new SqlDataAdapter(query, conn);
+            // this will query your database and return the result to your datatable
+
+            DataSet myDataSet = new DataSet();
+            da.Fill(myDataSet);
+
+            DataView myDataView = new DataView();
+            myDataView = myDataSet.Tables[0].DefaultView;
+
+            if (sortExp != string.Empty)
+            {
+                myDataView.Sort = string.Format("{0} {1}", sortExp, sortDir);
+            }
+
+            yourTasksGV.DataSource = myDataView;
+            yourTasksGV.DataBind();
+
+            conn.Close();
+        }
+        catch (Exception ex)
+        {
+            string error = ex.Message;
+        }
+    }
+}
+</code></pre>

@@ -1,0 +1,68 @@
+<p>You can accomplish this by using the ScriptManager.SetFocus in the Page_PreRender. The ScriptManager in this case is located in MasterPage.</p>
+
+<pre><code>Private Sub Page_PreRender(sender As Object, e As System.EventArgs) Handles Me.PreRender
+
+    If HiddenFieldPostBackControl.Value &lt;&gt; "" Then
+        Dim PostBackControl As Control = FindControlById(HiddenFieldPostBackControl.Value)
+        If PostBackControl IsNot Nothing Then
+            Dim sm As ScriptManager = ScriptManager.GetCurrent(Master.Page)
+            sm.SetFocus(PostBackControl )
+        End If
+    End If
+
+End Sub
+</code></pre>
+
+<p>Note: If you are working with dynamic controls (which have to be recreated on every postback), you will have to remove the (OnFocus of OnFocusIn) event for the target control while adding the event to the other controls. This has to be done before the Page_PreRender.</p>
+
+<pre><code>function ControlOnFocus(ctrl, request, doc, min, max, docSec) {
+        if (ctrl != "") {
+            var hf = document.getElementById("MainContent_HiddenFieldPostControl").value = ctrl.id;
+            var c = document.getElementById(ctrl.id);
+            PostControl = ctrl;
+
+            //ONFOCUS
+            if (request.toLowerCase() == 'server') {
+                //SERVER Handler
+                __doPostBack(ctrl.id, "onfocus");
+            } else {
+                //CLIENT Handler
+                //Your code here...
+            }
+
+            ReAssignEvent(ctrl.id);
+
+            var hf = document.getElementById("MainContent_hfValidated");
+            hf.innerText = "";
+        };
+    };
+ function ReAssignEvent(ControlID) {
+        //loop through an array with (id,onfocus event) for each control
+        //this array is only required for the focus event
+
+        for (var i = 0; i &lt; FocusArray.length; i++) {
+
+            var carr = FocusArray[i].split("[1]"); //split the element to get id and event
+            var carrId = carr[0]; //get the id
+            var c = document.getElementById(carrId); //find control and assign control to var
+            var e = carr[1]; //assing event as string to var
+
+            if (c != null) {
+                if (ControlID!= carrId) {
+                    if (c.type == "text" || c.type == "select-one") {
+                        c.setAttribute("onfocus", e);
+                    } else {
+                        c.setAttribute("onfocusin", e);
+                    }
+                } else {
+                    if (c.type == "text" || c.type == "select-one") {
+                        c.removeAttribute("onfocus");
+                    } else {
+                        c.removeAttribute("onfocusin");
+                    }
+                }
+            }
+
+        }
+ }
+</code></pre>

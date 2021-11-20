@@ -1,0 +1,92 @@
+<p>//1. your code is async
+//2. you need use 1. promise or 2. resolve in your router or 3. $scope.apply() after get response in your controller</p>
+
+<p>//Prime 1 (Promise):</p>
+
+<p>//code in Controller</p>
+
+<pre><code>var vm = this;
+vm.asyncGreet = function () {
+    var deferred = $q.defer();
+
+
+    $http({
+        method: 'post',
+        data: $httpParamSerializerJQLike({
+            //***your-send-data***
+        }),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        url: ''//***your-url***
+    }).
+        success(function (data, status) {
+            deferred.resolve('true');
+        });
+    return deferred.promise;
+};
+
+var promise = vm.asyncGreet();
+promise.then(function (greeting) {
+    //alert('Success: ' + greeting);
+
+    //YOUR CODE AFTER SERVER REQUEST
+    $scope.details = res.data.rating;
+
+}, function (reason) {
+    //alert('Failed: ' + reason);
+}, function (update) {
+    //alert('Got notification: ' + update);
+});
+</code></pre>
+
+<p>//Prime 2 (Resolve in your Route)</p>
+
+<pre><code>(function (angular) {
+    'use strict';
+
+    // route-config.js
+    angular
+        .module('app')
+        .config(config);
+
+    config.$inject = ['$routeProvider'];
+    function config($routeProvider) {
+        console.log('routeConfig');
+        $routeProvider
+            .when('/requests', {
+                templateUrl: '/tpl.html',
+                controller: 'requestController',
+                controllerAs: 'vm',
+                //(Promise) IS REQUEST TO SERVER, AFTER START requestController
+                resolve: {
+                    requestPrepService: requestPrepService
+                }
+            });
+    }
+    requestPrepService.$inject =  ['requestService'];
+    function requestPrepService(requestService) {
+        //This $http response 
+        return requestService.getRequests();
+    }
+
+
+    })(window.angular);
+
+
+//in Controller
+
+
+.$inject = ['requestPrepService'];
+ vm.request = {
+    data: requestPrepService.data,
+ }
+</code></pre>
+
+<p>//<strong>Addition</strong></p>
+
+<pre><code>1. If you use promise do not forget $inject = ['$q']
+2. Please, read https://docs.angularjs.org/api/ng/directive/ngCloak
+ (
+ how use:
+ &lt;div ng-controller="yourController" ng-cloak&gt;&lt;/div&gt;
+ )
+</code></pre>

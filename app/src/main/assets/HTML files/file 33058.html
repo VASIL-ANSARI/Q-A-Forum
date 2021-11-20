@@ -1,0 +1,44 @@
+<p><strong>After discussion SQL-FIDDLE</strong> <a href="http://sqlfiddle.com/#!2/8e5ab/5" rel="nofollow">http://sqlfiddle.com/#!2/8e5ab/5</a></p>
+
+<p>--</p>
+
+<p><strong>SQL-FIDDLE</strong> <a href="http://sqlfiddle.com/#!2/ab988/1" rel="nofollow">http://sqlfiddle.com/#!2/ab988/1</a> </p>
+
+<pre><code>SELECT user_id, SUM(time_difference) as time_spent
+FROM (    
+  SELECT t1.user_id,
+  CASE WHEN t1.user_id = t2.user_id 
+  THEN time_to_sec(t2.time_duration) - time_to_sec(t1.time_duration) ELSE 0 END time_difference
+  FROM T t1 LEFT OUTER JOIN T t2
+  ON t1.id = t2.id - 1
+  JOIN (SELECT @DIS := 0)R)TAB1
+GROUP BY user_id;
+</code></pre>
+
+<p>What does this query do?</p>
+
+<ul>
+<li>The same table is used twice. The calculation result is available in the outer SELECT.</li>
+<li>The inner SELECT (subquery) does the following:
+<ul>
+<li>calc time difference (t2-t1)</li>
+<li>when user_id is the same (user_id = user_id)</li>
+<li>but different row (id-1)</li>
+<li>the result is time_difference</li>
+</ul></li>
+<li>The outer SELECT gets time_difference and SUMs it up</li>
+</ul>
+
+<p>For now, you get time_spent in seconds. 
+If you want your exact result '20:00', you might change the first line to include a time conversion, like so:</p>
+
+<pre><code>SELECT user_id, TIME_FORMAT(SEC_TO_TIME(SUM(time_difference)),'%i') as time_spent
+better
+SELECT user_id, TIME_FORMAT(SEC_TO_TIME(SUM(time_difference)),'%Hh %im') as time_spent
+</code></pre>
+
+<p>To get the time_spent for a user_id, you might add</p>
+
+<p>JOIN (SELECT @DIS := 0)R)TAB1 <code>WHERE user_id = 1</code> </p>
+
+<p><strong>SQL FIDDLE with time conversion and WHERE user_id</strong> <a href="http://sqlfiddle.com/#!2/ab988/9" rel="nofollow">http://sqlfiddle.com/#!2/ab988/9</a></p>

@@ -1,0 +1,52 @@
+<p>The maven-surefire-report-plugin however explicity states, that it invokes the <code>test</code> goal of the default lifecycle. The pitest plugin doesn't. So yes, you have to add the pitest-maven plugin to the build section and bind it to a lifecycle phase, i.e. <code>pre-site</code>. I wouldn't recommend the use of the site lifecycle for that purpose as it is not intended for long-running analysis tasks, but that is up to you. </p>
+
+<p>So the build order is:</p>
+
+<ul>
+<li>build lifecycle
+
+<ul>
+<li>build the module (compile phase)</li>
+<li>run the test (test phase)</li>
+<li>run the mutation coverage (i.e. in verify phase)</li>
+</ul></li>
+<li>site lifecycle
+
+<ul>
+<li>pre-site (mutationCoverage);</li>
+<li>generate reports</li>
+<li>publish reports</li>
+<li>...</li>
+</ul></li>
+</ul>
+
+<p>I'd suggest to use a profile so the mutation test is not run on every build and you can activate it when needed (i.e. <code>mvn site-P pit</code>)</p>
+
+<pre><code>&lt;profile&gt;
+  &lt;id&gt;pit&lt;/id&gt;
+  &lt;build&gt;
+    &lt;plugins&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.pitest&lt;/groupId&gt;
+            &lt;artifactId&gt;pitest-maven&lt;/artifactId&gt;
+            &lt;configuration&gt;
+                &lt;targetClasses&gt;
+                    &lt;param&gt;pricingengine.*&lt;/param&gt;
+                &lt;/targetClasses&gt;
+                &lt;targetTests&gt;
+                    &lt;param&gt;pricingengine.*&lt;/param&gt;
+                &lt;/targetTests&gt;
+            &lt;/configuration&gt;
+            &lt;executions&gt;
+                &lt;execution&gt;
+                    &lt;goals&gt;
+                        &lt;goal&gt;mutationCoverage&lt;/goal&gt;
+                    &lt;/goals&gt;
+                    &lt;phase&gt;pre-site&lt;/phase&gt;
+                &lt;/execution&gt;
+            &lt;/executions&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+  &lt;/build&gt;
+&lt;/profile&gt;
+</code></pre>

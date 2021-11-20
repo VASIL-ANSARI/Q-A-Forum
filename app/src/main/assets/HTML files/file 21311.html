@@ -1,0 +1,127 @@
+<p>Without seeing your table structure, etc. it is hard to give an exact answer.  But I can suggest how you could perform this in SQL.  You have some previous questions tagged with sql server so I am guessing that. </p>
+
+<p>You can do this using both an <code>UNPIVOT</code> and a <code>PIVOT</code>:</p>
+
+<pre><code>;with unpiv as
+(
+  select activity, 
+      work, 
+      Location+'_'+col as col, 
+      value
+    from
+    (
+      select activity,
+        work,
+        cast(AssignedTasks as varchar(50)) AssignedTasks,
+        cast(CompletedTasks as varchar(50)) AchievedTasks,
+        Location
+      from yourtable
+    ) src
+    unpivot
+    (
+      value
+      for col in (AssignedTasks, AchievedTasks)
+    ) unpiv
+),
+piv as
+(
+  select Activity,
+    work,
+    London_AssignedTasks, 
+    London_AchievedTasks,
+    Geneva_AssignedTasks, 
+    Geneva_AchievedTasks,
+    row_number() over(partition by activity order by activity, work) rn
+  from unpiv
+  pivot
+  (
+    max(value)
+    for col in (London_AssignedTasks, London_AchievedTasks,
+                Geneva_AssignedTasks, Geneva_AchievedTasks)
+  ) piv
+)
+select case when rn = 1 then activity else '' end activity,
+  work,
+  London_AssignedTasks, 
+  London_AchievedTasks,
+  Geneva_AssignedTasks, 
+  Geneva_AchievedTasks
+from piv
+</code></pre>
+
+<p>See <a href="http://www.sqlfiddle.com/#!3/8e685/32" rel="nofollow">SQL Fiddle with Demo</a>.</p>
+
+<p>The result is:</p>
+
+<pre><code>|   ACTIVITY |   WORK | LONDON_ASSIGNEDTASKS | LONDON_ACHIEVEDTASKS | GENEVA_ASSIGNEDTASKS | GENEVA_ACHIEVEDTASKS |
+-------------------------------------------------------------------------------------------------------------------
+| Activity 1 | Task 1 |                   10 |                    8 |                    1 |                    1 |
+|            | Task 2 |                   15 |                   15 |                  100 |                   25 |
+| Activity 2 | Task 1 |                    5 |                    5 |                    0 |                    0 |
+|            | Task 2 |                    0 |                    0 |                    2 |                    2 |
+| Activity 3 | Task 1 |                   10 |                   10 |                   50 |                   40 |
+</code></pre>
+
+<p>Edit #1, If you have an unknown or dynamic number of <code>Locations</code> then you can use dynamic SQL to return the result:</p>
+
+<pre><code>DECLARE @cols AS NVARCHAR(MAX),
+    @query  AS NVARCHAR(MAX)
+
+select @cols = STUFF((SELECT ',' + QUOTENAME(Location+'_'+t.tasks) 
+                    from yourtable
+                    cross apply
+                    (
+                      select 'AssignedTasks' tasks
+                      union all
+                      select 'AchievedTasks'
+                    ) t
+                    group by location, tasks
+                    order by location
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)') 
+        ,1,1,'')
+
+set @query = ';with unpiv as
+              (
+                select activity, 
+                    work, 
+                    Location+''_''+col as col, 
+                    value
+                  from
+                  (
+                    select activity,
+                      work,
+                      cast(AssignedTasks as varchar(50)) AssignedTasks,
+                      cast(CompletedTasks as varchar(50)) AchievedTasks,
+                      Location
+                    from yourtable
+                  ) src
+                  unpivot
+                  (
+                    value
+                    for col in (AssignedTasks, AchievedTasks)
+                  ) unpiv
+              ),
+              piv as
+              (
+                select Activity,
+                  work,
+                  row_number() over(partition by activity order by activity, work) rn,
+                  '+@cols+'
+                from unpiv
+                pivot
+                (
+                  max(value)
+                  for col in ('+@cols+')
+                ) piv
+              )
+              select case when rn = 1 then activity else '''' end activity,
+                work,
+                '+@cols+'
+              from piv'
+
+
+execute(@query)
+</code></pre>
+
+<p>See <a href="http://www.sqlfiddle.com/#!3/8e685/46" rel="nofollow">SQL Fiddle with Demo</a></p>

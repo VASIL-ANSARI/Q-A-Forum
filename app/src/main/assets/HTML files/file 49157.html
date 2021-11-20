@@ -1,0 +1,55 @@
+<p>One way to include directories in your rule is to exclude everything else. </p>
+
+<p>Assuming that <em>everything else</em> has a file extension (e.g. <code>.php</code>, <code>.css</code>. <code>.js</code>, etc.) you can negate all input that has the <code>.</code> in the path. </p>
+
+<p>I changed your code a bit to make a working demo locally (I don't have HTTPS locally to test so instead of redirecting to HTTP I set it to redirect to <code>About.aspx</code>) and the two rules are:</p>
+
+<pre><code>&lt;rule name="HTTPS" enabled="true" stopProcessing="true"&gt;
+    &lt;match url=".*\.(asp)$" ignoreCase="false" /&gt;
+    &lt;action type="Redirect" url="/About.aspx" appendQueryString="true" redirectType="Permanent" /&gt;
+&lt;/rule&gt;
+&lt;rule name="NEWRULE" enabled="true" stopProcessing="true"&gt;
+    &lt;match url="(.*)" /&gt;
+    &lt;conditions&gt;
+        &lt;add input="{REQUEST_URI}" negate="true" pattern=".*\.(.)$" ignoreCase="true" /&gt;
+        &lt;add input="{REQUEST_URI}" negate="true" pattern="^/About*" ignoreCase="true" /&gt;
+    &lt;/conditions&gt;
+    &lt;action type="Redirect" url="/About.aspx" appendQueryString="true" redirectType="Permanent" /&gt;
+&lt;/rule&gt; 
+</code></pre>
+
+<p>So, based on your original code sample, a new rule that will work for you would be similar to this:</p>
+
+<pre><code>&lt;rule name="IncludeDirectories" enabled="true" stopProcessing="true"&gt;
+    &lt;match url="(.*)" /&gt;
+    &lt;conditions&gt;
+        &lt;add input="{REQUEST_URI}" negate="true" pattern=".*\.(.)$" ignoreCase="true" /&gt;
+        &lt;add input="{HTTPS}" pattern="on" /&gt;
+        &lt;add input="{REQUEST_URI}" negate="true" pattern="^/ecards/user*" ignoreCase="true" /&gt;
+    &lt;/conditions&gt;
+    &lt;action type="Redirect" url="http://{HTTP_HOST}/{R:1}" appendQueryString="true" redirectType="Permanent" /&gt;
+&lt;/rule&gt;  
+</code></pre>
+
+<p><strong>Note</strong>: The above approach is rather aggressive. You could replace this condition:</p>
+
+<pre><code>&lt;add input="{REQUEST_URI}" negate="true" pattern=".*\.(.)$" ignoreCase="true" /&gt;
+</code></pre>
+
+<p>with the following:</p>
+
+<pre><code>&lt;add input="{REQUEST_URI}" negate="true" pattern=".*\.(php|css|js|jpg|gif|png)$" ignoreCase="true" /&gt;
+</code></pre>
+
+<p>Where you exclude specific extensions. You add as many as you want. </p>
+
+<p><strong>Edit</strong>: If you want to have specific pages still with HTTPS maybe the following rule will be helpful (haven't tested it though). The previous rule sends to HTTP all URLs except those that have <code>/ecards/user</code> where this one sends to HTTPS those that have <code>/ecards/user</code>. I believe there will be no conflict. </p>
+
+<pre><code>&lt;rule name="HTTPS2Admins" enabled="true" stopProcessing="true"&gt;
+    &lt;match url="/ecards/user(.*)" /&gt;
+    &lt;conditions&gt;
+        &lt;add input="{HTTP}" pattern="on" /&gt;
+    &lt;/conditions&gt;
+    &lt;action type="Redirect" url="https://{HTTP_HOST}/ecards/user{R:1}" appendQueryString="true" redirectType="Permanent" /&gt;
+&lt;/rule&gt;
+</code></pre>

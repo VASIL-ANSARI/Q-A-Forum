@@ -1,0 +1,146 @@
+<p>Whenever faced with a complex XML, consider an XSLT script to transform your XML into a simpler structure. As information, <a href="https://www.w3.org/TR/xslt" rel="nofollow">XSLT</a> is a special-purpose, declarative language (same type as SQL) designed to transform XML into various structures for end use needs. Python like other general purpose languages maintains an XSLT processor, specifically in its <a href="http://lxml.de/" rel="nofollow">lxml</a> module. </p>
+
+<p>While this transformation does not address your entire needs, you can parse the simpler structure for your Nuke application needs. Directories and names are simplified and labeled for daynumber, rollnumber, shotnames, and clip with pathurls.</p>
+
+<p><strong>XSLT</strong> script <em>(save as .xsl or .xslt to be referenced in .py script below)</em></p>
+
+<pre><code>&lt;xsl:transform xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"&gt;
+&lt;xsl:output version="1.0" encoding="UTF-8" indent="yes" /&gt;
+&lt;xsl:strip-space elements="*"/&gt;
+
+&lt;xsl:key name="idkey" match="ctype" use="@id" /&gt;
+
+  &lt;xsl:template match="/"&gt;
+    &lt;root&gt;
+      &lt;xsl:apply-templates select="*"/&gt;
+    &lt;/root&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="xmeml/bin"&gt;
+    &lt;daynumber&gt;&lt;xsl:value-of select="name"/&gt;&lt;/daynumber&gt;
+    &lt;xsl:apply-templates select="children/bin"/&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="xmeml/bin/children/bin"&gt;
+    &lt;roll&gt;
+      &lt;rollnumber&gt;&lt;xsl:value-of select="name"/&gt;&lt;/rollnumber&gt;
+      &lt;rollnumberdir&gt;&lt;xsl:value-of select="concat(ancestor::bin/name, 
+                                                  '/', name)"/&gt;&lt;/rollnumberdir&gt;
+      &lt;xsl:apply-templates select="children/bin"/&gt;
+    &lt;/roll&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="xmeml/bin/children/bin/children/bin"&gt;
+    &lt;shot&gt;
+      &lt;shotname&gt;&lt;xsl:value-of select="name"/&gt;&lt;/shotname&gt;
+      &lt;shotnamedir&gt;&lt;xsl:value-of select="concat(/xmeml/bin/name, '/', 
+                               /xmeml/bin/children/bin/name, '/', name)"/&gt;&lt;/shotnamedir&gt;
+      &lt;xsl:apply-templates select="descendant::clip[position() &amp;lt; 4]"/&gt;
+    &lt;/shot&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="clip"&gt;
+    &lt;clip&gt;
+      &lt;clipname&gt;&lt;xsl:value-of select="descendant::name"/&gt;&lt;/clipname&gt;
+      &lt;xsl:copy-of select="in"/&gt;
+      &lt;pathurl&gt;&lt;xsl:value-of select="descendant::pathurl"/&gt;&lt;/pathurl&gt;
+    &lt;/clip&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:transform&gt;
+</code></pre>
+
+<p><strong>Python</strong> script  <em>(transform, parse, and export simpler structure)</em></p>
+
+<pre><code>#!/usr/bin/python
+import lxml.etree as ET
+
+# LOAD INPUT XML AND XSLT
+dom = ET.parse('Input.xml'))
+xslt = ET.parse('XSLTScript.xsl')
+
+# TRANSFORM XML (SIMPLER NEWDOM CAN BE FURTHER PARSED: ITER(), FINDALL(), XPATH())
+transform = ET.XSLT(xslt)
+newdom = transform(dom)
+
+# XPATH EXPRESSIONS (LIST OUTPUTS)
+daynumber = newdom.xpath('//daynumber/text()')
+# ['Day_00']
+rolls = newdom.xpath('//rollnumber/text()')
+# ['R001', 'R002']
+shots = newdom.xpath('//shotname/text()')
+# ['R001_C001', 'R002_C001', 'R002_C002']
+
+# CONVERT TO STRING (IF NEEDED)
+tree_out = ET.tostring(newdom, encoding='UTF-8', pretty_print=True,  xml_declaration=True)
+print(tree_out.decode("utf-8"))
+
+# OUTPUT TO FILE (IF NEEDED)
+xmlfile = open('Output.xml'),'wb')
+xmlfile.write(tree_out)
+xmlfile.close()
+</code></pre>
+
+<p><strong>TRANSFORMED XML</strong> <em>(contained in newdom object in .py script)</em></p>
+
+<pre><code>&lt;?xml version='1.0' encoding='UTF-8'?&gt;
+&lt;root&gt;
+  &lt;daynumber&gt;Day_00&lt;/daynumber&gt;
+  &lt;roll&gt;
+    &lt;rollnumber&gt;R001&lt;/rollnumber&gt;
+    &lt;rollnumberdir&gt;Day_00/R001&lt;/rollnumberdir&gt;
+    &lt;shot&gt;
+      &lt;shotname&gt;R001_C001&lt;/shotname&gt;
+      &lt;shotnamedir&gt;Day_00/R001/R001_C001&lt;/shotnamedir&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;A002_C001_0216MW_001.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R001/A002/A002_0216FE.RDM/A002_C001_0216MW.RDC/A002_C001_0216MW_001.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;A002_C001_0216MW_002.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R001/A002/A002_0216FE.RDM/A002_C001_0216MW.RDC/A002_C001_0216MW_002.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;A002_C001_0216MW_003.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R001/A002/A002_0216FE.RDM/A002_C001_0216MW.RDC/A002_C001_0216MW_003.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+    &lt;/shot&gt;
+  &lt;/roll&gt;
+  &lt;roll&gt;
+    &lt;rollnumber&gt;R002&lt;/rollnumber&gt;
+    &lt;rollnumberdir&gt;Day_00/R002&lt;/rollnumberdir&gt;
+    &lt;shot&gt;
+      &lt;shotname&gt;R002_C001&lt;/shotname&gt;
+      &lt;shotnamedir&gt;Day_00/R001/R002_C001&lt;/shotnamedir&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;A003_C001_0216XI_001.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/A003/A003_0216XO.RDM/A003_C001_0216XI.RDC/A003_C001_0216XI_001.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;B002_C001_02169H_002.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/B002/B002_0216G4.RDM/B002_C001_02169H.RDC/B002_C001_02169H_002.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;C002_C001_02168R_001.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/C002/C002_0216RL.RDM/C002_C001_02168R.RDC/C002_C001_02168R_001.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+    &lt;/shot&gt;
+    &lt;shot&gt;
+      &lt;shotname&gt;R002_C002&lt;/shotname&gt;
+      &lt;shotnamedir&gt;Day_00/R001/R002_C002&lt;/shotnamedir&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;C002_C002_0216M9_001.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/C002/C002_0216RL.RDM/C002_C002_0216M9.RDC/C002_C002_0216M9_001.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;C002_C002_0216M9_002.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/C002/C002_0216RL.RDM/C002_C002_0216M9.RDC/C002_C002_0216M9_002.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+      &lt;clip&gt;
+        &lt;clipname&gt;C002_C002_0216M9_003.R3D&lt;/clipname&gt;
+        &lt;pathurl&gt;file://localhost/Volumes/REDLAB_3A/SESQUI/MASTER_FILES/DAY_00/RED/R002/C002/C002_0216RL.RDM/C002_C002_0216M9.RDC/C002_C002_0216M9_003.R3D&lt;/pathurl&gt;
+      &lt;/clip&gt;
+    &lt;/shot&gt;
+  &lt;/roll&gt;
+&lt;/root&gt;
+</code></pre>

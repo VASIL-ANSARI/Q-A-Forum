@@ -1,0 +1,48 @@
+<p>A <code>UIBezierPath</code> is composed by path <code>Elements</code> where the first is <code>moveToPoint</code> that , as explained in the <a href="https://developer.apple.com/reference/uikit/uibezierpath" rel="nofollow">official document</a>, <strong><em>starts a new subpath at a specified location in a mutable graphics path</em></strong>.</p>
+
+<p>So, unfortunately is not enough doing:</p>
+
+<pre><code>UIBezierPath *circlePathReversed = [circlePath bezierPathByReversingPath];
+</code></pre>
+
+<p>because when you stop your circle from following the path, the actual position of the circle is not the same of the <code>moveToPoint</code> point (coordinates x and y).</p>
+
+<p>However you could rebuild your path retrieving all elements and re-starting from the actual circle position.</p>
+
+<pre><code>void MyCGPathApplierFunc (void *info, const CGPathElement *element) {
+    NSMutableArray *bezierPoints = (__bridge NSMutableArray *)info;
+
+    CGPoint *points = element-&gt;points;
+    CGPathElementType type = element-&gt;type;
+
+    switch(type) {
+        case kCGPathElementMoveToPoint: // contains 1 point
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[0]]];
+            break;
+
+        case kCGPathElementAddLineToPoint: // contains 1 point
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[0]]];
+            break;
+
+        case kCGPathElementAddQuadCurveToPoint: // contains 2 points
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[0]]];
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[1]]];
+            break;
+
+        case kCGPathElementAddCurveToPoint: // contains 3 points
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[0]]];
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[1]]];
+            [bezierPoints addObject:[NSValue valueWithCGPoint:points[2]]];
+            break;
+
+        case kCGPathElementCloseSubpath: // contains no point
+            break;
+    }
+}
+</code></pre>
+
+<p><strong>Usage</strong>:</p>
+
+<pre><code>NSMutableArray *bezierPoints = [NSMutableArray array];
+CGPathApply(circlePath.CGPath, bezierPoints, MyCGPathApplierFunc);
+</code></pre>

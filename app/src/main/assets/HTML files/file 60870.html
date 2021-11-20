@@ -1,0 +1,75 @@
+<p>I will present a way to achievie such functionality for a <code>View</code> extending <code>BottomSheetDialogFragment</code>.</p>
+
+<p><strong>Expanding:</strong></p>
+
+<p>First of all overrive <code>onResume</code>:</p>
+
+<pre><code>@Override
+public void onResume() {
+    super.onResume();
+    addGlobaLayoutListener(getView());
+}
+
+private void addGlobaLayoutListener(final View view) {
+    view.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+        @Override
+        public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+            setPeekHeight(v.getMeasuredHeight());
+            v.removeOnLayoutChangeListener(this);
+        }
+    });
+}
+
+public void setPeekHeight(int peekHeight) {
+    BottomSheetBehavior behavior = getBottomSheetBehaviour();
+    if (behavior == null) {
+        return;
+    }
+    behavior.setPeekHeight(peekHeight);
+}
+</code></pre>
+
+<p>What the code above is supposed to do is just setting the <code>BottomSheet</code> <code>peekHeight</code> to the heigth of the view. The key here is the function <code>getBottomSheetBehaviour()</code>. The implementation is below:</p>
+
+<pre><code>private BottomSheetBehavior getBottomSheetBehaviour() {
+    CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams) ((View) getView().getParent()).getLayoutParams();
+    CoordinatorLayout.Behavior behavior = layoutParams.getBehavior();
+    if (behavior != null &amp;&amp; behavior instanceof BottomSheetBehavior) {
+        ((BottomSheetBehavior) behavior).setBottomSheetCallback(mBottomSheetBehaviorCallback);
+        return (BottomSheetBehavior) behavior;
+    }
+    return null;
+}
+</code></pre>
+
+<p>This just check if the parent of <code>View</code> has 'CoordinatorLayout.LayoutParams' set. If yes, sets appropriate <a href="https://developer.android.com/reference/android/support/design/widget/BottomSheetBehavior.BottomSheetCallback.html" rel="nofollow"><code>BottomSheetBehavior.BottomSheetCallback</code></a> (which is needed in the next part), and more importantly returns the <code>CoordinatorLayout.Behavior</code>, which is supposed to be <code>BottomSheetBehavior</code>.</p>
+
+<p><strong>Collapsing:</strong></p>
+
+<p>Here a [`BottomSheetBehavior.BottomSheetCallback.onSlide (View bottomSheet, float slideOffset)``](<a href="https://developer.android.com/reference/android/support/design/widget/BottomSheetBehavior.BottomSheetCallback.html#onSlide(android.view.View" rel="nofollow">https://developer.android.com/reference/android/support/design/widget/BottomSheetBehavior.BottomSheetCallback.html#onSlide(android.view.View</a>, float)) is just exactly what is needed. From the [documentation](<a href="https://developer.android.com/reference/android/support/design/widget/BottomSheetBehavior.BottomSheetCallback.html#onSlide(android.view.View" rel="nofollow">https://developer.android.com/reference/android/support/design/widget/BottomSheetBehavior.BottomSheetCallback.html#onSlide(android.view.View</a>, float)):</p>
+
+<blockquote>
+  <p>Offset increases as this bottom sheet is moving upward. From 0 to 1 the sheet is between collapsed and expanded states and from -1 to 0 it is between hidden and collapsed states.</p>
+</blockquote>
+
+<p>This means, that just checking the second parameter is needed for collapse detection:</p>
+
+<p>define <code>BottomSheetBehavior.BottomSheetCallback</code> in the same class:</p>
+
+<pre><code>private BottomSheetBehavior.BottomSheetCallback mBottomSheetBehaviorCallback = new BottomSheetBehavior.BottomSheetCallback() {
+
+    @Override
+    public void onStateChanged(@NonNull View bottomSheet, int newState) {
+        if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+            dismiss();
+        }
+    }
+
+    @Override
+    public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+        if (slideOffset &lt; 0) {
+            dismiss();
+        }
+    }
+};
+</code></pre>

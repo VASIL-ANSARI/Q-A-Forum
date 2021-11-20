@@ -1,0 +1,64 @@
+<pre><code>create schema test8484a;
+use test8484a;
+
+create table sometable
+(   id int auto_increment primary key,
+    user_email varchar(255) not null COLLATE utf8_unicode_ci NOT NULL,
+    key `keyname8282`(user_email)
+)engine=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+CREATE TABLE `example` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `url_slug` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+  `user_email` varchar(255) COLLATE utf8_unicode_ci NOT NULL,  
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `example_configs_url_slug_unique` (`url_slug`),
+  CONSTRAINT `example_configs_user_email_foreign` 
+      FOREIGN KEY (`user_email`) 
+      REFERENCES sometable(`user_email`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+show create table example;
+CREATE TABLE `example` (
+   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+   `url_slug` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+   `user_email` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+   PRIMARY KEY (`id`),
+   UNIQUE KEY `example_configs_url_slug_unique` (`url_slug`),
+   KEY `example_configs_user_email_foreign` (`user_email`), -- created on your behalf
+   CONSTRAINT `example_configs_user_email_foreign` FOREIGN KEY (`user_email`) REFERENCES `sometable` (`user_email`)
+ ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- find the FK name above in case some name mangling occurred
+
+alter table example drop foreign key example_configs_user_email_foreign;
+show create table example;
+CREATE TABLE `example` (
+   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+   `url_slug` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+   `user_email` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+   PRIMARY KEY (`id`),
+   UNIQUE KEY `example_configs_url_slug_unique` (`url_slug`),
+   KEY `example_configs_user_email_foreign` (`user_email`) -- residue remains ***********
+ ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci
+
+-- cleanup:
+drop schema test8484a;
+</code></pre>
+
+<p>Use <code>show create table theTableName</code> to inspect the names and the indexes that remain. Note the residue Helper index that remains after the "drop FK".</p>
+
+<p>Upon creation of the FK initially, the Helper index in the child table is created. After the drop FK that index is still there.</p>
+
+<p>From the manual page entitled <a href="https://dev.mysql.com/doc/refman/5.7/en/create-table-foreign-keys.html" rel="nofollow">Using FOREIGN KEY Constraints</a>:</p>
+
+<blockquote>
+  <p>MySQL requires indexes on foreign keys and referenced keys so that
+  foreign key checks can be fast and not require a table scan. In the
+  referencing table, there must be an index where the foreign key
+  columns are listed as the first columns in the same order. Such an
+  index <strong>is created on the referencing table automatically if it does not
+  exist.</strong> This index might be silently dropped later, if you create
+  another index that can be used to enforce the foreign key constraint.
+  index_name, if given, is used as described previously.</p>
+</blockquote>

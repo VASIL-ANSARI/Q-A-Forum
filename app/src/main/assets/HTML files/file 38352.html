@@ -1,0 +1,38 @@
+<blockquote>
+  <p>So I can imagine that Linq is calling GetEnumerator() many times</p>
+</blockquote>
+
+<p>No, that's not the case. The problem is in your implementation of <code>IEnumerable</code>, notably here:</p>
+
+<pre><code>public IEnumerator&lt;Person&gt; GetEnumerator()
+{
+    return GetEnumerator();
+}
+</code></pre>
+
+<p>That method is recursive. You're probably <em>expecting</em> it to call the explicit interface implementation, but it's not - it's just recursing.</p>
+
+<p>Typically, you make the explicit interface implementation call the public method:</p>
+
+<pre><code>System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+{
+    // Call the public method. The body of this method wasn't even valid before,
+    // as it was calling `people.GetEnumerator() but not returning anything.
+    return GetEnumerator();
+}
+
+public IEnumerator&lt;Person&gt; GetEnumerator()
+{
+    return people.GetEnumerator();
+}
+</code></pre>
+
+<p>Basically, you'd have seen the same effect if you'd just used a normal <code>foreach</code> loop:</p>
+
+<pre><code>foreach (var person in people)
+{
+    // You'd never get this far
+}
+</code></pre>
+
+<p>It has nothing to do with LINQ.</p>

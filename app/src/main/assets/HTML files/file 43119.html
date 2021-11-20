@@ -1,0 +1,30 @@
+<p>Yes, you can reuse the childContext instance in the completion block nested within the performBlock block. It will be retained by the block until the block is deallocated.  </p>
+
+<p>However you would likely need to use a further nested block because you'd have to again use <code>performBlock</code> to dispatch the MOC work to the correct queue for childContext because the success block could be dispatched to a different queue. That indicates you may want to nest the childContext performBlock invocation within the success completion block, the opposite nesting from what you've illustrated.  But if there's MOC work you plan to do both before <em>and</em> after that POST function, you'll end up with another nested block.  It really depends on what real code you wrap around the psuedocode here.</p>
+
+<p>The options I'm discussing, illustrated.</p>
+
+<pre><code>childContext.parentContext = self.managedObjectContext;
+[childContext performBlock:^{
+    ... update a NSManagedObject...
+    [RequestOperationManager POST... parameters... success...{
+        [childContext performBlock:^{
+            ... update a NSManagedObject...
+            ... (and maybe save)
+        }];
+    }];
+}];
+</code></pre>
+
+<p>versus</p>
+
+<pre><code>childContext.parentContext = self.managedObjectContext;
+[RequestOperationManager POST... parameters... success...{         
+    [childContext performBlock:^{
+        ... update a NSManagedObject...
+        ... (and maybe save)
+    }];
+}];
+</code></pre>
+
+<p>You can use the latter if you're not mutating anything in the childContext before calling that POST method with the success completion block.</p>

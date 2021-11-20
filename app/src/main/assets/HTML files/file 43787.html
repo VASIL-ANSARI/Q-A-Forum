@@ -1,0 +1,139 @@
+<p>After tried a lot of possible way, what is the problem. I found, the solution. I forget to delete command of the first initial box_size. So here the solution</p>
+
+<pre><code>    #include &lt;iostream&gt;
+#include &lt;fstream&gt;
+#include &lt;regex&gt;
+#include &lt;string&gt;
+
+using namespace std;
+
+int main()
+{
+    int global_memory = 700;
+    // set input file stream
+    ifstream fileLammpsTrajectory;
+    // initialy find the size of frames
+    // set string line
+    string line;
+    // open file
+    fileLammpsTrajectory.open("innickel81.lammpstrj");
+    // check if the file is good or close
+    if(!fileLammpsTrajectory.good()) return 1;
+
+    // initiate memory
+    int memory = global_memory;
+    // read increment
+    int increment = 0;
+    bool information = false;
+    // initiate total timestep
+    int timestep = 0;
+    // initiate atoms
+    int* atoms = new int[memory];
+    bool c_atoms = false;
+    int i_atoms = 0;
+    // initiate simulation box
+    int memory_box = global_memory;
+    string* box_bounds = new string[memory_box];
+    bool c_box = false;
+    int i_box = 0;
+    // initiate simulation box size
+    int memory_col = global_memory;
+    int memory_row = global_memory;
+    int i_row = 0;
+    int i_col = 0;
+    bool c_box_properties = false;
+    string** box_size = new string*[memory_row];
+    for(int i = 0; i &lt; memory_row; i++) box_size[i] = new string[memory_col];
+//    for(int i = 0; i &lt; memory_row; i++) delete [] box_size[i];
+//    delete [] box_size;
+//    vector&lt; vector&lt;string&gt; &gt; box_size;
+    while(!fileLammpsTrajectory.eof())
+    {
+        getline(fileLammpsTrajectory,line);
+        increment++;
+
+        string::size_type ITEM = line.find("ITEM");
+        information = ITEM != string::npos ? true : false;
+
+        if(information)
+        {
+            // find how many timestep
+            if(line == "ITEM: TIMESTEP") timestep++;
+            // determine is compute atoms?
+            string::size_type NUMBER = line.find("NUMBER");
+            c_atoms = NUMBER != string::npos ? true : false;
+            // determine is compute simulation box?
+            string::size_type BOX = line.find("BOUNDS");
+            c_box = BOX != string::npos ? true : false;
+        }
+
+        // reset i_col to make sure array dimension
+        i_col = c_box ? i_col : 0;
+        if(c_box &amp;&amp; information)
+        {
+            if(i_box &gt;= memory_box)
+            {
+                memory_box = memory_box * 2;
+                string* temp_box_bounds = new string[memory_box];
+                for(int i = 0; i &lt; i_box; i++) temp_box_bounds[i] = box_bounds[i];
+                delete [] box_bounds;
+                box_bounds = temp_box_bounds;
+            }
+            box_bounds[i_box] = line.substr(6);
+            i_box++;
+            i_row = i_box - 1;
+        }
+
+        // determine is to compute simulation box
+        c_box_properties = c_box &amp;&amp; !information ? true : false;
+        if(c_box_properties)
+        {
+            if(i_row &gt;= memory_row || i_col &gt;= memory_col)
+            {
+                break;
+                memory_row = i_row &gt;= memory_row ? memory_row * 2 : memory_row;
+                memory_col = i_col &gt;= memory_col ? memory_col * 2 : memory_col;
+                string** temp_box_size = new string*[memory_row];
+                for(int i = 0; i &lt; memory_row; i++) temp_box_size[i] = new string[memory_col];
+                // copy
+                for(int i = 0; i &lt; i_row; i++)
+                {
+                    if(i_col &lt; 1)
+                    {
+                        temp_box_size[i][0] = box_size[i][0];
+                    }else{
+                        for(int j = 0; j &lt; i_col; j++)
+                        {
+                            temp_box_size[i][j] = box_size[i][j];
+                        }
+                    }
+                    delete [] box_size[i];
+                }
+                delete [] box_size;
+                box_size = temp_box_size;
+            }
+            box_size[i_row][i_col] = line;
+            i_col++;
+        }
+
+        if(!information &amp;&amp; c_atoms)
+        {
+            if(i_atoms &gt;= memory)
+            {
+                memory = memory * 2;
+                int* temp_atoms = new int[memory];
+                for(int i = 0; i &lt; i_atoms; i++) temp_atoms[i] = atoms[i];
+                delete [] atoms;
+                atoms = temp_atoms;
+            }
+            atoms[i_atoms] = atoi(line.c_str());
+            i_atoms++;
+        }
+    }
+
+    // net timestep
+    timestep--;
+    fileLammpsTrajectory.close();
+    return 0;
+}
+</code></pre>

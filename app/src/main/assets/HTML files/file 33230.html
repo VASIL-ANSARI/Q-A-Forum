@@ -1,0 +1,59 @@
+<p>if I had to venture a guess:  notice the rough structure of your code is:</p>
+
+<pre><code>def getBusinesses():
+    businessesQuery = ("SELECT * FROM business")
+    businessRows = cursor.fetchall()
+
+    businessObjects = []
+    for businessRow in businessRows:
+        menuQuery = ("SELECT * FROM menu WHERE business_id = %s" % businessRow[0])
+        menuRows = cursor.fetchall()
+
+
+        for menuIdx, menuRow in enumerate(menuRows):
+            sectionQuery = ("SELECT * FROM menu_section WHERE menu_id = %s" % menuRow[0])
+            cursor.execute(sectionQuery)
+            sectionRows = cursor.fetchall()
+
+            sectionObjects = []
+            for sectionIdx, sectionRow in enumerate(sectionRows):
+                itemQuery = ("SELECT * FROM menu_item WHERE section_id = %s" % sectionRow[0])
+                itemRows = cursor.fetchall()
+</code></pre>
+
+<p>That is, you execute nearly identical queries in a loop for <code>menu</code>, <code>menu_section</code> and especially <code>menu_item</code>.  Also, you're using <code>fetchall()</code> to return the full contents of the result set but examine each element only once, in a loop, where you create <em>another</em> list of objects.</p>
+
+<p>what you might want instead is something more like:</p>
+
+<pre><code>businesses = []
+cursor.execute("select * from business")
+row = cursor.fetchone()
+while row is not None:
+    business.append(...(row))
+    row = cursor.fetchone()
+
+cursor.execute("select * from menu")
+row = cursor.fetchone()
+while row is not None:
+    business[row['business_id']].menus.append(...(row))
+    row = cursor.fetchone()
+
+cursor.execute("select menu.business_id, menu_section.*"
+               " from menu_section"
+               " join menu on menu.id = menu_section.menu_id")
+row = cursor.fetchone()
+while row is not None:
+    business[row['business_id']][row['menu_id']].sections.append(...(row))
+    row = cursor.fetchone()
+
+cursor.execute("select menu.business_id, menu_section.menu_id, menu_item.*"
+               " from menu_item"
+               " join menu_section on menu_section.id = menu_item.section_id"
+               " join menu on menu.id = menu_section.menu_id")
+row = cursor.fetchone()
+while row is not None:        
+    business[row['business_id']][row['menu_id']][row['section_id'].items.append(...(row))
+    row = cursor.fetchone()
+</code></pre>
+
+<p>so that you're issuing a much smaller number of queries, and only loading the amount of data you can process in one go.</p>

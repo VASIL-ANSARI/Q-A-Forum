@@ -1,0 +1,64 @@
+<p>Start off with the Identity Transform....</p>
+
+<pre><code>&lt;xsl:template match="@*|node()"&gt;
+    &lt;xsl:copy&gt;
+        &lt;xsl:apply-templates select="@*|node()"/&gt;
+    &lt;/xsl:copy&gt;
+&lt;/xsl:template&gt;
+</code></pre>
+
+<p>For the rule "<em>If any complex element contains only text then corresponding element attributes translate into element to parent level</em>", you could use the following template (I am ignoring comments and processing-instuctions here, and just checking the element has no child element)</p>
+
+<pre><code>&lt;xsl:template match="*[not(*)][@*]"&gt;
+    &lt;xsl:copy&gt;
+        &lt;xsl:apply-templates select="node()"/&gt;
+    &lt;/xsl:copy&gt;
+    &lt;xsl:apply-templates select="@*" mode="toelement"/&gt;
+&lt;/xsl:template&gt;
+</code></pre>
+
+<p>The template with mode "toelement" will turn the attribute to an element. (It will be re-used by the other rule).</p>
+
+<pre><code>    &lt;xsl:template match="@*" mode="toelement"&gt;
+        &lt;xsl:element name="{local-name()}"&gt;
+            &lt;xsl:value-of select="." /&gt;
+        &lt;/xsl:element&gt;
+    &lt;/xsl:template&gt;
+</code></pre>
+
+<p>For the rule "<em>If any complex element contains children then corresponding element attributes translate into element to same element level.</em>" then you could actually match on the attribute directly:</p>
+
+<pre><code>&lt;xsl:template match="*[*]/@*"&gt;
+    &lt;xsl:apply-templates select="." mode="toelement"/&gt;
+&lt;/xsl:template&gt;
+</code></pre>
+
+<p>Try this XSLT:</p>
+
+<pre><code>&lt;xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"&gt;
+    &lt;xsl:output method="xml" indent="yes" /&gt;
+
+    &lt;xsl:template match="*[*]/@*"&gt;
+        &lt;xsl:apply-templates select="." mode="toelement"/&gt;
+    &lt;/xsl:template&gt;
+
+    &lt;xsl:template match="*[not(*)][@*]"&gt;
+        &lt;xsl:copy&gt;
+            &lt;xsl:apply-templates select="node()"/&gt;
+        &lt;/xsl:copy&gt;
+        &lt;xsl:apply-templates select="@*" mode="toelement"/&gt;
+    &lt;/xsl:template&gt;
+
+    &lt;xsl:template match="@*" mode="toelement"&gt;
+        &lt;xsl:element name="{local-name()}"&gt;
+            &lt;xsl:value-of select="." /&gt;
+        &lt;/xsl:element&gt;
+    &lt;/xsl:template&gt;
+
+    &lt;xsl:template match="@*|node()"&gt;
+        &lt;xsl:copy&gt;
+            &lt;xsl:apply-templates select="@*|node()"/&gt;
+        &lt;/xsl:copy&gt;
+    &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>

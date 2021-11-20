@@ -1,0 +1,28 @@
+<h2>Background</h2>
+
+<p>As far as I can tell, there is a discrepancy with the interaction between the <code>.ToString()</code> method and the <strong><em>DefaultDisplayProperty</em></strong> of objects returned by <code>Get-ChildItem</code>.</p>
+
+<p>The behavior manifests when both of the following conditions are true:<br>
+   - The <code>-filter</code> parameter is being used.<br>
+   - The value of the <code>-Path</code> parameter resolves to a single directory, whether or not <code>-Recurse</code> is used.</p>
+
+<p>Under the above circumstances, the <code>.ToString()</code> method implemented by PowerShell uses the <em>Name</em> property as default, rather than <em>FullName</em> as is the case in all other scenarios. </p>
+
+<p>My guess is that this inconsistency is due to the underlying object types returned by the FileSystem provider when <code>-Filter</code> is used, rather than the objects PowerShell returns when it handles the search/filter itself (as is the case with <code>-Include</code>).</p>
+
+<h2>Observation</h2>
+
+<p>When you wrap your <code>$_</code> pipeline object variable in double quotes, PowerShell's type-conversion implicitly calls the <code>.ToString()</code> method and you get the resulting name variation.</p>
+
+<h2>Solution</h2>
+
+<p>To correct your issue, you could simply use <code>-Filter</code> in both code examples and get the desired output, however, that is prone to cause problems sooner or later.</p>
+
+<p>The more appropriate way to negate the problem is to properly use a PowerShell <strong><em>sub-expression</em></strong> within the double-quoted strings. </p>
+
+<p>To create a sub-expression, simply wrap the desired code like so: <code>$()</code>. This creates a separation between which characters are code and which are part of the string; in your case allowing you to use the member access operator <code>.</code>. The method also alleviates the need to do string concatenation with the <code>+</code> operator.  </p>
+
+<p><em>Solution Code:</em>   </p>
+
+<pre><code>$HTMLOut = Get-ChildItem -Path $SearchPath -Recurse -Include $FileType | Where-Object {$_.LastWriteTime -ge "01/01/2014"} | Select @{Name="Link";Expression={("&lt;a rel=$($_.FullName) href=file:///$($_.FullName)&gt;$($_.Name)&lt;/a&gt;")}}
+</code></pre>

@@ -1,0 +1,143 @@
+<p>Here's a simple example. I have created a jQM login page, you need to enter you username and password. This data will be used to check if username exist in database, if it exist true is returned back, false in other case.
+I would advise you to create a better db reading logic, this one is a simple solution, prone to SQL injection, but it will work well for your assignment.</p>
+
+<p><strong>index.php :</strong></p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;jQM Complex Demo&lt;/title&gt;
+    &lt;meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0"/&gt;
+    &lt;link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.css" /&gt;
+    &lt;style&gt;
+        #login-button {
+            margin-top: 30px;
+        }        
+    &lt;/style&gt;
+    &lt;script src="http://www.dragan-gaic.info/js/jquery-1.8.2.min.js"&gt;&lt;/script&gt;    
+    &lt;script src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"&gt;&lt;/script&gt;
+    &lt;script src="js/custom.js"&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div data-role="page" id="login"&gt;
+        &lt;div data-theme="a" data-role="header"&gt;
+            &lt;h3&gt;Login Page&lt;/h3&gt;
+        &lt;/div&gt;
+
+        &lt;div data-role="content"&gt;
+            &lt;label for="username"&gt;Enter your username:&lt;/label&gt;
+            &lt;input type="text" value="" name="username" id="username"/&gt;
+            &lt;label for="password"&gt;Enter your password:&lt;/label&gt;
+            &lt;input type="password" value="" name="password" id="password"/&gt;  
+            &lt;a data-role="button" id="login-button" data-theme="b"&gt;Login&lt;/a&gt;
+        &lt;/div&gt;
+
+        &lt;div data-theme="a" data-role="footer" data-position="fixed"&gt;
+
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div data-role="page" id="index"&gt;
+        &lt;div data-theme="a" data-role="header"&gt;
+            &lt;h3&gt;&lt;/h3&gt;
+        &lt;/div&gt;
+
+        &lt;div data-role="content"&gt;
+            Here goes content
+        &lt;/div&gt;
+
+        &lt;div data-theme="a" data-role="footer" data-position="fixed"&gt;
+            &lt;h3&gt;Page footer&lt;/h3&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;    
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p><strong>json.php :</strong></p>
+
+<pre><code>&lt;?php
+    $var1 = $_REQUEST['action']; // We dont need action for this tutorial, but in a complex code you need a way to determine ajax action nature
+    $jsonObject = json_decode($_REQUEST['outputJSON']); // Decode JSON object into readable PHP object
+
+    $username = $jsonObject-&gt;{'username'}; // Get username from object
+    $password = $jsonObject-&gt;{'password'}; // Get password from object
+
+    mysql_connect("localhost","root","");  // Conect to mysql, first parameter is location, second is mysql username and a third one is a mysql password
+    @mysql_select_db("test") or die( "Unable to select database"); // Connect to database called test
+
+    $query = "SELECT * FROM users WHERE user_name = '".$username."' and user_pass = '".$password."'";
+    $result=mysql_query($query);
+    $num = mysql_numrows($result);
+
+    if($num != 0) {
+        echo "true";
+    } else {
+        echo "false";        
+    }
+?&gt;
+</code></pre>
+
+<p><strong>custom.js :</strong> </p>
+
+<pre><code>$(document).on('pagebeforeshow', '#login', function(){ 
+    $('#login-button').on('click', function(){
+        if($('#username').val().length &gt; 0 &amp;&amp; $('#password').val().length &gt; 0){
+            userObject.username = $('#username').val(); // Put username into the object
+            userObject.password = $('#password').val(); // Put password into the object
+            // Convert an userObject to a JSON string representation
+            var outputJSON = JSON.stringify(userObject);
+            // Send data to server through ajax call
+            // action is functionality we want to call and outputJSON is our data
+            ajax.sendRequest({action : 'login', outputJSON : outputJSON});
+        } else {
+            alert('Please fill all nececery fields');
+        }
+    });    
+});
+
+$(document).on('pagebeforeshow', '#index', function(){ 
+    if(userObject.username.length == 0){ // If username is not set (lets say after force page refresh) get us back to the login page
+        $.mobile.changePage( "#login", { transition: "slide"} ); // In case result is true change page to Index  
+    }
+    $(this).find('[data-role="header"] h3').append('Wellcome ' + userObject.username); // Change header with wellcome msg
+    //$("#index").trigger('pagecreate');
+});
+
+// This will be an ajax function set
+var ajax = {
+    sendRequest:function(save_data){
+        $.ajax({url: 'http://localhost/JSONP_Tutorial/json.php',
+            data: save_data,
+            async: true,
+            beforeSend: function() {
+                // This callback function will trigger before data is sent
+                $.mobile.showPageLoadingMsg(true); // This will show ajax spinner
+            },
+            complete: function() {
+                // This callback function will trigger on data sent/received complete
+                $.mobile.hidePageLoadingMsg(); // This will hide ajax spinner
+            },
+            success: function (result) {
+                if(result == "true") {
+                    $.mobile.changePage( "#index", { transition: "slide"} ); // In case result is true change page to Index
+                } else {
+                    alert('Login unsuccessful, please try again!'); // In case result is false throw an error
+                }
+                // This callback function will trigger on successful action
+            },
+            error: function (request,error) {
+                // This callback function will trigger on unsuccessful action                
+                alert('Network error has occurred please try again!');
+            }
+        });
+    }
+}
+
+// We will use this object to store username and password before we serialize it and send to server. This part can be done in numerous ways but I like this approach because it is simple
+var userObject = {
+    username : "",
+    password : ""
+}
+</code></pre>
+
+<p>If you want, contact me on my email (you can find it in ma profile) and I will send you project with source code and used sql script.</p>

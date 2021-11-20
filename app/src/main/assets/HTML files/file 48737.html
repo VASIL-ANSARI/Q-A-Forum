@@ -1,0 +1,49 @@
+<p>With the assumption that all the lines to be aggregated under the same name are contiguous, this Python script</p>
+
+<pre><code>from itertools import groupby
+
+with open('infile.txt') as in_f, open('outfile.txt', 'w') as out_f:
+    next(in_f)  # skip header
+    aggr = groupby(in_f, lambda line: line.partition(',')[0])
+    for k, lines in aggr:
+        slines = (l.lstrip(k+',').rstrip() for l in lines)
+        out_line = k+','+','.join(slines)+'\n'
+        out_f.write(out_line)
+</code></pre>
+
+<p>does the trick.</p>
+
+<p>For example, with an input file of</p>
+
+<pre><code>name,time_in,time_out
+jim,1/1/2000 08:24,1/1/2000 15:24
+jim,1/2/2000 08:13,1/2/2000 16:24
+jim,1/3/2000 08:14,1/3/2000 15:25
+jim,1/4/2000 08:33,1/4/2000 16:23
+linda,1/1/2000 08:24,1/1/2000 15:24
+mark,1/2/2000 08:13,1/2/2000 16:24
+mark,1/3/2000 08:14,1/3/2000 15:25
+mark,1/4/2000 08:33,1/4/2000 16:23
+</code></pre>
+
+<p>it produces an output file of</p>
+
+<pre><code>jim,1/1/2000 08:24,1/1/2000 15:24,1/2/2000 08:13,1/2/2000 16:24,1/3/2000 08:14,1/3/2000 15:25,1/4/2000 08:33,1/4/2000 16:23
+linda,1/1/2000 08:24,1/1/2000 15:24
+mark,1/2/2000 08:13,1/2/2000 16:24,1/3/2000 08:14,1/3/2000 15:25,1/4/2000 08:33,1/4/2000 16:23
+</code></pre>
+
+<p>It leverages the power of <a href="https://docs.python.org/3/library/itertools.html#itertools.groupby" rel="nofollow">itertools.groupby</a></p>
+
+<p>Basically, it keeps grouping the lines as long as the prefix (i.e. the name) doesn't change. When it does it moves on, creating another group on the newly found prefix.
+It then simply joins the elements of each group on a single line, separated by ','</p>
+
+<p>Note: in case you want the header to appear in the output file, change the line</p>
+
+<pre><code>    next(in_f)  # skip header
+</code></pre>
+
+<p>to</p>
+
+<pre><code>    out_f.write(next(in_f))  # write and skip header
+</code></pre>

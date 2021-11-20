@@ -1,0 +1,33 @@
+<p>The main problem you have is that you're sending <code>Content-Type: image/png</code> after putting some output. Once you put any output, PHP immediately sends all response headers and proceeds to the body part of response. The default <code>Content-Type</code> is <code>text/html</code> on most servers, so your browser is interpreting image content as HTML, and thats why you're seeing some garbage. It's a bit like opening PNG file in notepad.</p>
+
+<p><a href="http://stackoverflow.com/questions/8028957/how-to-fix-headers-already-sent-error-in-php">See this question for more information about sending response headers</a> </p>
+
+<p>Also you can't return HTML and image content upon one request, so <strong>do not put any HTML</strong> in your image-generating file. The image is independent file and it has to be returned upon it's own, separate request, containing only headers, image bytes and nothing more.</p>
+
+<p>This should work:</p>
+
+<pre><code>&lt;?php
+$image = new Imagick();
+$image-&gt;newImage(100, 100, new ImagickPixel('red'));
+$image-&gt;setImageFormat('png');
+
+header('Content-type: image/png');
+echo $image;
+</code></pre>
+
+<p>Note, that this is whole PHP file and you can't send any other output neither from outside of <code>&lt;?php ?&gt;</code> nor by echoing.</p>
+
+<p>If you want to include your image into HTML you need a second file (it may be plain HTML), which should look as follows:</p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;head&gt;
+    &lt;title&gt;ImageMagick Test&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;!-- here we're including our image-generating PHP script --&gt;
+    &lt;img src="imagickTest.php"&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>Then you can refer either to PHP file if you want to see only image or to HTML file if you want to see image put into HTML context.</p>

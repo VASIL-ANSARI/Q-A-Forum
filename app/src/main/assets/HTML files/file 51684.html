@@ -1,0 +1,58 @@
+<p>A string is a sequence of characters that terminates at the first <code>'\0'</code> character. That means <code>"0x134"</code> terminates with a <code>'\0'</code> character value, not an <code>EOF</code> value.</p>
+
+<p>You are operating on a sequence of characters that you expect to be terminated by an <code>EOF</code> value, but that is simply not possible. I'll explain why later... Suffice to say for now, the string <code>"0x134"</code> contains no <code>EOF</code> value.</p>
+
+<p>Your loop reaches the string-terminating <code>'\0'</code>, which isn't in the range <code>0..9</code>, <code>a..f</code> or <code>A..F</code> and so this branch executes:</p>
+
+<pre><code>          else {
+              printf("This is a illegal hexadecimal number.\n");
+              ishex = FALSE;
+              return 0;
+          }
+</code></pre>
+
+<p>Perhaps you meant to write your loop like so:</p>
+
+<pre><code>for (j = 2; (c = s[j]) != '\0'; ++j) {
+    /* SNIP */
+}
+</code></pre>
+
+<hr>
+
+<p>I promised to explain what is wrong with expecting <code>EOF</code> to exist as a character value. Assuming an <code>unsigned char</code> is 8 bits, <code>getchar</code> can return one of 256 character values, and it will return them as a <em>positive</em> <code>unsigned char</code> value... <strong>OR</strong> it can return the <em>negative</em> <code>int</code> value <code>EOF</code>, corresponding to an error or end-of-file.</p>
+
+<p>Confused? In an empty file, there are no characters... Yet if you try to read a character from the file, you will get <code>EOF</code> every time, in spite of there being no characters. Hence, <code>EOF</code> is not a character value. It's an <code>int</code> value, and should be treated as such <em>before</em> you attempt to convert the value to a character, like so:</p>
+
+<pre><code>int c = getchar();
+if (c == EOF) {
+    /* Here, c is NOT A CHARACTER VALUE! *
+     * It's more like an error code ...  *
+     * XXX: Break or return or something */
+}
+else {
+    /* Here, c IS a character value, ... *
+     * so the following conversion is ok */
+    char ch = c;
+}
+</code></pre>
+
+<hr>
+
+<p>On another note, <code>c &gt;= '0' &amp;&amp; c &lt;= '9'</code> will evaluate truthfully when c is one of the digits in the range <code>0..9</code>... This is a requirement from the C standard</p>
+
+<p>Neither <code>c &gt;= 'a' &amp;&amp; c &lt;= 'f'</code> nor <code>c &gt;= 'A' &amp;&amp; c &lt;= 'F'</code> are required to evaluate truthfully under any circumstance, however. It happens to work on your system, because you are using ASCII which contains all of the lowercase letters in one contiguous block, and all of the uppercase letters in another contiguous block. C does not require that ASCII be the character set.</p>
+
+<p>If you want this code to work <em>portably</em>, you might consider something like:</p>
+
+<pre><code>char alpha_digit[] = "aAbBcCdDeEfF";
+if (c &gt;= '0' &amp;&amp; c &lt;= '9') {
+    c -= '0';
+}
+else if (strchr(alpha_digit, c)) {
+    c = 10 + (strchr(alpha_digit, c) - alpha_digit) / 2;
+}
+else {
+    /* SNIP... XXX invalid digit */
+}
+</code></pre>

@@ -1,0 +1,95 @@
+<p>While it is undocumented, it is certainly possible. It's pretty much the same as for <a href="http://laravel.com/docs/4.2/pagination#custom-presenters" rel="nofollow">Laravel 4</a>. Basically all you need to is create a custom presenter and wrap the paginator instance.</p>
+
+<p>Here's how a presenter might look like:</p>
+
+<pre><code>use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Contracts\Pagination\Presenter;
+use Illuminate\Pagination\BootstrapThreeNextPreviousButtonRendererTrait;
+use Illuminate\Pagination\UrlWindow;
+use Illuminate\Pagination\UrlWindowPresenterTrait;
+
+class CustomPresenter implements Presenter
+{
+    use BootstrapThreeNextPreviousButtonRendererTrait, UrlWindowPresenterTrait;
+
+    private $paginator;
+
+    private $window;
+
+    public function __construct(Paginator $paginator, UrlWindow $window = null)
+    {
+        $this-&gt;paginator = $paginator;
+        $this-&gt;window = is_null($window) ? UrlWindow::make($paginator) : $window-&gt;get();
+    }
+
+    public function render()
+    {
+        if ($this-&gt;hasPages()) {
+            return sprintf(
+                '&lt;ul class="pagination"&gt;%s %s %s&lt;/ul&gt;',
+                $this-&gt;getPreviousButton("Previous"),
+                $this-&gt;getLinks(),
+                $this-&gt;getNextButton("Next")
+            );
+        }
+
+        return null;
+    }
+
+    public function hasPages()
+    {
+        return $this-&gt;paginator-&gt;hasPages() &amp;&amp; count($this-&gt;paginator-&gt;items() !== 0);
+    }
+
+    protected function getDisabledTextWrapper($text)
+    {
+        return '&lt;li class="disabled"&gt;&lt;span&gt;'.$text.'&lt;/span&gt;&lt;/li&gt;';
+    }
+
+    protected function getActivePageWrapper($text)
+    {
+        return '&lt;li class="active"&gt;&lt;span&gt;'.$text.'&lt;/span&gt;&lt;/li&gt;';
+    }
+
+    protected function getDots()
+    {
+        return $this-&gt;getDisabledTextWrapper("...");
+    }
+
+    protected function currentPage()
+    {
+        return $this-&gt;paginator-&gt;currentPage();
+    }
+
+    protected function lastPage()
+    {
+        return $this-&gt;paginator-&gt;lastPage();
+    }
+
+    protected function getAvailablePageWrapper($url, $page, $rel = null)
+    {
+        $rel = is_null($rel) ? '' : ' rel="'.$rel.'"';
+
+        return '&lt;li&gt;&lt;a href="'.htmlentities($url).'"'.$rel.'&gt;'.$page.'&lt;/a&gt;&lt;/li&gt;';
+    }
+}
+</code></pre>
+
+<p>Then from your controller:</p>
+
+<pre><code>    public function index()
+    {
+        $users = User::paginate(5);
+        $presenter = new CustomPresenter($users);
+
+        return view("home.index")-&gt;with(compact('users', 'presenter'));
+    }
+</code></pre>
+
+<p>The view:</p>
+
+<pre><code>@foreach ($users as $user)
+    &lt;div&gt;{{ $user-&gt;email }}&lt;/div&gt;
+@endforeach
+{!! $presenter-&gt;render() !!}
+</code></pre>

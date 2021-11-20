@@ -1,0 +1,67 @@
+<p>TBH I think we need a fast built-in way of normalizing elements like this.. although since I've been out of the loop for a bit for all I know there is one by now, and I just don't know it. :-)  In the meantime I've been using methods like this:</p>
+
+<pre><code>def create(n):
+    df = pd.DataFrame({ 'gene':["foo",
+                                "bar // lal",
+                                "qux",
+                                "woz"], 
+                        'cell1':[5,9,1,7], 'cell2':[12,90,13,87]})
+    df = df[["gene","cell1","cell2"]]
+    df = pd.concat([df]*n)
+    df = df.reset_index(drop=True)
+    return df
+
+def orig(df):
+    s = df["gene"].str.split(' // ').apply(pd.Series,1).stack()
+    s.index = s.index.droplevel(-1)
+    s.name = "Genes"
+    del df["gene"]
+    return df.join(s)
+
+def faster(df):
+    s = df["gene"].str.split(' // ', expand=True).stack()
+    i = s.index.get_level_values(0)
+    df2 = df.loc[i].copy()
+    df2["gene"] = s.values
+    return df2
+</code></pre>
+
+<p>which gives me</p>
+
+<pre><code>&gt;&gt;&gt; df = create(1)
+&gt;&gt;&gt; df
+         gene  cell1  cell2
+0         foo      5     12
+1  bar // lal      9     90
+2         qux      1     13
+3         woz      7     87
+&gt;&gt;&gt; %time orig(df.copy())
+CPU times: user 12 ms, sys: 0 ns, total: 12 ms
+Wall time: 10.2 ms
+   cell1  cell2 Genes
+0      5     12   foo
+1      9     90   bar
+1      9     90   lal
+2      1     13   qux
+3      7     87   woz
+&gt;&gt;&gt; %time faster(df.copy())
+CPU times: user 16 ms, sys: 0 ns, total: 16 ms
+Wall time: 12.4 ms
+  gene  cell1  cell2
+0  foo      5     12
+1  bar      9     90
+1  lal      9     90
+2  qux      1     13
+3  woz      7     87
+</code></pre>
+
+<p>for comparable speeds at low sizes, and</p>
+
+<pre><code>&gt;&gt;&gt; df = create(10000)
+&gt;&gt;&gt; %timeit z = orig(df.copy())
+1 loops, best of 3: 14.2 s per loop
+&gt;&gt;&gt; %timeit z = faster(df.copy())
+1 loops, best of 3: 231 ms per loop
+</code></pre>
+
+<p>a 60-fold speedup in the larger case.  Note that the only reason I'm using <code>df.copy()</code> here is because <code>orig</code> is destructive.  </p>

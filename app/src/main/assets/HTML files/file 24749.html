@@ -1,0 +1,52 @@
+<p>I put a Navigate methods in the base class that all my ViewModel's share:</p>
+
+<pre><code>protected void Navigate(string address)
+{
+    if (string.IsNullOrEmpty(address))
+        return;
+
+    Uri uri = new Uri(address, UriKind.Relative);
+    Debug.Assert(App.Current.RootVisual is PhoneApplicationFrame);
+    BeginInvoke(() =&gt;
+        ((PhoneApplicationFrame)App.Current.RootVisual).Navigate(uri));
+}
+
+protected void Navigate(string page, AppViewModel vm)
+{
+    // this little bit adds the viewmodel to a static dictionary
+    // and then a reference to the key to the new page so that pages can
+    // be bound to arbitrary viewmodels based on runtime logic
+    string key = vm.GetHashCode().ToString();
+    ViewModelLocator.ViewModels[key] = vm;
+
+    Navigate(string.Format("{0}?vm={1}", page, key));
+}
+
+protected void GoBack()
+{
+    var frame = (PhoneApplicationFrame)App.Current.RootVisual;
+    if (frame.CanGoBack)
+        frame.GoBack();
+}
+</code></pre>
+
+<p>So the ViewModel base class executes the navigation if that's what you are asking. And then typically some derived ViewModel class controls the target of the navigation in response to the execution of an ICommand bound to a button or hyperlink in the View.</p>
+
+<pre><code>protected SelectableItemViewModel(T item)
+{
+    Item = item;
+    SelectItemCommand = new RelayCommand(SelectItem);
+}
+
+public T Item { get; private set; }
+
+public RelayCommand SelectItemCommand { get; private set; }
+
+protected override void SelectItem()
+{
+    base.SelectItem();
+    Navigate(Item.DetailPageName, Item);
+}
+</code></pre>
+
+<p>So the View only knows when a navigate action is needed and the ViewModels know where to go (based on ViewModel and Model state) and how to get there.</p>

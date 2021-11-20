@@ -1,0 +1,109 @@
+<p><strong>EDIT 1:</strong></p>
+
+<p>It seems it's some restriction of HTTPClient. I've finally resolved an issue for me. Here is my advice:</p>
+
+<ol>
+<li><p>Change you UriTemplate in you service contract:</p>
+
+<pre><code>[WebInvoke(UriTemplate = "Inventory", Method = "POST")]
+public InventoryResponse Post(InventoryRequest inventoryRequest)
+</code></pre></li>
+<li><p>Change endpoint address to</p>
+
+<pre><code>http://localhost
+</code></pre></li>
+<li><p>Try to hit the service with HTTPClient again:</p>
+
+<pre><code>using (var client = new HttpClient())
+{
+    var postUri= "http://localhost/";
+    client.BaseAddress = new Uri(postUri);
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+    inventoryResponse = client.PostAsJsonAsync("Inventory", inventoryRequest).Result.Content.ReadAsAsync&lt;InventoryResponse&gt;().Result;
+
+}
+</code></pre></li>
+</ol>
+
+<p>Finally, it should work.</p>
+
+<p><strong>Prev. answer:</strong></p>
+
+<p>Your client doesn't send a proper request, server expects xml but client send something else (it seems that it's json and content type is text). </p>
+
+<ol>
+<li><p>You can make a call on the client a bit differently:
+Reference at you client library with just service interfaces and data contracts (there shouldn't be service implementation, but it's ok if it's for the test). And replace your code with this:</p>
+
+<pre><code>ChannelFactory&lt;YourServiceInterface&gt; myChannelFactory = new ChannelFactory&lt;YourServiceInterface&gt;("MyService"); //MyServive clinet endpoint name
+
+// Create a channel.
+YourServiceInterface wcfClient1 = myChannelFactory.CreateChannel();
+var resp = wcfClient1.Post(inventoryRequest);
+
+((IClientChannel)wcfClient1).Close();
+</code></pre>
+
+<p>If you care about async operation you can do it with TPL, using a Task</p></li>
+<li><p>Fiddler has an option to catch every request from other clients. Do that and send us content of a request and response.</p></li>
+<li><p>It's definitely something wrong with you client. You can try this code, it must work (it works for me, I've checked):</p>
+
+<pre><code>public class WebRequestor
+{
+    public void MakeCall(DividendEvents dividends, Uri uri)
+    {
+        var postData = Serialize(dividends);
+        var request = FormWebRequest(postData, uri);
+
+        var response = request.GetResponse();
+
+        Console.WriteLine(((HttpWebResponse)response).StatusDescription);
+        var dataStream = response.GetResponseStream();
+        var reader = new StreamReader(dataStream);
+
+        // Read the content of response, if you need to have to deserialize it (in the same way as Serialize method does serialization)
+        string responseFromServer = reader.ReadToEnd();
+
+        reader.Close();
+        dataStream.Close();
+        response.Close();
+    }
+
+    private static WebRequest FormWebRequest(string postData, Uri uri)
+    {
+        WebRequest request = WebRequest.Create(uri);
+        request.Method = "POST";
+        request.ContentType = "application/json";
+
+        byte[] byteArray = Encoding.UTF8.GetBytes(postData);
+        request.ContentLength = byteArray.Length;
+        // Get the request stream.
+        Stream dataStream = request.GetRequestStream();
+        // Write the data to the request stream.
+        dataStream.Write(byteArray, 0, byteArray.Length);
+        // Close the Stream object.
+        dataStream.Close();
+        return request;
+    }
+
+    private static string Serialize(object data)
+    {
+        var stream1 = new MemoryStream();
+        var testSer = new DataContractJsonSerializer(data.GetType());
+        testSer.WriteObject(stream1, data);
+        stream1.Seek(0, SeekOrigin.Begin);
+        var sreader = new StreamReader(stream1);
+        var cont = sreader.ReadToEnd();
+        return cont;
+    }
+}
+</code></pre></li>
+</ol>
+
+<p>And here is the actual call:</p>
+
+<pre><code>        var div = new DividendEvents() {Events = new[] {1, 2, 3}, Id = "GOOGL"};
+        new WebRequestor().MakeCall(div, new Uri("http://localhost:9002/Pricing/Dividends"));
+</code></pre>

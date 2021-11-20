@@ -1,0 +1,40 @@
+<p>I was having the same problem, and hopefully Google eventually provides an official means of cleanup, but for now I was able to solve the problem by manually removing the pac-container object, a reference to which can be found in the Autocomplete class returned from:</p>
+
+<pre><code>var autocomplete = new google.maps.places.Autocomplete(element, options);
+</code></pre>
+
+<p>The reference to the pac-container element can be found at:</p>
+
+<pre><code>autocomplete.gm_accessors_.place.Mc.gm_accessors_.input.Mc.L
+</code></pre>
+
+<p>Which I simply removed from the DOM in my widget destructor:</p>
+
+<pre><code>$(autocomplete.gm_accessors_.place.Mc.gm_accessors_.input.Mc.L).remove();
+</code></pre>
+
+<p>Hope this helps.</p>
+
+<hr/>
+
+<p><strong>Update</strong></p>
+
+<p>I'm not sure how Google's obfuscation works, but parts of the above seem obfuscated, and obviously will fail if the obfuscation or internal structures of the API change. Can't do much about the latter, but for the former you could at least search the object properties by expected criteria. As we can see, some of the property names are not obfuscated, while some appear to be, such as "Mc" and "L". To make this a little more robust, I wrote the following code:</p>
+
+<pre><code>var obj = autocomplete.gm_accessors_.place;
+$.each(Object.keys(obj), function(i, key) {
+  if(typeof(obj[key]) == "object" &amp;&amp; obj[key].hasOwnProperty("gm_accessors_")) {
+    obj = obj[key].gm_accessors_.input[key];
+    return false;
+  }
+});
+$.each(Object.keys(obj), function(i, key) {
+  if($(obj[key]).hasClass("pac-container")) {
+    obj = obj[key];
+    return false;
+  }
+});
+$(obj).remove();
+</code></pre>
+
+<p>The code expects the general structure to remain the same, while not relying on the (possibly) obfuscated names "Mc" and "L". Ugly I know, but hopefully Google fixes this issue soon.</p>

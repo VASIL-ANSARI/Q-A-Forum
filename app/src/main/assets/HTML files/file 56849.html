@@ -1,0 +1,8 @@
+<p>I canât reproduce your result with <code>-Xmx500m</code>, but with <code>-Xmx200m</code>. Consistently, the program will fail when you add the <code>finalize()</code> method, as the finalizer is the <em>cause</em> of the problem. However, there <em>are</em> some <code>"finalized"</code> message printed in my system. Without the <code>finalize()</code> method, it runs perfectly forever (well, actually until I kill it).</p>
+
+<p>There is no problem reclaiming the space of ordinary objects, but when you add a nontrivial <code>finalize()</code> method, you are actively preventing the objects from going out of scope, as they now must be enqueued for finalization.</p>
+
+<p>While the JVM will always perform a garbage collection, trying to free all unused objects, before throwing an <code>OutOfMemoryError</code>, there is no such guaranty for objects hanging in the finalization queue. Slowing down the main task by disabling the JIT may indeed allow the finalization to process more elements. Keep in mind that having both, the main task and the finalize method printing to <code>System.out</code> has a synchronization effect which can make the timing of the processing critical.</p>
+
+<p>The are several environmental aspects that can influence the outcome. Since there is no guaranty regarding which thread will execute a finalizer, the finalization can use all unused CPU cores (and your main thread uses only one).
+Also the actual garbage collection algorithm (the JVM allows selecting one of several different algorithms) can have an impact.</p>

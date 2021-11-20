@@ -1,0 +1,67 @@
+<p>You could create your own parser, i made a draw, you can surely improve the code, put it in a class and make it properly but it works for the example input you provide in your question.</p>
+
+<pre><code>$data = 'Accept:application/json, text/plain, */*
+Accept-Encoding:gzip,deflate,sdch
+Connection:keep-alive
+Content-Length:604
+Content-Type:multipart/mixed; boundary=1408785817122
+Host:localhost:8080
+Origin:null
+
+--1408785817122
+Content-Type: application/http; msgtype=request
+
+GET /api/products HTTP/1.1
+Host: localhost:8080
+Accept: application/json, text/plain, */*
+....'
+
+$result = preg_match_all('/(--[0-9]+)|(GET|PUT|POST)(.*)HTTP|Accept:(.*)|content-type:(.*)|(\"\{.*)/mi', $data, $matches);
+
+$verbs = $matches[2];
+$urls = $matches[3];
+$accepts = $matches[4];
+$contentTypes = $matches[5];
+$bodies = $matches[6];
+$separators = $matches[1];
+
+$final = [];
+
+function extractData(&amp;$final, $verbs, $urls, $accepts, $contentTypes, $bodies, $separators, $start)
+{
+    $next = $start;
+    if ($start &gt;= count($verbs)) {
+        return;
+    }
+
+    if ('' !== $verbs[$start]) {
+        $indexFinal = count($final);
+        $final[$indexFinal]['method'] = $verbs[$start];
+        while ($separators[$next] === '' &amp;&amp; $next &lt; count($separators)) {
+        if ($urls[$start] !== '') {
+            $final[$indexFinal]['url'] = $urls[$start];
+        }
+
+        if ($accepts[$next] !== '') {
+            $final[$indexFinal]['accept'] = $accepts[$next];
+        }
+
+        if ($contentTypes[$next] !== '') {
+            $final[$indexFinal]['content-type'] = $contentTypes[$next];
+        }
+
+        if ($bodies[$next] !== '') {
+            $final[$indexFinal]['body'] = $bodies[$next];
+        }
+        $next++;
+    }
+        extractData($final, $verbs, $urls, $accepts, $contentTypes, $bodies, $separators, $next);
+    } else {
+        extractData($final, $verbs, $urls, $accepts, $contentTypes, $bodies, $separators, $start + 1);
+    }
+}
+
+extractData($final, $verbs, $urls, $accepts, $contentTypes, $bodies, $separators, 0);
+</code></pre>
+
+<p>As i said, it just a draw, free to you to improve it if it fit you. But as you see the <code>$final</code> array is what you expect.</p>

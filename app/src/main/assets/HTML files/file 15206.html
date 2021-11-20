@@ -1,0 +1,95 @@
+<p>from my <a href="https://github.com/dittodhole/jquery-week-calendar/commit/6dbf12cca6024f37f964ea825c25b831f3983c1d" rel="nofollow">jquery-week-calendar commit</a>, this is how i do it:</p>
+
+<pre><code>    _groupOverlappingEventElements: function($weekDay) {
+        var $events = $weekDay.find('.wc-cal-event:visible');
+        var complexEvents = jQuery.map($events, function (element, index) {
+            var $event = $(element);
+            var position = $event.position();
+            var height = $event.height();
+            var calEvent = $event.data('calEvent');
+            var complexEvent = {
+                'event': $event,
+                'calEvent': calEvent,
+                'top': position.top,
+                'bottom': position.top + height
+            };
+            return complexEvent;
+        }).sort(function (a, b) {
+            var result = a.top - b.top;
+            if (result) {
+                return result;
+            }
+            return a.bottom - b.bottom;
+        });
+        var groups = new Array();
+        var currentGroup;
+        var lastBottom = -1;
+        jQuery.each(complexEvents, function (index, element) {
+            var complexEvent = element;
+            var $event = complexEvent.event;
+            var top = complexEvent.top;
+            var bottom = complexEvent.bottom;
+            if (!currentGroup || lastBottom &lt; top) {
+                currentGroup = new Array();
+                groups.push(currentGroup);
+            }
+            currentGroup.push($event);
+            lastBottom = Math.max(lastBottom, bottom);
+        });
+        return groups;
+    }
+</code></pre>
+
+<p>there's a bit of component-specific noise around, but you'll get the logic:</p>
+
+<ul>
+<li>sort the events by their starting ascending</li>
+<li>sort the events by their ending ascending</li>
+<li>iterate over the sorted events and check the starting/ending of the previous event (done rather by position, than by the event properties themself - just because the design might overlap, but the events not ... eg: making a border 2px, events with not overlapping start/end-times might overlap or "touch")</li>
+<li>each overlapping-group (<code>currentGroup</code>) is a new array inside the <code>groups</code>-array</li>
+</ul>
+
+<p>soo ... your code might look sth alike this (btw, no need to work with the real <code>date</code>-instances)</p>
+
+<pre><code>events.sort(function (a, b) {
+    var result = a.start - b.start;
+    if (result) {
+        return result;
+    }
+    return a.end - b.end;
+});
+var groups = new Array();
+var currentGroup;
+var lastEnd = -1;
+jQuery.each(events, function (index, element) {
+    var event = element;
+    var start = event.start;
+    var end = event.end;
+    if (!currentGroup || lastEnd &lt; start) {
+        currentGroup = new Array();
+        groups.push(currentGroup);
+    }
+    currentGroup.push(event);
+    lastEnd = Math.max(lastEnd, end);
+});
+return groups;
+</code></pre>
+
+<p>soo ... you are not willed to push some own energy into <em>your</em> problem ... well</p>
+
+<pre><code>var output = new Array();
+jQuery.each(groups, function (index, element) {
+    var group = element;
+    if (group.length &lt;= 1) {
+        return;
+    }
+    jQuery.each(group, function (index, element) {
+        var event = element;
+        var foo = {
+            'id': event.id,
+            'eventCount': group.length
+        };
+        output.push(foo);
+    });
+});
+</code></pre>

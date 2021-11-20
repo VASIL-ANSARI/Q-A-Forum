@@ -1,0 +1,29 @@
+<p>You don't have to run async methods using <code>Task.Run()</code>, or any other special means, just call them. And in your case, that's exactly what is causing the problem.</p>
+
+<p>Given function like this:</p>
+
+<pre><code>Action f = async () =&gt;
+{
+    while (true)
+    {
+        // modify the observable collection here
+        await Task.Delay(500);
+    }
+};
+</code></pre>
+
+<p>Calling it like this from some method run on the UI thread, like an event handler:</p>
+
+<pre><code>f();
+</code></pre>
+
+<p>works exactly as it should. It executes the first iteration of the cycle and then returns. The next iteration is executed after 500 ms (or more, if the UI thread is busy) on the UI thread.</p>
+
+<p>On the other hand, if you call it like this:</p>
+
+<pre><code>Task.Run(addNames);
+</code></pre>
+
+<p>it doesn't work correctly. The reason for this is that <code>async</code> methods try to continue in the same context as they were started (unless you explicitly specify otherwise). The first version was started on the UI thread, so it continued on the UI thread. The second version started on a ThreadPool thread (thanks to <code>Task.Run()</code>) and continued there too. Which is why it caused your error.</p>
+
+<p>All this is done using <a href="http://msdn.microsoft.com/en-us/library/system.threading.synchronizationcontext.aspx" rel="nofollow"><code>SynchronizationContext</code></a>, if one is present.</p>

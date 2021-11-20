@@ -1,0 +1,48 @@
+<p>To fix this, remove the GROUP BY clause. If you are wanting to to eliminate duplicate rows from being returned using the GROUP BY, then include all of the expressions in the SELECT list in the GROUP BY clause.</p>
+
+<pre><code>SELECT `booking`.`receipt_no`, `client`, `operator`, `discount`, `total_amount`, `amount_paid`, `balance`, `date`, `jobtitle`, `quantity`, `amount`, `date_paid`, `old_balance`, `debtor_amount_paid`, `new_balance`
+FROM (`booking`)
+JOIN `jobtitle` ON `jobtitle`.`bookingID` = `booking`.`bookingID`
+JOIN `first_graphics_debtors` ON `first_graphics_debtors`.`receipt_no` = `booking`.`receipt_no`
+WHERE `booking`.`receipt_no` =  '753263343'
+AND `first_graphics_debtors`.`receipt_no` =  '753263343'
+GROUP BY `booking`.`receipt_no`, `client`, `operator`, `discount`, `total_amount`, `amount_paid`, `balance`, `date`, `jobtitle`, `quantity`, `amount`, `date_paid`, `old_balance`, `debtor_amount_paid`, `new_balance`
+</code></pre>
+
+<p>MySQL has a feature that lets you omit non-aggregates from the GROUP BY clause. To disable this feature, and make MySQL work like other relational databases:</p>
+
+<pre><code>SET sql_mode = 'ONLY_FULL_GROUP_BY';
+</code></pre>
+
+<hr>
+
+<p>[ADDENDUM]</p>
+
+<p>You ask "How can I fix this", but we aren't give a clear indication of the result set you expect to have returned.</p>
+
+<p>We fully expect some "duplicates" to be returned when you have a one-to-many relationship between the joined tables.</p>
+
+<p>For example, suppose I have an <code>order</code> table and a <code>line_item</code> table, and an order can have zero, one or more associated rows in <code>line_item</code>, but a <code>line_item</code> is associated with one <code>order</code>. When I run a query like:</p>
+
+<pre><code>SELECT o.id, l.id
+  FROM orders o
+  JOIN line_item l ON l.order_id = o.id
+</code></pre>
+
+<p>I expect to have "duplicate" values of o.id returned for every order that has more than one line_item associated with it.</p>
+
+<p>I strongly suspect the issue is with the use of "receipt_no" as the join predicate. Normally, join predicates are of the form  <code>child_table.parent_key = parent_table.key</code></p>
+
+<p>I recommend you run a query that pulls the primary key values from each table </p>
+
+<pre><code>SELECT b.bookingID
+     , j.ID
+     , d.ID
+  FROM booking b
+  JOIN jobtitle j ON j.bookingID = b.bookingID
+  JOIN first_graphics_debtors d ON d.receipt_no = b.receipt_no
+ WHERE b.receipt_no = '753263343'
+ORDER BY 1,2,3
+</code></pre>
+
+<p>That will show you where you are getting the "duplicates". Without a schema definition, and some sample data, that's about all I can tell you.</p>

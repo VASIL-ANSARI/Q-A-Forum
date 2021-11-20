@@ -1,0 +1,13 @@
+<p>The problem here is that RDS doesn't support using <code>mysqlbinlog</code> to playback a log file.</p>
+
+<p>The first time you encounter a <code>BINLOG '...</code> statement in the output, you'll get the permission denied error because those events are interpreted in a fully-privileged context -- there is no privilege checking done when the events are processed, it's done up front -- by requiring that the user executing the <code>BINLOG '...</code> statement has the <code>SUPER</code> privilege -- which you don't get and can't have, with RDS, presumably because it would allow you to break things.</p>
+
+<p>But, there's a workaround, which ultimately might be better, anyway.</p>
+
+<p>After restoring the dump file, you can actually connect your RDS master to a MySQL Server outside of RDS, and temporarily make your master a slave of the external database.  It will connect, fetch the binlogs, and play them back like a normal slave, syncing its data to the external master in almost real time, until you shut down the external master and move your application to point to the RDS machine.</p>
+
+<p>They introduced this capability specifically for the purpose of migrating a live external system into RDS with minimal downtime.</p>
+
+<p><a href="http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/MySQL.Procedural.Importing.NonRDSRepl.html" rel="nofollow">http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/MySQL.Procedural.Importing.NonRDSRepl.html</a></p>
+
+<p><a href="https://aws.amazon.com/blogs/aws/migrate-mysql-data-to-amazon-rds-and-back/" rel="nofollow">https://aws.amazon.com/blogs/aws/migrate-mysql-data-to-amazon-rds-and-back/</a></p>

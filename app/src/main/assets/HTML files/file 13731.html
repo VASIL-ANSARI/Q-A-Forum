@@ -1,0 +1,36 @@
+<p>Keeping that much data in memory at once is definitely going to be a problem. Fortunately, you don't need toâyou can write the data to disk as it comes off the wire, and you can keep a running checksum. </p>
+
+<p>Trade your ReceivedData for a couple of new ivars:</p>
+
+<pre><code>NSFileHandle* filehandle;
+MD5_CTX md5sum;
+</code></pre>
+
+<p>MD5_CTX is in OpenSSL, which â¦still isn't on iOS? Gah. Okay, you can find the MD5 source online, e.g. here: <a href="http://people.csail.mit.edu/rivest/Md5.c">http://people.csail.mit.edu/rivest/Md5.c</a> (I'd originally suggested adding OpenSSL to your project, but that's a lot of extra junk that you don't need. But if you happen to already be using OpenSSL, it includes the MD5 functions.)</p>
+
+<pre><code>- (void)connection:(NSURLConnection*)connection didReceiveResponse:(NSURLResponse*)response
+{
+    MD5Init(&amp;md5sum);
+
+    filehandle = [[NSFileHandle filehandleForWritingAtPath:path] retain];
+}
+
+- (void)connection:(NSURLConnection*)connection didReceiveData:(NSData*)data
+{
+    MD5Update(&amp;md5sum, [data bytes], [data length]);
+
+    [filehandle writeData:data];
+}
+
+- (void)connectionDidFinishLoading:(NSURLConnection*)connection
+{
+    MD5Final(&amp;md5sum);
+    // MD5 sum is in md5sum.digest[]
+
+    [filehandle closeFile];
+
+    // verify MD5 sum, etc..
+}
+</code></pre>
+
+<p>At the end, your file will be on disk, you'll have its MD5 sum, and you'll barely be using any memory at all.</p>

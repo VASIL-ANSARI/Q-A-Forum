@@ -1,0 +1,68 @@
+<p>Some amount of banging my head against things brought me to the following, which does do what I want, though I'd still certainly accept an answer which explained why ResourceHandler isn't appropriate for what I want...</p>
+
+<pre><code>import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.DefaultServlet;
+import org.eclipse.jetty.servlet.ErrorPageErrorHandler;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+
+public class JettyTest {
+
+    public static void main(String[] args) throws Exception {
+        Server server = new Server(8080);
+
+        ServletContextHandler servletContextHandler = new ServletContextHandler();
+        servletContextHandler.setContextPath("/context-path");
+        servletContextHandler.setResourceBase("/tmp/directory-with-just-an-index.html-file");
+        servletContextHandler.addServlet(new ServletHolder(new DefaultServlet()), "/*");
+
+        ErrorPageErrorHandler errorHandler = new ErrorPageErrorHandler();
+        errorHandler.addErrorPage(404, "/index.html");
+
+        servletContextHandler.setErrorHandler(errorHandler);
+
+        server.setHandler(servletContextHandler);
+
+        server.start();
+        System.out.println("Started!");
+        server.join();
+    }
+
+}
+</code></pre>
+
+<p>...Now to try to turn that back into an xml context file :)</p>
+
+<hr>
+
+<p>...which I eventually did with the following in case anyone needs it later.</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="ISO-8859-1"?&gt;
+&lt;!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "http://www.eclipse.org/jetty/configure.dtd"&gt;
+
+&lt;Configure class="org.eclipse.jetty.servlet.ServletContextHandler" id="myContext"&gt;
+
+    &lt;Set name="contextPath"&gt;/context-path&lt;/Set&gt;
+    &lt;Set name="resourceBase"&gt;/tmp/directory-with-just-an-index.html-file&lt;/Set&gt;
+
+    &lt;!-- Direct all 404s to index.html (required by Angular's PathLocationStrategy) --&gt;
+    &lt;Set name="errorHandler"&gt;
+        &lt;New class="org.eclipse.jetty.servlet.ErrorPageErrorHandler"&gt;
+            &lt;Call name="addErrorPage"&gt;
+                &lt;Arg type="int"&gt;404&lt;/Arg&gt;
+                &lt;Arg type="String"&gt;/index.html&lt;/Arg&gt;
+            &lt;/Call&gt;
+        &lt;/New&gt;
+    &lt;/Set&gt;
+
+    &lt;Call name="addServlet"&gt;
+        &lt;Arg&gt;&lt;New class="org.eclipse.jetty.servlet.ServletHolder"&gt;
+            &lt;Arg&gt;
+                &lt;New class="org.eclipse.jetty.servlet.DefaultServlet"&gt;&lt;/New&gt;
+            &lt;/Arg&gt;
+        &lt;/New&gt;&lt;/Arg&gt;
+        &lt;Arg&gt;/*&lt;/Arg&gt;
+    &lt;/Call&gt;
+
+&lt;/Configure&gt;
+</code></pre>

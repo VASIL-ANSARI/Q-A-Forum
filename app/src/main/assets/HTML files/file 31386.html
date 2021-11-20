@@ -1,0 +1,36 @@
+<p>The logical(and working) solution here would be to get the parent element of each <code>td</code> cell in the loop, which is the whole row (<code>tr</code>).</p>
+
+<p>Replace the three:</p>
+
+<pre><code>$_.SetAttributeValue(
+</code></pre>
+
+<p>with</p>
+
+<pre><code>$_.Parent.SetAttributeValue(
+</code></pre>
+
+<p>You should take some time and actually learn PowerShell, maybe a little HTML and searching with Google. If you had searched for the <code>Descendants</code> method for <code>XDocument</code>, you would see that it returns an <a href="http://msdn.microsoft.com/en-us/library/system.xml.linq.xelement%28v=vs.110%29.aspx" rel="nofollow">XElement</a>, which MSDN says has a <code>Parent</code> property.</p>
+
+<p>UPDATE: Here's YOUR script with my single update in the three locations. It works perfectly here. The whole row gets colored.</p>
+
+<pre><code>Add-Type -AssemblyName System.Xml.Linq
+
+# Get the running processes to x(ht)ml
+$xml = [System.Xml.Linq.XDocument]::Parse( "$(Get-Process | ConvertTo-Html)" )
+
+# Find the index of the column you want to format:
+$wsIndex = (($xml.Descendants("{http://www.w3.org/1999/xhtml}th") | Where-Object {             $_.Value -eq "WS" }).NodesBeforeSelf() | Measure-Object).Count
+
+# Format the column based on whatever rules you have:
+switch($xml.Descendants("{http://www.w3.org/1999/xhtml}td") | Where {     ($_.NodesBeforeSelf() | Measure).Count -eq $wsIndex } ) {
+{200MB -lt $_.Value } { $_.Parent.SetAttributeValue( "style", "background: red;"); continue } 
+{20MB  -lt $_.Value } { $_.Parent.SetAttributeValue( "style", "background: orange;"); continue    } 
+{10MB  -lt $_.Value } { $_.Parent.SetAttributeValue( "style", "background: yellow;"); continue   } 
+ }
+ # Save the html out to a file
+$xml.Save("c:\procs2.html")
+
+# Open the thing in your browser to see what we've wrought
+ii c:\procs2.html
+</code></pre>

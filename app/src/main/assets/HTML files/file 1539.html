@@ -1,0 +1,49 @@
+<p>Whilst there's not a tremendous amount of information to go on, what you've listed should be fine. (The 'tag' being the 'description' field in the industry table, etc.)</p>
+
+<p>As you might imagine, all of the real work is done outside of SQL, where you'll need to...</p>
+
+<ol>
+<li>(Potentially) add new tag(s) that don't yet exist.</li>
+<li>Associate the industry with the supplied tag(s).</li>
+<li>(Potentially) prune previously used tags that may no longer be in use.</li>
+</ol>
+
+<p>...every time you edit an industry.</p>
+
+<p>That said, the key limitation of your proposed setup is that each company can only belong to a single industry. (i.e.: It can only have a single industry tag associated with it.)</p>
+
+<p>As such, you might want to consider a schema along the lines of...</p>
+
+<pre><code>Company
+    id
+    ...
+    countryOfOrigin
+
+Industries
+    id
+    description
+
+CompanyIndustriesLookup
+    companyID
+    industryID
+</code></pre>
+
+<p>...which would let you associate multiple industries/tags with a given company.</p>
+
+<p><strong>Update...</strong></p>
+
+<p>For example, under this setup, to get all of the tags associated with company ID 1, you'd use...</p>
+
+<pre><code>SELECT Industries.description FROM (CompanyIndustriesLookup, Industries)
+WHERE companyID=1 AND industryID=Industries.ID
+ORDER BY Industries.description ASC;
+</code></pre>
+
+<p>On a similar basis, to get all companies tagged with an industry of "testing", you'd use...</p>
+
+<pre><code>SELECT Company.name FROM (Company, Industries, CompanyIndustriesLookup)
+WHERE Company.id=CompanyIndustriesLookup.companyID
+AND Industries.id=CompanyIndustriesLookup.industryID
+AND Industries.description="testing"
+ORDER BY Company.name ASC
+</code></pre>

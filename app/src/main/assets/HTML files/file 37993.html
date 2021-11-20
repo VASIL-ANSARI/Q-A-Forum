@@ -1,0 +1,33 @@
+<p>It's not possible to change the name of the data table based on some information in the runtime (this feature exists in the Android SDK, so you can consider <a href="http://feedback.azure.com/forums/216254-mobile-services" rel="nofollow">creating a feature request</a> to have it added to the managed SDK as well).</p>
+
+<p>What you can do, however, is to use a message handler which can "tweak" the request URI for table-related operations, so that you can achieve this programmatically. Basically, your portable library would expose, in addition to the data type you want shared across multiple applications, a class extending from <code>DelegatingHandler</code> which does that. Below is an example of such handler.</p>
+
+<pre><code>public class AppSpecificTableNamesHandler : DelegatingHandler
+{
+    public const string TablePrefix = "MyType";
+    private const string TablesPathPrefix = "/tables/";
+
+    private string tableSuffix;
+    public AppSpecificTableNamesHandler(string tableSuffix)
+    {
+        this.tableSuffix = tableSuffix;
+    }
+
+    protected override Task&lt;HttpResponseMessage&gt; SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        UriBuilder uriBuilder = new UriBuilder(request.RequestUri);
+        string path = uriBuilder.Path;
+        if (path.StartsWith(TablesPathPrefix + TablePrefix))
+        {
+            path = TablesPathPrefix + TablePrefix +
+                this.tableSuffix + path.Substring(TablesPathPrefix.Length + TablePrefix.Length);
+            uriBuilder.Path = path;
+            request.RequestUri = uriBuilder.Uri;
+        }
+
+        return base.SendAsync(request, cancellationToken);
+    }
+}
+</code></pre>
+
+<p>You can find the full code for the solution I used to test that (at least the most important classes) at <a href="https://gist.github.com/carlosfigueira/9582c08851d116f5a426" rel="nofollow">https://gist.github.com/carlosfigueira/9582c08851d116f5a426</a>.</p>

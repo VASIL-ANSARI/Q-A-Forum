@@ -1,0 +1,52 @@
+<p>Python uses reference counting to manage <em>objects</em>, not variables. If you want to know when the object referenced by <code>x</code> is cleared from memory, you need to keep track of how many references there are to it. <code>x</code> is just one such reference.</p>
+
+<p>But, if there are <em>no other references</em> to the same object (<code>x</code> is the only reference to it), then yes, that object will be deleted from memory, because both <code>add</code> and <code>mul</code> are not returned by <code>test</code>.</p>
+
+<p><code>x</code> is used as a closure by those two nested functions, and thus the object referenced by <code>x</code> would gain two additional references (via the function object closures). But since the function objects are deleted when the function ends (as they are just locals within <code>test</code>), so will their closures, and so the end result is that there are no more references to the object referenced by <code>x</code> at the end of the <code>test()</code> call as there were at the start of the call.</p>
+
+<p>It doesn't matter here that closure cells are somewhat special in that they track a variable, not an object directly. Closures are just objects too to Python (albeit with special support in the interpreter to help track the original reference), so they are subject to reference counting too.</p>
+
+<p>You can use <a href="https://docs.python.org/3/library/sys.html#sys.getrefcount" rel="nofollow"><code>sys.getrefcount()</code> function</a> to see how many references there are to an object:</p>
+
+<pre><code>&gt;&gt;&gt; import sys
+&gt;&gt;&gt; def test(x):
+...    def add(y):
+...       return x+y
+...    def mul(y):
+...        return x*y
+...    return "test"
+...
+&gt;&gt;&gt; value = 'foo bar'
+&gt;&gt;&gt; sys.getrefcount(value)
+2
+&gt;&gt;&gt; test(value)
+'test'
+&gt;&gt;&gt; sys.getrefcount(value)
+2
+</code></pre>
+
+<p>The refcount did not change, so <code>test</code> never resulted in additional references after the function completed. This changes if you actually returned the nested functions:</p>
+
+<pre><code>&gt;&gt;&gt; def test2(x):
+...    def add(y):
+...       return x+y
+...    def mul(y):
+...        return x*y
+...    return {'+': add, '*': add}
+...
+&gt;&gt;&gt; test_result = test2(value)
+&gt;&gt;&gt; test_result
+{'+': &lt;function add at 0x104e85b90&gt;, '*': &lt;function add at 0x104e85b90&gt;}
+&gt;&gt;&gt; sys.getrefcount(value)
+3
+&gt;&gt;&gt; del test_result['+']
+&gt;&gt;&gt; sys.getrefcount(value)
+3
+&gt;&gt;&gt; del test_result['*']
+&gt;&gt;&gt; sys.getrefcount(value)
+2
+</code></pre>
+
+<p>The two functions both reference the same closure cell, which in turn references the value of <code>x</code>, so while those two function objects still exist the reference count goes up by one. Deleting both functions cleared the closure cell (the refcount for that object went down to 0), and the reference count dropped again.</p>
+
+<p>As soon as the refcount for the <code>'foo bar'</code> string goes to 0, it'll too be deleted. In the above examples it is always 2, because both the name <code>value</code> and the <code>sys.getrefcount()</code> function reference it whenever I try to access the reference count.</p>

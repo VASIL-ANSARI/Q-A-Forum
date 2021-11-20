@@ -1,0 +1,46 @@
+<p>This could be what you need. You need to enter your Google username and password in the <code>$email</code> and <code>$passwd</code> variables and to setup the autoloader or require ZF classes.</p>
+
+<p>References: <a href="http://framework.zend.com/manual/en/zend.gdata.clientlogin.html" rel="nofollow">Zend_Gdata_ClientLogin</a> and <a href="http://code.google.com/apis/accounts/docs/AuthForInstalledApps.html" rel="nofollow">ClientLogin</a></p>
+
+<pre><code>// setup the autoloader first or require used classes
+// using the example code in the example to get auth tokens
+try {
+    $client = Zend_Gdata_ClientLogin::getHttpClient($email, $passwd, 'xapi', $httpClient);
+} catch (Zend_Gdata_App_CaptchaRequiredException $cre) {
+    echo 'URL of CAPTCHA image: ' . $cre-&gt;getCaptchaUrl() . "\n";
+    echo 'Token ID: ' . $cre-&gt;getCaptchaToken() . "\n";
+} catch (Zend_Gdata_App_AuthException $ae) {
+    echo 'Problem authenticating: ' . $ae-&gt;exception() . "\n";
+}
+
+// extract authentication tokens from response body
+$ck_count = preg_match_all('/^(.+)=(.+)$/m', $client-&gt;getLastResponse()-&gt;getBody(), $cookies);
+
+// build a new http client
+$auth = new Zend_Http_Client('http://www.google.com/trends/viz?q=facebook&amp;graph=all_csv&amp;sa=N');
+
+for ($i = 0; $i &lt; $ck_count; $i++) {
+    // authenticate it using the provided tokens as cookies
+    $auth-&gt;setCookie($cookies[1][$i], $cookies[2][$i]);
+}
+// make the request and dump cvs data
+Zend_Debug::dump($auth-&gt;request()-&gt;getBody());
+</code></pre>
+
+<p>Output given (truncated for brevity):</p>
+
+<pre><code>facebook, facebook (std error)
+1.00, 0%
+
+
+Week, facebook, facebook (std error)
+Jan 4 2004, 0, &gt;10%
+Jan 11 2004, 0, &gt;10%
+Jan 18 2004, 0, &gt;10%
+Jan 25 2004, 0, &gt;10%
+Feb 1 2004, 0, &gt;10%
+Feb 8 2004, 0, &gt;10%
+Feb 15 2004, 0, &gt;10%
+Feb 22 2004, 0, &gt;10%
+Feb 29 2004, 0, &gt;10%
+</code></pre>

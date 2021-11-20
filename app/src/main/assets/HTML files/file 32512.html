@@ -1,0 +1,106 @@
+<p>I made it work by using Bezier Paths instead of Core Graphics.</p>
+
+<p><strong>You can find some background about Bezier Paths here:</strong>
+<a href="https://developer.apple.com/library/ios/documentation/2ddrawing/conceptual/drawingprintingios/BezierPaths/BezierPaths.html" rel="nofollow">https://developer.apple.com/library/ios/documentation/2ddrawing/conceptual/drawingprintingios/BezierPaths/BezierPaths.html</a></p>
+
+<p>Since i wanted to implement an Undo button, i created a Class for storing the Color of the line, as well as the corresponding Path:</p>
+
+<pre><code>public class VESLine{
+public UIBezierPath Path {
+    get;
+    set;
+}
+
+public UIColor Color {
+    get;
+    set;
+}
+
+public byte Index {
+    get;
+    set;
+}
+}
+</code></pre>
+
+<p>The <code>TouchesBegan</code> event was modified accordingly, to create a new UIBezierPath object, store it in the array, along with its Color and Index, and touch location:</p>
+
+<pre><code>public override void TouchesBegan (MonoTouch.Foundation.NSSet touches, UIEvent evt)
+{
+    IndexCount++;
+
+    UIBezierPath path   = new UIBezierPath ();
+    path.LineWidth      = 5.0f;
+
+    UITouch touch   = (UITouch)touches.AnyObject;
+    previousPoint1  = touch.PreviousLocationInView (this);
+
+    PointF p = touch.LocationInView (this);
+    path.MoveTo (p);
+
+    InvokeOnMainThread (() =&gt; {
+        this.SetNeedsDisplay ();
+    });
+
+    currentPath = path;
+
+    VESLine line = new VESLine () {
+        Path    = currentPath, 
+        Color   = StrokeColor,
+        Index   = IndexCount 
+    };
+    lines.Add(line);
+}
+</code></pre>
+
+<p><code>TouchesMoved</code> event was also modified, to create a smooth line path, by using a QuadCurve instead of a regular line. I also call the <code>SetNeedsDisplay</code> method, to force view drawing:</p>
+
+<pre><code>public override void TouchesMoved (MonoTouch.Foundation.NSSet touches, UIEvent evt)
+{
+    UITouch touch   = (UITouch)touches.AnyObject;
+    PointF p        = touch.LocationInView (this);
+
+    if (Math.Abs (p.X - previousPoint1.X) &gt;= 4 ||
+        Math.Abs (p.Y - previousPoint1.Y) &gt;= 4) {
+
+        PointF cP = new PointF ((p.X + previousPoint1.X) / 2, (p.Y + previousPoint1.Y) / 2);
+
+        currentPath.AddQuadCurveToPoint (cP, previousPoint1);
+        previousPoint1 = p;
+    }
+    else
+        currentPath.AddLineTo (p);
+
+    InvokeOnMainThread (() =&gt; {
+        this.SetNeedsDisplay ();
+    });
+}
+</code></pre>
+
+<p><code>TouchesEnded</code> and <code>TouchesCancelled</code> will redraw the view:</p>
+
+<pre><code>public override void TouchesEnded (MonoTouch.Foundation.NSSet touches, UIEvent evt)
+{
+    InvokeOnMainThread (() =&gt; {
+        this.SetNeedsDisplay ();
+    });
+}
+
+public override void TouchesCancelled (MonoTouch.Foundation.NSSet touches, UIEvent evt)
+{
+    InvokeOnMainThread (() =&gt; {
+        this.SetNeedsDisplay ();
+    });
+}
+</code></pre>
+
+<p>Finally, the <code>Draw</code> method was rewritten to iterate the Array of paths, drawing each one of them using the corresponding color:</p>
+
+<pre><code>public override void Draw (System.Drawing.RectangleF rect)
+{
+    foreach (VESLine p in lines) {
+        p.Color.SetStroke ();
+        p.Path.Stroke ();
+    }
+}
+</code></pre>

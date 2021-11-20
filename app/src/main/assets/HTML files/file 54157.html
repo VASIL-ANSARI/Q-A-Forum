@@ -1,0 +1,32 @@
+<p>This is my edited answer after trying it on my own on an Ubuntu 14.04 Azure VM.</p>
+
+<p>The following approach worked for me:</p>
+
+<ul>
+<li>Build and install binutils 2.26; for the purposes of this discussion,
+let's say it's installed in /opt/gcc-5.3.0.</li>
+<li>Configure gcc-5.3.0 in a build directory using <code>/root/objdir/../gcc-5.3.0/configure --prefix=/opt/gcc-5.3.0
+--enable-languages=c,c++ --disable-multilib --with-ld=/opt/gcc-5.3.0/bin/ld --with-as=/opt/gcc-5.3.0/bin/as</code> assuming gcc-5.3.0 and the build directory, <code>objdir</code>, are at the same
+level.</li>
+<li>Do <code>make</code> followed by <code>make install</code> in the <code>objdir</code> build directory.</li>
+</ul>
+
+<p>To verify that the <code>ld</code> used by the newly-built <code>gcc</code> is the one from the new binutils:</p>
+
+<pre><code>/opt/gcc-5.3.0/bin/gcc -print-prog-name=ld
+</code></pre>
+
+<p>The output should be, in this example:</p>
+
+<pre><code>/opt/gcc-5.3.0/bin/ld
+</code></pre>
+
+<p>Another test: rename the system <code>ld</code>, in my case <code>/usr/bin/ld</code>; the newly-built gcc should still work.  </p>
+
+<p>Of course, this applies to both <code>ld</code> and <code>as</code>.</p>
+
+<p>Setting AS and LD environment variables to point to the newly-built binaries from the binutils package did not work: the <code>-print-prog-name=...</code> still showed default tools, and removing/renaming the default tools caused gcc to fail.</p>
+
+<p>Thus the best way of accomplishing this is to build binutils first and then use the <code>--with-ld</code> and <code>--with-as</code> options to <code>configure</code>.  If you also want to ensure that the newly-built binutils are used to build GCC, you may want to put them in the PATH before the system-provided tools, or you can even rename the system-provided tools to keep them out of the picture.  </p>
+
+<p>Thank you for checking with another mailing list to verify that building GCC and binutils together doesn't work unless they are pulled from the source control, I guess that option is not applicable when using downloaded tarballs.  Overall this was an interesting exercise.</p>

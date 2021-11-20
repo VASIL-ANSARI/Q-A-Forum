@@ -1,0 +1,37 @@
+<p>On your parent process's code, you do this:</p>
+
+<pre><code>//Parent Code
+waitpid(childpid1, &amp;status, 0);
+char buffer[1024];
+
+close(fd[0]);
+
+read(fd[0], buffer, sizeof(buffer));
+
+sscanf(buffer, "%d", &amp;num1);
+printf("%d\n", num1);
+</code></pre>
+
+<p>So you close <code>fd[0]</code>, which I guess is your pipe's read end, and then you try to <code>read</code> from it.</p>
+
+<p>That read should return you an <code>EBADF</code> error, which you never check. So you probably just print garbage on output.</p>
+
+<p>Change your <code>read(...)</code> to this:</p>
+
+<pre><code>if (read(fd[0], buffer, sizeof(buffer) &lt; 0) {
+    perror("read");
+    exit(EXIT_FAILURE);
+}
+</code></pre>
+
+<p>and see yourself what happens.</p>
+
+<p>What you probably need to do is close the write end of the pipe for the parent process. So change <code>close(fd[0])</code> to:</p>
+
+<pre><code>if (close(fd[1]) &lt; 0) {
+    perror("close");
+    exit(EXIT_FAILURE);
+}
+</code></pre>
+
+<p>and always mind how important it is to check system calls' return values.</p>

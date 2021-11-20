@@ -1,0 +1,38 @@
+<p>Make sure you clear the execution + data caches between each test run.</p>
+
+<p>e.g.</p>
+
+<pre><code>DBCC FREEPROCCACHE
+DBCC DROPCLEANBUFFERS
+</code></pre>
+
+<p>If you run with the UNION ALL first, and then run the 2 selects separately afterwards, the data will already be cached in memory making performance much better (therefore giving the false impression that the subsequent approach is quicker when it may not be).</p>
+
+<p>If you used a UNION then that may well be slower as it has to apply a DISTINCT, but UNION ALL doesn't have to do that so it should be no different.</p>
+
+<p><strong>Update:</strong><br/>
+Have a look at the execution plans and compare them - see if there is any difference. You can view the execution plan by clicking the "Include Actual Execution Plan" button in SSMS before running the query</p>
+
+<p><strong>Update 2:</strong><br/> 
+Based on full CTEs given, I think I'd be looking at optimising those - I don't think the UNION ALL is actually the problem.</p>
+
+<p>IMHO, best thing to try is work through the CTEs one by one and try to optimise each one individually so that when you then combine them all in the main query, they perform better.</p>
+
+<p>e.g. for tDictionaryStreets, how about trying this:</p>
+
+<pre><code>SELECT DISTINCT
+    r.KladrItemName AS RegionName,
+        a.KladrItemName AS AreaName,
+        c.KladrItemName AS CityName,
+        sc.KladrItemName AS SubCityName,
+        s.StreetName      
+FROM StreetNames s
+    JOIN tFoundStreets fs ON s.StreetName = fs.KladrItemName
+    LEFT JOIN tFoundRegions r ON s.RegionName = r.KladrItemName
+    LEFT JOIN tFoundAreas a ON s.AreaName = a.KladrItemName
+    LEFT JOIN tFoundCities c ON s.CityName = c.KladrItemName
+    LEFT JOIN tFoundSubCities sc ON s.SubCityName = scc.KladrItemName
+</code></pre>
+
+<p>KladrItemName on each table should at least have an index on.
+Try reworking tDictionarySubCities in the same kind of way with joins too.</p>

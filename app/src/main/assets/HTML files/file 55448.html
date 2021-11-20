@@ -1,0 +1,48 @@
+<p>I don't think you should return from the method until the popen method call (including the block you specified) has completed.  If this is true, then you'd need to declare those return variables before calling <code>popen</code>, then return them only after <code>popen</code> is complete.  Something like this:</p>
+
+<pre><code>def run_cmd(cmd)
+  as_user "user1" do |user|
+    puts("In block as #{user} (uid=#{Process.uid}), pid is #{Process.pid}")
+
+    captured_stdout = captured_stderr = nil  # just to declare them
+
+    Open3.popen3(cmd) do |i,o,e,wait_tnr|
+       captured_stdout = o.read
+       captured_stderr = e.read
+
+       i.close
+       o.close
+       e.close
+
+    end
+    [captured_stdout, captured_stderr]
+  end
+end
+</code></pre>
+
+<p>By the way, are you sure you want to be using Ruby 1.8?  It's very ancient now and has been unsupported for a very long time.</p>
+
+<p>Come to think of it, this could be simplified considerably by removing the local <code>captured_</code> variables and <code>close</code> calls:</p>
+
+<pre><code>def run_cmd(cmd)
+  as_user "user1" do |user|
+    puts("In block as #{user} (uid=#{Process.uid}), pid is #{Process.pid}")
+    Open3.popen3(cmd) { |i,o,e,wait_tnr| [o.read, e.read] }
+  end
+end
+</code></pre>
+
+<p>To harden this a bit, you might want to add a thread join so that just in case the command closes its stdout and then needs to be running for a while after that, it gets the time to complete its work:</p>
+
+<pre><code>def run_cmd(cmd)
+  as_user "user1" do |user|
+    puts("In block as #{user} (uid=#{Process.uid}), pid is #{Process.pid}")
+    Open3.popen3(cmd) do |i,o,e,wait_tnr|
+      stdout = o.read
+      stderr = e.read
+      wait_thr.join
+      [stdout, stderr]
+    end
+  end
+end
+</code></pre>

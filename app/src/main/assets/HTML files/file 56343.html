@@ -1,0 +1,48 @@
+<p>Thank you all for the help.
+Turns out the cursor window does indeed not allow data greater than 1 MB in a query.
+Bellow is the code that now pulls out the file in bits and pieces.</p>
+
+<pre><code>private byte[] ProcessRawData(String searchID) {
+    String selection = TempImageEntry.ID + "=" + searchID;
+    String [] cols;
+    int count = 0;
+    byte [] rawData = new byte[0];
+    Long tracker = BlobSize;//use a generic length function of your choice
+    do {
+        cols = new String [] {"substr(" + TempImageEntry.RawData + ","+(1 + 1000000L * count)+",1000000)"};
+        Cursor cursor = mDatabase.getReadableDatabase().query(TempImageEntry.TABLE_NAME,cols,selection,null,null,null,null);
+        if(!cursor.moveToFirst())
+        {
+            cursor.close();
+            Log.e(LOG_TAG,"Serious Error");
+            return rawData;
+        }
+        byte [] theBit = cursor.getBlob(0);//get the current chunk
+        cursor.close();
+        byte[] c = new byte[rawData.length + theBit.length];//make room for the new chunk
+        System.arraycopy(rawData, 0, c, 0, rawData.length);//copy old chunk into the new room
+        System.arraycopy(theBit, 0, c, rawData.length, theBit.length);//copy the new chunk into the room made for the total
+        rawData = c;//set the new collected as the main
+        count++;
+        tracker -= 1000000L;
+    }while (tracker&gt; 1000000L);
+    cols = new String[]{"substr(" + TempImageEntry.RawData + "," + (1 + 1000000L * count) + "," + tracker + ")"};
+    Cursor cursor = mDatabase.getReadableDatabase().query(TempImageEntry.TABLE_NAME, cols, selection, null, null, null, null);
+    if (!cursor.moveToFirst()) {
+        cursor.close();
+        Log.e(LOG_TAG, "Serious Error");
+        return rawData;
+    }
+    byte[] theBit = cursor.getBlob(0);
+    cursor.close();
+    byte[] c = new byte[rawData.length + theBit.length];
+    System.arraycopy(rawData, 0, c, 0, rawData.length);
+    System.arraycopy(theBit, 0, c, rawData.length, theBit.length);
+    rawData = c;
+
+    return rawData;
+}
+</code></pre>
+
+<p>Maybe no the best way of doing this but it's functional.
+Yes storing blobs is maybe not the best way of doing this since we can write to disk but I've experienced problems with android with files going missing and we want to explicitly destroy files when they are no longer needed.</p>

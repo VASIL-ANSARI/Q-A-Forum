@@ -1,0 +1,78 @@
+<p>So the 'b' object doesn't even have an NSMutableArray in 'x'. 'x' will be nil for the object 'b'.</p>
+
+<p>But I suspect there's a different misunderstanding here. The object 'b' and the object 'a' are two different objects. Just because class B is a subclass of A, doesn't mean that adding strings to some instance of class B is going to add those strings to some <strong>other</strong> instance of class A.</p>
+
+<p>To answer your question in the comments, suppose you did want every instance of class B to have its own NSMutableArray in 'x'. You can do this like so: </p>
+
+<pre><code>// in ClassA.h
+@interface ClassA: NSObject {
+   NSMutableArray *x;
+}
+
+@property (retain,nonatomic) NSMutableArray *x;
+@end
+
+// in ClassA.m
+
+@implementation ClassA
+@synthesize x;
+
+- (id)init {
+    if ((self = [super init])) {
+
+      x = [[NSMutableArray alloc] init];
+      // whenever we init an instance of class A, we will have
+      // an nsmutablearray in 'x'
+    }
+    return self;
+}
+
+- (void)dealloc {
+
+   // assume you aren't using ARC
+   [x release];
+   [super dealloc];
+ }
+
+// in ClassB.h
+@interface ClassB: ClassA {
+   NSMutableArray *y;
+}
+
+@property (retain,nonatomic) NSMutableArray *y; // for consistency
+@end
+
+// in ClassB.m
+
+@implementation ClassB
+@synthesize y;
+
+- (id)init {
+    if ((self = [super init])) { // call Class A's init
+
+      y = [[NSMutableArray alloc] init];
+      // whenever we init an instance of class B, we will have
+      // everything an instance of A has, plus this y we need
+    }
+    return self;
+}
+
+- (void)dealloc {
+
+    // assume you aren't using ARC
+    [y release];
+    [super dealloc];
+}
+</code></pre>
+
+<p>I moved your initVar into a proper init, there's no reason to have two methods there. And I'm just showing the init's only, leaving out the addString and print. </p>
+
+<p>So now you can do this:</p>
+
+<p><code>ClassB *instanceOfB = [[ClassB alloc] init];</code></p>
+
+<p>and that instance will have both the x and y arrays that you want.</p>
+
+<p>I left the instance variable declarations in there also, even though they aren't strictly required with the newer compilers. The newer compiler versions can implicitly define those instance variables. If you don't understand that, don't worry about it at this point. Not that important.</p>
+
+<p>I hope that helps.</p>

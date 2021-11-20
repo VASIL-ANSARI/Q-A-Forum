@@ -1,0 +1,46 @@
+<blockquote>
+  <p>So I'm wondering if it is kosher to use the static initializer</p>
+</blockquote>
+
+<p>The funny thing is that</p>
+
+<pre><code>private static final boolean subscribed = subscribe();
+</code></pre>
+
+<p>and</p>
+
+<pre><code>private static final boolean subscribed;
+static {
+    subscribed = subscribe();
+}
+</code></pre>
+
+<p>get compiled to exactly the same bytecode. So using the needless static variable is strictly worse.</p>
+
+<hr>
+
+<blockquote>
+  <p>But until we are ready to scale up to a DI-driven framework,</p>
+</blockquote>
+
+<p>Discover <a href="https://github.com/google/guice" rel="nofollow">Guice</a>. Don't call it framework (though it is). It's easy to use and let's you get rid of <code>static</code>.</p>
+
+<p>Or do it manually. Rewrite your class by dropping all static modifiers and pass it everywhere you need it. It's rather verbose sometimes, but  stating dependencies explicitly allows you to test classes in isolation.</p>
+
+<p>The way it is, you can't test <code>StratBand</code> without hitting the database, no matter how trivial the method under test is. The problem is the coupling of every <code>StratBand</code> instance to the list of all <code>StratBand</code>s.</p>
+
+<p>Moreover, you can't test the behavior dependent on the <code>stratBands</code> contents as it always get loaded from the DB (sure, you can fill your DB correspondingly, but it's a big pain).</p>
+
+<p>For starters, I'd create <code>StratBandManager</code> (or <code>StratBands</code> or whatever name you like) and move all the static functionality to it. In order to easy the transition, I'd create a <em>temporary</em> class with static helpers like</p>
+
+<pre><code>private static StratBandManager stratBandManager = new StratBandManager();
+public static ImmutableList&lt;StratBand&gt; stratBands() {
+   return stratBandManager.stratBands();
+}
+</code></pre>
+
+<p>Then deprecate it all and replace it by DI (using Guice or doing it manually).</p>
+
+<hr>
+
+<p><a href="http://programmers.stackexchange.com/a/256177/14167">I find</a> Guice useful even for small projects. The overhead is tiny as often there's no or hardly any configuration.</p>

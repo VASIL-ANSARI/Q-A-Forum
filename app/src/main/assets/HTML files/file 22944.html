@@ -1,0 +1,27 @@
+<p>Ok, in case it helps someone, I managed to do it this way:</p>
+
+<pre><code>NSDictionary* parametersDictionary = @{@"AWSAccessKeyId" : @"YOUR_KEY",
+                                                  @"acl" : @"public-read", // or whatever you need
+                                                  @"key" : @"filename.ext", // file name on server, without leading /
+                                               @"policy" : @"YOUR_POLICY_DOCUMENT_BASE64_ENCODED",
+                                            @"signature" : @"YOUR_CALCULATED_SIGNATURE"
+                                    };
+
+AFHTTPClient *httpClient = [[AFHTTPClient alloc] initWithBaseURL:[NSURL URLWithString: @"http://s3-bucket.s3.amazonaws.com"]];
+NSMutableURLRequest *request = [httpClient multipartFormRequestWithMethod:@"POST"
+                                                                     path:nil
+                                                               parameters:parametersDictionary
+                                                constructingBodyWithBlock: ^(id &lt;AFMultipartFormData&gt;formData) {
+                                                    [formData appendPartWithFileData:fileData
+                                                                                name:@"file" //N.B.! To post to S3 name should be "file", not real file name
+                                                                            fileName:@"your_filename"
+                                                                            mimeType:@"mime/type"];
+                                                }];
+AFHTTPRequestOperation* operation = [[AFHTTPRequestOperation alloc] initWithRequest:request];
+</code></pre>
+
+<p>You can use any other kind of operation like AFXMLRequestOperation, if needed, because S3 returns response in XML format.</p>
+
+<p>If any parameters is missing or contains invalid data - request won't be accepted.</p>
+
+<p>Here is a link to background info on this: <a href="http://aws.amazon.com/articles/1434">Browser Uploads to S3 using HTML POST Forms</a></p>

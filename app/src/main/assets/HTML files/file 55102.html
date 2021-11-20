@@ -1,0 +1,53 @@
+<p>The root causes of the problem were the following ones:</p>
+
+<ol>
+<li>The simulation time in <code>main.cpp</code> function was too short (10 ns, I modified to 500 ns).</li>
+<li>As the test function in the testbench module is an <code>SC_CTHREAD</code>, it must be within an infinite loop. The previous implementation was completely wrong and I think this was also the root cause of the <code>Segmentation fault (core dumped)</code> message.</li>
+</ol>
+
+<p>In addition, the loop which repeats the test five times is not necessary as the number of iterations is related to the simulation time (set in the <code>main.cpp</code> function). Below is the code for <code>testbench.cpp</code> corrected:</p>
+
+<pre><code>void testbench::test(){
+
+    uint8_t c = 0;
+    int k = 0;
+
+    if (rst_tb){
+        c = 0;
+        k = 0;
+        cout &lt;&lt; "\nReset on!\n" &lt;&lt; endl;
+    }
+
+    else{
+        while(1){   
+                a_tb.write( (1 + rand() % (128-1)) );
+                b_tb.write( (1 + rand() % (128-1)) );
+
+                valid_tb.write(1);
+                wait();
+                valid_tb.write(0);
+                wait();
+
+                while(!ready_tb.read()) wait();//This condition waits until ready_tb = true to continue the simulation
+
+                cout &lt;&lt; "\nTest number " &lt;&lt; k+1 &lt;&lt; endl;
+                cout &lt;&lt; "\ta = " &lt;&lt; a_tb.read() &lt;&lt; " and b = " &lt;&lt; b_tb.read() &lt;&lt; endl;
+                cout &lt;&lt; "\tAddition of " &lt;&lt; a_tb.read() &lt;&lt; " and " &lt;&lt; b_tb.read();
+                cout &lt;&lt; " = " &lt;&lt; result_tb.read() &lt;&lt; endl;
+
+                c = a_tb.read() + b_tb.read();
+
+                if ( result_tb.read() != c ){
+                    cout &lt;&lt; "Real result = " &lt;&lt; a_tb.read() + b_tb.read();
+                    cout &lt;&lt; " and result with module = " &lt;&lt; result_tb.read() &lt;&lt; endl;  
+                    cout &lt;&lt; "Wrong result\n" &lt;&lt; endl;
+                    exit(1);
+                }
+
+                else cout &lt;&lt; "Result OK\n" &lt;&lt; endl;
+
+                k++;
+        }   
+    }
+}
+</code></pre>

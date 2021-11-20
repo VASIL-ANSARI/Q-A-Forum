@@ -1,0 +1,235 @@
+<h2>Preface</h2>
+
+<p>A couple of quick points before we get into the meat of this:</p>
+
+<blockquote>
+  <ul>
+  <li>All modern desktop browsers support <code>use strict</code>...</li>
+  </ul>
+</blockquote>
+
+<p>No, not at all. <s>IE8 is a fairly modern browser</s> <em>(not anymore, in 2015)</em>, and IE9 is a <s>quite</s> fairly modern browser. Neither of them supports strict mode (IE9 supports parts of it). IE8 is going to be with us a long time, because it's as high as you can go on Windows XP. Even though XP is now flatly end-of-lifed (well, you can buy a special "Custom Support" plan from MS), people will continue to use it for a while.</p>
+
+<blockquote>
+  <ul>
+  <li>The <code>use strict</code> is scoped within my function, so everything defined outside its scope is not affected</li>
+  </ul>
+</blockquote>
+
+<p>Not quite. The specification imposes restrictions on how even non-strict code uses functions created in strict mode. So strict mode can reach outside its box. And in fact, that's part of what's going on with the code you're using.</p>
+
+<h2>Overview</h2>
+
+<blockquote>
+  <p>So, are all browsers except Chrome wrong? Or is it the other way round? Or is this undefined behaviour so the browsers may choose to implement it in either way?</p>
+</blockquote>
+
+<p>Looking into it a bit, it looks like:</p>
+
+<ol>
+<li><p>Chrome is getting it right one way,</p></li>
+<li><p>Firefox is getting it right a different way,</p></li>
+<li><p>...and IE10 is getting it <em>very slightly</em> wrong. :-) (IE9 definitely gets it wrong, although not in a particularly harmful way.)</p></li>
+</ol>
+
+<p>I didn't look at the others, I figured we'd covered the ground.</p>
+
+<p>The code fundamentally causing the trouble is this loop</p>
+
+<pre><code>var a5 = arguments.callee;
+while (a5) {
+    a5 = a5.caller      // Error on this line in all browsers except Chrome
+}
+</code></pre>
+
+<p>...which relies on the <code>caller</code> property of function objects. So let's start there.</p>
+
+<h2><code>Function#caller</code></h2>
+
+<p>The <code>Function#caller</code> property was never defined in the 3rd edition specification. Some implementations provided it, others didn't. It's <s>a shockingly bad idea</s> <em>(sorry, that was subjective, wasn't it?)</em> an implementation issue (even more of one than <code>arguments.caller</code>), particularly in multi-threaded environments (and there are multi-threaded JavaScript engines), as well as with recursive code, as Bergi pointed out in the comments on the question.</p>
+
+<p>So in the 5th edition they explicitly got rid of it, by specifying that referencing the <code>caller</code> property on a strict function would throw an error. (This is in <a href="http://www.ecma-international.org/ecma-262/5.1/#sec-13.2">Â§13.2, <em>Creating Function Objects</em>, Step 19</a>.)</p>
+
+<p>That's on a <em>strict</em> function. On a non-strict function, though, the behavior is unspecified and implementation-dependent. Which is why there are so many different ways to get this right.</p>
+
+<h2>Instrumented Code</h2>
+
+<p>It's easier to refer back to instrumented code than a debugging session, so let's <a href="http://jsbin.com/ejijiw/1">use this</a>:</p>
+
+<pre><code>console.log("1. Getting a5 from arguments.callee");
+var a5 = arguments.callee;
+console.log("2. What did we get? " +
+            Object.prototype.toString.call(a5));
+while (a5) {
+    console.log("3. Getting a5.caller");
+    a5 = a5.caller;      // Error on this line in all browsers except Chrome
+    console.log("4. What is a5 now? " +
+                Object.prototype.toString.call(a5));
+}
+</code></pre>
+
+<h2>How Chrome Gets It Right</h2>
+
+<p>On V8 (Chrome's JavaScript engine), the code above gives us this:</p>
+
+<pre>1. Getting a5 from arguments.callee
+2. What did we get? [object Function]
+3. Getting a5.caller
+4. What is a5 now? [object Null]</pre>
+
+<p>So we got a reference to the <code>foo.bar</code> function from <code>arguments.callee</code>, but then accessing <code>caller</code> on that non-strict function gave us <code>null</code>. The loop terminates and we don't get any error.</p>
+
+<p>Since <code>Function#caller</code> is unspecified for non-strict functions, V8 is allowed to do anything it wants for that access to <code>caller</code> on <code>foo.bar</code>. Returning <code>null</code> is perfectly reasonable (although I was surprised to see <code>null</code> rather than <code>undefined</code>). (We'll come back to that <code>null</code> in the conclusions below...)</p>
+
+<h2>How Firefox Gets It Right</h2>
+
+<p>SpiderMonkey (Firefox's JavaScript engine) does this:</p>
+
+<pre>1. Getting a5 from arguments.callee
+2. What did we get? [object Function]
+3. Getting a5.caller
+TypeError: access to strict mode caller function is censored</pre>
+
+<p>We start out getting <code>foo.bar</code> from <code>arguments.callee</code>, but then accessing <code>caller</code> on that non-strict function fails with an error.</p>
+
+<p>Since, again, the access to <code>caller</code> on a non-strict function is unspecified behavior, the SpiderMonkey folks can do what they want. They decided to throw an error if the function that would be returned is a strict function. A fine line, but as this is unspecified, they're allowed to walk it.</p>
+
+<h2>How IE10 Gets It Very Slightly Wrong</h2>
+
+<p>JScript (IE10's JavaScript engine) does this:</p>
+
+<pre> 1. Getting a5 from arguments.callee 
+ 2. What did we get? [object Function] 
+ 3. Getting a5.caller 
+SCRIPT5043: Accessing the 'caller' property of a function or arguments object is not allowed in strict mode</pre>
+
+<p>As with the others, we get the <code>foo.bar</code> function from <code>arguments.callee</code>. Then trying to access that non-strict function's <code>caller</code> gives us an error saying we can't do that in strict mode.</p>
+
+<p>I call this "wrong" (but with a <em>very</em> lower-case "w") because it says that we can't do what we're doing in strict mode, but we're not <em>in</em> strict mode.</p>
+
+<p>But you could argue this is no more wrong that what Chrome and Firefox do, because (again) the <code>caller</code> access is unspecified behavior. So the IE10 folks decided that their implementation of this unspecified behavior would throw a strict-mode error. I think it's misleading, but again, if it's "wrong," it certainly isn't <em>very</em> wrong.</p>
+
+<p>BTW, IE9 definitely gets this wrong:</p>
+
+<pre>1. Getting a5 from arguments.callee 
+2. What did we get? [object Function] 
+3. Getting a5.caller 
+4. What is a5 now? [object Function] 
+3. Getting a5.caller 
+4. What is a5 now? [object Null]</pre>
+
+<p>It allows <code>Function#caller</code> on the non-strict function, and then allows it on a strict function, returning <code>null</code>. The spec is clear that that second access should have thrown an error, as it was accessing <code>caller</code> on a strict function.</p>
+
+<h2>Conclusions and Observations</h2>
+
+<p>What's interesting about all of the above is that in addition to the clearly-specified behavior of throwing an error if you try to access <code>caller</code> on strict functions, Chrome, Firefox, and IE10 all (in various ways) prevent your using <code>caller</code> to get a reference to a strict function, even when accessing <code>caller</code> on a non-strict function. Firefox does this by throwing an error. Chrome and IE10 do it by returning <code>null</code>. They all support getting a reference to a <strong>non</strong>-strict function via <code>caller</code> (on a non-strict function), just not a strict function.</p>
+
+<p>I can't find that behavior specified anywhere (but then, <code>caller</code> on non-strict functions is entirely unspecified...). It's probably the Right Thing<sup>(tm)</sup>, I just don't see it specified.</p>
+
+<p>This code is also fun to play with: <a href="http://jsbin.com/iliguq/1">Live Copy</a> | <a href="http://jsbin.com/iliguq/1/edit">Live Source</a></p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta charset=utf-8 /&gt;
+&lt;title&gt;Strict and Loose Function#caller&lt;/title&gt;
+  &lt;style&gt;
+    p {
+      font-family: sans-serif;
+      margin: 0.1em;
+    }
+    .err {
+      color: #d00;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;script&gt;
+    function display(msg, cls) {
+        var p = document.createElement('p');
+        if (cls) {
+            p.className = cls;
+        }
+        p.innerHTML = String(msg);
+        document.body.appendChild(p);
+    }
+
+    // The loose functions
+    (function () {
+      function loose1() {
+        display("loose1 calling loose2");
+        loose2();
+      }
+      loose1.id = "loose1"; // Since name isn't standard yet
+
+      function loose2() {
+        var c;
+
+        try {
+          display("loose2: looping through callers:");
+          c = loose2;
+          while (c) {
+            display("loose2: getting " + c.id + ".caller");
+            c = c.caller;
+            display("loose2: got " +
+                    ((c &amp;&amp; c.id) || Object.prototype.toString.call(c)));
+          }
+          display("loose2: done");
+        }
+        catch (e) {
+          display("loose2: exception: " +
+                  (e.message || String(e)),
+                  "err");
+        }
+      }
+      loose2.id = "loose2";
+
+      window.loose1 = loose1;
+
+      window.loose2 = loose2;
+    })();
+
+    // The strict ones
+    (function() {
+      "use strict";
+
+      function strict1() {
+        display("strict1: calling strict2");
+        strict2();
+      }
+      strict1.id = "strict1";
+
+      function strict2() {
+        display("strict2: calling loose1");
+        loose1();
+      }
+      strict2.id = "strict2";
+
+      function strict3() {
+        display("strict3: calling strict4");
+        strict4();
+      }
+      strict3.id = "strict3";
+
+      function strict4() {
+        var c;
+
+        try {
+          display("strict4: getting strict4.caller");
+          c = strict4.caller;
+        }
+        catch (e) {
+          display("strict4: exception: " +
+                  (e.message || String(e)),
+                 "err");
+        }
+      }
+      strict4.id = "strict4";
+
+      strict1();      
+      strict3();
+    })();
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>

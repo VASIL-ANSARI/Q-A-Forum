@@ -1,0 +1,56 @@
+<p>Yes it's possible. You need to override Request.getHeaders(). I'm lazy and I used HttpHeaders and HttpAuthentication from Spring for Android but you can just build the auth header and return it from the method. From getHeaders() you can return the auth header for basic auth. This is a sample request with basic auth. </p>
+
+<pre><code>public class GetUser extends Request&lt;User&gt; {
+
+    private static final String TAG = GetUser.class.getName();
+
+    private Response.Listener&lt;User&gt; mListener;
+    private ObjectMapper mMapper = new ObjectMapper();
+
+    public GetUser(Response.ErrorListener errorListener, Response.Listener&lt;User&gt; listener){
+        super(Method.GET, PoisUtils.BASE_URL + "/users", errorListener);
+
+        mListener = listener;
+    }
+
+    @Override
+    protected Response&lt;User&gt; parseNetworkResponse(NetworkResponse response) {
+        String jsonString = new String(response.data);
+        try {
+            User result = mMapper.readValue(jsonString, User.class);
+            return Response.success(result, getCacheEntry());
+        } catch (IOException e) {
+            Log.d(TAG, e.getMessage());
+        }
+        return null;
+    }
+
+    @Override
+    protected void deliverResponse(User response) {
+        mListener.onResponse(response);
+    }
+
+    @Override
+    public Map&lt;String, String&gt; getHeaders() throws AuthFailureError {
+        return AuthUtils.buildAuthHeaders().toSingleValueMap();
+    }
+}
+</code></pre>
+
+<p>And here is how I build the auth headers</p>
+
+<pre><code>public static HttpHeaders buildAuthHeaders(){
+
+    if(UserUtils.isUserLogged()){
+        HttpHeaders requestHeaders = new HttpHeaders();
+        User user = PoisApplication.get().getUser();
+
+        HttpAuthentication auth = new HttpBasicAuthentication(
+                user.getUsername(), user.getPassword());
+        requestHeaders.setAuthorization(auth);
+
+        return requestHeaders;
+    }
+    return null;
+}
+</code></pre>

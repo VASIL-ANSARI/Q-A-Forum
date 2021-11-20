@@ -1,0 +1,38 @@
+<p>If you are talking about downloading the files in a logging bucket, we use something like the following:</p>
+
+<ul>
+<li>connect to S3 (using the access/secret keys)</li>
+<li>open up the bucket entitled <code>"loggingBucket"</code></li>
+<li>get each of the objects in that bucket</li>
+<li>read the file in and process it</li>
+<li>after we process each file, we remove it</li>
+</ul>
+
+<p>Here's the sample code:</p>
+
+<pre><code>BasicAWSCredentials credentials =
+    new BasicAWSCredentials("accessKey", "secretAccessKey");
+AmazonS3Client client = new AmazonS3Client(credentials);
+
+for (ObjectListing listing = client.listObjects("loggingBucket");;
+        listing = client.listNextBatchOfObjects(listing)) {
+    // run through each listing to process it
+    for (S3ObjectSummary summary : listing.getObjectSummaries()) {
+        String bucketName = summary.getBucketName();
+        String fileName = summary.getKey();
+        S3Object object = client.getObject(bucketName, fileName);
+        S3ObjectInputStream stream = object.getObjectContent();
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(stream));
+        ... process the file here writing it locally or something
+        // delete the file afterwards
+        client.deleteObject(bucketName, fileName);
+    }
+    // we may need to get more files
+    if (!listing.isTruncated()) {
+        break;
+    }
+}
+</code></pre>
+
+<p>If this isn't what you want, please edit your post so we can help you better.</p>

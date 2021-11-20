@@ -1,0 +1,34 @@
+<p>Since a decorator wraps the function, you can intercept the input and output of the function when it is called.  In this way, you could look for an <code>_expected</code> keyword, strip it out, call the function, then test the return value of the function against the passed in expected value.</p>
+
+<pre><code>from functools import wraps
+
+_empty = object()  # sentinel value used to control testing
+
+def dump_ne(func):
+    @wraps(func)
+    def decorated(*args, **kwargs):
+        # remove the expected value from the actual call kwargs
+        expected = kwargs.pop('_expected', _empty)
+
+        # call the function with rest of args and kwargs
+        result = func(*args, **kwargs)
+
+        # only test when _expected was passed in the kwargs
+        # only print when the result didn't equal expected
+        if expected is not _empty and expected != result:
+            print('FAIL: func={}, args={}, kwargs={}'.format(func.__name__, args, kwargs))
+
+        return result
+
+    return decorated
+
+@dump_ne
+def cool(thing):
+    return thing.upper()
+
+print(cool('cat'))  # prints 'CAT', test isn't run
+
+for thing in ('cat', 'ice', 'cucumber'):
+    print(cool(thing, _expected='CUCUMBER'))
+    # dumps info for first 2 calls (cat, ice)
+</code></pre>

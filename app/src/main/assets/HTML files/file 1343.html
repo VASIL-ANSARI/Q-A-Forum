@@ -1,0 +1,68 @@
+<p>You are describing a very common problem. </p>
+
+<p>The normal approach to address it is through the use of <a href="http://en.wikipedia.org/wiki/Optimistic_concurrency_control" rel="nofollow">Optimistic Concurrency Control</a>.</p>
+
+<p>If that sounds like gobbledegook, it's not.  It's pretty simple idea.  The concurrency part of the term refers to the fact that there are updates happening to the data-of-record, and those updates are happening concurrently.  Possibly many writers.  (your situation is a degenerate case where a single writer is the source of the problem, but it's the same basic idea).  The optimistic part I'll get to in a minute.</p>
+
+<p><strong>The Problem</strong></p>
+
+<p>It's possible when there are multiple writers that the read+write portion of two updates become interleaved.  Suppose you have A and B, both of whom read and then update the same row in a database.  A reads the database, then B reads the database, then B updates it, then A updates it.  If you have a naive approach, then the "last write" will win, and B's writes may be destroyed. </p>
+
+<p>Enter optimistic concurrency.  The basic idea is to presume that the update will work, but check.  Sort of like the <em>trust but verify</em> approach to arms control from a few years back.  The way to do this is to include a field in the database table, which must be also included in the domain object, that provides a way to distinguish one "version" of the db row or domain object from another.  The simplest is to use a timestamp field, named lastUpdate, which holds the time of last update.  There are other more complex ways to do the consistency check, but  timestamp field is good for illustration purposes. </p>
+
+<p>Then, when the writer or updater wants to update the DB, it can only update the row for which the key matches (whatever your key is)  <em>and also</em> when the lastUpdate matches. This is the verify part. </p>
+
+<p>Since developers understand code, I'll provide some pseudo-SQL. Suppose you have a blog database, with an index, a headline, and some text for each blog entry.  You might retrieve the data for a set of rows (or objects) like this:</p>
+
+<pre><code>SELECT ix, Created, LastUpdated, Headline, Dept FROM blogposts 
+    WHERE CONVERT(Char(10),Created,102) = @targdate 
+</code></pre>
+
+<p>This sort of query might retrieve all the blog posts in the database for a given day, or month, or whatever. </p>
+
+<p>With simple optimistic concurrency, you would update <em>a single row</em> using SQL like this: </p>
+
+<pre><code>UPDATE blogposts Set Headline = @NewHeadline, LastUpdated = @NewLastUpdated
+    WHERE ix=@ix AND LastUpdated = @PriorLastUpdated
+</code></pre>
+
+<p>The update can only happen if the index matches (and we presume that's the primary key), and the LastUpdated field is the same as what it was when the data was read.  Also note that you must insure to update the LastUpdated field for every update to the row. </p>
+
+<p>A more rigorous update might insist that none of the columns had been updated.  In this case there's no timestamp at all.  Something like this:</p>
+
+<pre><code>UPDATE Table1 Set Col1 = @NewCol1Value,
+              Set Col2 = @NewCol2Value,
+              Set Col3 = @NewCol3Value
+WHERE Col1 = @OldCol1Value AND
+      Col2 = @OldCol2Value AND
+      Col3 = @OldCol3Value
+</code></pre>
+
+<p><strong>Why is it called "optimistic"?</strong></p>
+
+<p>OCC is used as an alternative to holding database locks, which is a heavy-handed approach to keeping data consistent.  A DB lock might prevent <em>anyone</em> from reading or updating the db row, while it is held. This obviously has huge performance implications.  So OCC relaxes that, and acts "optimistically", by presuming that when it comes time to update, the data in the table will not have been updated in the meantime. But of course it's not blind optimism - you have to check right before update. </p>
+
+<p><strong>Using Optimistic Cancurrency in practice</strong></p>
+
+<p>You said you use .NET.  I don't know if you use DataSets for your data access, strongly typed or  otherwise.  But .NET DataSets, or specifically DataAdapters, include built-in support for OCC.  You can specify and hand-code the UpdateCommand for any DataAdapter, and that is where you can insert the consistency checks.  This is also <a href="http://www.asp.net/learn/data-access/tutorial-21-cs.aspx" rel="nofollow">possible within the Visual Studio design experience</a>.</p>
+
+<p><img src="http://static.asp.net/asp.net/images/dataaccess/21fig06CS.png" alt="alt text">  </p>
+
+<p>If you get a violation, the update will return a result showing that ZERO rows were updated.  You can check this in the <a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqldataadapter.rowupdated.aspx" rel="nofollow">DataAdapter.RowUpdated event</a>.   (Be aware that in the ADO.NET model, there's a different DataAdapter for each sort of database.  The link there is for SqlDataAdapter, which works with SQL Server, but you'll need a different DA for different data sources.)</p>
+
+<p>In the RowUpdated event, you can check for the number of rows that have been affected, and then take some action if the count is zero.  </p>
+
+<hr>
+
+<p><strong>Summary</strong></p>
+
+<p>Verify the contents of the database have not been changed, before writing updates.  This is called <em>optimistic concurrency control</em>. </p>
+
+<hr>
+
+<p>Other links: </p>
+
+<ul>
+<li><a href="http://msdn.microsoft.com/en-us/library/aa0416cz.aspx" rel="nofollow">MSDN on Optimistic Concurrency Control in ADO.NET</a>  </li>
+<li><a href="http://www.primedigit.com/implementing-optimistic-concurrency-with-sql-timestamps/" rel="nofollow">Tutorial on using SQL Timestamps for OCC</a></li>
+</ul>

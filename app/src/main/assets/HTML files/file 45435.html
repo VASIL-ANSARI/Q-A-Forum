@@ -1,0 +1,36 @@
+<p>I don't know Unity, but your question is a  common DI patterns.</p>
+
+<p>IMHO the problem is you pass <a href="http://stackoverflow.com/questions/1214944/why-not-pass-your-ioc-container-around">your ioc container around</a>, in Configuration ctor:</p>
+
+<pre><code>public Configuration()  {
+  AutomaticMigrationsEnabled = false;
+  using (var container = UnityConfig.GetConfiguredContainer())  {
+        ....
+  }
+</code></pre>
+
+<p>you should use a <a href="http://blog.ploeh.dk/2011/07/28/CompositionRoot/" rel="nofollow">CompositionRoot</a>:</p>
+
+<pre><code>public class Bootstrap {
+  public void Register() {
+     var container = new UnityContainer();
+     container.RegisterType&lt;IGenderService, GenderService&gt;();
+     container.RegisterType&lt;Configuration&gt;();
+
+  }
+}
+
+internal sealed class Configuration:  {
+  private IGenderService _genderService;
+  public Configuration(IGenderService genderService) {
+     _genderService = genderService;
+  }
+}
+
+...
+// resolving
+var config = container.Resolve&lt;Configuration&gt;();
+</code></pre>
+
+<p>Behind the scenes, the Unity container first constructs a GenderService object and then passes it to the constructor of
+the Configuration class.</p>

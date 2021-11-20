@@ -1,0 +1,46 @@
+<p>Your using a jQuery-ui autocomplete plugin for the <code>CustomerID</code> property which hides the textbox that <code>@Html.DropDownListFor(model =&gt; Model.CustomerID, ...)</code> generates and replaces it with its own html. You need to use the values from the plugin to get both the value and display text. You have not shown how you have attached the plugin, but assuming its</p>
+
+<pre><code>$('#CustomerID').autocomplete({
+    ....
+});
+</code></pre>
+
+<p>then you can add a global variables and in the <code>select</code> event, set the values which you can then pass to the modal</p>
+
+<pre><code>var customerID;
+var customerName;
+
+$('#CustomerID').autocomplete({
+    source: function (request, response) {
+        $.ajax({
+            url: '@Url.Action("GetVisitCustomer", "VisitorsForm")',
+            datatype: "json",
+            data: {
+                Areas: 'Sales',
+                term: request.term
+            },
+            success: function (data) {
+                response($.map(data, function (val, item) {
+                    return {
+                        label: val.Name,
+                        value: val.ID,
+                    }                                     
+                }))
+            }
+        })
+    },
+    select: function (event, ui) {
+        customerID = ui.item.value;
+        customerName = ui.item.label;
+    }
+});
+</code></pre>
+
+<p>and then the code to open the dialog</p>
+
+<pre><code> $("#modal-opener").click(function () {                         
+    $('#customer').val(CustomerID);                          
+    $('#customername').text(customerName);              
+    $("#dialog-modal").dialog("open");
+})
+</code></pre>

@@ -1,0 +1,61 @@
+<pre><code>struct BarIsh{
+  Bar&amp;b;
+  operator Bar&amp;&amp;()&amp;&amp;{return std::move(b);}
+  operator Bar&amp;()&amp;&amp;{return b;}
+};
+</code></pre>
+
+<p>then <code>f(BarIsh{bar})</code>.</p>
+
+<p>The downside is that if <code>f</code> takes a deduced parameter, it gets a <code>BarIsh</code> not a <code>Bar</code>.</p>
+
+<p>Assuming you have a SFINAE friendly <code>result_of</code>...</p>
+
+<pre><code>template&lt;class...&gt;struct voider{using type=void;};
+template&lt;class...Ts&gt;using void_t=typename voider&lt;Ts...&gt;::type;
+
+template&lt;class...&gt;struct types{using type=types;};
+
+namespace details{
+  template&lt;template&lt;class...&gt;class Z,class types,class=void&gt;
+  struct can_apply:std::false_type{};
+  template&lt;template&lt;class...&gt;class Z,class...Ts&gt;
+  struct can_apply&lt;Z,types&lt;Ts...&gt;,void_t&lt;Z&lt;Ts...&gt;&gt;&gt;:
+    std::true_type
+  {};
+};
+template&lt;template&lt;class...&gt;class Z,class...Ts&gt;
+using can_apply=details::can_apply&lt;Z,types&lt;Ts...&gt;&gt;;
+
+template&lt;class Sig&gt;
+using result_of_t=typename std::result_of&lt;Sig&gt;::type;
+
+template&lt;class Sig&gt;
+using can_invoke=can_apply&lt;result_of_t,Sig&gt;;
+</code></pre>
+
+<p>and now we can test.</p>
+
+<pre><code>template&lt;typename F&gt;
+void foo(F&amp;&amp; f,std::true_type)
+{
+  Bar bar;
+  std::forward&lt;F&gt;(f)(std::move(bar));
+}
+
+template&lt;typename F&gt;
+void foo(F&amp;&amp; f,std::false_type)
+{
+  Bar bar;
+  std::forward&lt;F&gt;(f)(bar);
+}
+
+
+template&lt;typename F&gt;
+void foo(F f)
+{
+  foo(std::forward&lt;F&gt;(f),can_apply&lt;F(Bar&amp;&amp;)&gt;{});
+}
+</code></pre>
+
+<p>and done.  (there may be typos above, code written on phone)</p>

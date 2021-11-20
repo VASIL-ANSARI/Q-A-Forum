@@ -1,0 +1,102 @@
+<p>In your definition of <code>FileInfoCollection</code> in the method <code>CreateNewElement</code> you create <code>FileInfoCollection</code> which is wrong. Overridden <code>CreateNewElement</code> should return new collection element, not the new collection:</p>
+
+<pre><code>public class FileInfoCollection : ConfigurationElementCollection
+{
+    protected override ConfigurationElement CreateNewElement()
+    {
+        return new FileInfoElement();
+    }
+
+    protected override object GetElementKey (ConfigurationElement element)
+    {
+        return ((FileInfoElement)element).Extension;
+    }
+}
+</code></pre>
+
+<p>Regarding your desired configuration, probably the simplest implementation will look like:</p>
+
+<pre><code>public class AuthorisedClientsSection : ConfigurationSection {
+    [ConfigurationProperty("", IsDefaultCollection = true)]
+    public AuthorisedClientElementCollection Elements {
+        get { return (AuthorisedClientElementCollection)base[""];}
+    }
+}
+
+public class AuthorisedClientElementCollection : ConfigurationElementCollection {
+    const string ELEMENT_NAME = "AuthorisedClient";
+
+    public override ConfigurationElementCollectionType CollectionType {
+        get { return ConfigurationElementCollectionType.BasicMap; }
+    }
+
+    protected override string ElementName {
+        get { return ELEMENT_NAME; }
+    }
+
+    protected override ConfigurationElement CreateNewElement() {
+        return new AuthorisedClientElement();
+    }
+
+    protected override object GetElementKey(ConfigurationElement element) {
+        return ((AuthorisedClientElement)element).Name;
+    }
+}
+
+public class AuthorisedClientElement : ConfigurationElement {
+    const string NAME = "name";
+
+    [ConfigurationProperty(NAME, IsRequired = true)]
+    public string Name {
+        get { return (string)base[NAME]; }
+    }
+
+    [ConfigurationProperty("", IsDefaultCollection = true)]
+    public QueueElementCollection Elements {
+        get { return (QueueElementCollection)base[""]; }
+    }
+}
+
+public class QueueElementCollection : ConfigurationElementCollection {
+    const string ELEMENT_NAME = "Queue";
+
+    public override ConfigurationElementCollectionType CollectionType {
+        get { return ConfigurationElementCollectionType.BasicMap; }
+    }
+
+    protected override string ElementName {
+        get { return ELEMENT_NAME; }
+    }
+
+    protected override ConfigurationElement CreateNewElement() {
+        return new QueueElement();
+    }
+
+    protected override object GetElementKey(ConfigurationElement element) {
+        return ((QueueElement)element).Id;
+    }
+}
+
+public class QueueElement : ConfigurationElement {
+    const string ID = "id";
+
+    [ConfigurationProperty(ID, IsRequired = true)]
+    public int Id {
+        get { return (int)base[ID]; }
+    }
+}
+</code></pre>
+
+<p>And the test:</p>
+
+<pre><code>var authorisedClientsSection = ConfigurationManager.GetSection("AuthorisedClients")
+    as AuthorisedClientsSection;
+
+foreach (AuthorisedClientElement client in authorisedClientsSection.Elements) {
+    Console.WriteLine("Client: {0}", client.Name);
+
+    foreach (QueueElement queue in client.Elements) {
+        Console.WriteLine("\tQueue: {0}", queue.Id);
+    }
+}
+</code></pre>

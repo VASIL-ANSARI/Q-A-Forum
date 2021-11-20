@@ -1,0 +1,66 @@
+<p>Can I suggest the following ... the key bit of code is in the last two lines ... the rest of the code was to recreate your DataFrame ...</p>
+
+<pre><code># load your data
+from StringIO import StringIO # import from io for python 3
+data = """     Date,   open,   high,  close,    low,   volume,  price_change
+2015-03-25 13:55:00,  15.37,  15.38,  15.35,  15.34,  1121.00,         -0.02
+2015-03-25 14:00:00,  15.36,  15.38,  15.36,  15.34,  595.00,           0.00
+2015-03-25 14:05:00,  15.36,  15.38,  15.36,  15.35,  1369.01,          0.00
+2015-03-25 14:10:00,  15.36,  15.40,  15.40,  15.36,  3215.55,          0.04
+2015-03-25 14:15:00,  15.40,  15.45,  15.39,  15.39,  1563.45,         -0.01"""
+df = pd.read_csv(StringIO(data), header=0, index_col=None, skipinitialspace=True)
+df.Date = pd.to_datetime(df.Date)
+
+# now let's create the date and time columns you want
+df['date_only'] = [x.date() for x in df['Date']]
+df['time_only'] = [x.time() for x in df['Date']]
+</code></pre>
+
+<p>The output this gives me is as follows ...</p>
+
+<pre><code>In [8]: df
+Out[8]: 
+                 Date   open   high  close    low   volume  price_change  \
+0 2015-03-25 13:55:00  15.37  15.38  15.35  15.34  1121.00         -0.02   
+1 2015-03-25 14:00:00  15.36  15.38  15.36  15.34   595.00          0.00   
+2 2015-03-25 14:05:00  15.36  15.38  15.36  15.35  1369.01          0.00   
+3 2015-03-25 14:10:00  15.36  15.40  15.40  15.36  3215.55          0.04   
+4 2015-03-25 14:15:00  15.40  15.45  15.39  15.39  1563.45         -0.01   
+
+    date_only time_only  
+0  2015-03-25  13:55:00  
+1  2015-03-25  14:00:00  
+2  2015-03-25  14:05:00  
+3  2015-03-25  14:10:00  
+4  2015-03-25  14:15:00  
+</code></pre>
+
+<p>It is worth noting the different types of data this creates.</p>
+
+<pre><code>In [62]: type(df.date_only[0])
+Out[62]: datetime.date
+
+In [63]: type(df.time_only[0])
+Out[63]: datetime.time
+
+In [64]: type(df.Date[0])
+Out[64]: pandas.tslib.Timestamp
+
+In [65]: df.info()
+&lt;class 'pandas.core.frame.DataFrame'&gt;
+Int64Index: 5 entries, 0 to 4
+Data columns (total 9 columns):
+Date            5 non-null datetime64[ns]
+open            5 non-null float64
+high            5 non-null float64
+close           5 non-null float64
+low             5 non-null float64
+volume          5 non-null float64
+price_change    5 non-null float64
+date_only       5 non-null object
+time_only       5 non-null object
+dtypes: datetime64[ns](1), float64(6), object(2)
+memory usage: 400.0+ bytes
+</code></pre>
+
+<p>All of the above aside, you might be able to achieve what you want with the new .dt accessor attribute for a Series of datetime64[ns] objects (which the Date column above is). This was introduced in pandas 0.15.0. It allows you to do things like <code>df.Date.dt.year</code> to get the year from the datetime64[ns] object. Also month, day, hour, minute, second, etc., etc.</p>

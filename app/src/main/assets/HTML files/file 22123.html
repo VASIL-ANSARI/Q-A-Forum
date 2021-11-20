@@ -1,0 +1,71 @@
+<p><strong>Update</strong>: See the answer to <a href="http://stackoverflow.com/questions/19792552/d3-put-arc-labels-in-a-pie-chart-if-there-is-enough-space/19801529#19801529">D3 put arc labels in a Pie Chart if there is enough space</a> for a more comprehensive answer.</p>
+
+<hr>
+
+<p>If by <em>avoiding clipping</em> you mean that the <code>&lt;text&gt;</code> elements should not be occluded by the ensuing <em>arc</em>, then this can be achieved by making the <code>&lt;text&gt;</code> elements occur after the <code>.arc</code> elements in the DOM. One way of doing it is shown here: <a href="http://jsfiddle.net/tu3Pk/2/" rel="nofollow">http://jsfiddle.net/tu3Pk/2/</a></p>
+
+<p>Here, I have created a fresh <code>g.arc-labels</code> element which contains the labels and appears in the DOM after <code>g.arcs</code>.</p>
+
+<pre class="lang-js prettyprint-override"><code>pie: function (config) {
+
+    // ...
+
+    var g = svg.selectAll(".arc")
+            .data(pie(config.data))
+          .enter()
+            .append("g")
+            .attr("class", "arc");
+
+    g.append("path")
+        .attr("d", arc)
+        .style("fill", function(d) { 
+            return color(d.data.name); 
+        });
+
+    // Creating a new g for labels
+    var gLabel = svg.selectAll('.arc-label')
+                  .data(pie(config.data))
+                .enter()
+                  .append('g')
+                  .attr('class', 'arc-label');
+
+    gLabel.append("text")
+        .attr("transform", function(d) { 
+              return "translate(" + arc.centroid(d) + ")"; 
+        })
+        .attr("dy", ".35em")
+        .style("text-anchor", "middle")
+        .text(function(d) { return d.data.name; });
+
+    // ...
+}
+</code></pre>
+
+<hr>
+
+<p>However, this does not help in legibility much. To make the labels more legible, you might want to take a look at the question: <a href="http://stackoverflow.com/questions/14534024/preventing-overlap-of-text-in-d3">Preventing Overlap of Text in D3</a> in which case, the solution would be on these lines: <a href="http://jsfiddle.net/tu3Pk/3/" rel="nofollow">http://jsfiddle.net/tu3Pk/3/</a></p>
+
+<pre class="lang-js prettyprint-override"><code>// Get the angle on the arc and then rotate by -90 degrees
+function getAngle(d) {
+    var ang = (180 / Math.PI * (d.startAngle + d.endAngle) / 2 - 90);
+    return (ang &gt; 180) ? 180 - ang : ang;
+};
+
+// ...
+
+pie: function (config) {
+
+    // ...
+
+    gLabel.append("text")
+        .attr("transform", function(d) { 
+              return "translate(" + arc.centroid(d) + ") " +
+                     "rotate(" + getAngle(d) + ")";
+        })
+        .attr("dy", ".35em")
+        .style("text-anchor", "middle")
+        .text(function(d) { return d.data.name; });
+
+    // ...
+}
+</code></pre>

@@ -1,0 +1,79 @@
+<p>You probably have found a solution, but for others who may be looking for a similar solution.</p>
+
+<p>Assuming you have data in XML as:</p>
+
+<pre><code>&lt;rows&gt;
+    &lt;row&gt;
+        &lt;state&gt;Mississippi&lt;/state&gt;
+        &lt;district&gt;Holmes&lt;/district&gt;
+    &lt;/row&gt;
+
+    &lt;row&gt;
+        &lt;state&gt;Texas&lt;/state&gt;
+        &lt;district&gt;Cayuga ISD&lt;/district&gt;
+    &lt;/row&gt;
+    ...
+&lt;/rows&gt;
+</code></pre>
+
+<p>You can use this code that I used somewhere:</p>
+
+<pre><code>public class MySQLPullParser {
+
+    private String currTag = null;  
+    private boolean firstTag = true;
+
+    public String parseXML(Context ctx) {
+        try {
+            StringBuilder sb = new StringBuilder(500);  // give sufficient length to start with
+            sb.append("INSERT INTO " + yourTableName + " VALUES (");
+
+            XmlPullParserFactory xppFactory = XmlPullParserFactory.newInstance();
+            xppFactory.setNamespaceAware(true);
+            XmlPullParser xpp = xppFactory.newPullParser();
+
+            URL yourXmlPath = new URL(url);
+            InputStream is = yourXmlPath.openConnection().getInputStream();
+
+                    xpp.setInput(is,null);
+
+                    int e = xpp.getEventType();
+            while (e != XmlPullParser.END_DOCUMENT)
+            {
+                if(e == XmlPullParser.START_TAG) {
+                        currTag = xpp.getName();
+                }
+                else if (e == XmlPullParser.END_TAG) {
+                        currTag = null;
+                }
+                else if (e == XmlPullParser.TEXT) {
+                    if ( currTag.equals("state") ) {    // first table column
+                            if (firstTag)
+                                sb.append( xmlText + "(" ); // for first row insert
+                            else
+                                sb.append( xmlText + ",(" );
+                    }
+
+                    else if ( currTagType.equals("district") ){
+                        sb.append( "'" + xmlText + "')" );  // last table column should have a closing paran ")"
+                    }
+                }
+                e = xpp.next();
+            }
+
+        }   catch (XmlPullParserException e) {
+            e.printStackTrace();
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+
+        return sb.toString();
+    }
+}
+</code></pre>
+
+<p><code>parseXML()</code> will return the SQL INSERT statement that you can execute:</p>
+
+<pre><code>MySQLPullParser spp = new MySQLPullParser();
+db.execSQL( spp.parseXML(mContext) );
+</code></pre>

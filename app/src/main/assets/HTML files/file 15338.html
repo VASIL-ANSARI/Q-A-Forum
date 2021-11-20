@@ -1,0 +1,21 @@
+<p>What happens if you don't use the <code>os.system</code> call?</p>
+
+<p>for me:</p>
+
+<pre><code>python test.py 10   # 0.14
+python test.py 100  # 1.18
+python test.py 1000 # 11.77
+</code></pre>
+
+<p>It grows approximately an order of magnitide each time without <code>os.system</code>.  So, I'd say your problem is in the system call, not the performance of numpy (This is confirmed by doing the same test over except this time commenting out the numpy portion of the code).  At this point, the question becomes "Why is it slow(er) to do repeated system calls?" ... Unfortunately, I don't have an answer for that.</p>
+
+<p>Interestingly enough, If I do this in bash, there is no problem (it returns almost immediately)...</p>
+
+<pre><code>time for i in `seq 1 1000`; do echo true &gt; /dev/null; done
+</code></pre>
+
+<p>It also seems that the problem isn't just <code>os.system</code> -- <code>subprocess.Popen</code> suffers the same mality... (although, <code>subprocess</code> may just call <code>os.system</code> under the hood, I don't actually know...)</p>
+
+<p><strong>EDIT</strong></p>
+
+<p>This is getting better and better.  In my previous tests, I was leaving the allocation of the numpy array ... If you remove the allocation of the numpy array also, the test goes relatively fast.  However, the allocation of the array (1000,800,800) only takes ~1 second.  So, the allocation isn't taking all (or even much of the time) and the assignment of data to the array doesn't take much time either, but the allocation status of the array does effect how long it takes for the system call to execute.  Very weird.</p>

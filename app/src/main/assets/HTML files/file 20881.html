@@ -1,0 +1,52 @@
+<p>You correctly identified this as a tree-like data structure, and it's very wise of you to transform it because the original representation is clearly and utterly broken.</p>
+
+<p>Now that you know that you have a tree, you need to ask yourself what its nodes are. In your case, a node is either:</p>
+
+<ol>
+<li>a leaf, which has a name and a value</li>
+<li>an inner node, which has a name and children</li>
+</ol>
+
+<p>The problem is that there are two different representation of the second type:</p>
+
+<ol>
+<li>A pair <code>("&lt;name&gt;", { "&lt;child1&gt;" : ..., "&lt;child2&gt;" })</code></li>
+<li>A pair <code>("&lt;name&gt;", [{"&lt;child1&gt;" : ... }, { "&lt;child2&gt;": ... }])</code></li>
+</ol>
+
+<p>Your example doesn't show it, but maybe the following would also be possible:</p>
+
+<p><code>("&lt;name&gt;", [{"&lt;child1&gt;" : ... }, { "&lt;child2&gt;": ..., "&lt;child3&gt;": ... }])</code></p>
+
+<p>Recursion is indeed a good way to solve this. The edge case is clear, it's the leaf nodes. You just need to check the two other cases first:</p>
+
+<pre><code>def transform_node(name, val):
+    if isinstance(val, list):
+        val = ("children", [transform_node(k,v) for x in val for k, v in x.items()])
+    elif isinstance(val, dict):
+        val = ("children", [transform_node(*kv) for kv in val.items()])
+    else:
+        val = ("value", val)
+    return dict([("name", name), val])
+</code></pre>
+
+<p>Now you get:</p>
+
+<pre><code>&gt;&gt;&gt; transform_node("a", 3)
+{'name': 'a', 'value': 3}
+&gt;&gt;&gt; transform_node("a", { "c1" : 3, "c2" : 4 })
+{'name': 'a', 'children': [{'name': 'c2', 'value': 4}, {'name': 'c1', 'value': 3}]}
+&gt;&gt;&gt; transform_node("a", [{ "c1" : 3 }, { "c2" : 4, "c3": 5 }])
+{'name': 'a', 'children': [{'name': 'c1', 'value': 3}, {'name': 'c3', 'value': 5}, {'name': 'c2', 'value': 4}]}
+</code></pre>
+
+<p>Perfect! Now you can just do:</p>
+
+<pre><code>&gt;&gt;&gt; tree = { "a": { "b": 1 }}
+&gt;&gt;&gt; transform_node("root", tree)
+{'name': 'root', 'children': [{'name': 'a', 'children': [{'name': 'b', 'value': 1}]}]}
+</code></pre>
+
+<p>Of course if you want "a" to be the root, you can then just extract the first child of the root.</p>
+
+<p>That said, it's probably better to represent this as a real data type using classes, instead  of a dictionary, which is completly untyped.</p>

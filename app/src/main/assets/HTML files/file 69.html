@@ -1,0 +1,74 @@
+<p>Well, as with all "What might be faster in real life" questions, you can't beat a real life test.</p>
+
+<pre><code>function timeFunc($function, $runs)
+{
+  $times = array();
+
+  for ($i = 0; $i &lt; $runs; $i++)
+  {
+    $time = microtime();
+    call_user_func($function);
+    $times[$i] = microtime() - $time;
+  }
+
+  return array_sum($times) / $runs;
+}
+
+function Method1()
+{ 
+  $foo = 'some words';
+  for ($i = 0; $i &lt; 10000; $i++)
+    $t = "these are $foo";
+}
+
+function Method2()
+{
+  $foo = 'some words';
+  for ($i = 0; $i &lt; 10000; $i++)
+    $t = "these are {$foo}";
+}
+
+function Method3()
+ {
+  $foo = 'some words';
+  for ($i = 0; $i &lt; 10000; $i++)
+    $t = "these are " . $foo;
+}
+
+print timeFunc('Method1', 10) . "\n";
+print timeFunc('Method2', 10) . "\n";
+print timeFunc('Method3', 10) . "\n";
+</code></pre>
+
+<p>Give it a few runs to page everything in, then...</p>
+
+<p>0.0035568</p>
+
+<p>0.0035388</p>
+
+<p>0.0025394</p>
+
+<p>So, as expected, the interpolation are virtually identical (noise level differences, probably due to the extra characters the interpolation engine needs to handle). Straight up concatenation is about 66% of the speed, which is no great shock. The interpolation parser will look, find nothing to do, then finish with a simple internal string concat. Even if the concat were expensive, the interpolator will still have to do it, <strong>after</strong> all the work to parse out the variable and trim/copy up the original string.</p>
+
+<p><strong>Updates By Somnath:</strong></p>
+
+<p>I added Method4() to above real time logic.</p>
+
+<pre><code>function Method4()
+ {
+  $foo = 'some words';
+  for ($i = 0; $i &lt; 10000; $i++)
+    $t = 'these are ' . $foo;
+}
+
+print timeFunc('Method4', 10) . "\n";
+
+Results were:
+
+0.0014739
+0.0015574
+0.0011955
+0.001169
+</code></pre>
+
+<p>When you are just declaring a string only and no need to parse that string too, then why to confuse PHP debugger to parse. I hope you got my point.</p>

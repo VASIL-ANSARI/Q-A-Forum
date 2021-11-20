@@ -1,0 +1,26 @@
+<p>You need to use <code>UPDATE</code>, not <code>INSERT</code>. Assuming they are not able to log out unless they have logged in (i.e. there is record in <code>tblCollegeStudentLog</code> where <code>StudentTimeIn</code> is <code>NULL</code>, you can just use:</p>
+
+<pre><code>UPDATE  tblCollegeStudentLog
+SET     StudentTimeOut = @OutTime
+WHERE   StudentNumber = @StudentNumber
+AND     StudentTimeOut IS NULL;
+</code></pre>
+
+<p>Then you would use <a href="http://bobby-tables.com/" rel="nofollow">SqlParameters to properly execute the command</a> and not leave yourself vunerable to SqlInjection, poor SQL Plan caching and data type issues:</p>
+
+<pre><code>Dim Sql as String = "UPDATE tblCollegeStudentLog SET StudentTimeOut = @OutTime WHERE StudentNumber = @StudentNumber AND StudentTimeOut IS NULL;"
+Using cmd = New SqlCommand(Sql, con)
+    cmd.Parameters.AddWithValue("@OutTime", Convert.ToDateTime(lblTimeOutNya.Text))
+    cmd.Parameters.AddWithValue("@StudentNumber", lvwLog.SelectedItems(0).Text)
+    con.Open()
+    If cmd.ExecuteNonQuery() = 0 Then
+        'If no rows are affected then there was not a valid
+        'record to update, i.e. the student was not logged in
+        MsgBox("You were not logged in")
+    Else
+        MsgBox("You are now logged out!")
+    End If
+End Using
+</code></pre>
+
+<p><em>N.B. Please excuse my VB.NET, I have not used it in quite some time so there may be some syntax errors.</em></p>

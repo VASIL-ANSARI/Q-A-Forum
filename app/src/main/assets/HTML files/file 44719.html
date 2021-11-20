@@ -1,0 +1,23 @@
+<p>(Answer box used because it has the option of formatting).</p>
+
+<p>The ENGINE is the main issue in this case as indicated by Rick. You can influence the type of index created by using "USING BTREE" in the index creation (BTREE or HASH does not really seem to matter a lot in this case: You iterate through a range: Then BTREE is optimal. However you retrieve it per value, then HASH is optimal: Your query has both behaviours).</p>
+
+<p>When you switch to INNODB, the caches will make the query probably just as quick as an in memory table. You do then have the benefit of an index. To guarantee BTREE indexing I would create the schema as follows:</p>
+
+<pre><code>CREATE TABLE `entries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `weight` decimal(9,3) DEFAULT NULL,
+  `fenwick` decimal(9,3) NOT NULL DEFAULT '0.000',
+  PRIMARY KEY (`id`)
+) ENGINE=INNODB DEFAULT CHARSET=latin1;
+
+CREATE UNIQUE INDEX idx_nn_1 ON entries (id,fenwick) USING BTREE;
+</code></pre>
+
+<p>This uses the idx_nn_1 index on the main calculation (And only the index: The whole table is not used at all since all data is in the index). The sample size of 100 records however is too small to give any definitive answer regarding performance. The time the index takes to build compared to the data being accessed by just using the table, can however be such that you do not have any performance gain at all. So the final answer will be in your test.</p>
+
+<p>Other database engines (SQL Server, Oracle, Postgres): They will show similar behaviour. So switching to any of those engines will not make a huge difference except maybe for better processing in general (no way of predicting this). </p>
+
+<p>SQL Server might be a bit better (=faster) in building the index since that would just use an unique index on id and include the fenwick value, thus not having to really index that value.</p>
+
+<p>Oracle can really force the indexes, however this is not advised: In Oracle, assuming ordered data in the table, reading the table is quicker than reading the index and then the table for a lookup. Again in this scenario you can just add the id,fenwick index and never access the table. With index creation time taken into account, Oracle would have to read the full table once anyway, and in that time (or less depending on how many records it needs to reach your exit condition) it would also have executed your calculation.</p>

@@ -1,0 +1,46 @@
+<p>Possibly one approach if you're after distinct counts ( though you may need to adjust to the PK field)</p>
+
+<pre><code>SELECT emp.*, 
+       COUNT(distinct rep.id ) no_of_field_reports, --may need to be on Unique key instead
+       COUNT(distinct of_rep.id) no_of_office_reports --may need to be on Unique key instead)
+FROM employee emp
+LEFT JOIN report rep
+    ON (emp.id = rep.employee_id) 
+LEFT JOIN office_report of_rep 
+    ON (emp.id = of_rep.employee_id) 
+WHERE emp.user_id =7 AND emp.active = 1 
+GROUP BY emp.id, emp.name 
+ORDER BY emp.name ASC
+</code></pre>
+
+<p>An approach getting the counts before the joins if you're not after a distinct count then this is likely the right approach and offers flexibility.</p>
+
+<pre><code>SELECT emp.*, rep.cnt, of_Rep.cnt 
+FROM employee emp
+LEFT JOIN (SELECT count(ID) cnt , employee_ID
+           FROM REPORT 
+           GROUP BY employee_ID) rep
+  ON (emp.id = rep.employee_id) 
+LEFT JOIN (SELECT count(ID) cnt, Employee_ID      
+          FROM office_report 
+          GROUP BY employee_ID) of_rep 
+  ON (emp.id = of_Rep.employee_id) 
+WHERE emp.user_id =7 AND emp.active = 1 
+GROUP BY emp.id, emp.name 
+ORDER BY emp.name ASC
+</code></pre>
+
+<p>or use of correlated queries (but not supported all the time Such as when creating materialized views from this SQL)</p>
+
+<pre><code>SELECT emp.*, 
+      (SELECT count(ID)
+       FROM REPORT 
+       WHERE  emp.id = rep.employee_id) Report_Cnt, 
+      (SELECT count(ID)
+       FROM office_report  of_REP
+       WHERE emp.id = of_Rep.employee_id) of_Rep_Cnt
+FROM employee emp
+WHERE emp.user_id =7 AND emp.active = 1 
+GROUP BY emp.id, emp.name 
+ORDER BY emp.name ASC
+</code></pre>

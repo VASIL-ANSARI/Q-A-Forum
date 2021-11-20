@@ -1,0 +1,43 @@
+<p>In <code>PostgreSQL</code>, you can select the whole record as a field and expand it later:</p>
+
+<pre><code>SELECT  id, name, (sr).*
+FROM    (
+        SELECT  id, name,
+                (
+                SELECT  stage_rank
+                FROM    stage_rank
+                WHERE   stage = stage.id
+                ORDER BY
+                        rank_time DESC
+                LIMIT 1
+                ) sr
+        FROM    stage
+        ) q
+ORDER BY
+        name
+</code></pre>
+
+<p>or rewrite the query:</p>
+
+<pre><code>SELECT  DISTINCT ON (s.name, s.id, sr.rank_time, sr.id)
+        s.id, s.name, sr.*
+FROM    stage s
+JOIN    stage_rank sr
+ON      sr.stage = s.id
+ORDER BY
+        s.name, s.id, sr.rank_time DESC, sr.id DESC
+</code></pre>
+
+<p>or rewrite it the other way:</p>
+
+<pre><code>SELECT  id, name, (sr).*
+FROM    (
+        SELECT  s.id, s.name, sr, ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY sr.rank_time DESC, sr.id DESC) rn
+        FROM    stage
+        JOIN    stage_rank sr
+        ON      sr.stage = s.id
+        ) q
+WHERE   rn = 1
+ORDER BY
+        name
+</code></pre>

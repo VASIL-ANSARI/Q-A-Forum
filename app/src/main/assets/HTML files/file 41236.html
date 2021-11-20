@@ -1,0 +1,39 @@
+<p>Guava documentation for <a href="http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/collect/Multiset.html#count(java.lang.Object)]" rel="nofollow">Multiset#count()</a>
+has to say:</p>
+
+<blockquote>
+  <p>Note that for an Object.equals(java.lang.Object)-based multiset, this gives the same result as Collections.frequency(java.util.Collection, java.lang.Object) (which would presumably perform more poorly).</p>
+</blockquote>
+
+<p>So, yes, I suspect that performance is the issue here.</p>
+
+<p>I think <code>Multiset#count</code> is more efficient because <code>Collections#frequency</code> iterates through the entire collection. For an object o whose frequency you're checking, it goes through all elements e in the collection and checks <code>(o == null ? e == null : o.equals(e))</code>.</p>
+
+<p>For Multiset (which is an interface), the exact implementation of <code>count</code> depends on the class. If it is a <code>HashMultiset</code>, for example, then it is backed by a <code>HashMap</code>. For details about how that is more efficient than iterating through the whole collection, take a look at this answer: <a href="http://stackoverflow.com/questions/6493605/how-does-a-hashmap-work-in-java">How does a HashMap work in Java?</a>.</p>
+
+<p>The <a href="https://github.com/google/guava/blob/master/guava/src/com/google/common/collect/AbstractMapBasedMultiset.java" rel="nofollow">Guava code</a> is as follows </p>
+
+<pre><code>public int count(@Nullable Object element) {
+    Count frequency = Maps.safeGet(backingMap, element);
+    return (frequency == null) ? 0 : frequency.get();
+}
+</code></pre>
+
+<p>Similarly, for a <code>TreeMultiset</code>, which maintains the ordering of its elements and is backed by an AVL tree, <code>count</code> can be obtained in O(log(n)) steps instead of O(n), where n is the size of the collection. The <a href="https://github.com/google/guava/blob/master/guava/src/com/google/common/collect/TreeMultiset.java" rel="nofollow">Guava code</a> is as follows:</p>
+
+<pre><code>public int count(@Nullable Object element) {
+    try {
+      @SuppressWarnings("unchecked")
+          E e = (E) element;
+          AvlNode&lt;E&gt; root = rootReference.get();
+          if (!range.contains(e) || root == null) {
+              return 0;
+          }
+      return root.count(comparator(), e);
+    } catch (ClassCastException e) {
+          return 0;
+    } catch (NullPointerException e) {
+          return 0;
+    }
+}
+</code></pre>

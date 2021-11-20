@@ -1,0 +1,50 @@
+<p>ONE [Company] --> MANY [Officer], And ONE [Officer] --> MANY [Task].</p>
+
+<p>In HQL this should be pretty straight forward (I gave up using Criteria API, as it did not allow joining the same object class twice):</p>
+
+<p>Obviously, I did not test the queries, but they should work...</p>
+
+<pre><code>select Task 
+  from Task join Task.Officer o join o.Company c
+ where c.name = 'xxx'
+</code></pre>
+
+<p>or </p>
+
+<pre><code>select t
+  from Company c join c.Officers o join o.Tasks t
+ where  c.name = 'xxx'
+</code></pre>
+
+<p>Note: My experience with criteria is limited, as I have said. But looking at your code, I have two comments. Maybe you should not use the Map of officers but the list <code>officers.values()</code> to <code>allEq()</code>. Second remark: If you didn't do a mistake, Hibernate obviously magically finds the reference to the property you want to be allEq with, otherwise, the allEq misses a property you want to compare to.</p>
+
+<p>UPDATE: Ok, as promised, I checked the Javadocs for you: <a href="https://docs.jboss.org/hibernate/orm/3.5/api/org/hibernate/Criteria.html" rel="nofollow">https://docs.jboss.org/hibernate/orm/3.5/api/org/hibernate/Criteria.html</a></p>
+
+<p>A <code>join</code> in HQL is the equivalent of a criteria added to another criteria or an alias:</p>
+
+<pre><code>detachedCriteria = DetachedCriteria.forClass(Task.class)
+                   .createCriteria("Officer") // Officer property of task
+                   .createCriteria("Company") // Company property of officer
+                   .add(Restriction.eq(Key.COMPANY, compKey); // the company
+
+List&lt;Object&gt; list = detachedCriteria
+                    .getExecutableCriteria(hibernateSession)
+                    .list();
+</code></pre>
+
+<p>This should get you going...</p>
+
+<p>Note on HQL:</p>
+
+<p>To run the query, you get a query from the hibernate session with the HQL and then you call <code>list()</code> or <code>executeUpdate()</code>on it. <code>taskHqlString</code> is a HQL-statement as above. Replace the companyKey in the query with a named parameter <code>:companyKey</code>:</p>
+
+<pre><code>String taskHqlString = "select Task "  
+                     + "  from Task join Task.Officer o "
+                     + "            join o.Company c "
+                     + " where c.name = :companyKey";
+
+List&lt;Task&gt; list = (List&lt;Task&gt;)hibernateSession
+                  .createQuery(taskHqlString)
+                  .setParameter("companyKey", companyKeyValue)
+                  .list();
+</code></pre>

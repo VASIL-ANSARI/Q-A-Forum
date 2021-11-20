@@ -1,0 +1,35 @@
+<p>I use Selenium with <code>pyvirtualdisplay</code> with a normal browser in a manner similar to this: <a href="http://coreygoldberg.blogspot.jp/2011/06/python-headless-selenium-webdriver.html" rel="nofollow">Python - Headless Selenium WebDriver Tests using PyVirtualDisplay</a> (though I'm using Chrome; just a matter of a different driver).</p>
+
+<p>Much more stable than my experience with PhantomJS from both node and Python. You'll still likely want to use a process manager, just in case, but this way has been far less error-prone for me.</p>
+
+<p>Also, I suggest writing a little Python wrapper class so you can use a <code>with</code> block and ensure your environment always gets cleaned up; if you don't kill the session appropriately you can end up with an orphaned browser eating memory.</p>
+
+<p>From my project:</p>
+
+<pre><code>import os, time
+
+from selenium import webdriver
+from pyvirtualdisplay import Display
+
+
+class ChromeSession(object):
+    def __enter__(self):
+        self.display = Display(visible=0, size=(1024, 768))
+        self.display.start()
+
+        chromedriver = "/usr/lib/chromium/chromedriver"
+        os.environ["websession.chrome.driver"] = chromedriver
+
+        self.driver = webdriver.Chrome(chromedriver)
+        # Tell the driver to wait (if necessary) in case UI rendering takes a while...
+        self.driver.implicitly_wait(5)
+
+        return self.driver
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            print exc_type, exc_val
+            print exc_tb
+        self.driver.quit()
+        self.display.stop()
+</code></pre>

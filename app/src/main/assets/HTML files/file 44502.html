@@ -1,0 +1,151 @@
+<p>As you search for the URL something here, it's worth to make clear what makes it different from it's context.</p>
+
+<p>A URL in general does not contain whitespace and often it's enclosed in some kind of quoting or parenthesis that makes it easy to spot:</p>
+
+<pre class="lang-none prettyprint-override"><code> URL   -- surrounded by whitespace --
+"URL"  -- quoted like in your example --
+&lt;URL&gt;  -- the class way of marking an URL --
+</code></pre>
+
+<p>That would allow to describe the URL as the following expression</p>
+
+<pre class="lang-pcre prettyprint-override"><code>~(?P&lt;url&gt;[^\s&lt;&gt;"\']+)~
+</code></pre>
+
+<p>Running this alone on the document in your example already does some sort of work here, it gives 13 results of which 12 are false positives, but the URL is in:</p>
+
+<pre class="lang-none prettyprint-override"><code>#1 h1,            #2 Test,           #3 /h1,
+#4 some,          #5 html,           #6 elements,
+#7 a,             #8 href=,        
+
+#9 www.example.com/test?abc=xxxx&amp;def=yyyy&amp;ghi=zzzzz,
+
+#10 /a,           #11 more,          #12 html,
+#13 elements.
+</code></pre>
+
+<p>Luckily you have even more criteria what a URL is in your case, so this can be added. For example a query string must be there. That it, it must contain a question mark:</p>
+
+<pre class="lang-regex prettyprint-override"><code>~(?P&lt;url&gt;[^\s&lt;&gt;"\'?]+\?[^\s&lt;&gt;"\'?]+)~
+</code></pre>
+
+<p>The question mark has been excluded from the allowed character group, the group has been split in two and the question mark is now required in the middle. As a URL can only contain it once, this is perfectly fine.</p>
+
+<p>And now there is only one match left.</p>
+
+<pre><code>www.example.com/test?abc=xxxx&amp;def=yyyy&amp;ghi=zzzzz
+</code></pre>
+
+<p>As this now is really hard to read, let's write this better down:</p>
+
+<pre><code>~
+    (?(DEFINE)
+        (?&lt;Chars&gt; [^\s&lt;&gt;"\'?]+)
+    )
+
+    (?P&lt;url&gt; (?&amp;Chars) \? (?&amp;Chars) )
+~x
+</code></pre>
+
+<p>And that's not yet still the end, as you clearly know what you're looking for, that <code>abc=(.*?)&amp;</code> part. It's a little wrong, the value is terminated by <code>&amp;</code> so it can't contain it. As with the question mark, this should be put into it's pattern and as such a value can be at the end of the URL as well, the rest following can be made optional:</p>
+
+<pre><code>~
+    (?(DEFINE)
+        (?&lt;Chars&gt; [^\s&lt;&gt;"\'?]+ )
+        (?&lt;Val&gt; [^\s&lt;&gt;"\'?&amp;]* )
+    )
+
+    (?P&lt;url&gt;   (?&amp;Chars) \? (?&amp;Chars)? abc = (?P&lt;value&gt; (?&amp;Val) ) &amp;? (?&amp;Chars)?  )
+~x
+</code></pre>
+
+<p>So as long as you're interested in a specific URL it's relatively simple to do this with a regular expression, but: the URL in the document must not be normalized and other similar problems can be. So it's normally most worthy to normalize URLs first and then proceed with them. For example when looking URL parameters in the query-info part.</p>
+
+<p>While writing this I actually think, the filtering of the URLs you're getting from the document should be independent to the parsing method. As other users have commented, you perhaps want to use a HTML parser instead of regular expressions. Or you perhaps want both.</p>
+
+<p>Let's first take care of the regular expression scenario. Here is a regex variant with correct URL parsing. As a precaution, the maximum length of URLs has been limited from 6 to 256 bytes:</p>
+
+<pre><code>$matcher  = new PregStringMatcher('~([^\s&lt;&gt;"\']{6,256})~');
+$segments = new StringMatcherIterator($matcher, $input);
+$all      = new DecoratingIterator($segments, 'Net_URL2');
+$urls     = new CallbackFilterIterator($all, function (Net_URL2 $url) {
+    return isset($url-&gt;getQueryVariables()['abc']);
+});
+
+foreach ($urls as $url) {
+    echo $url-&gt;getQueryVariables()['abc'], ' - ', $url, "\n";
+}
+</code></pre>
+
+<p>This code makes use of classes from IteratorGarden and Pears <code>Net_URL2</code>. The output is (I modified your example HTML a little):</p>
+
+<pre><code>xxxx - www.example.com/test?%61%62%63=xxxx&amp;def=yyyy&amp;ghi=zzzzz
+</code></pre>
+
+<p>If you now consider to switch over to the HTML parser, you won't need to change much of that code. As the filtering logic remains the same, all you need is to exchange the underlying <strong>Traversable</strong>:</p>
+
+<pre><code>$doc   = new DOMDocument();
+$saved = libxml_use_internal_errors(true);
+$doc-&gt;loadHTML($input);
+libxml_use_internal_errors($saved);
+
+$attributes = (new DOMXPath($doc))-&gt;query('//@href');
+$segments   = new DecoratingIterator($attributes, function (DOMAttr $attr) {
+    return $attr-&gt;nodeValue;
+});
+</code></pre>
+
+<p>The rest of the code can remain the same and the result in this case is the same. So I hope these exampes are useful and show both some ways on how to deal with the regex pattern as well on how to add more checks.</p>
+
+<p>Here the code-example in full with both the regex and the HTML parser. The URL filter is the same in both:</p>
+
+<pre><code>&lt;?php
+/**
+ * preg_match: return entire url by matching a word inside it
+ *
+ * @link http://stackoverflow.com/a/29481904/367456
+ */
+
+require __DIR__ . '/vendor/autoload.php';
+
+$input = &lt;&lt;&lt;BUFFER
+&lt;h1&gt; Test &lt;/h1&gt;
+&lt;some html elements&gt;
+&lt;a href="www.example.com/test?%61%62%63=xxxx&amp;def=yyyy&amp;ghi=zzzzz"&gt;&lt;/a&gt;
+
+&lt;more html elements&gt;
+BUFFER;
+
+// Regex based retrieval
+
+$matcher  = new PregStringMatcher('~([^\s&lt;&gt;"\']{6,256})~');
+$segments = new StringMatcherIterator($matcher, $input);
+$all  = new DecoratingIterator($segments, 'Net_URL2');
+$urls = new CallbackFilterIterator($all, function (Net_URL2 $url) {
+    return isset($url-&gt;getQueryVariables()['abc']);
+});
+
+foreach ($urls as $url) {
+    echo $url-&gt;getQueryVariables()['abc'], ' - ', $url, "\n";
+}
+
+// DOMDocument based retrieval
+
+$doc   = new DOMDocument();
+$saved = libxml_use_internal_errors(true);
+$doc-&gt;loadHTML($input);
+libxml_use_internal_errors($saved);
+
+$attributes = (new DOMXPath($doc))-&gt;query('//@href');
+$segments   = new DecoratingIterator($attributes, function (DOMAttr $attr) {
+    return $attr-&gt;nodeValue;
+});
+$all  = new DecoratingIterator($segments, 'Net_URL2');
+$urls = new CallbackFilterIterator($all, function (Net_URL2 $url) {
+    return isset($url-&gt;getQueryVariables()['abc']);
+});
+
+foreach ($urls as $url) {
+    echo $url-&gt;getQueryVariables()['abc'], ' - ', $url, "\n";
+}
+</code></pre>

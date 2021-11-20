@@ -1,0 +1,38 @@
+<p>The following will work</p>
+
+<pre><code>&lt;%= Post.find_unread_by(current_user).size %&gt;
+</code></pre>
+
+<p>or</p>
+
+<pre><code>&lt;%= Post.find_unread_by(current_user).length %&gt;
+</code></pre>
+
+<p>However if you check your development.log you should see that it gets the unread count by </p>
+
+<ol>
+<li>Retrieving all the posts</li>
+<li>Retrieving all the posts read by the user</li>
+<li>Removing all of 2. from 1. in ruby</li>
+</ol>
+
+<p>This will be very bad performance wise with lots of posts. </p>
+
+<p>A better way would be to retrieve the posts read by the current user and then use ActiveRecord::Calculations to get a count without retrieving all the posts in the database</p>
+
+<pre><code>Post.count(:conditions =&gt; [ "id NOT IN (?)", Post.find_read_by(current_user)])
+</code></pre>
+
+<p>This should go into your Post model to follow best practices of not having finders in the view  or controller </p>
+
+<h2>Post.rb</h2>
+
+<pre><code>def self.unread_post_count_for_user(user)
+  count(:conditions =&gt; [ "id NOT IN (?)", Post.find_read_by(user)])
+end
+</code></pre>
+
+<p>Then your view will just be</p>
+
+<pre><code>&lt;%= Post.unread_post_count_for_user(current-user) %&gt;
+</code></pre>

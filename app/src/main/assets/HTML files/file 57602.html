@@ -1,0 +1,37 @@
+<p>This problem is due to incomplete trust path for the server certificate: the server certificate is probably not trusted by the client.</p>
+
+<p>Usually the fix is to import the server certificate into the client trust store. The default trustStore is in jre/lib/security/cacerts but is is a better practice to use your own keystore</p>
+
+<p>You can create an <code>SSLSocketFactory</code> and add to your connection before connecting or apply to all connections using the static method</p>
+
+<pre><code> HttpsURLConnection.setDefaultSSLSocketFactory(sslFactory);
+</code></pre>
+
+<p>This is an example to create the socket factory</p>
+
+<pre><code>/* Load the keyStore that includes the server cert as a "trusted" entry. */
+KeyStore keyStore = ... 
+TrustManagerFactory tmf = 
+  TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+tmf.init(keyStore);
+SSLContext ctx = SSLContext.getInstance("TLS");
+ctx.init(null, tmf.getTrustManagers(), null);
+sslFactory = ctx.getSocketFactory();
+</code></pre>
+
+<p>Example of loading the keyStore</p>
+
+<pre><code>KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+keyStore.load(trustStore, trustStorePassword);
+trustStore.close();
+</code></pre>
+
+<p>The trust store can also be configured using system properties</p>
+
+<pre><code> System.setProperty("javax.net.ssl.trustStore", "pathtoyourjavakeystorefile");
+ System.setProperty("javax.net.ssl.trustStorePassword", "password");
+</code></pre>
+
+<p>The simplest way to create the key store file is using the GUI tool Portecle. <em>New KeyStore > Import Trusted certificates</em></p>
+
+<p>You can import the root certificate of the chain if you want to 'trust' all certificates from root, or import only the server certificate. For a self-signed certificate, import it directly</p>

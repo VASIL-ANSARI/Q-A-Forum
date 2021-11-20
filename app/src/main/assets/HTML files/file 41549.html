@@ -1,0 +1,30 @@
+<p>The CASE statement and ORDER BY are fine, as I've used this same approach without major performance problems in the past on some large tables (100s of millions of rows).</p>
+
+<p>The first thing to check is your indexes.  For the above query, you'll definitely want an Index on the AddressID column of AddressMedia, and possibly an index on the Ship_To_Add column of OrderHeader.</p>
+
+<p>Some basic indexes to consider:</p>
+
+<pre><code>CREATE NONCLUSTERED INDEX IX_Address_AddressID 
+  ON dbo.AddressMedia (AddressID)
+
+CREATE NONCLUSTERED INDEX IX_OrderHeader_Ship_To_Addr 
+  ON dbo.OrderHeader (Ship_To_Addr)
+  INCLUDE (OrderID)
+</code></pre>
+
+<p>(Obviously recommending indexes based on a single query is potentially misleading for your application's overall performance, so you'll need to consider what makes the most sense for your database and application).</p>
+
+<p>If you're happy with your indexes, the next things to evaluate:</p>
+
+<ol>
+<li>Cached query plans: if the poor performing query is part of a stored procedure, try running sp_recompile on the objects to see if that makes any difference.</li>
+<li>Out-of-date statistics: If the tables are extremely large (likely, if you're noticing performance issues with this simple query), there's a chance your statuses have grown stale and the query plan it is deriving is non-optimal.  (Compare estimated vs actual query plans to see if you see huge discrepancies between estimated row counts and actual).  Manually updating statistics can sometimes alleviate these problems, but sometimes only temporarily depending on how quickly these tables are growing.</li>
+<li><p>That subquery/DISTINCT on the right side of the LEFT JOIN <em>could</em> be causing issues.  In this particular query, you can move the DISTINCT to the outer query (and get the same results) to limit the risk that SQL server optimizer will evaluate the entire subquery before taking your TOP into consideration.  (And if AddressMedia has a lot of rows, that could be causing your performance issues -- the actual execution plan would make that apparent).  Here's what that query might look like:</p>
+
+<pre><code>SELECT DISTINCT TOP 300 OH.OrderID, 
+CASE WHEN tAddrMedia.AddressID IS NULL THEN '0' ELSE '1' END AS HasMediaFlag 
+FROM OrderHeader OH 
+LEFT JOIN dbo.AddressMedia tAddrMedia ON tAddrMedia.AddressID = OH.Ship_To_Addr  
+ORDER BY HasMediaFlag DESC, OrderID DESC 
+</code></pre></li>
+</ol>

@@ -1,0 +1,43 @@
+<p>It seems like you can use a recursive CTE to get the result:</p>
+
+<pre><code>;with data (roomid, rateid, startdate, enddate, description) as
+(
+  select roomid, rateid, startdate, enddate, description
+  from RoomRateCotract
+  union all
+  select roomid, rateid, dateadd(day, 1, startdate), enddate, description
+  from data
+  where dateadd(day, 1, startdate) &lt;= enddate
+)
+-- insert into DisplayInventory
+select 
+  r.roomid, 
+  r.rateid,
+  case 
+    when r.ratedate = d.startdate 
+    then r.description else d.description end description,
+  d.startdate RateDate
+from data d
+left join RoomRateChange r
+  on d.roomid = r.roomid
+  and d.rateid = r.rateid
+</code></pre>
+
+<p>See <a href="http://www.sqlfiddle.com/#!3/0786d/2" rel="nofollow">SQL Fiddle with Demo</a>.</p>
+
+<p>The recursive part will get the list of start/end dates for each room and rate:</p>
+
+<pre><code>;with data (roomid, rateid, startdate, enddate, description) as
+(
+  select roomid, rateid, startdate, enddate, description
+  from RoomRateCotract
+  union all
+  select roomid, rateid, dateadd(day, 1, startdate), enddate, description
+  from data
+  where dateadd(day, 1, startdate) &lt;= enddate
+)
+select *
+from data
+</code></pre>
+
+<p>Then using the result, you will join to the <code>RoomRateChange</code> to get the result.  This could then be used to populate the <code>DisplayInventory</code> table.</p>

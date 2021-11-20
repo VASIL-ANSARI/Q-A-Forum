@@ -1,0 +1,154 @@
+<p>Your first query can be re-written as follows:</p>
+
+<pre><code>SELECT b.centerBranchNumber,
+       b.countryCode,
+       a.type,
+       SUM(DECODE(a.status, 1, 1, 0)) filled
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode
+  JOIN tableC 
+    ON a.registerNumber = c.registerNumber
+ WHERE c.registerDate &lt;= '01.02.2013'
+   AND c.state = 'A'
+   AND c.contractState != 2
+ GROUP BY b.centerBranchNumber,
+          b.countryCode,
+          a.type
+</code></pre>
+
+<p>Turning your second into the ANSI syntax as well (it'll help with more complicated queries as it's extremely obvious when you've done something wrong) it becomes this:</p>
+
+<pre><code>SELECT b.centerBranchNumber,
+       b.countryCode,
+       a.type,
+       SUM(DECODE(a.status, 0, 1, 0)) free, 
+       SUM(DECODE(a.status, 2, 1, 0)) damaged    
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode      
+ WHERE a.kks_kayitdrm = 'A'
+   AND a.recordDate &lt;= '01.02.2013'  
+ GROUP BY b.centerBranchNumber,
+           a.type,
+           b.countryCode
+</code></pre>
+
+<p>As you can see there's a large amount of similarity between the two queries. In order to get the result set as you want it there are two ways of doing it. Move the non-similar conditions into a CASE statement in your SUM. Alternatively, you can UNION ALL the two queries together and sum again. I would prefer to use the CASE statement as you reduce the amount of work that you have to do; the downside is that the query becomes less easy to read.</p>
+
+<p>The common part of your query is:</p>
+
+<pre><code>SELECT b.centerBranchNumber,
+       b.countryCode,
+       a.type
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode 
+ GROUP BY b.centerBranchNumber,
+          a.type,
+          b.countryCode
+</code></pre>
+
+<p>Taking this as the base you can slowly add to it until you get the same result. You have to remember to add the same conditions to the WHERE / JOINS to ensure that you get the same result.</p>
+
+<p>If we first add all your conditions; you have to change the JOIN on tableC in the first query to a LEFT OUTER JOIN. This is exactly the same as the WHERE clause will restrict the result set as if it were a INNER JOIN.</p>
+
+<pre><code>SELECT b.centerBranchNumber,
+       b.countryCode,
+       a.type
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode
+  LEFT OUTER JOIN tableC 
+    ON a.registerNumber = c.registerNumber
+ WHERE c.registerDate &lt;= '01.02.2013'
+   AND c.state = 'A'
+   AND c.contractState != 2
+ GROUP BY b.centerBranchNumber,
+          b.countryCode,
+          a.type
+</code></pre>
+
+<p>Adding the conditions on the second query you now need an OR in your WHERE clause:</p>
+
+<pre><code>SELECT b.centerBranchNumber,
+       b.countryCode,
+       a.type
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode
+  LEFT OUTER JOIN tableC 
+    ON a.registerNumber = c.registerNumber
+ WHERE ( c.registerDate &lt;= '01.02.2013'
+         AND c.state = 'A'
+         AND c.contractState != 2 
+             )
+    OR ( a.kks_kayitdrm = 'A'
+         AND a.recordDate &lt;= '01.02.2013' 
+             )
+ GROUP BY b.centerBranchNumber,
+          b.countryCode,
+          a.type
+</code></pre>
+
+<p>Next, your dates seem to be more than a little strange. You don't seem to be doing any conversion of the string literal <code>'01.02.2013'</code> to a date and as it's not in the form YYYYMMDD your comparisons will not work. You're relying on your <a href="http://docs.oracle.com/cd/E11882_01/server.112/e25513/initparams145.htm#REFRN10119" rel="nofollow">NLS_DATE_FORMAT</a> being of the form <code>DD.MM.YYYY</code>, which you cannot guarantee for every session. To compare a date you should either explicitly convert using the built-in <a href="http://docs.oracle.com/cd/E11882_01/server.112/e26088/functions203.htm#SQLRF06132" rel="nofollow"><code>TO_DATE()</code></a> function, and the appropriate <a href="http://docs.oracle.com/cd/E11882_01/server.112/e26088/sql_elements004.htm" rel="nofollow">format model</a>, or an ANSI <a href="http://docs.oracle.com/cd/E11882_01/server.112/e26088/sql_elements003.htm#SQLRF51062" rel="nofollow">datetime literal</a>, as I explain more fully in <a href="http://stackoverflow.com/questions/10178292/comparing-dates-in-oracle-sql/10178346#10178346">this answer</a>.</p>
+
+<p>Suffice it to say that Oracle <a href="http://docs.oracle.com/cd/E11882_01/server.112/e26088/sql_elements002.htm#i53062" rel="nofollow">explicitly recommends against using implicit conversion</a> because:</p>
+
+<blockquote>
+  <ul>
+  <li><p>SQL statements are easier to understand when you use explicit data type conversion functions.</p></li>
+  <li><p>Implicit data type conversion can have a negative impact on    performance, especially if the data type of a column value is converted to that of a constant rather than the other way around.</p></li>
+  <li><p>Implicit conversion depends on the context in which it occurs and may not work the same way in every case. For example, implicit conversion from a datetime value to a VARCHAR2 value may return an unexpected year depending on the value of the NLS_DATE_FORMAT
+  parameter.</p></li>
+  <li><p>Algorithms for implicit conversion are subject to change across software releases and among Oracle products. Behavior of explicit conversions is more predictable.</p></li>
+  </ul>
+</blockquote>
+
+<p>To compare your dates I would therefore recommend using TO_DATE(), for instance:</p>
+
+<pre><code>WHERE ( c.registerDate &lt;= to_date('01.02.2013', 'dd.mm.yyyy')
+</code></pre>
+
+<p>Lastly we can add the SUMs in; this means repeating your previous conditions within them. You can simplify this for your first query as whether something is "filled" is solely dependent on the LEFT OUTER JOIN, which means that if the <code>registerNumber</code> of that table, in the JOIN, is not null then the conditions are true.</p>
+
+<p>In both cases I use a CASE statement as opposed to a DECODE; this is because CASE is a lot more powerful, and enforces the correct data-types, <a href="http://stackoverflow.com/questions/13712763/are-a-case-statement-and-a-decode-equivalent/13712765#13712765">which is not guaranteed with DECODE</a>.</p>
+
+<p>Putting all this together your final query becomes:</p>
+
+<pre><code>SELECT b.centerBranchNumber
+     , b.countryCode
+     , a.type
+     , sum(case when a.status = 1 and c.registernumber is not null then 1
+                else 0
+           end) as filled
+     , sum(case when a.status = 0 
+                     and a.kks_kayitdrm = 'A'
+                     and a.recordDate &lt;= to_date('01.02.2013', 'dd.mm.yyyy')
+                     then 1
+                else 0
+           end) as free
+     , sum(case when a.status = 2
+                     and a.kks_kayitdrm = 'A'
+                     and a.recordDate &lt;= to_date('01.02.2013', 'dd.mm.yyyy')
+                     then 1
+                else 0
+           end) as damaged
+  FROM tableA a
+  JOIN tableB b
+    ON a.branchCode = b.branchCode
+  LEFT OUTER JOIN tableC 
+    ON a.registerNumber = c.registerNumber
+ WHERE ( c.registerDate &lt;= to_date('01.02.2013', 'dd.mm.yyyy')
+         AND c.state = 'A'
+         AND c.contractState != 2 
+             )
+    OR ( a.kks_kayitdrm = 'A'
+         AND a.recordDate &lt;= to_date('01.02.2013', 'dd.mm.yyyy')
+             )
+ GROUP BY b.centerBranchNumber
+        , b.countryCode
+        , a.type
+</code></pre>
+
+<p>You can use this approach more generically to combine queries, where it is appropriate.</p>

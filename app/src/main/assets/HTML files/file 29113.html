@@ -1,0 +1,45 @@
+<p>Per mythz suggestion in the comments, I added an app host and used its container and the test worked. Below is the updated test.</p>
+
+<pre><code>[TestMethod]
+    public void GetAgencyCase_Returns_AgencyCaseDetailsResponse()
+    {
+        var appHost = new BasicAppHost().Init();//this is needed for caching
+        Container container = appHost.Container;
+
+        Mock&lt;IChangeRequestService&gt; changeRequestService = new Mock&lt;IChangeRequestService&gt;();
+        Mock&lt;IRequestService&gt; requestService = new Mock&lt;IRequestService&gt;();
+
+        //Build the case we want returned
+        Case testCase = Builder&lt;Case&gt;.CreateNew()
+            .With(x =&gt; x.CaseId = "123")
+            .And(x =&gt; x.CaseNumber = "456")
+            .With(x =&gt; x.Agencies = Builder&lt;CasesAgency&gt;.CreateListOfSize(1)
+                .All()
+                .With(m =&gt; m.Agency = Builder&lt;Agency&gt;.CreateNew().With(z =&gt; z.AgencyId = 2).And(z =&gt; z.AgencyName = "Test").Build())
+                .Build())
+            .With(x =&gt; x.Requests = Builder&lt;Request&gt;.CreateListOfSize(5)
+                .Build())
+                .Build();
+
+        requestService.Setup&lt;Case&gt;(x =&gt; x.GetCase(It.IsAny&lt;CaseSearchCriteria&gt;(), It.IsAny&lt;AuthenticatedUser&gt;()))
+            .Returns(testCase);
+
+        container.Register&lt;IChangeRequestService&gt;(changeRequestService.Object);
+        container.Register&lt;IRequestService&gt;(requestService.Object);
+
+        container.Register&lt;ILog&gt;(new Mock&lt;ILog&gt;().Object);
+        container.Register&lt;ICacheClient&gt;(new MemoryCacheClient());
+        container.RegisterAutoWired&lt;AgencyCaseService&gt;();
+
+        var service = container.Resolve&lt;AgencyCaseService&gt;();
+        service.SetResolver(new BasicResolver(container));
+
+        var context = new MockRequestContext() { ResponseContentType = ContentType.Json };
+
+        service.RequestContext = context;
+
+
+        var response = service.Get(new GetAgencyCase { AgencyId = 2, AgencyCaseNumber = "123" });
+        ...assert stuff
+    }
+</code></pre>

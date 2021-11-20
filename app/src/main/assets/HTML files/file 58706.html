@@ -1,0 +1,88 @@
+<p>The output you are getting is because an exception is being raised. If you added a <code>print e</code> you would see that this is because <code>import io</code> was missing from the top of the script. Secondly, the station name you gave was out by one character. Try the following:</p>
+
+<pre><code>import io
+import requests
+import pandas as pd
+from dateutil import parser, rrule
+from datetime import datetime, time, date
+import time
+
+def getRainfallData(station, day, month, year):
+    """
+    Function to return a data frame of minute-level weather data for a single Wunderground PWS station.
+
+    Args:
+        station (string): Station code from the Wunderground website
+        day (int): Day of month for which data is requested
+        month (int): Month for which data is requested
+        year (int): Year for which data is requested
+
+    Returns:
+        Pandas Dataframe with weather data for specified station and date.
+    """
+
+    url = "http://www.wunderground.com/weatherstation/WXDailyHistory.asp?ID={station}&amp;day={day}&amp;month={month}&amp;year={year}&amp;graphspan=day&amp;format=1"
+    full_url = url.format(station=station, day=day, month=month, year=year)
+
+    # Request data from wunderground data
+    response = requests.get(full_url)
+    data = response.text
+    # remove the excess &lt;br&gt; from the text data
+    data = data.replace('&lt;br&gt;', '')
+
+    # Convert to pandas dataframe (fails if issues with weather station)
+    try:
+        dataframe = pd.read_csv(io.StringIO(data), index_col=False)
+        dataframe['station'] = station
+    except Exception as e:
+        print("Issue with date: {}-{}-{} for station {}".format(day,month,year, station))
+        return None
+
+    return dataframe
+
+# Generate a list of all of the dates we want data for
+start_date = "2016-08-01"
+end_date = "2016-08-31"
+start = parser.parse(start_date)
+end = parser.parse(end_date)
+dates = list(rrule.rrule(rrule.DAILY, dtstart=start, until=end))
+
+# Create a list of stations here to download data for
+stations = ["ILONDONL28"]
+# Set a backoff time in seconds if a request fails
+backoff_time = 10
+data = {}
+
+# Gather data for each station in turn and save to CSV.
+for station in stations:
+    print("Working on {}".format(station))
+    data[station] = []
+    for date in dates:
+        # Print period status update messages
+        if date.day % 10 == 0:
+            print("Working on date: {} for station {}".format(date, station))
+        done = False
+        while done == False:
+            try:
+                weather_data = getRainfallData(station, date.day, date.month, date.year)
+                done = True
+            except ConnectionError as e:
+                # May get rate limited by Wunderground.com, backoff if so.
+                print("Got connection error on {}".format(date))
+                print("Will retry in {} seconds".format(backoff_time))
+                time.sleep(10)
+        # Add each processed date to the overall data
+        data[station].append(weather_data)
+    # Finally combine all of the individual days and output to CSV for analysis.
+    pd.concat(data[station]).to_csv(r"data/{}_weather.csv".format(station))
+</code></pre>
+
+<p>Giving you an output CSV file starting as follows:</p>
+
+<pre class="lang-none prettyprint-override"><code>,Time,TemperatureC,DewpointC,PressurehPa,WindDirection,WindDirectionDegrees,WindSpeedKMH,WindSpeedGustKMH,Humidity,HourlyPrecipMM,Conditions,Clouds,dailyrainMM,SoftwareType,DateUTC,station
+0,2016-08-01 00:05:00,17.8,11.6,1017.5,ESE,120,0.0,0.0,67,0.0,,,0.0,WeatherCatV2.31B93,2016-07-31 23:05:00,ILONDONL28
+1,2016-08-01 00:20:00,17.7,11.0,1017.5,SE,141,0.0,0.0,65,0.0,,,0.0,WeatherCatV2.31B93,2016-07-31 23:20:00,ILONDONL28
+2,2016-08-01 00:35:00,17.5,10.8,1017.5,South,174,0.0,0.0,65,0.0,,,0.0,WeatherCatV2.31B93,2016-07-31 23:35:00,ILONDONL28
+</code></pre>
+
+<p>If you are not getting a CSV file, I suggest you add a full path to the output filename.</p>

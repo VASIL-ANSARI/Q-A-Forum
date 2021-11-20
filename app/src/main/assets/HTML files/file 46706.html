@@ -1,0 +1,26 @@
+<p>I'm not certain, but I've a theory. You have this (I've removed the <code>includes</code> calls that don't concern us just now:</p>
+
+<pre><code>@clin = Clin.includes(:tasks).includes(:labor_hours).find(params[:id])
+</code></pre>
+
+<p>What you're doing here is eager-loading the Tasks associated with each Clin and the LaborHours associated with each Clinâso far, so good, but in your view you're doing this (more or less):</p>
+
+<pre><code>@clin.tasks.distinct.each do |task|
+  # inside the partial...
+  task.labor_hours...
+end
+</code></pre>
+
+<p>Here you're not accessing the LaborHours associated each Clinâwhich is what you eager-loadedâyou're accessing the LaborHours associated with each Task associated with each Clin. To access the LaborHours associated with each Clin, you'd have to do this:</p>
+
+<pre><code>@clin.labor_hours.each do |labor_hour|
+  # ...
+end
+</code></pre>
+
+<p>But since you are rendering the Tasks (and not just the LaborHours), I don't think that's what you want. Instead, you need to tell Rails that you want to eager-load the second-order associationâi.e. LaborHours associated with the <em>Tasks</em>, not the LaborHours associated with the Clinsâby passing a hash to <code>includes</code>:</p>
+
+<pre><code>@clin = Clin.includes(:tasks =&gt; :labor_hours).find(params[:id])
+</code></pre>
+
+<p>P.S. There's some additional improvement you could makeâfor example, it looks like you're not actually using any of the attributes from LaborHours, you're actually just using the sum of the <code>total_hours</code> column. But calculating the sum in Ruby is a waste when you can just let the database do it. However, that's beyond the scope of this answer.</p>

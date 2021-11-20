@@ -1,0 +1,22 @@
+<p>You are probably overflowing the socket buffer because you set the socket to <code>O_NONBLOCK</code>. Normally (when blocking is enabled), if the socket buffer is full, <code>sendto</code> blocks until there is sufficient buffer space to hold the message for sending.</p>
+
+<p>From <a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/sendto.html" rel="nofollow">http://pubs.opengroup.org/onlinepubs/009695399/functions/sendto.html</a>:</p>
+
+<blockquote>
+  <p>If space is not available at the
+  sending socket to hold the message to
+  be transmitted and the socket file
+  descriptor does not have O_NONBLOCK
+  set, sendto() shall block until space
+  is available. If space is not
+  available at the sending socket to
+  hold the message to be transmitted and
+  the socket file descriptor does have
+  O_NONBLOCK set, sendto() shall fail.</p>
+</blockquote>
+
+<p>When you added <code>sleep</code>s between your <code>sendto</code> calls, you were effectively throttling down the throughput and preventing the socket buffers from overflowing.</p>
+
+<p>Instead of <code>sleep</code>, you should use a blocking socket. If the socket buffers become full, <code>sendto</code> will block, which is effectively the same thing as sleeping, except that it will automatically stop sleeping the instant the socket is able to hold your next datagram.</p>
+
+<p>To achieve better thoughput, try lumping data into datagrams close to the MTU size (while taking care to save enough room for UDP/IP headers). This should give you smaller header overhead compared to sending very short datagrams.</p>

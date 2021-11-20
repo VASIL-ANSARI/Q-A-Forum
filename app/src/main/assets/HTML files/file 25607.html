@@ -1,0 +1,84 @@
+<p>It does, but only through some dark magic hackery going on under the hood.</p>
+
+<p>When you look at <code>DateTimeKind</code>, you will see three options, <code>Unspecified</code>, <code>Utc</code> and <code>Local</code>.  This information is packed into two bits of the internal 64-bit representation.  Since there are four possible values that can be represented with two bits, that leaves room for a fourth kind.</p>
+
+<p>And as Jon Skeet uncovered and described <a href="http://codeblog.jonskeet.uk/2012/05/02/more-fun-with-datetime/" rel="nofollow">in this blog post</a>, <em>there is indeed a hidden fourth kind</em>!  Basically, it is <code>Local</code> but is treated differently when resolving ambiguous times.</p>
+
+<p>Of course, outside of .Net, <code>DateTime</code> with <code>Local</code> kind doesn't round trip anyway.  It gets treated as <code>Unspecified</code> on the return - unless you tell it otherwise.  I blogged about this <a href="http://codeofmatt.com/2013/04/25/the-case-against-datetime-now/" rel="nofollow">here</a>.  The better alternative is <code>DateTimeOffset</code>.</p>
+
+<p>Of course, this is just one of many screwy things with <code>DateTime</code> in .Net.  Another great post by Jon Skeet <a href="http://noda-time.blogspot.com/2011/08/what-wrong-with-datetime-anyway.html" rel="nofollow">here</a> discusses a few of them.</p>
+
+<p>The best solution is to stop using any of the built-in date and time types, and get familiar with <a href="https://code.google.com/p/noda-time/" rel="nofollow">Noda Time</a> instead.  You may have to still use <code>DateTime</code> or <code>DateTimeOffset</code> when interacting with other systems, but you can use Noda Time internally, and let it do all of the conversions for you.</p>
+
+<p><strong>Additional Information</strong></p>
+
+<p>You asked about round-tripping through another format, such as ticks or a string.</p>
+
+<ul>
+<li><p><code>DateTime.Ticks</code> in .Net isn't a great serialization format, because it doesn't adhere to a single point of reference.  They are integer number of 100-nanosecond intervals since midnight Jan 1, 0001.  But they are not respective to UTC - rather, they align with the <code>Kind</code> that is being used.  In other words:</p>
+
+<pre><code>var utcNow = DateTime.UtcNow;
+var now = utcNow.ToLocalTime();
+var equal = utcNow.Ticks == now.Ticks; // false
+</code></pre>
+
+<p>Compare that to JavaScript, which uses the Jan 1 1970 reference point - <em>at midnight UTC</em>.  Any time you get a number of ticks, such as with <code>.getTime()</code>, it reflects UTC.  You can't actually get ticks in local time with a simple method call, because they are meaningless in JavaScript.  Other languages work like this as well.</p>
+
+<p>Also, the Gregorian calendar that we use didn't go into effect until 1582, so it's screwy that 1/1/0001 is is their reference point.  Dates before 1582 are meaningless on our current scale and have to be translated.</p></li>
+<li><p>Strings can be a great way to transmit date and time values, because they are human readable.  But you should also make sure that they are machine readable without any ambiguity.  For example, don't use a value like <code>1/4/2013</code>, because without additional culture information, you won't know if that's January 4th or April 1st.  Instead, use one of the ISO8601 formats.</p>
+
+<p>When using these with <code>DateTime</code>, you can use the <code>"o"</code> format string, which can round-trip the kind.  It appends a <code>Z</code> for <code>Utc</code> kinds, or the local offset for <code>Local</code> kinds.</p>
+
+<pre><code>var dt = new DateTime(2013,6,4,8,56,0);  // Unspecified Kind
+var iso = dt.ToString("o");              // 2013-06-04T08:56:00.0000000
+
+var dt = DateTime.UtcNow;                // Utc Kind
+var iso = dt.ToString("o");              // 2013-06-04T15:56:00.0000000Z
+
+var dt = DateTime.Now;                   // Local Kind
+var iso = dt.ToString("o");              // 2013-06-04T08:56:00.0000000-07:00
+</code></pre>
+
+<p>When parsing from this format, if you don't have an offset, then the kind will be <code>Unspecified</code>. But if you have a <code>Z</code> or <em>any</em> offset, then by default the kind will be <code>Local</code>.  It will also apply whatever offset you provide, so that the result is the equivalent <em>local</em> time.  So if you want to apply it correctly, you must explicitly tell it to round-trip the kind.</p>
+
+<pre><code>var dt = DateTime.Parse("2013-01-04T15:56:00.0000000Z");
+var kind = dt.Kind;  // Local - incorrect!
+var s = dt.ToString("o");  // "2013-01-04T08:56:00.0000000-07:00"  (ouch!)
+</code></pre>
+
+<p>Instead:</p>
+
+<pre><code>var dt = DateTime.Parse("2013-01-04T15:56:00.0000000Z",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.RoundtripKind);
+var kind = dt.Kind;  // Utc  - that's better.
+var s = dt.ToString("o");  // "2013-01-04T15:56:00.0000000Z"  (nice!)
+</code></pre>
+
+<p>Of course, you are much better off working with <code>DateTimeOffset</code>.  When you serialize this in ISO8601 format, you always get a complete representation:</p>
+
+<pre><code>var dto = DateTimeOffset.Now;
+var iso = dto.ToString("o");   // 2013-06-04T08:56:00.0000000-07:00
+</code></pre>
+
+<p>This format aligns with <a href="http://www.ietf.org/rfc/rfc3339.txt" rel="nofollow">RFC3339</a>, which describes this profile of the ISO8601 spec, and is quickly becoming the de-facto standard for serializing timestamps between dissimilar systems.  IMHO - you should use this format whenever possible.  It is <em>vastly</em> superior to other formats such as RFC1123 that you commonly see on the web.  <a href="http://www.hackcraft.net/web/datetime/" rel="nofollow">Here are some more details on various date/time formats</a>.</p></li>
+</ul>
+
+<p><code>DateTimeOffset</code> values will always roundtrip, as they carry all relevant information in the serialized format.  So will <code>Unspecified</code> and <code>Utc</code> kinds of <code>DateTime</code>.  Just steer clear of <code>Local</code> kinds of <code>DateTime</code>.  Those will easily get you into trouble.</p>
+
+<p><strong>Answer Please?</strong></p>
+
+<p>Just reading this again, and realized while I provided lots of details, I didn't <em>directly</em> answer your question.  The tests will fail if the input kind is <em>already</em> of the first kind that you're converting to.  Let's look at the two test conditions:</p>
+
+<ul>
+<li><p><code>someDateTime == someDateTime.ToUniversalTime().ToLocalTime()</code></p>
+
+<p>This will fail if the original value is already of <code>Utc</code> kind.</p>
+
+<p>This test will also fail if the original value is invalid in the local time zone during a DST spring-forward transition.  For example, <code>2013-03-10 02:00:00</code> does not exist in US Pacific Time.  However, since it doesn't exist, you probably won't encounter it in your data.  So it's probably not a valid test condition.</p></li>
+<li><p><code>someDateTime == someDateTime.ToLocalTime().ToUniversalTime()</code></p>
+
+<p>This will fail if the original value is already of <code>Local</code> kind.</p></li>
+</ul>
+
+<p>Also note that the <code>Kind</code> property does not participate in the equality check.  So while the input of either of these could be <code>Unspecified</code>, the output of test 1 will always have a <code>Local</code> kind, and the output of test 2 will always have a <code>Utc</code> kind - <em>but the tests will pass anyway</em>.</p>

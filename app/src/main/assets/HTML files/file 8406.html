@@ -1,0 +1,93 @@
+<p><sub>OT: <code>&lt;rant&gt;</code>I love PoCo, have used it before. These days I gravitate to Boost instead, since compiler support is becoming ubiquitous. <em>This problem is my definition of a intrusive/restrictive framework: simple things become hard to do. Defies the value of a good programmer sometimes</em>.<code>&lt;/rant&gt;</code></sub></p>
+
+<p>I suggest keeping a flag, like so: (look foor <code>_noop</code>)</p>
+
+<pre><code>#include "Poco/Util/Application.h"
+#include "Poco/Util/Option.h"
+#include "Poco/Util/OptionSet.h"
+#include "Poco/Util/HelpFormatter.h"
+#include "Poco/Util/AbstractConfiguration.h"
+#include "Poco/AutoPtr.h"
+#include "Poco/Process.h"
+#include "Poco/PipeStream.h"
+#include "Poco/StreamCopier.h"
+#include &lt;fstream&gt;
+#include &lt;iostream&gt;
+
+using Poco::Util::Application;
+using Poco::Util::Option;
+using Poco::Util::OptionSet;
+using Poco::Util::HelpFormatter;
+using Poco::Util::AbstractConfiguration;
+using Poco::Util::OptionCallback;
+using Poco::AutoPtr;
+using Poco::Process;
+using Poco::ProcessHandle;
+using namespace std;
+
+class SampleApp: public Application
+{
+
+    protected:  
+    void defineOptions(OptionSet&amp; options)
+    {
+        Application::defineOptions(options);
+        options.addOption(
+            Option("help", "h", "Displays help details")
+                .required(false)
+                .repeatable(false)
+                .callback(OptionCallback&lt;SampleApp&gt;(this, &amp;SampleApp::handleHelp)));
+
+        options.addOption(
+            Option("Execute", "e", "Executes a c++ code and stores output in processess.txt")
+                .required(false)
+                .repeatable(false)
+                .callback(OptionCallback&lt;SampleApp&gt;(this, &amp;SampleApp::handleExecute)));
+    }
+
+    void handleHelp(const std::string&amp; name, const std::string&amp; value)
+    {   
+        Help();
+    }
+    void handleExecute(const std::string&amp; name, const std::string&amp; value)
+    {   
+        Execute();
+    }
+
+    void Help()
+    {
+        _noop = false;
+        cout &lt;&lt; "App.exe /option";
+
+    }
+    void Execute()
+    {
+        _noop = false;
+        std::string cmd("D:\\Projects\\sample_cpp\\Debug\\sample_cpp.exe");
+        std::vector&lt;std::string&gt; path;
+        path.push_back("");
+        Poco::Pipe outPipe;
+        ProcessHandle ph = Process::launch(cmd, path, 0, &amp;outPipe, 0);
+        Poco::PipeInputStream istr(outPipe);
+        std::ofstream ostr("processes.txt");
+        Poco::StreamCopier::copyStream(istr, ostr);
+        cout &lt;&lt; "Chk for processess.txt file" &lt;&lt; endl;
+    }
+
+    SampleApp() : _noop(true) { }
+
+    int main(const std::vector&lt;std::string&gt;&amp; args)
+    {
+        if (_noop)
+            Help();
+
+        return Application::EXIT_OK;
+    }
+
+  private:
+    bool _noop;
+
+};
+
+POCO_APP_MAIN(SampleApp)
+</code></pre>

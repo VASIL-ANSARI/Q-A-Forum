@@ -1,0 +1,104 @@
+<p>Don't forget to <code>kfree(data)</code> in your error cases...</p>
+
+<p>In any case, <code>buf</code> is a pointer to user memory, so DON'T call <code>strlen(buf)</code>.  You must <code>copy_from_user</code> first.  Why not</p>
+
+<pre><code>data = kmalloc(count);
+copy_from_user(data, buf, count);
+</code></pre>
+
+<p>?</p>
+
+<hr>
+
+<p>Your read handler assumes that <code>data</code> is a NUL-terminated string.  When you were using an array, this may have been true by accident, but you never actually ensure this in your write handler.  My guess is that <code>copy_to_user</code> fails.</p>
+
+<p>Here's a working example of a "memo" module that I wrote up just now, using <code>kmalloc</code>:</p>
+
+<pre><code>#include &lt;linux/fs.h&gt;
+#include &lt;linux/miscdevice.h&gt;
+#include &lt;linux/module.h&gt;
+#include &lt;linux/types.h&gt;
+#include &lt;linux/uaccess.h&gt;
+
+static char *data;
+static size_t len;
+
+static ssize_t
+memo_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+        ssize_t copy_len = min(len - min(len, *ppos), count);
+        ssize_t retval;
+
+        if (copy_to_user(buf, data + *ppos, copy_len)) {
+                retval = -EFAULT;
+                goto out;
+        }
+
+        *ppos += copy_len;
+        retval = copy_len;
+
+out:
+        return retval;
+}
+
+static ssize_t
+memo_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+{
+        ssize_t retval;
+        char *newdata;
+
+        newdata = kmalloc(count, GFP_KERNEL);
+        if (!newdata) {
+                retval = -ENOMEM;
+                goto out;
+        }
+
+        if (copy_from_user(newdata, buf, count)) {
+                retval = -EFAULT;
+                goto out;
+        }
+
+        kfree(data);
+        data = newdata;
+        newdata = NULL;
+        retval = len = count;
+
+out:
+        kfree(newdata);
+        return retval;
+}
+
+static const struct file_operations memo_fops = {
+        .owner = THIS_MODULE,
+        .llseek = no_llseek,
+        .read = memo_read,
+        .write = memo_write,
+};
+
+static struct miscdevice memo_misc = { MISC_DYNAMIC_MINOR, "memo", &amp;memo_fops };
+
+static int __init memo_init(void)
+{
+        int result;
+
+        result = misc_register(&amp;memo_misc);
+        if (result &lt; 0)
+                return -ENODEV;
+
+        return 0;
+}
+
+static void __exit memo_exit(void)
+{
+        misc_deregister(&amp;memo_misc);
+        kfree(data);
+        return;
+}
+
+module_init(memo_init);
+module_exit(memo_exit);
+MODULE_AUTHOR("ephemient");
+MODULE_LICENSE("GPL");
+</code></pre>
+
+<p>Of course this is missing locking and other safety precautions, but I hope this helps.</p>

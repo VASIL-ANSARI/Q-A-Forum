@@ -1,0 +1,36 @@
+<p>A class is a callable. When you call <code>SetDict(3)</code>, <code>SetDict.__call__</code> first calls the constructor <code>SetDict.__new__(SetDict)</code> and then calls the initializer <code>__init__(3)</code> on the return value of <code>__new__</code> if it's an instance of <code>SetDict</code>. So you can get a new instance of <code>SetDict</code> (or any other class) without calling its initializer by just calling its constructor directly.</p>
+
+<p>After that, you have an instance of your type and you can simply add regular copies of any container attributes and return it. Something like this should do the trick.</p>
+
+<pre><code>import collections
+import copy
+
+class SetDict(object):
+    def __init__(self, size):
+        self.d = collections.defaultdict(set)
+        # Do some initialization; if size is large, this is expensive
+        for i in range(size):
+            self.d[i].add(1)
+
+    def __copy__(self):
+        other = SetDict.__new__(SetDict) 
+        other.d = self.d.copy()
+        return other
+</code></pre>
+
+<p><code>__new__</code> is a static method and requires the class to be constructed as its first argument. It should be as simple as this unless you're overriding <code>__new__</code> to do something in which case you should show what it is so that this can be modified. Here's the test code do demonstrate the behavior that you want.</p>
+
+<pre><code>t = SetDict(3)
+print t.d  # defaultdict(&lt;type 'set'&gt;, {0: set([1]), 1: set([1]), 2: set([1])})
+
+s = copy.copy(t)
+print s.d # defaultdict(&lt;type 'set'&gt;, {0: set([1]), 1: set([1]), 2: set([1])})
+
+t.d[3].add(1)
+print t.d # defaultdict(&lt;type 'set'&gt;, {0: set([1]), 1: set([1]), 2: set([1]), 3: set([1])})
+print s.d # defaultdict(&lt;type 'set'&gt;, {0: set([1]), 1: set([1]), 2: set([1])})
+
+s.d[0].add(2)
+print t.d[0] # set([1, 2])
+print s.d[0] # set([1, 2])
+</code></pre>

@@ -1,0 +1,40 @@
+<p>If you modify entities and explicitly want them not to be flushed, you can detach them before modifying. The detached entities will no longer be managed by the persistence context.</p>
+
+<p>Hibernate API:</p>
+
+<p><a href="http://docs.jboss.org/hibernate/orm/4.1/javadocs/org/hibernate/Session.html#evict%28java.lang.Object%29" rel="nofollow"><code>session.evict(myEntity)</code></a></p>
+
+<p>JPA:</p>
+
+<p><a href="http://docs.oracle.com/javaee/7/api/javax/persistence/EntityManager.html#detach%28java.lang.Object%29" rel="nofollow"><code>entityManager.detach(myEntity)</code></a></p>
+
+<p><strong>EDIT</strong>: In case you want to detach all entities and manage only some of them, you can clear your persistence context first and then merge the entites you <strong>do</strong> need to be managed:</p>
+
+<p>Hibernate API:</p>
+
+<pre><code>session.clear();
+managedEntity = session.merge(detachedEntity);
+</code></pre>
+
+<p>JPA:</p>
+
+<pre><code>entityManager.clear();
+managedEntity = entityManager.merge(detachedEntity);
+</code></pre>
+
+<p><strong>EDIT 2</strong> All changes to managed entities are flushed on transaction commit. I am not aware of any feature of JPA or Hibernate that can turn this behavior off. So in addition to detaching some or all entities, you have some other choices, but none is exactly what you are looking for:</p>
+
+<ul>
+<li><p>fetching the entities outside a transaction, so they are detached immediately. This seems to come closest to what you want - no hassle with managed changes, only explicit merging would save an entity and you would have to deal less with the persistence API. However you would still need to open a session to merge the entities you do want to be saved with changes.</p></li>
+<li><p>mapping query results to DTOs/POJOs (which are always detached) using the <code>NEW</code> operator in your queries. This approach has the advantage of separating the persistence mapping from the application. However introducing a bunch of new classes may not be worth it, and not doing it consistently across the application adds conceptual complexity.  </p></li>
+<li><p>working inside a transaction, but rolling back instead of committing. You would not be able to save anything, and it is kind of a crude way to prevent changes from being synced with the DB. Unfortunately, you have to either commit or rollback a transaction eventually.</p></li>
+<li><p>creating deep copies of the entities to change them. Frankly, this doesn't make much sense to me neither, just adding it for the sake of completeness.    </p></li>
+</ul>
+
+<p><strong>EDIT 3</strong> Though not specified by the JPA spec, both Hibernate and Eclipselink allow marking transactions or even result sets from a single query as read-only. This could be useful for you, as</p>
+
+<blockquote>
+  <p>When a persistent object is read-only, Hibernate does not dirty-check simple properties</p>
+</blockquote>
+
+<p>Change flushing gets a bit more complicated when it comes to relationships. Please refer to <a href="http://docs.jboss.org/hibernate/orm/4.3/manual/en-US/html/ch12.html" rel="nofollow">this documentation for Hibernate</a> or <a href="http://wiki.eclipse.org/EclipseLink/UserGuide/JPA/Basic_JPA_Development/Querying/Query_Hints" rel="nofollow">this one for Eclipselink</a>.</p>

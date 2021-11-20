@@ -1,0 +1,24 @@
+<p>This is not a direct answer to your question, but I'll post it as an answer anyways because I think it will help you.</p>
+
+<p>Instead of running all of the code's migrations from the beginning of time, you should use the <code>schema.rb</code> file for the app. Note, this only works when you're first setting up an existing app that you've begun work on (because it force-creates all the tables, therefore deleting any content), but it is the correct way to load your database in this case. Migrations are meant for incremental changes.</p>
+
+<p>To load the schema into your database:</p>
+
+<pre><code>rake db:schema:load
+</code></pre>
+
+<p>Then your database will be setup according to the <code>schema.rb</code> file (which gets updated automatically by Rails for this exact purpose).</p>
+
+<p><strong>Edit</strong>
+The cause of your problem is probably some code in your application getting loaded before the migration that references the <code>roles</code> table (or more likely the <code>Role</code> model). This happens frequently when there is a database query in the <code>routes.rb</code> file, but it could be from any number of files that get loaded when the <code>environment</code> rake task is invoked (which is the case for the <code>:migrate</code> task).</p>
+
+<p><strong>Edit 2</strong> Looking at your stack trace:</p>
+
+<blockquote>
+  <p>/Users/sa/Documents/AptanaWorkspace/recprototype/config/initializ
+  ers/constants.rb:1:in `'</p>
+</blockquote>
+
+<p>I guess that the <code>config/initializers/constants.rb</code> file has something like <code>Role.all</code>. The initializers get loaded whenever the Rails environment is loaded (which is the case for most rake tasks provided by Rails).</p>
+
+<p>You should still use the <code>rake db:schema:load</code> task, but you'll need to comment out that line before you run it (if my theory is correct, of course).</p>

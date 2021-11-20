@@ -1,0 +1,34 @@
+<p>You appear to be forgetting to <em>show</em> the <code>Login</code> form e.g.</p>
+
+<pre><code>Login l = new Login();
+l.ShowDialog(); // block until the user closes the dialog
+var userName = l.UsernameInput.Text;
+// get secret code
+</code></pre>
+
+<p>However, you should try to avoid running non-UI operations like DB queries on the UI thread, mainly because you will find your UI will appear "frozen" until this code has finished. Instead you should consider firing that stuff off in a new thread thus freeing up the UI</p>
+
+<pre><code>var userName = l.UsernameInput.Text;
+Task.Run&lt;string&gt;(() =&gt; 
+{
+    using (var con = new OleDbConnection("..."))
+    using (var cmd = new OleDbCommand(con))
+    {
+        cmd.CommandText = "SELECT [secretcode] FROM UsrDet WHERE usrname = @username";
+        cmd.Parameters.AddWithValue("@username", userName);
+        con.Open();
+        using (var dr = cmd.ExecuteReader())
+        {
+            while(dr.Read())
+            {
+                return dr["secretcode"].ToString();
+            }   
+        }
+    }
+}).ContinueWith((t) =&gt; 
+{
+    // update UI
+    seccode.Visible = true;
+    seccode.Text = t.Result;
+}, TaskScheduler.FromCurrentSynchronizationContext());
+</code></pre>

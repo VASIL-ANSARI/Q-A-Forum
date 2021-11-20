@@ -1,0 +1,34 @@
+<p>Think about what this does:</p>
+
+<pre><code>lambda.invoke(params, function(err, data) { ...
+</code></pre>
+
+<p>It starts "doing something" (the fact that happens to be invoking another lambda function is actually unimportant) and when "something" is done, it calls function(), right?</p>
+
+<p>But it also returns immediately, and the next statement executes.</p>
+
+<p>Meanwhile "something" is being handled by the asynchronous event loop.</p>
+
+<p>The "next statement" is</p>
+
+<pre><code>console.log(' end of function');
+</code></pre>
+
+<p>Then, you're telling lambda "hey, I may have some async stuff going on, but don't worry about waiting for it to finish":</p>
+
+<pre><code>context.callbackWaitsForEmptyEventLoop = false; 
+</code></pre>
+
+<p>So the good news is your code is doing what is was written to do... but that turns out to be wrong.</p>
+
+<p>Everywhere you have one of these two things...</p>
+
+<pre><code>// an error occurred
+// successful response
+</code></pre>
+
+<p>...<em>those</em> are the places you should be calling <code>callback()</code>, not at the end of the handler function, which your code reaches very quickly, as it is supposed to.</p>
+
+<p>You shouldn't need to use <code>context.callbackWaitsForEmptyEventLoop = false;</code> if you properly disconnect your database connections and all modules you include are well-behaved.  While that has its purposes, there seem to be a lot of people using it to cover up for subtle unfinished business.</p>
+
+<p>Or, for a tidier solution, where you only have one mention of the callback at the end and your function { function { function { nesting doesn't get so out of control, use <a href="https://www.npmjs.com/package/async-waterfall" rel="nofollow"><code>async-waterfall</code></a>.</p>

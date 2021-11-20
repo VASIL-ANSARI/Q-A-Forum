@@ -1,0 +1,21 @@
+<p>You get 404 errors because there is no specific managed handler mapped to path <code>*.png</code> in IIS configuration. So all requests to <code>Image/*.png</code> paths are intercepted by <code>StaticFile</code> modules (<code>StaticFileModule, DefaultDocumentModule, DirectoryListingModule</code>) and these modules can not find requested files.</p>
+
+<p>You can workaround this problem by configuring your application in <code>web.config</code>.</p>
+
+<p><em>The first option</em> is to add <code>runAllManagedModulesForAllRequests="true"</code> attribute to <code>configuration/system.webServer/modules</code> element. It should be looking like this:</p>
+
+<pre><code>    &lt;modules runAllManagedModulesForAllRequests="true" /&gt;
+</code></pre>
+
+<p><strong>NOTE:</strong> But I would strongly recommend to not doing this. Read more about <a href="http://www.britishdeveloper.co.uk/2010/06/dont-use-modules-runallmanagedmodulesfo.html" rel="nofollow">possible performance problems</a>.</p>
+
+<p>So <em>the second (and much better) option</em> is to register ASP.NET ISAPI for handling your requests to <code>Image/*.png</code> path:</p>
+
+<pre><code>&lt;system.webServer&gt;
+  &lt;handlers&gt;
+    &lt;add name="ImageMVCHandler-ISAPI-4.0_32bit" path="image/*.png" verb="GET,HEAD" modules="IsapiModule" scriptProcessor="%windir%\Microsoft.NET\Framework\v4.0.30319\aspnet_isapi.dll" preCondition="classicMode,runtimeVersionv4.0,bitness32" responseBufferLimit="0" /&gt;
+    &lt;add name="ImageMVCHandler-ISAPI-4.0_64bit" path="image/*.png" verb="GET,HEAD" modules="IsapiModule" scriptProcessor="%windir%\Microsoft.NET\Framework64\v4.0.30319\aspnet_isapi.dll" preCondition="classicMode,runtimeVersionv4.0,bitness64" responseBufferLimit="0" /&gt;
+    &lt;add name="ImageMVCHandler-Integrated-4.0" path="image/*.png" verb="GET,HEAD" type="System.Web.Handlers.TransferRequestHandler" preCondition="integratedMode,runtimeVersionv4.0" /&gt;
+  &lt;/handlers&gt;
+&lt;/system.webServer&gt;
+</code></pre>

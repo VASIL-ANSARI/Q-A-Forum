@@ -1,0 +1,71 @@
+<p>Cool problem. I brute forced this w/out using pandas or numpy, but I got your answer (thanks for working it out). I have not tested it on anything else. I also don't know how fast it is since it only goes through each dataframe once, but does not do any vectorization.</p>
+
+<pre><code>import pandas as pd
+#############################################################################
+#Preparing the dataframes
+times_1 = ["2016-10-05 11:50:02.000734","2016-10-05 11:50:03.000033",
+           "2016-10-05 11:50:10.000479","2016-10-05 11:50:15.000234",
+           "2016-10-05 11:50:37.000199","2016-10-05 11:50:49.000401",
+           "2016-10-05 11:50:51.000362","2016-10-05 11:50:53.000424",
+           "2016-10-05 11:50:53.000982","2016-10-05 11:50:58.000606"]
+times_1 = [pd.Timestamp(t) for t in times_1]
+vals_1 = [0.50,0.25,0.50,0.25,0.50,0.50,0.25,0.75,0.25,0.75]
+
+times_2 = ["2016-10-05 11:50:07.000537","2016-10-05 11:50:11.000994",
+           "2016-10-05 11:50:19.000181","2016-10-05 11:50:35.000578",
+           "2016-10-05 11:50:46.000761","2016-10-05 11:50:49.000295",
+           "2016-10-05 11:50:51.000835","2016-10-05 11:50:55.000792",
+           "2016-10-05 11:50:55.000904","2016-10-05 11:50:57.000444"]
+times_2 = [pd.Timestamp(t) for t in times_2]
+vals_2 = [0.50,0.50,0.50,0.50,0.50,0.75,0.75,0.25,0.75,0.75]
+
+data_1 = pd.DataFrame({"time":times_1,"vals":vals_1})
+data_2 = pd.DataFrame({"time":times_2,"vals":vals_2})
+#############################################################################
+
+shared_time = 0      #Keep running tally of shared time
+t1_ind = 0           #Pointer to row in data_1 dataframe
+t2_ind = 0           #Pointer to row in data_2 dataframe
+
+#Loop through both dataframes once, incrementing either the t1 or t2 index
+#Stop one before the end of both since do +1 indexing in loop
+while t1_ind &lt; len(data_1.time)-1 and t2_ind &lt; len(data_2.time)-1:
+    #Get val1 and val2
+    val1,val2 = data_1.vals[t1_ind], data_2.vals[t2_ind]
+
+    #Get the start and stop of the current time window
+    t1_start,t1_stop = data_1.time[t1_ind], data_1.time[t1_ind+1]
+    t2_start,t2_stop = data_2.time[t2_ind], data_2.time[t2_ind+1]
+
+    #If the start of time window 2 is in time window 1
+    if val1 == val2 and (t1_start &lt;= t2_start &lt;= t1_stop):
+        shared_time += (min(t1_stop,t2_stop)-t2_start).total_seconds()
+        t1_ind += 1
+    #If the start of time window 1 is in time window 2
+    elif val1 == val2 and t2_start &lt;= t1_start &lt;= t2_stop:
+        shared_time += (min(t1_stop,t2_stop)-t1_start).total_seconds()
+        t2_ind += 1
+    #If there is no time window overlap and time window 2 is larger
+    elif t1_start &lt; t2_start:
+        t1_ind += 1
+    #If there is no time window overlap and time window 1 is larger
+    else:
+        t2_ind += 1
+
+#How I calculated the maximum possible shared time (not pretty)
+shared_start = max(data_1.time[0],data_2.time[0])
+shared_stop = min(data_1.time.iloc[-1],data_2.time.iloc[-1])
+max_possible_shared = (shared_stop-shared_start).total_seconds()
+
+#Print output
+print "Shared time:",shared_time
+print "Total possible shared:",max_possible_shared
+print "Percent shared:",shared_time*100/max_possible_shared,"%"
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>Shared time: 17.000521
+Total possible shared: 49.999907
+Percent shared: 34.0011052421 %
+</code></pre>

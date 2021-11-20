@@ -1,0 +1,47 @@
+<p>It sounds like this might be a design issue. Are <code>Accounts</code> and <code>RetirementAccounts</code> significantly different? Will they share much of the same logic, but not all? If so, I think I would avoid using conditional logic in the controller and solve it using inheritance.</p>
+
+<p>The idea here is that <code>retirement_accounts</code> would be considered a new resource in your routes file:</p>
+
+<pre><code>resources :retirement_accounts
+</code></pre>
+
+<p>Then you manually create a new controller for it (skip the <code>rails generate...</code> command). Save this file as <code>app/controllers/retirement_accounts_controller.rb</code>:</p>
+
+<pre><code>class RetirementAccountsController &lt; AccountsController
+end
+</code></pre>
+
+<p>Notice how it inherits from <code>AccountsController</code> instead of <code>ApplicationController</code>. Even in this empty state, <code>RetirementAccountsController</code> shares all of the logic of <code>AccountsController</code>, including the <code>new</code> and <code>create</code> methods, plus all of the view files to which they refer. To make the necessary modifications for the retirement accounts, you simply need to override the appropriate actions and views.</p>
+
+<p>You can delete your <code>retirement_accounts_new</code> action, since it is identical to the <code>new</code> action. Move the view for <code>retirement_accounts_new</code> to <code>app/views/retirement_accounts/new.html.erb</code>, so that template will be rendered when <code>new</code> is called on the <code>RetirementAccountsController</code>.</p>
+
+<p>As for the conditional create method, you can make a private method on both controllers that will determine where the post-create redirect should point:</p>
+
+<pre><code>class AccountsController &lt; ApplicationController
+  # ...
+
+  def create
+    @account = current_user.accounts.build(account_params)
+    if @account.save
+      redirect_to post_create_redirect_path, notice: 'Account was successfully created.'
+    else
+      render action: 'new'
+    end
+  end
+
+  private
+
+  def post_create_redirect_path
+    accounts_path
+  end
+end
+
+class RetirementAccountsController &lt; AccountsController
+
+  private
+
+  def post_create_redirect_path
+     retirement_accounts_path
+  end
+end
+</code></pre>

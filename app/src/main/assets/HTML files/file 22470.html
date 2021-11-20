@@ -1,0 +1,63 @@
+<p>The change to <code>O_NONBLOCK</code> is not relevant before the <em>next</em> read.</p>
+
+<p>So, You must check <code>len</code> and <code>errno</code> <em>before</em> you call <code>fcntl</code>. And you must check the return value of <code>fcntl</code> of course, because it might fail as well.</p>
+
+<p>To summarize, <code>len == 0</code> and <code>errno == EIO</code> has nothing to do with the change to <code>O_NONBLOCK</code>, but with the <code>s_recv</code> before.</p>
+
+<p>Additionally, be aware that your </p>
+
+<pre><code>if (len == -1 || len == 0 &amp;&amp; errno != EAGAIN)
+</code></pre>
+
+<p>is the same as </p>
+
+<pre><code>if (len == -1 || (len == 0 &amp;&amp; errno != EAGAIN) )
+</code></pre>
+
+<p>which is not meaningful, because if the return value is <em>not</em> <code>-1</code>, errno must be ignored. If the return value is <code>0</code>, then the peer has closed the connection.</p>
+
+<p><strong>Update</strong>:</p>
+
+<p>I've built a simple echo client </p>
+
+<pre><code>fd = socket(AF_INET, SOCK_STREAM, 0);
+if (fd == -1)
+    error("socket");
+
+he = gethostbyname("localhost");
+memset(&amp;addr, 0, sizeof(addr));
+addr.sin_family = AF_INET;
+addr.sin_addr.s_addr = ((struct in_addr*)he-&gt;h_addr)-&gt;s_addr;
+addr.sin_port = htons(7); /* echo */
+if (connect(fd, (struct sockaddr*) &amp;addr, sizeof(addr)) == -1)
+    error("connect");
+
+while (fgets(buf, sizeof(buf), stdin)) {
+    n = strlen(buf);
+    printf("fgets=%d, %s", n, buf);
+    if (send(fd, buf, n, 0) == -1)
+        error("send");
+
+    n = recv(fd, buf, sizeof(buf), 0);
+    if (n == -1)
+        error("recv");
+
+    printf("recv=%d, %s", n, buf);
+
+    flags = fcntl(fd, F_GETFL, 0);
+    printf("flags=%d\n", flags);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+        error("fcntl");
+}
+</code></pre>
+
+<p>and after setting <code>O_NONBLOCK</code>, I receive </p>
+
+<blockquote>
+  <p>errno=11<br>
+  recv: Resource temporarily unavailable</p>
+</blockquote>
+
+<p>If I move <code>fcntl(O_NONBLOCK)</code> before the loop, everything works fine.</p>
+
+<p>So, it seems not advisable to fiddle with non blocking after reading or writing to the socket.</p>

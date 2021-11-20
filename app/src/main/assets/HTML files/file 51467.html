@@ -1,0 +1,41 @@
+<pre><code>if(request.session.sellerId){
+    response.redirect('/area?logged_in=true');
+}
+
+db.authenticate(request.body.loginid, function(err, results) {
+    // .... 
+});
+</code></pre>
+
+<p>You send the header when <code>request.session.sellerId</code> evaluates to <code>true</code> by calling the <code>response.redirect</code>, but you continue with the the <code>db.authenticate</code> afterwards.
+Inside of that callback you will do another redirect, even when your redirect for that response has already taken place.</p>
+
+<p>Inside of the <code>db.authenticate</code> you have the same problem with the <code>if(err)</code></p>
+
+<p><strong>EDIT</strong></p>
+
+<p>you need to use an <code>else</code> block (or a <code>return</code>) for both the <code>if (request.session.sellerId)</code>  and the <code>if (err) {</code></p>
+
+<pre><code>if (request.session.sellerId) {
+  response.redirect('/area?logged_in=true');
+} else {
+  db.authenticate(request.body.loginid, function(err, results) {
+    if (err) {
+      response.redirect('/sellers/login?err=1&amp;logged_in=false&amp;type=db');
+    } else if (results.length &gt;= 1) {
+      var hash = results[0]['hash'];
+      var seller_id = results[0]['id'];
+      bcrypt.compare(request.body.password, hash, function(err, res) {
+        if (res) {
+          request.session.sellerId = seller_id;
+          response.redirect('/sellers/area?logged_in=true');
+        } else {
+          response.redirect('/sellers/login?err=1&amp;logged_in=false&amp;type=pMatch');
+        }
+      });
+    } else {
+      response.redirect('/sellers/login?err=1&amp;logged_in=false&amp;type=user');
+    }
+  });
+}
+</code></pre>

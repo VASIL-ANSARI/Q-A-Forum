@@ -1,0 +1,43 @@
+<p>We do this in three steps. The first step is to find records that <strong>fail</strong> the "No other leading digit" requirement. The second step is to find records the meet the "must start with an 8" requirement. The third step is to match the two sets together with an <a href="http://stackoverflow.com/questions/4560471/how-to-exclude-rows-that-dont-join-with-another-table">exclusion join</a>, such that we take the set from step 2 and exclude the set from step 1:</p>
+
+<p>We also need to know the datatype of the <code>procedureCode</code> column. Knowing a little bit about <a href="http://en.wikipedia.org/wiki/Current_Procedural_Terminology" rel="nofollow">CPT codes</a>, I'd expect <code>char(5)</code> or similar is the most appropriate choice, depending on how you handle modifiers. If that is how you stored it, then this should work:</p>
+
+<pre><code>With BadClaims As ( --Step 1
+  SELECT distinct ClaimID
+  FROM [Table]
+  WHERE procedureCode NOT LIKE '8%'
+), GoodClaims AS ( --Step 2
+  SELECT distinct ClaimID
+  FROM [Table]
+  WHERE procedureCode LIKE '8%'
+)
+SELECT g.ClaimID --Step 3
+FROM GoodClaims g
+LEFT JOIN BadClaims b on b.ClaimID = g.ClaimID
+WHERE b.ClaimID IS NULL
+</code></pre>
+
+<p>However, you may have stored it as integer/numeric field. If that's the case, this should work:</p>
+
+<pre><code>With BadClaims As ( --Step 1
+  SELECT distinct ClaimID
+  FROM [Table]
+  WHERE procedureCode &lt; 80000 or procedureCode &gt;= 90000
+), GoodClaims AS ( --Step 2
+  SELECT distinct ClaimID
+  FROM [Table]
+  WHERE procedureCode LIKE &gt;= 80000 and procedureCode &lt; 90000
+)
+SELECT g.ClaimID --Step 3
+FROM GoodClaims g
+LEFT JOIN BadClaims b on b.ClaimID = g.ClaimID
+WHERE b.ClaimID IS NULL
+</code></pre>
+
+<p>That's the long form, to explain what's going on here. You can also simplify these steps into a single self-join:</p>
+
+<pre><code>SELECT distinct t1.claimID 
+FROM [Table] t1
+LEFT JOIN [Table] t2 ON t2.claimID = t1.ClaimID and t2.procecureCode NOT LIKE '8%'
+WHERE t1.procedureCode LIKE '8%' and t2.claimID IS NULL 
+</code></pre>

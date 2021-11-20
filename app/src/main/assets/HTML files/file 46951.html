@@ -1,0 +1,11 @@
+<p>It appears that Pyramid functions best (in terms of handling the connection pool) when you use the <a href="http://docs.pylonsproject.org/projects/pyramid-tm/en/latest/" rel="nofollow">Pyramid transaction manager</a> (pyramid_tm). This <a href="https://metaclassical.com/what-the-zope-transaction-manager-means-to-me-and-you/" rel="nofollow">excellent article by Jon Rosebaugh</a> provides some helpful insight into both how Pyramid apps typically set up their database connections and how they <em>should</em> set them up.</p>
+
+<p>In my case, it was necessary to include the pyramid_tm package and then remove a few occurrences where we were manually committing session changes since pyramid_tm will automatically commit changes if it doesn't see a reason not to.</p>
+
+<p>[Update]</p>
+
+<p>I continued to have connection pooling issues although much fewer of them. After a lot of debugging, I found that the pyramid transaction manager (if you're using it correctly) should not be the issue at all. The issue to the other connection pooling issues I had had to do with scripts that ran via cron jobs. A script will release it's connections when it's finished, but bad code design may result in situations where the same script can be opened up and starts running while the previous one is running (causing them both to run slower, slow enough to have both running while a third instance of the script starts and so on).</p>
+
+<p>This is a more language- and database-agnostic error since it stems from poor job-scripting design but it's worth keeping in mind. In my case, the script had an "&amp;" at the end so that each instance started as a background process, waited 10 seconds, then spawned another, rather than making sure the first job started AND completed, then waited 10 seconds, then started another.</p>
+
+<p>Hope this helps when debugging this very frustrating and thorny issue.</p>

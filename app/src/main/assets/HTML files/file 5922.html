@@ -1,0 +1,24 @@
+<p><code>int</code> is 32 bits long. <code>IntPtr</code> is as long as a pointer for your architecture. Therefore, a pointer can be stored into an <code>int</code> only on 32 bit systems, while it can <em>always</em> be stored in an <code>IntPtr</code>.</p>
+
+<p>Notice that your "int as a return value" example does <em>not</em> use an <code>int</code> to hold a pointer, but just to hold a numeric value. This does not mean that an <code>int</code> is automatically the correct size though: the author of that P/Invoke signature should have gone to the documentation for <a href="http://msdn.microsoft.com/en-us/library/ms633505%28VS.85%29.aspx"><code>GetForegroundWindow</code></a> and see that it returns a <code>HWND</code>.</p>
+
+<p>Then, from <code>windef.h</code> in the Platform SDK (or <a href="http://msdn.microsoft.com/en-us/library/aa383751%28VS.85%29.aspx">this MSDN page</a>) we can see that a <code>HWND</code> is a <code>HANDLE</code> which is a <code>PVOID</code> which is... a pointer!</p>
+
+<p>Therefore, as far as I can tell, that signature is <em>wrong</em>, as the size of the return value of <code>GetForegroundWindow</code> depends on the architecture. Thus, it should also be an <code>IntPtr</code>.</p>
+
+<p><strong>Update:</strong></p>
+
+<p>While it can be inferred from the above, I think it's worthwhile to explicitly point out that:</p>
+
+<ul>
+<li>Erroneously using <code>int</code> instead of <code>IntPtr</code> in 32-bit applications will never cause a problem, even if they run on 64-bit Windows; since most applications are 32-bit at this point in time, this will let you get away such mistakes very often.</li>
+<li>Erroneously using <code>int</code> instead of <code>IntPtr</code> in 64-bit applications is <em>not guaranteed</em> to cause problems, since it is quite possible that in practice the values being encountered will fit in the 32 bits of the <code>int</code>. This further lessens the probability that a mistake will manifest as an application error.</li>
+</ul>
+
+<p>Therefore, for an error to actually manifest there are three conditions that have to be satisfied at the same time:</p>
+
+<ol>
+<li>An <code>int</code> is used where an <code>IntPtr</code> should be.</li>
+<li>The executable image is 64-bit.</li>
+<li>A value returned by some PInvoke call and stored as an <code>int</code> is actually larger than 32 bits.</li>
+</ol>

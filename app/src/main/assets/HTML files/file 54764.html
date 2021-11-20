@@ -1,0 +1,15 @@
+<p>You already mention most of the available decision criterias. Maybe I can add some more: </p>
+
+<p>Relational tags inside the documents could use array indices to filter on them, which could make queries on them fast. However, if you like to add a rating or an explanation to each item of that tag array, there is no way to. If you want to count the documents tagged, this may also be more expensive than counting all edges that originate from a specific tag, or maybe find all tags matching a search criteria.</p>
+
+<p>One of the powers of multi model is, that you don't need to decide between the both aproaches. You can have an edge collection connecting tags with attributes to your documents, and have an indexed array with the same (flat) tags inside of the document. If you find all (or most) of your queries just use one method, try to convert the rest and remove the other solution. If that doesn't work, your application simply needs both of them. </p>
+
+<p>In both cases finding other tagged documents alongside could be done in a subequery:</p>
+
+<pre><code>LET docs=(FOR ftDoc IN FULLTEXT(articles, 'text', 'search')
+    COLLECT tags = ftDoc.tags INTO tags RETURN {tags, ftDoc})
+LET tags = FLATTEN(FOR t IN docs[*].tags RETURN t)
+LET otherArticles = (FOR oneTag IN tags 
+    FOR oneD IN articles FILTER oneTag IN oneD.tag RETURN oneD._key)
+RETURN {articles: docs, tags: tags, otherArticles: otherArticles}
+</code></pre>

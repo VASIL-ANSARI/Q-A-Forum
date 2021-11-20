@@ -1,0 +1,41 @@
+<p>There are two issues with the code shown:</p>
+
+<ol>
+<li>The polyline is being created using <code>MKMapPoint</code>s which are incorrectly set to latitude/longitude values.  An <code>MKMapPoint</code> is not degrees of latitude/longitude.  It is an x/y transformation of a lat/long on the flat map projection.  Either <em>convert</em> the latitude/longitude values to <code>MKMapPoint</code>s using <code>MKMapPointForCoordinate</code> or just use <code>CLLocationCoordinate2D</code> instead.  Just using <code>CLLocationCoordinate2D</code> when you have the lat/long is much easier to code and understand.</li>
+<li>In <code>viewForOverlay</code>, the code is creating an empty <code>MKOverlayView</code> which is invisible.  Create an <code>MKPolylineView</code> instead (a subclass of <code>MKOverlayView</code> that draws <code>MKPolyline</code>s) and set its <code>strokeColor</code>.</li>
+</ol>
+
+<p><br>
+For the first issue, use:</p>
+
+<ul>
+<li><code>CLLocationCoordinate2D</code> instead of <code>MKMapPoint</code>,</li>
+<li><code>CLLocationCoordinate2DMake</code> instead of <code>MKMapPointMake</code>,</li>
+<li>and <code>polylineWithCoordinates</code> instead of <code>polylineWithPoints</code></li>
+</ul>
+
+<p><br>
+For the second issue, here's an example:</p>
+
+<pre><code>- (MKOverlayView *)mapView:(MKMapView *)mapView viewForOverlay:(id &lt;MKOverlay&gt;)overlay
+{
+    if ([overlay isKindOfClass:[MKPolyline class]])
+    {
+        MKPolylineView *mapOverlayView = [[MKPolylineView alloc] initWithPolyline:overlay];
+        //add autorelease if not using ARC
+        mapOverlayView.strokeColor = [UIColor redColor];
+        mapOverlayView.lineWidth = 2;
+        return mapOverlayView;
+    }
+
+    return nil;
+}
+</code></pre>
+
+<p><br>
+A couple of other things:</p>
+
+<ul>
+<li>Instead of <code>valueForKey:@"lat"</code>, I would use <code>objectForKey:@"lat"</code> (same for <code>@"lng"</code>).</li>
+<li>Make sure the map view's <code>delegate</code> is set otherwise the <code>viewForOverlay</code> delegate method will not get called even with all the other changes.</li>
+</ul>

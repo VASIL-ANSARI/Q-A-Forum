@@ -1,0 +1,108 @@
+<p>You must store the marker  in a way in which you are able to get a relation between the <code>&lt;li&gt;</code> and the marker, e.g. via <code>$.data</code></p>
+
+<p>simple example:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function initialize() {
+  //set latlng of starting window of map
+  var map = new google.maps.Map($('#map-canvas')[0], {
+              center: { lat: 34.073609, lng: -118.562313},
+              zoom: 14,
+              disableDefaultUI:true
+            }),
+      home = new google.maps.Marker({
+  position: { lat: 34.073514, lng: -118.562348},
+  map: map,
+  title: "Home",
+  icon:'http://maps.google.com/mapfiles/arrow.png'
+});
+
+  map.controls[google.maps.ControlPosition.TOP_LEFT].push($(".DataList")[0]);
+
+
+  //on click of li add new marker or remove if marker already exists
+  $(".DataList li").click(function(){
+    var that=$(this);
+    //when there is no marker associated with the li we create a new
+    if(!that.data('marker')){
+
+      that.data('marker',new google.maps.Marker({position:(function(ll){
+          return new google.maps.LatLng(ll[0],ll[1]);
+        }(that.data('position').split(/,/)))}));
+    
+    }
+    
+    var marker=that.data('marker');
+    //simply check the markers map-property to decide 
+    //if the marker has to be added or removed
+    if(marker.getMap()){
+      that.removeClass('current');
+      marker.setMap(null);
+    }
+    else{
+      that.addClass('current');
+      marker.setMap(map);
+    }
+  });
+
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>       html,body,#map-canvas{height:100%;margin:0;padding:0}
+       .current{background:#f1f1f1;}
+       .DataList{background:#fff;padding:0;}
+       .DataList li{cursor:pointer;padding:4px;list-style-position:inside;}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://code.jquery.com/jquery-latest.js"&gt;&lt;/script&gt;
+&lt;script src="https://maps.googleapis.com/maps/api/js?v=3"&gt;&lt;/script&gt;
+&lt;ul class="DataList"&gt;
+  &lt;li data-position="34.0717825, -118.567396"&gt;Santa Ynez Canyon Park&lt;/li&gt;
+  &lt;li data-position="34.0787989, -118.572502"&gt;Palisades Country Estates&lt;/li&gt;
+  &lt;li data-position="34.078375, -118.56098"&gt;Highland Recreation Center&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div id="map-canvas"&gt;&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<hr>
+
+<h2>Related to the comments:</h2>
+
+<p>You didn't mess up with variable-names, my examples uses less variables, but you may use more variables when you want to. </p>
+
+<p>I prefer to avoid variables when I need to access an object only once.</p>
+
+<hr>
+
+<p>The marker will be created here(and stored as a property of the <code>&lt;li/&gt;</code>):</p>
+
+<pre><code>//when there is no marker associated with the li we create a new
+if(!that.data('marker')){
+
+  that.data('marker',new google.maps.Marker({position:(function(ll){
+      return new google.maps.LatLng(ll[0],ll[1]);
+    }(that.data('position').split(/,/)))}));
+
+}
+</code></pre>
+
+<p>The part that splits the <code>data-position</code>-attribute is this:</p>
+
+<pre><code>(function(ll){
+      return new google.maps.LatLng(ll[0],ll[1]);
+}(that.data('position').split(/,/)))
+</code></pre>
+
+<p>It's a so-called "self-executing anonymous function", which returns the desired value(a <code>LatLng</code>) which will be used as <code>position</code> of the Marker. The splitted data-position-attribute will be used as argument for this function</p>
+
+<pre><code>that.data('position').split(/,/)
+</code></pre>
+
+<hr>
+
+<p><code>getMap()</code> returns whatever the <code>map</code>-property has been set to, either a <code>google.maps.Map</code>-instance or <code>null</code> (when you want to remove the marker or when the property is not set). Although it's not a boolean value it evaluates to either true(when it's a map) or false(when it's <code>null</code>), so it may be used as condition.</p>
+
+<hr>
+
+<p>The <code>that</code>-variable is always a new variable, that's correct, but it will always be a reference to the same object, the clicked <code>&lt;li/&gt;</code>. The marker has been stored as property of this object.</p>

@@ -1,0 +1,32 @@
+<p>IT looks like you're not setting the artist_id on the song anywhere.  You are doing it right though - with a album_id and artist_id, you have to pick one of those as the parent.  It's as though you are caching the artist_id on the song. </p>
+
+<p>I think I would keep things they way you are doing it but add this to the model.</p>
+
+<pre><code>class Song &lt; ActiveRecord::Base
+
+  before_save :ensure_artist_id
+
+
+  def ensure_artist_id
+    self.artist_id = self.album.artist_id
+  end
+
+end
+</code></pre>
+
+<p>The other option is to set it in the controller explicitly</p>
+
+<pre><code>  def create
+    @artist = Artist.find(params[:artist_id])
+    @album = Album.find(params[:album_id])
+    @song = @album.songs.create(params[:song].merge(:artist_id =&gt; @artist.id)
+      if @song.save
+        redirect_to artist_album_songs_url
+        flash[:success] = "Song Created."
+      else
+        render 'new'
+      end
+  end
+</code></pre>
+
+<p>But that doesn't feel as clean and may be repeated in other controller methods.  It's nicer to have it in the model.</p>

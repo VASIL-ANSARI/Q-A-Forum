@@ -1,0 +1,69 @@
+<p>Given your sample code:</p>
+
+<pre><code>def main(init):
+    def report(x):
+        print x
+    bigop(init, report)
+</code></pre>
+
+<p>However, I don't think that's what you're looking for here. Presumably you want <code>report</code> to feed data into <code>view</code> in some way.</p>
+
+<p>You can do that by turning things aroundâinstead of <code>view</code> being a generator that drives another generator, it's a generator that's driven by an outside caller calling <code>send</code> on it. For example:</p>
+
+<pre><code>def view():
+    while True:
+        value = yield
+        print value
+def main(init):
+    v = view()
+    v.next()
+    def report(x):
+        v.send(x)
+    bigop(init, report)
+</code></pre>
+
+<p>But you said that <code>view</code> can't be changed. Of course you can write a <code>viewdriver</code> that <code>yield</code>s a new object whenever you <code>send</code> it one. Or, more simply, just repeatedly call <code>view([data])</code> and let it iterate over a single object.</p>
+
+<p>Anyway, I don't see how you expect this to help anything. <code>bigop</code> is not a coroutine, and you cannot turn it into one. Given that, there's no way to force it to cooperatively share with other coroutines.</p>
+
+<p>If you want to interleave processing and reporting concurrently, you have to use threads (or processes). And the fact that "REPORT must finish at each step before BIGOP continues" is already part of your requirements implies that you can't safely do anything concurrent here anyway, so I'm not sure what you're looking for.</p>
+
+<p>If you just want to interleave processing and reporting <em>without</em> concurrencyâor periodically hook into <code>bigop</code>, or other similar thingsâyou <em>can</em> do that with a coroutine, but it will have exactly the same effect as using a subroutineâthe two examples above are pretty much equivalent. So, you're just adding complexity for no reason.</p>
+
+<p>(If <code>bigop</code> is I/O bound, you could use greenlets, and monkeypatch the I/O operations to asyncify them, as <code>gevent</code> and <code>eventlet</code> do. But if it's CPU-bound, there would be no benefit to doing so.)</p>
+
+<hr>
+
+<p>Elaborating on the <code>viewdriver</code> idea: What I was describing above was equivalent to calling <code>view([data])</code> each time, so it won't help you. If you want to make it an iterator, you can, but it's just going to lead to either blocking <code>bigop</code> or spinning <code>view</code>, because you're trying to feed a consumer with a consumer.</p>
+
+<p>It may be hard to understand as a generator, so let's build it as a class:</p>
+
+<pre><code>class Reporter(object):
+    def __init__(self):
+        self.data_queue = []
+        self.viewer = view(self)
+    def __call__(self, data):
+        self.data_queue.append(data)
+    def __iter__(self):
+        return self
+    def __next__(self):
+        return self.data_queue.pop()
+
+bigop(init, Reporter())
+</code></pre>
+
+<p>Every time <code>bigop</code> calls <code>report(data)</code>, that calls our <code>__call__</code>, adding a new element to our queue. Every time <code>view</code> goes through the loop, it calls our <code>__next__</code>, popping an element off the queue. If <code>bigop</code> is guaranteed to go faster than <code>view</code>, everything will work, but the first time <code>view</code> gets ahead, it will get an <code>IndexError</code>.</p>
+
+<p>The only way to fix that is to make <code>__next__</code> try until <code>data_queue</code> is non-empty. But just doing that will spin forever, not letting <code>bigop</code> do the work to produce a new element. And you can't make <code>__next__</code> into a generator, because <code>view</code> is expecting an iterator over values, not an iterator over iterators.</p>
+
+<p>Fortunately, <code>__call__</code> can be a generator, because <code>bigop</code> doesn't care what value it gets back. So, you can turn things around. But you can't do that, because then there's nothing to drive that generator.</p>
+
+<p>So, you have to add another level of coroutines, underneath the iteration. Then, <code>__next__</code> can wait on a <code>next_coro</code> (by calling <code>next</code> on it), which yields to a <code>call_coro</code> and then yields the value it got. Meanwhile, <code>__call__</code> has to <code>send</code> to the same <code>call_coro</code>, wait on it, and yield.</p>
+
+<p>So far, that doesn't change anything, because you've got two routines both trying to drive <code>next_coro</code>, and one of them (<code>__next__</code>) isn't blocking anywhere else, so it's just going to spinâit's <code>next</code> call will look like a <code>send(None)</code> from <code>__call__</code>.</p>
+
+<p>The only way to fix that is to build a trampoline (<a href="http://www.python.org/dev/peps/pep-0342/" rel="nofollow">PEP 342</a> includes source for a general-purpose trampoline, although in this case you could build a simpler special-purpose one), schedule <code>next_coro</code> and <code>call_coro</code> to explicitly alternate, make sure <code>next_coro</code> properly handles alternating between two different entry points, then drive the scheduler's <code>run</code> from <code>__next__</code> (and <code>__init__</code>).</p>
+
+<p>Confused? You won't be, after this week's episode ofâ¦Â Nah, who am I kidding. You're going to be confused. Writing all of this is one thing; debugging it is another. (Especially since every important stack trace just terminates immediately at the trampoline.) And what does all that work get you? The exact same benefit as using greenlets or threads, with the exact same downsides.</p>
+
+<p>Since your original question is whether there's a simpler way than using threads, the answer is: No, there isn't.</p>

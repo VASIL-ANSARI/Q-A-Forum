@@ -1,0 +1,77 @@
+<ol>
+<li><p>No you should not be initializing your controller, this exactly what IoC and Ninject are for. When you initialize your view/form, Ninject should make the view fetch the controller it depends on, which will auto fetch controllers it depends on and so on.<br>
+Of course this won't work like you've set it up right now. For starters, your view needs to know the controller it depends on.</p>
+
+<pre><code>public partial class ApplicationShellView : Form, IApplicationShellView
+{
+    private IApplicationShellController _controller;
+
+    public ApplicationShellView()
+    {
+        InitializeComponent();
+        init();
+
+        //InitializeView()
+    }
+
+    private void init() {
+        _controller = NinjectProgram.Kernel.Get&lt;IApplicationShellController&gt;();
+        //Because your view knows the controller you can always pass himself as parameter or even use setter to inject
+        //For example:  _controller.SetView1(this);
+    }
+
+    public void InitializeView()
+    {
+        dockPanel.Theme = vS2012LightTheme;
+    }
+}
+
+public class ApplicationShellController : IApplicationShellController
+{
+
+    //Implementes functionality for the MainForm.
+
+    public ApplicationShellController()
+    {
+        //Also possible to add other controllers with DI
+    }
+}
+</code></pre></li>
+<li><p>This does indeed look like a Service Locator, simply initializing your view should do be sufficient.</p>
+
+<pre><code>public class NinjectProgram
+{
+    //Gets the inject kernal for the program.
+    public static IKernel Kernel { get; protected set; }
+}
+
+public class Program : NinjectProgram
+{
+    [STAThread]
+    private static void Main()
+    {
+        Kernel = new StandardKernel();
+        Kernel.Load(new ApplicationModule());
+
+        Application.Run(new ApplicationShellView());
+    }
+}
+
+public class ApplicationModule : NinjectModule
+{
+    public override void Load()
+    {
+        //Here is where we define what implementations map to what interfaces.
+        Bind&lt;IApplicationShellController&gt;().To&lt;ApplicationShellController&gt;();
+
+        //We can also load other modules this project depends on.
+        Kernel.Load(new NinjectModule());
+    }
+}
+</code></pre></li>
+<li><p>Don't try and make it too complicated, a good start is important but you can always apply changes when and where needed during development.</p></li>
+</ol>
+
+<p>I believe the following GitHub project might be a good starting point: <a href="https://gist.github.com/dkellycollins/9c3fecaedd830094d7f2" rel="nofollow">Example of how you might use Ninject within a WinForms application.</a></p>
+
+<p>If you have any more questions, just leave a comment and I'll try to answer them as soon as possible</p>

@@ -1,0 +1,27 @@
+<p>The rule that inner and outer classes can access their <code>private</code> members is a pure Java programming language construct which isnât reflected by the JVMâs access checks. When inner classes were introduced in JavaÂ 1.1, they were introduced in a way that didnât require changes to the JVM. From the JVMâs point of view, nested classes are ordinary (top level) classes with some additional, ignorable meta information.</p>
+
+<p>When an inner class is declared <code>private</code>, itâs ordinary class access level is âdefaultâ aka <em>package-private</em>. When itâs declared <code>protected</code>, it will be <code>public</code> on the JVM level.</p>
+
+<p>When nested classes access each otherâs <code>private</code> fields or methods, the compiler will generate synthetic helper methods with <em>package-private</em> access in the target class, providing the desired access.</p>
+
+<p>So from the JVMâs point of view, you are trying to subclass a <em>package-private</em> class and the dollar in the name is just an ordinary name character. The generated class has a matching qualified name, but you are trying to define it in a <em>different class loader</em>, so the JVM considers these packages not identical at runtime, despite their identical name.</p>
+
+<p>You can verify that the package level access works, if you define the class within the same class loader. Change the line</p>
+
+<pre><code>Class&lt;?&gt; genClass = myClassLoader.defineClass("Parent$OtherChild", bytes);
+</code></pre>
+
+<p>to</p>
+
+<pre><code>Method m=ClassLoader.class.getDeclaredMethod(
+    "defineClass", String.class, byte[].class, int.class, int.class);
+m.setAccessible(true);
+Class&lt;?&gt; genClass=(Class&lt;?&gt;)m.invoke(
+    Child.class.getClassLoader(), "Parent$OtherChild", bytes, 0, bytes.length);
+</code></pre>
+
+<p>Alternatively, you could declare <code>Child</code> as <code>protected</code>. Since itâs a <code>public</code> class on the low level then, it will be accessible by other class loaders.</p>
+
+<p>Note that in both cases, you havenât created a new inner class but just a class named <code>Parent$OtherChild</code> extending an inner class. The only difference is the meta information about the outer-inner class relationship but if you add that attribute to your generated class claiming that it was an inner class of <code>Parent</code>, it could happen that it gets rejected by the verifier because the meta information of <code>Parent</code> doesnât mention the existence of an inner class <code>OtherChild</code>. Thatâs the only place where a JVM might ever look at this attribute.</p>
+
+<p>But besides Reflection reporting inner class relationships, there is no functional difference between top level classes and nested classes anyway. As said, classes actually donât have the access levels <code>protected</code> nor <code>private</code> and for all other member accesses, youâll have to generate the necessary code yourself anyway. If you canât modify the code of the existing classes <code>Parent</code> or <code>Parent$Child</code>, you canât access those of their <code>private</code> members for which these synthetic accessor methods donât already existâ¦</p>

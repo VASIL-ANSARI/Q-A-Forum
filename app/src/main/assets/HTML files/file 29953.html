@@ -1,0 +1,16 @@
+<p>In order to create perpetual logins, you will need to make sure two things are in place (since you are using FormsAuthentication).</p>
+
+<p>First - ensure your ticket expiration time is set to sometime way out in the future</p>
+
+<pre><code> = new FormsAuthenticationTicket(1,
+        userLoginInfo.RegistrationId.ToString(CultureInfo.InvariantCulture),
+        DateTime.UtcNow,
+        DateTime.UtcNow.AddYears(20),
+        isPersistent,
+        userData,
+        FormsAuthentication.FormsCookiePath);
+</code></pre>
+
+<p>Second (and most likely why users are getting kicked out of the site when you reboot IIS) is to create a machineKey section in your web.config with a static key pair set.  By default, IIS autogenerates a machineKey per app.  This is what is used to encrypt/decrypt your forms authentication tickets.  If IIS restarts, you will most likely get a new machine key in this instance, which means that the ticket cannot be decrypted.... meaning user has to log in again.  By creating/defining a static key, you can prevent a key change when IIS recycles.  Information on setting the machine key can be <a href="http://technet.microsoft.com/en-us/library/cc772287%28v=WS.10%29.aspx" rel="nofollow">found on MSDN here</a>.</p>
+
+<p>Lastly, forms authentication has <em>ZERO</em> to do with sessions and session management.  They are mutually exclusive and do not impact each other in typical scenarios.  When a user logs in, they are given an encrypted cookie containing the expiration time and user name.  This is <em>NOT</em> stored in session, so adjusting session settings will have no impact on user logins.</p>

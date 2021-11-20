@@ -1,0 +1,14 @@
+<p>You need to replace <code>order by sec_id</code> with <code>partition by sec_id order by date</code>. Using <code>order by sec_id</code> produces an analytic window of the whole input table ordered by <code>sec_id</code>, which could give unpredictable results and will always get the previous row regardless of whether a new <code>sec_id</code> group is started.</p>
+
+<p>Partitioning by <code>sec_id</code> gives two analytic windows, so the <code>lag</code> function works as you would like it to:</p>
+
+<pre><code>select x.* 
+from
+(select sec_id,date_of_data,price,
+       LAG(sec_id,1) over (partition by sec_id order by date) as prev_sec_id,
+       LAG(date_of_data,1) over (partition by sec_id order by date) as prev_date,
+       LAG(price,1) over (partition by sec_id order by date) as prev_price,
+       price/LAG(price,1) over (partition by sec_id order by date)-1 as price_return
+from   eqa.asset_mkt_price_ts
+where  sec_id in (1,2)) x where x.price_return &lt; 0.3;
+</code></pre>

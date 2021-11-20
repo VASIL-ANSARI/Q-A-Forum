@@ -1,0 +1,55 @@
+<blockquote>
+  <p>So how is the model that I am passing to the view object persisted so that the DOM interactions can set attribute values on the underlying model object?</p>
+</blockquote>
+
+<p>Backbone Models and Views are simply Javascript objects that live in-memory in the scope of the page (like any other Javascript).  If you were to do ...</p>
+
+<pre><code>var name = 'Peter';
+var person = new Backbone.Model({ name: 'Peter' });
+var view = new Backbone.View({ model: person } );
+</code></pre>
+
+<p>... then <code>name</code>, <code>person</code>, and <code>view</code> are all just objects in memory.  They have no relation to jQuery; they have no relation to the DOM.  The View happens to be able to create DOM elements if you implement <code>render()</code>, but even then those elements don't ever have to ever be attached to the page's live DOM at all.</p>
+
+<blockquote>
+  <p>... how are DOM events acting on the underlying model object in the example above?  As soon as the renderCollaboratingView() function has exited how is the model that I passed to the view still being interacted with?</p>
+</blockquote>
+
+<p>Based on the code you've shown, the model isn't being interacted with directly.  Your <code>events</code> hash ...</p>
+
+<pre><code>events:{
+    'blur #job_form :input':'assignValue'
+},
+</code></pre>
+
+<p>... does say that any time a <code>blur</code> event happens in the <code>job_form</code> element, it will call a method on the view called <code>assignValue</code>.  That method may interact with the model (it probably does, right?), but DOM events don't directly cause interaction with the model at all.</p>
+
+<blockquote>
+  <p>If backbone views are really just jquery objects then aren't jquery listeners removed from DOM elements when the element backing the jquery object is removed from the DOM?</p>
+</blockquote>
+
+<p>Backbone's listeners are wholly different than jQuery listeners.  They listen for Backbone-centric events.  <a href="http://backbonejs.org/#Events-catalog" rel="nofollow">See here</a> for the list of built-in events that Backbone components fire.  A View's events hash is a nice convention that is used to listen for DOM events; it's basically <a href="http://backbonejs.org/#View-delegateEvents" rel="nofollow">a nice wrapper</a> around the jQuery concept of event delegation.</p>
+
+<blockquote>
+  <p>Do I only need to remove the listeners if I am going to not destroy the view entirely and save it for later use?</p>
+</blockquote>
+
+<p>If you don't remove listeners, they will continue to run whenever the related event happens, regardless of whether the listening component is changing the page.  Suppose you had a Backbone.View that did something like this:</p>
+
+<pre><code>var MyView = Backbone.View.extend({
+    // ...
+    events: {
+        // Don't do this!
+        'click': '_onClick'
+    },
+    // ...
+
+    _onClick: function() {
+         this.$el.append('Clicked!');
+    }
+ });
+</code></pre>
+
+<p>Any time any <code>click</code> DOM event happens on the page, this view will append the text <code>Clicked!</code> to its internal DOM element.  When the view is attached to the page's DOM, <code>Clicked!</code> would appear on every click.  When the view was removed from the DOM, the function would <em>still</em> run on every click... but since the View's internal root element wasn't attached to anything the function would have no effect.</p>
+
+<p>It's a type of a memory leak, as any instance of <code>MyView</code> will ever be cleared up by the garbage collector.  But the particularly nefarious side effect is it <em>also</em> uses CPU time to do something that is completely worthless.  Now imagine if the event listener did anything of consequence.  Performance of the page will suffer.</p>

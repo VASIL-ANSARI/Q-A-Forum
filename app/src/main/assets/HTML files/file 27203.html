@@ -1,0 +1,27 @@
+<p>The response will depend on the database you use.</p>
+
+<h2>Postgresql</h2>
+
+<p>For postgres, you can do something like this :</p>
+
+<pre><code>@notifications = current_user.notifications.
+                 select( "string_agg( users.user_name, ', ' ) as user_names, notifiables.name as notifiable_name" ).
+                 group( 'notifiables.name, notifications.notifiable_type' ).
+                 joins( :notifiable ).joins( :user ).
+                 page(params[:page]).per(10)
+</code></pre>
+
+<p>Then, use the aggrated object like that :</p>
+
+<pre><code>@notifications.map { |n| "#{n.user_names} #{n.notifiable_type} #{n.notifable_name}" }
+</code></pre>
+
+<p>Note that I have guessed you other tables field names, so adapt accordingly.</p>
+
+<p>The basic idea is to group your results and use database concatenation features. Kaminari and will_paginate will work happily with the result.</p>
+
+<p>Beware : as always when you use <code>#select</code>, do not write objects back to database or they'll be corrupted.</p>
+
+<h2>MySql</h2>
+
+<p>For mysql, this should be basically the same, but replacing <code>string_agg( users.user_name, ', ' )</code> with <code>group_concat( users.user_name )</code></p>

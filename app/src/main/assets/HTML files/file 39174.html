@@ -1,0 +1,49 @@
+<p>As other StackOverflow answers show (<a href="http://stackoverflow.com/questions/17811469/ratchet-without-symfony-session">Ratchet without Symfony session</a>, <a href="http://stackoverflow.com/questions/16183917/starting-a-session-within-a-ratchet-websocket-connection">Starting a session within a ratchet websocket connection</a>), there is no way to directly share the $_SESSION variable between Apache and the Ratchet process. It is possible, however, to start a session with the Apache server and then access the session cookie within the Ratchet code.</p>
+
+<p>Apache server's index.html starts the session:</p>
+
+<pre><code>&lt;?php
+// Get the session ID.
+$ses_id = session_id();
+if (empty($ses_id)) {
+    session_start();
+    $ses_id = session_id();
+}
+?&gt;&lt;!DOCTYPE html&gt; ...
+</code></pre>
+
+<p>Ratchet MessageComponentInterface code accesses the session token:</p>
+
+<pre><code>public function onMessage(ConnectionInterface $from, $msg) {
+    $sessionId = $from-&gt;WebSocket-&gt;request-&gt;getCookies()['PHPSESSID'];
+    # Do stuff with the token...
+}
+</code></pre>
+
+<p>Once both servers know the user's session token, they can use the token to share information through a MySQL database (which is what I do):</p>
+
+<pre><code>    # Access session data from a database:
+    $stmt = $this-&gt;mysqli-&gt;prepare("SELECT * FROM users WHERE cookie=?");
+    $stmt-&gt;bind_param('s', $sessionId);
+    $stmt-&gt;execute();
+    $result = $stmt-&gt;get_result();
+</code></pre>
+
+<p>Alternatively, you could do a more exotic form of inter-process communication:</p>
+
+<pre><code>    # Ratchet server:
+    $opts = array(
+        'http'=&gt;array(
+            'method'=&gt;'GET',
+            'header'=&gt;"Cookie: PHPSESSID=$sessionId\r\n"
+        )
+    );
+    $context = stream_context_create($opts);
+    $json = file_get_contents('http://localhost:80/get_session_info.php', false, $context);
+    $session_data = json_decode($json);
+
+    # Apache server's get_session_info.php
+    # Note: restrict access to this path so that remote users can't dump
+    # their own session data.
+    echo json_encode($_SESSION);
+</code></pre>

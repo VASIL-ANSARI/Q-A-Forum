@@ -1,0 +1,74 @@
+<p>The way that I would approach this.</p>
+
+<pre><code>______________________________________________________________
+| UniqueID | FavouriteID | Data | Name    | Page Link | Type |
+| Int(11)  | Int(11)     | Blob | varchar | Varchar   | Int? |
+______________________________________________________________
+</code></pre>
+
+<p>Second table</p>
+
+<pre><code>___________________________
+| UniqueID | FavouritName |
+| INT(11)  | VarChar      |
+___________________________
+</code></pre>
+
+<p>Create a foreign key between Table 2 UniqueID and Table 1 FavouritID</p>
+
+<p>when accessing via PHP I use this set of functions myself</p>
+
+<pre><code>function RDataLink($field, $table, $current=""){
+accessDB();
+    $QTable=mysql_query("SHOW CREATE TABLE $table");
+    $Table=mysql_result($QTable,0,1);
+exitDB();
+// CONSTRAINT `jobSeeker_ibfk_1` FOREIGN KEY (`location`) REFERENCES `24_location` (`UID`)
+$x=preg_match_all('/FOREIGN[^(]+.[^(]+[^)]+./',$Table,$matches);
+foreach ($matches as $array){
+    foreach ($array as $value){
+        if(preg_match("/(?&lt;=FOREIGN\sKEY.{3})$field/",$value)){
+            if (preg_match("/(?&lt;=REFERENCES[^`].)[^`]+/",$value,$ForeignTable)){
+                accessDB();
+                    $Qrows=mysql_query("SELECT * FROM ".$ForeignTable[0]);
+                exitDB();
+                $options="&lt;select name=\"$field\"&gt;";
+                while ($rows=mysql_fetch_array($Qrows,MYSQL_ASSOC)){
+                    $options.="&lt;option value=\"".$rows['UID']."\"".($current==$rows['UID'] ? "selected" : "") ."&gt;".$rows['name']."&lt;/option&gt;";
+                }
+                $options.="&lt;/select&gt;";
+            }
+        }
+    }
+}
+if(!$x){
+    return false;
+}
+    else {
+    return $options;
+}
+}
+
+function RQuery($field,$table,$current){
+accessDB();
+    $QTable=mysql_query("SHOW CREATE TABLE $table");
+    $Table=mysql_result($QTable,0,1);
+exitDB();
+$x=preg_match_all('/FOREIGN[^(]+.[^(]+[^)]+./',$Table,$matches);
+foreach ($matches as $array){
+    foreach ($array as $value){
+        if(preg_match("/(?&lt;=FOREIGN\sKEY.{3})$field/",$value)){
+            if (preg_match("/(?&lt;=REFERENCES[^`].)[^`]+/",$value,$ForeignTable)){
+                accessDB();
+                    $Qrow=mysql_query("SELECT name FROM ".$ForeignTable[0]." WHERE UID='$current'");
+                    return mysql_result($Qrow,0);
+                exitDB();
+            }
+        }
+    }
+}
+
+}
+</code></pre>
+
+<p>May take some looking at to apply to your situation. but I hope it is helpful</p>

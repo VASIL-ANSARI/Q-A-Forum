@@ -1,0 +1,40 @@
+<p>Each of your threads is synchronizing on different objects. So yes, they will not lock each other out. But more importantly, the <code>run</code> method is defined for the <code>Runnable</code> interface <strong><em>without</em></strong> a synchronization modifier, and you should not be adding one to it (as you can already see, it did not have the effect you thought it would).</p>
+
+<p>The key thing to remember is that when you use the synchronized modifier on a method:</p>
+
+<pre><code>public synchronized void someMethod();
+</code></pre>
+
+<p>It is effectively the same thing as using <code>synchronized(this)</code>. In both cases you are locking on the objects monitor. If you have multiple objects, you have multiple monitors.</p>
+
+<p>Here is a modified version of your own example, that will work more as you expected. It uses a common object monitor (in this case, your class itself), so that the synchronization works as expected:</p>
+
+<pre><code>public class ThreadExample implements Runnable {
+    public static void main(String args[]) {
+        System.out.println("A");
+        Thread T = new Thread(new ThreadExample());
+        Thread T1 = new Thread(new ThreadExample());
+        System.out.println("B");
+        T.setName("thread 1");
+        T1.setName("thread 2");
+        System.out.println("C");
+        T.start();
+        System.out.println("D");
+        T1.start();
+    }
+
+    public void run() {
+        synchronized (ThreadExample.class) {
+            for (int i = 0; i &lt; 5; i++) {
+                try {
+                    System.out.println("Inside run=&gt;"
+                            + Thread.currentThread().getName());
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+</code></pre>

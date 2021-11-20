@@ -1,0 +1,96 @@
+<p>You need to implement a middleware that would check if current user has given level.</p>
+
+<p><strong>Laravel 5.0</strong></p>
+
+<pre><code>//app/Http/Kernel.php - register middleware classes
+protected $routeMiddleware = [
+    'levelMaster'  =&gt; 'App\Http\Middleware\LevelMasterMiddleware',
+    'levelPortais' =&gt; 'App\Http\Middleware\LevelPortaisMiddleware'
+];
+
+//app/Http/Middleware/LevelMiddleware.php - base middleware class that checks if user has level stored in $level;
+namespace App\Http\Middleware;
+
+use Closure;
+use App;
+use Auth;
+
+abstract class LevelMiddleware
+{   
+    protected $level;
+
+    public function handle($request, Closure $next)
+    {
+        if (Auth::user() &amp;&amp; Auth::user()-&gt;level !== $this-&gt;level) {
+            return App::abort(Auth::check() ? 403 : 401, Auth::check() ? 'Forbidden' : 'Unauthorized');
+        }
+
+        return $next($request);
+    }
+}
+
+//app/Kernel/Middleware/LevelMasterMiddleware.php - checks if user has level Master
+namespace App\Http\Middleware;
+
+class LevelMasterMiddleware extends LevelMiddleware
+{   
+    protected $level = 'master';
+}
+
+//app/Kernel/Middleware/LevelPortaisMiddleware.php - checks if user has level Portais
+namespace App\Http\Middleware;
+
+class LevelPortaisMiddleware extends LevelMiddleware
+{   
+    protected $level = 'portais';
+}
+
+//config/routes.php - configure routes for different levels
+Route::group(['middleware' =&gt; 'levelMaster'], function()    
+{
+    //here add routes for users with level=master
+}
+
+Route::group(['middleware' =&gt; 'levelPortais'], function()    
+{
+    //here add routes for users with level=portais
+}
+</code></pre>
+
+<p><strong>Laravel 5.1</strong></p>
+
+<p>The latest version of Laravel introduces middleware parameters which lets simplify the above code a bit, as only one middleware class will be needed:</p>
+
+<pre><code>//app/Http/Kernel.php - register middleware class
+protected $routeMiddleware = ['level' =&gt; 'App\Http\Middleware\LevelMiddleware'];
+
+//app/Http/Middleware/LevelMiddleware.php - check if current user has given level
+namespace App\Http\Middleware;
+
+use Closure;
+use App;
+use Auth;
+
+class LevelMiddleware
+{    
+    public function handle($request, Closure $next, $level)
+    {
+        if (Auth::user() &amp;&amp; Auth::user()-&gt;level !== $level) {
+            return App::abort(Auth::check() ? 403 : 401, Auth::check() ? 'Forbidden' : 'Unauthorized');
+        }
+
+        return $next($request);
+    }
+}
+
+//config/routes.php - configure routes for different levels and pass level as middleware parameter
+Route::group(['middleware' =&gt; 'level:master'], function()    
+{
+    //here add routes for users with level=master
+}
+
+Route::group(['middleware' =&gt; 'level:portais'], function()    
+{
+    //here add routes for users with level=portais
+}
+</code></pre>

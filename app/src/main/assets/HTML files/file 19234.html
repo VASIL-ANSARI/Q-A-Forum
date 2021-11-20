@@ -1,0 +1,43 @@
+<p>It is not actually clear what you need but it sounds like you only want to return one record per <code>ac_id</code> from the <code>AC_TAB</code>. If so, then there are a few ways that you can do this.</p>
+
+<p>Using a subquery:</p>
+
+<pre><code>select *
+from
+(
+  select max(INS_DATE) INS_DATE, AC_ID
+  from ac_tab
+  group by AC_ID
+) a
+inner join txn_hdr t
+  on a.ac_id = t.ac_id;
+</code></pre>
+
+<p>Or with CTE using a <code>row_number()</code>:</p>
+
+<pre><code>;with cte as
+(
+  select a.ins_date, a.ac_id, t.amount, row_number() 
+            over(partition by a.ac_id order by a.ins_date desc) rn
+  from ac_tab a
+  inner join txn_hdr t
+    on a.ac_id = t.ac_id
+)
+select *
+from cte 
+where rn = 1;
+</code></pre>
+
+<p>Or with a <code>row_number()</code> in a subquery:</p>
+
+<pre><code>select *
+from 
+(
+  select a.ins_date, a.ac_id, t.amount, row_number() 
+            over(partition by a.ac_id order by a.ins_date desc) rn
+  from ac_tab a
+  inner join txn_hdr t
+    on a.ac_id = t.ac_id
+) x
+where rn = 1
+</code></pre>

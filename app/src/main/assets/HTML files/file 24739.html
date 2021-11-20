@@ -1,0 +1,30 @@
+<p>You are asking a very fuzzy question: "How should I build audio signals which ultimately can be turned into FFTs and the Arduino can analyse the same using the library and I can actuate anything?".  I am going to help you think through the problem - asking yourself the right questions is essential to get any answers.</p>
+
+<p>Presumably, your audio signals are "coming from somewhere" - i.e. they are sound. This means that you need to convert them into a stream of numbers first.</p>
+
+<p><strong>problem #1: converting audio signal into a stream of numbers</strong></p>
+
+<p>This breaks down into three separate sub problems:</p>
+
+<ol>
+<li>Getting the signal to the right amplitude</li>
+<li>Choosing the sampling rate needed</li>
+<li>Digitizing and storing the data for later processing</li>
+</ol>
+
+<p>Items (1) and (3) are related, since you need to know how you are going to digitize the signal before you can choose the right amplitude. For example, if you have a microphone as your sound input source, you will need to amplify the signal (and maybe add some automatic gain control) before feeding it into an ADC (analog to digital converter) that has a 5 V input range, since the microphone may have an output in the mV range.  Without more information about the hardware you are using, there's not a lot to add here. It sounds from your tag that you are trying to do that inside an Android device - in which case I wonder how you intend to move the digital signal to the Arduino (over USB?).</p>
+
+<p>The second point, "choosing the sampling rate", is actually very important. A sound signal contains many different frequencies - think of them as keys on the piano. In order to detect a high frequency, you need to sample the signal "faster than it is changing". There is a formal theorem called "Nyquist's Theorem" that states that you have to sample at 2x the highest frequency that is present in your signal. Note - it's not just "that you are interested in", but "that is present". If you sample a high frequency signal with a low frequency sample clock, it will appear "aliased" - it wil show up in your output as something completely different. So before you digitize a signal you have to decide what the frequencies of interest are, <em>and remove all higher frequencies</em> with a filter.  Let's say you are interested in frequencies up to 500 Hz (about 1 octave above middle C on a piano). To give your filter a chance to work, you might choose to cut off all frequencies above 1 kHz (filters "roll off" - i.e. they increase in strength over a range of frequencies), and would sample at 2 kHz. This means you get 2000 samples per second, and you need to figure out where to put them on your Arduino (memory fills up quickly on the little board.)</p>
+
+<p><strong>Problem #2: analyzing the signal</strong>
+Assuming that you have somehow captured a digital signal, your next task is analyzing it. The FFT is basicaly some clever math that tells you, for a given sound sample, "what keys on the piano were hit, and how hard". It breaks the sound signal into a series of frequency "bins", and determines how much energy is in each bin (it also computes the phase, but let's keep it simple). So if the input of a FFT algorithm is a sound sample, the output is an array of values telling you what frequencies were present in the signal. This is <em>approximate</em>, since it will find the "nearest bin". Sticking with the same analogy - if you were hitting a piano that's out of tune, the algorithm won't return "out of tune", but rather "a bit of C, and a bit of C sharp", since it cannot actually measure anything in between. The accuracy of an FFT is determined by the sampling frequency (which gives you the upper limit on the frequency you can detect) and the sample length: the longer you "listen" so the sample, the more subtle the differences you can "hear". So you have another trade-off to consider: if your audio signal changes rapidly, you have to sample for a short time (to capture the quick changes); but if you need an accurate frequency, you have to sample for a long time. For example if you are writing a Morse decoder, your sampling has to be short compared to a pause between "dits" and "dashes" - or they will slur together. Figuring out that a morse tone is present is pretty easy though, since there will be a single tone (one bin in the FFT) that is much larger than the others.</p>
+
+<p>Exactly how you implement these things depends on your application.  The third step, "doing something with it", requires you to decide what is a meaningful signal. Again, if you are making a Morse decoder, you would perhaps turn an LED ON when a single tone is present (one or two bins in the FFT have much bigger value than the mean of the others), and OFF when it is not (all noise - lots of bins with approximately the same size). But without a LOT more information from you, there's not much more one can say to help you.</p>
+
+<p>You might learn a lot from reading the following articles: </p>
+
+<p><a href="http://www.arduinoos.com/2010/10/sound-capture/" rel="nofollow">http://www.arduinoos.com/2010/10/sound-capture/</a></p>
+
+<p><a href="http://www.arduinoos.com/2010/10/fast-fourier-transform-fft/" rel="nofollow">http://www.arduinoos.com/2010/10/fast-fourier-transform-fft/</a></p>
+
+<p><a href="http://interface.khm.de/index.php/lab/experiments/frequency-measurement-library/" rel="nofollow">http://interface.khm.de/index.php/lab/experiments/frequency-measurement-library/</a></p>

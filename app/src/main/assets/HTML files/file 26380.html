@@ -1,0 +1,32 @@
+<p>The most obvious approach is to apply <a href="https://github.com/ReactiveCocoa/ReactiveCocoa/blob/f9bc1fd2c58e0c5f9096a1c42d3e51d9c912d4e0/ReactiveCocoaFramework/ReactiveCocoa/RACSignal+Operations.h#L270-275" rel="nofollow"><code>-takeUntil:</code></a>, which completes a signal when a supplied signal either sends a value, or completes. Since you only want completion when <code>incomingWorkSubject</code> completes, and not when it sends a value, use <a href="https://github.com/ReactiveCocoa/ReactiveCocoa/blob/f9bc1fd2c58e0c5f9096a1c42d3e51d9c912d4e0/ReactiveCocoaFramework/ReactiveCocoa/RACSignal+Operations.h#L481-485" rel="nofollow"><code>-ignoreValues</code></a>.</p>
+
+<p>I've extracted the timer signal to a variable for readability.</p>
+
+<pre><code>RACSignal *timer = [[RACSignal
+    interval:0.5 onScheduler:[RACScheduler scheduler]]
+    filter:^BOOL(__unused id _x) {
+        return isThereAProblemInDeliveringWork();
+    }];
+
+RACSignal *signal = [[RACSignal
+    merge:@[ incomingWorkSubject, timer ]]
+    takeUntil:[incomingWorkSubject ignoreValues]];
+</code></pre>
+
+<p>For the sake of discussion, there's another way of going about this that might fit the bill. Instead, using the <code>timer</code> defined above, take samples of <code>incomingWorkSubject</code> using <a href="https://github.com/ReactiveCocoa/ReactiveCocoa/blob/f9bc1fd2c58e0c5f9096a1c42d3e51d9c912d4e0/ReactiveCocoaFramework/ReactiveCocoa/RACSignal+Operations.h#L473-479" rel="nofollow"><code>-sample:</code></a>. How you do this depends on the nature of <code>incomingWorkSubject</code>. If it's a <code>RACReplaySubject</code>, and you know a value will be available, it can be sampled directly.</p>
+
+<pre><code>RACSignal *signal = [RACSignal merge:@[
+    incomingWorkSubject,
+    [incomingWorkSubject sample:timer]
+]];
+</code></pre>
+
+<p>However, if <code>incomingWorkSubject</code> is a vanilla <code>RACSubject</code>, then you'll need to compose a new signal to include an initial value, with <a href="https://github.com/ReactiveCocoa/ReactiveCocoa/blob/f9bc1fd2c58e0c5f9096a1c42d3e51d9c912d4e0/ReactiveCocoaFramework/ReactiveCocoa/RACStream.h#L172-174" rel="nofollow"><code>-startWith:</code></a>, so that <code>-sample:</code> has a value to send when <code>timer</code> fires.</p>
+
+<pre><code>RACSignal *signal = [RACSignal merge:@[
+    incomingWorkSubject,
+    [[incomingWorkSubject startWith:initialValue] sample:timer]
+]];
+</code></pre>
+
+<p>In english, this creates a signal that sends the latest value from <code>incomingWorkSubject</code>, and also will send a recent cached value from <code>incomingWorkSubject</code>, but only when a periodic check to <code>isThereAProblemInDeliveringWork()</code> is affirmative. The merged signal completes when <code>incomingWorkSubject</code> completes.</p>

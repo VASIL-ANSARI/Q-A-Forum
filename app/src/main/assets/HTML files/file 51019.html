@@ -1,0 +1,39 @@
+<blockquote>
+  <p>I just want to know how to verify in my ajax that the recaptcha was checked</p>
+</blockquote>
+
+<p>You have to know how <a href="http://scraping.pro/no-captcha-recaptcha-challenge/" rel="nofollow">reCaptcha works</a>. 
+After user clicks reCaptcha and google server returns result, google api on client side creates a new hidden form field with returned encoded value (that contains info if test is passed or not), <a href="https://developers.google.com/recaptcha/docs/verify" rel="nofollow">docs</a>.
+So you add this field value into your submission procedure: </p>
+
+<pre><code>function submitForm(){
+// Initiate Variables With Form Content
+var name = $("#name").val();
+var email = $("#email").val();
+var message = $("#message").val();
+var g_captcha_response = $("#g-recaptcha-response").val();
+$.ajax({
+type: "POST",
+url: "includes/core/class.contact2.php",
+data: "name=" + name + "&amp;email=" + email + "&amp;message=" + message, "&amp;resp=" + $("#g-recaptcha-response").val(),
+success : function(text){
+    if (text == "success"){
+        formSuccess();
+    } else {
+        formError();
+        submitMSG(false,text);
+      }
+   }
+});
+</code></pre>
+
+<p>And after that you need to verify this response (server side) using <em>secret key</em>:</p>
+
+<pre><code>header('Content-type: application/json');
+$url='https://www.google.com/recaptcha/api/siteverify';
+$response=$_POST['resp'];
+$secret = "[secter_key]"; 
+$params = array('secret'=&gt; $secret, 'response'=&gt; $response);
+$json=file_get_contents( $url  . '?secret=' . $secret . '&amp;response=' .    $response);
+echo $json; 
+</code></pre>

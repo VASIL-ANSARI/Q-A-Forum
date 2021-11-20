@@ -1,0 +1,46 @@
+<p>First of all I think the callback function of your request should look like this:</p>
+
+<pre><code>function (error, response, body) {
+  console.log('performing request');
+  var top = JSON.parse(body);
+  console.log(top);
+  if (top.error == 'conflict') {
+    console.log('the supplied email address already exists');
+    deferred.reject('account exists!');
+  } else {
+    console.log('resolving request');
+    deferred.resolve('account added.');
+  }
+})
+</code></pre>
+
+<p>That's because you can't call both <code>resolve</code> and <code>reject</code>. If <code>top.error == 'conflict'</code> this will be the case.</p>
+
+<p>How do you use the return value of this function?</p>
+
+<p>For testing you can use <a href="https://github.com/visionmedia/mocha" rel="nofollow">mocha</a> with <a href="http://chaijs.com/" rel="nofollow">chai</a> and <a href="http://chaijs.com/plugins/chai-as-promised" rel="nofollow">chai-as-promised</a>. Your test could look like this (with <code>chai</code> and <code>chai-as-promised</code> which are very helpfull):</p>
+
+<pre><code>var chai = require('chai'),
+    chaiAsPromised = require("chai-as-promised"),
+    assert;
+
+chai.use(chaiAsPromised);
+assert = chai.assert;
+
+describe('user', function () {
+  describe('.new_account', function () {
+    afterEach(function (done) {
+      done();
+    });
+
+    it("status should be success", function () {
+      var params = {name: "John Doe", email: "test@gmail.com", password: "p455w0rd"};
+      var promise = user.new_account(params);
+      var expectedResult = 'account added.';
+
+      //the first time, the account should be created successfully.
+      return assert.becomes(promise, expectedResult, 'account added.');
+    });
+  });
+});
+</code></pre>

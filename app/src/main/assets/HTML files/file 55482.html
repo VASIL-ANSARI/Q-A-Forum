@@ -1,0 +1,33 @@
+<p>I'm going to go out on a limb here and say that I believe there is a less complicated way of fixing your performance issue.
+I assume you are using MySQL with InnoDB and you are indexing the timestamp field(s).</p>
+
+<p>If I were you, I would simply turn the relevant timestamp (system or gps) into the primary key. With InnoDB, the table data is physically organized to do ultra-fast lookups based on the primary key column(s). Also, make sure that the relevant timestamp column is of the unsigned non-null type.</p>
+
+<p>Now, instead of doing a lookup for the paths in between start and end time (as you're currently doing), I would create a separate table within the same MySQL database containing pairs of trip ID/path timestamp, where "path timestamp" is the primary key from the paths table, as mentioned earlier. Primary index the trip ID. Populate this table using the same logic/mechanism you initially imagined for Riak or MongoDB. This will basically be your "caching" system, using nothing but MySQL.</p>
+
+<p>A typical lookup would take the trip ID to find all of the path timestamps associated and thus all of the path data.</p>
+
+<pre><code>CREATE TABLE IF NOT EXISTS `paths` (
+  `system_timestamp` int(10) unsigned NOT NULL,
+  `gps_timestamp` int(10) NOT NULL,
+  `speed` smallint(8) unsigned NOT NULL,
+  `lat` decimal(10,6) NOT NULL,
+  `lng` decimal(10,6) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+ALTER TABLE `paths` ADD PRIMARY KEY (`system_timestamp`);
+
+
+CREATE TABLE IF NOT EXISTS `trips` (
+  `trip_id` int(10) unsigned NOT NULL,
+  `system_timestamp` int(10) unsigned NOT NULL,
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+ALTER TABLE `trips` ADD PRIMARY KEY (`trip_id`);
+
+
+SELECT * FROM `trips` 
+INNER JOIN `paths` ON 
+    `trips`.`system_timestamp` = `paths`.`system_timestamp` 
+WHERE `trip_id` = 1;
+</code></pre>

@@ -1,0 +1,38 @@
+<p>You can use the following class to create a comparer that can compare sequences of items based on the values in those sequences, rather than based on the reference to the sequence:</p>
+
+<pre><code>public class SequenceComparer&lt;T&gt; : IEqualityComparer&lt;IEnumerable&lt;T&gt;&gt;
+{
+    private IEqualityComparer&lt;T&gt; comparer;
+    public SequenceComparer(IEqualityComparer&lt;T&gt; comparer = null)
+    {
+        comparer = comparer ?? EqualityComparer&lt;T&gt;.Default;
+    }
+    public bool Equals(IEnumerable&lt;T&gt; x, IEnumerable&lt;T&gt; y)
+    {
+        return x.SequenceEqual(y, comparer);
+    }
+
+    public int GetHashCode(IEnumerable&lt;T&gt; sequence)
+    {
+        unchecked
+        {
+            int hash = 19;
+            foreach (var item in sequence)
+                hash = hash * 79 + comparer.GetHashCode(item);
+            return hash;
+        }
+    }
+}
+</code></pre>
+
+<p>Once we have this we can transform your grouping selector so that it projects out a sequence of the items you are interested in, since it's not known at compile time.  The <code>Select</code> selector is largely unchanged.</p>
+
+<pre><code>var y = tb.AsEnumerable()
+    .GroupBy(row =&gt; listView2.Items.Cast&lt;ListViewItem&gt;()
+        .Select(item =&gt; row[item.Text]), new SequenceComparer&lt;object&gt;())
+    .Select(group =&gt; new
+    {
+        Values = group.Key,
+        Total = group.Sum(s =&gt; s.Field&lt;double&gt;(listView3.Items[0].Text)),
+    });
+</code></pre>

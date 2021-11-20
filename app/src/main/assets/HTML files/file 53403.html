@@ -1,0 +1,55 @@
+<p>One way is statefull filters, as described <a href="https://docs.angularjs.org/guide/filter" rel="nofollow">here</a>. The new filter definition differs only in the fact that it includes the <code>$stateful</code> flag:</p>
+
+<pre><code>app.filter('fromNow', function(){
+    function fromNow(value){
+    return moment(value).fromNow();
+  }
+
+  fromNow.$stateful = true;
+
+  return fromNow;
+});
+</code></pre>
+
+<p>And you need to run digests periodically, so an empty interval function will do:</p>
+
+<pre><code>$interval(function() {
+    // NOTHING
+}, 2000);
+</code></pre>
+
+<p>Check it out <a href="https://jsfiddle.net/e5mq1qth/" rel="nofollow">here</a>.</p>
+
+<p><strong>BUT</strong>, as noted in the filter reference page linked above:</p>
+
+<blockquote>
+  <p>It is strongly discouraged to write filters that are stateful, because the execution of those can't be optimized by Angular, which often leads to performance issues. Many stateful filters can be converted into stateless filters just by exposing the hidden state as a model and turning it into an argument for the filter.</p>
+</blockquote>
+
+<p>It would be more effective if you could actually enrich the model, or even use an alternative view model, so as not to pollute your main model. E.g.:</p>
+
+<pre><code>// in the controller:
+  // watch so that you can respond to changes in the list; if not necessary, just omit this line (and)
+  $scope.$watchCollection('list', calculateFromNowList);
+
+  function calculateFromNowList(list) {
+    $scope.fromNowList = list.map(function(x) {
+        return x.date.fromNow();
+    });
+  }
+
+  $interval(function() {
+    calculateFromNowList($scope.list)
+  }, 1000)
+</code></pre>
+
+<p>And you no longer need the filter, just change the template as:</p>
+
+<pre><code>&lt;div ng-repeat="item in list"&gt;
+    {{item.text}} - {{fromNowList[$index]}}
+&lt;/div&gt;
+</code></pre>
+
+<p>The code above periodically calculates the "from now" strings into a separate model and displays that. Relevant fiddle <a href="https://jsfiddle.net/j635wnzg/" rel="nofollow">here</a>.</p>
+
+<p>What concerns me is that this code is triggering digest cycles every second, just for a very specific change. If performance problems occur, it may be more efficient to use a couple of directives and the browser's <code>setInterval</code> to directly update the DOM, e.g. as in <a href="https://jsfiddle.net/k3hw19r3/" rel="nofollow">this fiddle</a>. This solution is <strong>DIRTY</strong>, but included here as a last resort, when performance becomes problematic.</p>

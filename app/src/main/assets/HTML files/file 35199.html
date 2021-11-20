@@ -1,0 +1,60 @@
+<p>You probably want this to say</p>
+
+<pre><code>SELECT `username`, `password` FROM Customers
+</code></pre>
+
+<p>to say this</p>
+
+<pre><code>SELECT `username`, `password` FROM Customers WHERE username = ?
+</code></pre>
+
+<p>or else it would give you all the users in the database... this is why your form is giving you problems... because it is checking the first user in the database...</p>
+
+<hr>
+
+<p>The following is how I would change your code...</p>
+
+<p><strong>Change this:</strong></p>
+
+<pre><code>$result = mysqli_query($con,'SELECT `username`, `password` FROM Customers');
+while($row = mysqli_fetch_array($result))
+{
+if($row['username'] === $username &amp;&amp; $row['password'] === $password)
+{
+$_SESSION['username']="$username";
+setcookie('username' , $row['username']) ;
+header("Location: http://localhost/loggedin.php") ;
+}
+else
+{
+header("Location: http://localhost/index.html") ;
+}
+</code></pre>
+
+<p><strong>to this:</strong></p>
+
+<pre><code>$query = 'SELECT `username`, `password` FROM Customers where username = ?';
+
+if($stmt = $mysqli-&gt;prepare($query)){
+    $stmt-&gt;bind_param('s',$username);
+    $stmt-&gt;execute();
+    $stmt-&gt;bind_result($get_username, $get_password);
+    $stmt-&gt;fetch();
+    $stmt-&gt;free_result();
+    $stmt-&gt;close();
+}
+
+if($get_username === $username &amp;&amp; $get_password === $password){
+    $_SESSION['username']="$username";
+    setcookie('username' , $row['username']) ;
+    header("Location: http://localhost/loggedin.php");
+    exit();
+} else {
+    header("Location: http://localhost/index.html");
+    exit();
+}
+</code></pre>
+
+<hr>
+
+<p>There is a big flaw with the way you are handling passwords in the database... they should not be raw passwords... please hash them, with a salt and maybe even a pepper. </p>

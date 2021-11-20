@@ -1,0 +1,40 @@
+<p>Your current query not only returns <em>wrong</em> value, but in fact returns wrong number of rows, because it will perform a cartesian product of both tables.<br>
+Also I would not overwrite the column name <code>location</code>. So I will use <code>geo_location</code> in the code below.</p>
+
+<p>You are right, and in order to pre-load images, you have to query for the whole <code>Store</code> instances. For example, like the query below:</p>
+
+<pre><code>q = (session.query(Store)
+        .outerjoin(Store.images) # load images
+        .options(contains_eager(Store.images)) # tell SA that we hav loaded them so that it will not perform another query
+        .filter(Store.is_flagship == True)
+    ).all()
+</code></pre>
+
+<p>In order to combine the two, you can do the following:</p>
+
+<pre><code>q = (session.query(Store, func.ST_AsGeoJSON(Store.location).label('geo_location'))
+        .outerjoin(Store.images) # load images
+        .options(contains_eager(Store.images)) # tell SA that we hav loaded them so that it will not perform another query
+        .filter(Store.is_flagship == True)
+    ).all()
+
+# patch values in the instances of Store:
+for store, geo_location in q:
+    store.geo_location = geo_location
+</code></pre>
+
+<p><strong>Edit-1:</strong> Alternatively try using <a href="http://docs.sqlalchemy.org/en/rel_0_9/orm/mapper_config.html#sqlalchemy.orm.column_property" rel="nofollow"><code>column_property</code></a></p>
+
+<pre><code>class Store(...):
+    # ...
+    location_json = column_property(func.ST_AsGeoJSON(location).label('location_json'))
+
+    q = (session.query(Store).label('geo_location'))
+            .outerjoin(Store.images) # load images
+            .options(contains_eager(Store.images)) # tell SA that we hav loaded them so that it will not perform another query
+            .filter(Store.is_flagship == True)
+        ).all()
+    for store in q:
+        print(q.location_json)
+        print(len(q.images))
+</code></pre>

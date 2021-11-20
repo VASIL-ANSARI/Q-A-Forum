@@ -1,0 +1,60 @@
+<p>You should encapsulate the behavior of both <code>Preferences</code> and <code>List&lt;Sortkey&gt;</code> in your own custom object. By using a <a href="https://en.wikipedia.org/wiki/Decorator_pattern" rel="nofollow">Decorator</a>, you can easily control how this functionality works. First, use a very basic implementation that only supports runtime storing of the <code>SortKey</code>s.</p>
+
+<pre><code>interface SortKeyManager {
+  void saveSortKeys(String name, List&lt;SortKey&gt; sortKeys);
+  List&lt;SortKey&gt; getSortKeys();
+}
+
+public class SimpleSortKeyManager implements SortKeyManager {
+  private List&lt;SortKey&gt; sortKeys;
+
+  void saveSortKeys(String name, List&lt;SortKey&gt; sortkeys) {
+    this.sortKeys = sortKeys;
+  }
+
+  public List&lt;SortKey&gt; getSortKeys() {
+    return sortKeys;
+  }
+}
+</code></pre>
+
+<p>Then, add a decorator that supports saving and loading to the Preferences.</p>
+
+<pre><code>public class PreferencesSortKeyDecorator implements SortKeyManager {
+  private final SortKeyManager manager;
+  private final Preferences preferences;
+
+   public PreferencesSortKeyDecorator(SortKeyManager manager, Preferences preferences) {
+     this.manager = manager;
+   }
+
+   public void saveSortKeys(String name, List&lt;SortKey&gt; sortKeys) {
+     manager.saveSortKeys(name, sortKeys);
+     saveToPreferences(name, sortKeys);
+   }
+
+   private void saveToPreferences(String name, List&lt;SortKey&gt; sortKeys) {
+     // your code
+   }
+
+   public List&lt;SortKey&gt; getSortKeys() {
+     List&lt;SortKey&gt; keys = manager.getSortKeys();
+     if(keys == null) {
+       // Your code to load from Preferences
+     }
+   }
+ }
+</code></pre>
+
+<p>Finally, inject the SortKeyManager into your JTable's constructor:</p>
+
+<pre><code>public class YourTable extends JTable {
+  private final SortKeyManager manager;
+
+  public YourTable(SortKeyManager) {
+    this.manager = manager;
+  }
+}
+</code></pre>
+
+<p>This configuration will give you complete control over the way everything works and obeys the <a href="https://en.wikipedia.org/wiki/Single_responsibility_principle" rel="nofollow">Single Responsibility Principle</a> and the <a href="https://en.wikipedia.org/wiki/Open/closed_principle" rel="nofollow">Open Closed Principle</a>. It also no longer binds your implementation to the way Preferences works, as it's an add-on effect to using the decorator version.</p>

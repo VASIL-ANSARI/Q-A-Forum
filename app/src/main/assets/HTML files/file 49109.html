@@ -1,0 +1,41 @@
+<p>In an expression like:</p>
+
+<pre><code>for row in daily_ret: 
+    daily_ret[row] = ((cumu_ret[row]/1000) - 1)
+</code></pre>
+
+<p><code>row</code> is an element of <code>daily_ret</code>.  If <code>daily_ret</code> is a 2d array, then <code>row</code> is a 1d array, a row of the 2d.   It is <strong>not</strong> an index, and can't be used as such.   <code>daily_ret[row]</code> is wrong, as is <code>cumu_ret[row]</code>.</p>
+
+<p>A possible iteration is:</p>
+
+<pre><code>for i in range(daily_ret.shape[0]):
+    daily_ret[i] = ((cumu_ret[i]/1000.) -1)
+</code></pre>
+
+<p>where <code>i</code> steps through 0,1,..., and <code>daily_ret[i]</code>, short for <code>daily_ret[i,:]</code> is a row of the array.</p>
+
+<p>Or</p>
+
+<pre><code>for i, row in enumerate(daily_ret):
+      row = ((cumu_ret[i]/1000.) - 1)
+</code></pre>
+
+<p><code>enumerate</code> is a common Python means of getting both an element and its index.</p>
+
+<p>The use of <code>nditer</code> is overkill in this context.  It's useful when experimenting on the way to writing <code>cython</code> or <code>c</code> versions, but generally not needed for Python level iteration.  It isn't faster.</p>
+
+<pre><code>    for i in np.nditer(daily_ret, flags=['buffered'], 
+        op_dtypes=['float'], casting='same_kind'):
+        i[...] = ((cumu_ret[i]/1000) - 1)
+</code></pre>
+
+<p>And it has the same issues as <code>for row in daily_ret</code>. Here <code>i</code> is an element of the array, not an index.  So it can't be used in <code>cumu_ret[i]</code>.  There is a way of making <code>nditer</code> return an index.  Or <code>nditer</code> can be setup to iterate over both <code>daily_ret</code> and <code>cumu_ret</code>.  </p>
+
+<p>Also it is tricky to make <code>nditer</code> iterate over just one dimension of an array.  By default it iterates element by element.</p>
+
+<p>Which raises the question - why are you iterating in the first place.  Why not just:</p>
+
+<pre><code> daily_ret = cumu_ret/1000. - 1
+</code></pre>
+
+<p>I haven't studied your code in detail, so can't be sure this what you want.  </p>

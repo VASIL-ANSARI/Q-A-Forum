@@ -1,0 +1,159 @@
+<p>The IWin32Window interface is a simple interface that only provides a <code>IntPtr</code> property named <code>Handle</code>. Feasibly something like this should work:</p>
+
+<pre><code>using System;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+
+namespace SO_ToolTip
+{
+    public partial class Form1 : Form
+    {
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDesktopWindow();
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            WindowWrapper windowWrapper = new WindowWrapper(GetDesktopWindow());
+            ToolTip toolTip = new ToolTip();
+            toolTip.Show("Blah blah... Blah blah... Blah blah...", windowWrapper, 1, 1, 10000);
+        }
+    }
+
+    public class WindowWrapper : IWin32Window
+    {
+        public WindowWrapper(IntPtr handle)
+        {
+            Handle = handle;
+        }
+
+        public IntPtr Handle { get; protected set; }
+    }
+}
+</code></pre>
+
+<p>But it doesn't. It complains about a NullReferenceException and I haven't debugged further. This does work:</p>
+
+<pre><code>...
+private void button1_Click(object sender, EventArgs e)
+{
+    ToolTip toolTip = new ToolTip();
+    toolTip.Show("Blah blah... Blah blah... Blah blah...", this, 1, 1, 10000);
+}
+...
+</code></pre>
+
+<p>Although the position is relative to the current form. Maybe that will get you going in the right direction.</p>
+
+<p><strong>Edit:</strong> Even this doesn't work so I'm not sure if it's an issue with WindowWrapper (how?) or what:</p>
+
+<pre><code>...
+private void button1_Click(object sender, EventArgs e)
+{
+    WindowWrapper windowWrapper = new WindowWrapper(this.Handle);
+    ToolTip toolTip = new ToolTip();
+    toolTip.Show("Blah blah... Blah blah... Blah blah...", windowWrapper, 1, 1, 10000);
+}
+...
+</code></pre>
+
+<hr>
+
+<p><strong>Here you go,</strong> use a transparent, maximized form that you <code>BringToFront()</code> before showing the <code>ToolTip</code></p>
+
+<p><strong>Form1 Code:</strong></p>
+
+<pre><code>using System;
+using System.Windows.Forms;
+
+namespace SO_ToolTip
+{
+    public partial class Form1 : Form
+    {
+        Random _Random = new Random();
+        ToolTip _ToolTip = new ToolTip();
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            BringToFront();
+            _ToolTip.Show("Blah blah... Blah blah... Blah blah...", this, _Random.Next(0, Width), _Random.Next(0, Height), 10000);
+        }
+    }
+}
+</code></pre>
+
+<p><strong>Form1 Designer Code:</strong> So you can see the forms properties:</p>
+
+<pre><code>namespace SO_ToolTip
+{
+    partial class Form1
+    {
+        /// &lt;summary&gt;
+        /// Required designer variable.
+        /// &lt;/summary&gt;
+        private System.ComponentModel.IContainer components = null;
+
+        /// &lt;summary&gt;
+        /// Clean up any resources being used.
+        /// &lt;/summary&gt;
+        /// &lt;param name="disposing"&gt;true if managed resources should be disposed; otherwise, false.&lt;/param&gt;
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing &amp;&amp; (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// &lt;summary&gt;
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// &lt;/summary&gt;
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.SuspendLayout();
+            // 
+            // timer1
+            // 
+            this.timer1.Enabled = true;
+            this.timer1.Interval = 1000;
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
+            // 
+            // Form1
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(284, 264);
+            this.ControlBox = false;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.Name = "Form1";
+            this.Opacity = 0;
+            this.ShowIcon = false;
+            this.ShowInTaskbar = false;
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.ResumeLayout(false);
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.Timer timer1;
+
+    }
+}
+</code></pre>

@@ -1,0 +1,81 @@
+<blockquote>
+  <p>What is the best method to </p>
+  
+  <p>a) pass the array of JSONs to the controller,</p>
+  
+  <p>the array is created from user input in one of the other views,</p>
+</blockquote>
+
+<p>Why not submit that form to the target action, then use ruby to assemble the data into an array?  If that isn't an option, you can use javascript to send an ajax request to your rails app.  Here it is using coffeescript and jquery:</p>
+
+<pre><code>window.my_func = () -&gt;  #`window` is needed if you call the function from another file  
+
+  array = [1, 2, 3]
+  text = JSON.stringify { my_array: array }
+
+  ajax_settings = 
+    type: "post",
+    url: 'http://localhost:3000/dogs/dostuff', 
+    data: text,  
+    contentType: "application/json",
+    success: (response) -&gt; 
+        $("#result").html(response)
+
+  $.ajax(ajax_settings)
+</code></pre>
+
+<p>When you write jquery code, there are so many annoying braces and parentheses, you should consider using coffeescript instead:</p>
+
+<p><a href="http://coffeescript.org" rel="nofollow">coffee script syntax</a><br>
+<a href="https://css-tricks.com/jquery-coffeescript/" rel="nofollow">coffee script syntax and jquery</a></p>
+
+<p>That coffeescript goes in your app/assets/javascript/controller_name.js.coffee file, which is automatically created by rails when you create a controller. In my case, I used a controller named DogsController, so the coffeescript file is app/assets/javascript/dogs.js.coffee.</p>
+
+<p>Then, in your <code>application.html.erb</code> layout, you include the one big minified js file that rails creates from all the individual js files, like this:</p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;meta charset="ISO-8859-1"&gt;
+  &lt;title&gt;Restauranteur&lt;/title&gt;
+  &lt;%= stylesheet_link_tag    "application", media: "all" %&gt;
+  &lt;%= javascript_include_tag "application" %&gt;  &lt;**** HERE *****
+  &lt;%= csrf_meta_tags %&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;p class="notice"&gt;&lt;%= notice %&gt;&lt;/p&gt;
+&lt;p class="alert"&gt;&lt;%= alert %&gt;&lt;/p&gt;
+
+&lt;div&gt;Application Layout&lt;/div&gt;
+
+&lt;div&gt;
+  &lt;%= yield %&gt;
+&lt;/div&gt;
+
+&lt;%= debug params %&gt;
+&lt;%= debug session[:allowed] %&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>To call <code>my_func()</code> in one of your views, you just need to write:</p>
+
+<pre><code>&lt;script&gt;
+my_func();
+&lt;/script&gt;
+</code></pre>
+
+<blockquote>
+  <p>b) parse the array in the controller so that I can do things like get
+  the array length</p>
+</blockquote>
+
+<p>Ruby has a standard library module for converting JSON text into a ruby hash so that you can easily retrieve the data:</p>
+
+<p><a href="http://ruby-doc.org/stdlib-2.3.1/libdoc/json/rdoc/JSON.html#method-c-5B-5D" rel="nofollow">http://ruby-doc.org/stdlib-2.3.1/libdoc/json/rdoc/JSON.html#method-c-5B-5D</a></p>
+
+<p>However, in your rails app you don't even need to write any code to convert the JSON text into a hash: in your jquery ajax request if you specify the <code>contentType</code>  to be <code>"application/json"</code>, then rails will automatically convert the JSON text in the request into a hash, which will be available in <code>params</code>:</p>
+
+<pre><code>{"my_array"=&gt;[1, 2, 3], "controller"=&gt;"dogs", "action"=&gt;"dostuff", "dog"=&gt;{}}  
+</code></pre>

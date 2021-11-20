@@ -1,0 +1,27 @@
+<p>One good way to do this would be to leverage a <code>ThreadLocal</code> variable.  </p>
+
+<p>As an example, Spring Security has a filter that initializes a thread local variable stored in <code>SecurityContextHolder</code> and then you can access this data from that specific thread simply by doing something like:</p>
+
+<pre><code>SecurityContext ctx = SecurityContextHolder.getSecurityContext();
+Authorization authorization = ctx.getAuthorization();
+</code></pre>
+
+<p>So imagine an additional interceptor that your web framework calls that either adds additional information to the spring security context, perhaps in a custom user details object if using spring security or create your own holder &amp; context object to hold the information the listener needs.  </p>
+
+<p>Then it becomes a simple:</p>
+
+<pre><code>public class MyRevisionEntityListener implements RevisionListener {
+  @Override
+  public void newRevision(Object revisionEntity) {
+    // If you use spring security, you could use SpringSecurityContextHolder.
+    final UserContext userContext = UserContextHolder.getUserContext();
+    MyRevisionEntity mre = MyRevisionEntity.class.cast( revisionEntity );
+    mre.setIpAddress( userContext.getIpAddress() );
+    mre.setUserName( userContext.getUserName() );
+  } 
+}
+</code></pre>
+
+<p>This feels like the cleanest approach to me.</p>
+
+<p>It is worth noting that the other API <code>getCurrentRevision(Session,boolean)</code> was deprecated as of Hibernate 5.2 and is scheduled for removal in 6.0.  While an alternative means may be introduced, the intended way to perform this type of logic is using a <code>RevisionListener</code>.</p>

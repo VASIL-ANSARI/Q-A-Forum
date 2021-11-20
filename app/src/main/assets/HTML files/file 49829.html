@@ -1,0 +1,105 @@
+<p>For your problem of splitting insertion of a large array into chunks to be inserted to a DB via network operations, an <code>NSOperationQueue</code> can be created that will allow you to add a separate operation for each chunk of data to be inserted. </p>
+
+<p>The queue can be set to run in a serial manner so that each operation will need to be complete before the next one is started. </p>
+
+<p>Using a queue makes the multiple operations more manageable than having the flow be controlled by callbacks.</p>
+
+<p>In summary, you create a queue and set its maximum concurrent operation count to 1. Then create an <code>NSOperation</code> subclass that performs the necessary steps to insert data into the database. Each chunk of data will correspond to a separate operation that will be added to the queue. Each operation will be performed in series until all are complete.</p>
+
+<p>Here is an outline for the solution:</p>
+
+<pre><code>// Create a new queue to hold network operations.
+self.operationQueue = [[NSOperationQueue alloc] init];
+self.operationQueue.maxConcurrentOperationCount = 1;
+
+// Split the large array into chunks of 20 items each.
+NSInteger chunkSize = 20;
+
+NSInteger i = 0;
+NSInteger total = [lowMArray count];
+
+while (i &lt; total) {    
+    NSInteger j = i;
+    NSMutableArray *chunk = [NSMutableArray alloc] init];
+    while (j &lt; i + chunkSize - 1 &amp;&amp; j &lt; total)  {
+        [chunk addObject:lowMArray[j]];
+        j++;
+    }
+
+    MyOperation *myOperation = [[MyOperation alloc] initWithArray:chunk];        
+    self.operationQueue.addOperation(myOperation)
+
+    i += chunkSize;
+}    
+</code></pre>
+
+<p>MyOperation.h:</p>
+
+<pre><code>@interface MyOperation : NSOperation
+
+- (instancetype)initWithArray:(NSArray *)chunk;
+@property NSArray *chunk;
+
+@end
+</code></pre>
+
+<p>MyOperation.m:</p>
+
+<pre><code>@implementation MyOperation
+
+- (instancetype)initWithArray:(NSArray *)chunk
+{
+    if (self = [super init]) {
+        self.chunk = chunk;
+    }
+    return self;
+}
+
+- (void)main
+{
+    // Create Json data from lowMArray
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:self.chunk
+                                                       options:NSJSONWritingPrettyPrinted
+                                                         error:nil];
+
+    // Construct post request
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@"%@/lows", _silServerBaseUrl]]];
+    request = [self applyAuth:request];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/json; charset=UTF-8" forHTTPHeaderField:@"Content-Type"];
+    [request setHTTPBody:jsonData];
+
+     // Send post request
+     AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
+     NSURLSessionDataTask *dataTask = [manager dataTaskWithRequest:request completionHandler:^(NSURLResponse *response, id responseObject, NSError *error) {
+
+        if (error) {
+            // NSLog(@"Response Failed!");
+        } else {
+            // NSLog(@"Response Success!");
+        }
+    }];
+
+    [dataTask resume]; // runs task
+}
+
+@end
+</code></pre>
+
+<p>AFNetworking has support for its own <code>NSOperation</code> subclass in <code>AFHTTPRequestOperation</code>. An example can be found <a href="http://samwize.com/2014/05/10/tutorial-on-using-afnetworking-2-dot-0/" rel="nofollow">here</a>. Also, the AFNetworking GitHub repository has an <a href="https://github.com/AFNetworking/AFNetworking#afhttprequestoperation" rel="nofollow">example for batch operations</a>.</p>
+
+<hr>
+
+<p><strong>Based on your revised question, setting the completion block of each <code>AFHTTPRequestOperation</code> to handle the response and error can help to debug the problem.</strong></p>
+
+<p>Here is how it is done:</p>
+
+<pre><code>[operation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation * _Nonnull operation, id  _Nonnull responseObject) {
+    NSString* decodedResponse = [[NSString alloc] initWithData:responseObject encoding:NSUTF8StringEncoding];
+    NSLog(@"response %@", decodedResponse);
+} failure:^(AFHTTPRequestOperation * _Nonnull operation, NSError * _Nonnull error) {
+    NSLog(@"error %@", error);
+}];
+</code></pre>
+
+<p>It would be inserted after <code>AFHTTPRequestOperation *operation = [[AFHTTPRequestOperation alloc] initWithRequest:request];</code>.</p>

@@ -1,0 +1,17 @@
+<p>The core problem in the way you are thinking about this is that you are thinking in a SQL/table type model. Each event is one record. One of the nice things about NoSQL technologies (which you feel an inkling towards) is that you can naturally store the record as one session per record. Once you store the data in a session-based manner, you can write a routine that checks to see if that session complies with the pattern or not. No need to do joins or anything, just a loop over a list of transactions in a session. Such is the power of semi-structured data.</p>
+
+<p>What if you store your sessions together? Then, all you have to do is iterate through each session and see if it matches.</p>
+
+<p>This is a fantastic use case for HBase, in my opinion.</p>
+
+<p>With HBase, you store the session ID as the row key, then each of the events as values with the time stamp as the column qualifier. What this leaves you with is data that is grouped together by session ID, then sorted by time.</p>
+
+<p>Ok, so now you want to figure out what % of sessions enacted behavior 1, then 2, then 3. You run a MapReduce job over this data. The MapReduce job will provide you one session per row key/value pair. Write a loop over the data to check to see if it matches the pattern. If it does count + 1, if not, don't.</p>
+
+<hr>
+
+<p>Without going all out with HBase, you can use MapReduce to sessionize your unorganized data at rest. Group by the session ID, then in the reducer you'll have all of the events associated with that session grouped together. Now, you're basically where you were with HBase where you can write a method in the reducer that checks for the pattern.</p>
+
+<hr>
+
+<p>HBase might be overkill if you don't have a ridiculous amount of data. Any sort of database that can store data hierarchically will be good in this situation. MongoDB, Cassandra, Redis all come to mind and have their strengths and weaknesses.</p>

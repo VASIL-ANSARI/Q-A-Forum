@@ -1,0 +1,63 @@
+<p>As I said in the comments, <code>xsl:sequence</code> and that XPath syntax you're trying to use aren't available in XSLT 1.0 (which XslCompiledTransform uses), but you can achieve a sum of formulas by using a recursive template:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:output method="text" indent="yes"/&gt;
+
+  &lt;xsl:template match="/"&gt;
+    &lt;xsl:call-template name="SumSet"&gt;
+      &lt;xsl:with-param name="items" select="/*/Item" /&gt;
+    &lt;/xsl:call-template&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template name="SumSet"&gt;
+    &lt;xsl:param name="items" /&gt;
+
+    &lt;xsl:if test="$items"&gt;
+      &lt;xsl:variable name="currentValue"&gt;
+        &lt;xsl:apply-templates select="$items[1]" /&gt;
+      &lt;/xsl:variable&gt;
+      &lt;xsl:variable name="remainderSum"&gt;
+        &lt;xsl:call-template name="SumSet"&gt;
+          &lt;xsl:with-param name="items" select="$items[position() &gt; 1]" /&gt;
+        &lt;/xsl:call-template&gt;
+      &lt;/xsl:variable&gt;
+
+      &lt;xsl:value-of select="$currentValue + $remainderSum"/&gt;
+    &lt;/xsl:if&gt;
+    &lt;xsl:if test="not($items)"&gt;0&lt;/xsl:if&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="Item"&gt;
+    &lt;xsl:value-of select="cost * related_id/Item/quantity"/&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>When this is run on your input XML, the result is:</p>
+
+<pre><code>580
+</code></pre>
+
+<p>That would be the generic approach, but since you've mentioned that you're using XslCompiledTransform, you can use <code>msxsl:node-set()</code> to simplify this task a bit:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+                xmlns:msxsl="urn:schemas-microsoft-com:xslt"&gt;
+  &lt;xsl:output method="text" indent="yes"/&gt;
+
+  &lt;xsl:template match="/"&gt;
+    &lt;xsl:variable name="values"&gt;
+      &lt;xsl:apply-templates select="/*/Item" /&gt;
+    &lt;/xsl:variable&gt;
+
+    &lt;xsl:value-of select="sum(msxsl:node-set($values)/*)"/&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="Item"&gt;
+    &lt;itemValue&gt;
+      &lt;xsl:value-of select="cost * related_id/Item/quantity"/&gt;
+    &lt;/itemValue&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>This also produces the value <code>580</code> when run on your input XML.</p>

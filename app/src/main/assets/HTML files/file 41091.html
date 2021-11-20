@@ -1,0 +1,135 @@
+<p>If you know the "rooftop" coordinates that you want to face, you can compute the heading required from the coordinates of the nearest streetview camera location and the coordinates of the location in question.</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/16443241/google-maps-api-streetview-panoramaoptions-point-of-view-setting-from-lon-lat">example (using the Google Maps Javascript API v3, not embedded streetview)</a></li>
+<li><a href="http://stackoverflow.com/questions/7068365/getting-the-pov-for-google-streetview-api/">another related question</a></li>
+</ul>
+
+<p>Be sure to set the radius to 50 or less if you want the closest panorama (from the <a href="https://developers.google.com/maps/documentation/javascript/streetview#StreetViewService" rel="nofollow">documentation</a>):</p>
+
+<blockquote>
+  <p>If the radius is 50 meters or less, the panorama returned will be the nearest panorama to the given location. </p>
+</blockquote>
+
+
+
+<pre><code>var streetViewMaxDistance = 50;
+var streetViewService = new google.maps.StreetViewService();
+
+streetViewService.getPanoramaByLocation(lookat, streetViewMaxDistance, function (streetViewPanoramaData, status) {
+    if (status === google.maps.StreetViewStatus.OK) {
+        var oldPoint = point;
+        point = streetViewPanoramaData.location.latLng;
+        var SVmarker = new google.maps.Marker({ position: streetViewPanoramaData.location.latLng, map: map});
+
+
+        var heading = google.maps.geometry.spherical.computeHeading(streetViewPanoramaData.location.latLng, lookat);
+        var panoramaOptions = {
+            position: oldPoint,
+            pov: {
+                heading: heading,
+                zoom: 1,
+                pitch: 0
+            },
+            zoom: 1
+        };
+        var myPano = new google.maps.StreetViewPanorama(
+        document.getElementById('pano'),
+        panoramaOptions);
+        myPano.setVisible(true);
+
+    }
+});
+</code></pre>
+
+<p><a href="http://jsfiddle.net/rk644kms/3/" rel="nofollow">working fiddle with your coordinates</a></p>
+
+<p>working code snippet:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function initialize() {
+  var fenway = new google.maps.LatLng(42.345573, -71.098326);
+  var mapOptions = {
+    center: fenway,
+    zoom: 19
+  };
+  // 45.497612,-73.56551
+  var lookat = new google.maps.LatLng(45.497671, -73.565611);
+
+  var map = new google.maps.Map(
+    document.getElementById('map-canvas'), mapOptions);
+  var SVlayer = new google.maps.StreetViewCoverageLayer();
+  SVlayer.setMap(map);
+
+  var streetViewMaxDistance = 50;
+
+  var point = new google.maps.LatLng(45.497671, -73.565611);
+
+  var marker = new google.maps.Marker({
+    position: lookat,
+    map: map
+  });
+  map.setCenter(lookat);
+  var streetViewService = new google.maps.StreetViewService();
+
+  streetViewService.getPanoramaByLocation(lookat, streetViewMaxDistance, function(streetViewPanoramaData, status) {
+
+    if (status === google.maps.StreetViewStatus.OK) {
+      var oldPoint = point;
+      point = streetViewPanoramaData.location.latLng;
+      var SVmarker = new google.maps.Marker({
+        position: streetViewPanoramaData.location.latLng,
+        map: map
+      });
+
+
+      var heading = google.maps.geometry.spherical.computeHeading(streetViewPanoramaData.location.latLng, lookat);
+      document.getElementById('info').innerHTML = "heading=" + heading;
+      var panoramaOptions = {
+        position: oldPoint,
+        pov: {
+          heading: heading,
+          zoom: 1,
+          pitch: 0
+        },
+        zoom: 1
+      };
+      var lineSymbol = {
+        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW
+      };
+      var polyline = new google.maps.Polyline({
+        map: map,
+        path: [streetViewPanoramaData.location.latLng, lookat],
+        icons: [{
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW
+          },
+          offset: '100%'
+        }]
+      });
+      var myPano = new google.maps.StreetViewPanorama(
+        document.getElementById('pano'),
+        panoramaOptions);
+      myPano.setVisible(true);
+
+    }
+  });
+
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>html,
+body,
+#map-canvas {
+  height: 100%;
+  margin: 0px;
+  padding: 0px
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://maps.googleapis.com/maps/api/js?libraries=geometry,places"&gt;&lt;/script&gt;
+&lt;div id="map-canvas" style="width: 400px; height: 300px"&gt;&lt;/div&gt;
+&lt;div id="pano" style="position:absolute; left:410px; top: 8px; width: 400px; height: 300px;"&gt;&lt;/div&gt;
+&lt;div id="info"&gt;&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

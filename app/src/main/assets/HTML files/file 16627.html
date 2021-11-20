@@ -1,0 +1,62 @@
+<p>First thing that looks odd is your checking of tags just after the <code>Some other tag collision checking before</code> comment. This would make more sense:</p>
+
+<pre><code>else if ((spriteA.tag == 1 &amp;&amp; spriteB.tag == 5) || (spriteB.tag == 1 &amp;&amp; spriteA.tag == 5))
+...
+else if ((spriteA.tag == 6 &amp;&amp; spriteB.tag == 1) || (spriteB.tag == 6 &amp;&amp; spriteA.tag == 1))
+...
+</code></pre>
+
+<p>i.e. this assumes that the collision contact you are testing against could give you the two bodies in either order - e.g. for two objects colliding, say character and ground, the contact listener could give ground as body A and feet as body B, or feet as body A and ground as body B. The statement above would guarantee that regardless of order, you execute the same conditional block. Is it possible that your execution path is oscillating between the two <code>else if</code> blocks and therefore setting an incorrect position when it goes into the wrong block?</p>
+
+<p>Ok, so assuming that those conditionals are all correct (and I just can't see that because I don't know what bodies the tags refer too, how the contact listener has been set up etc), then the oscillation must be caused by the physics simulation. What happens when you set the position of a CCSprite in Cocos2d with Box2D? Does setting the position of the sprite also change the position of the physics body, or are the two separate (with the sprite ordinarily rendered at the physics body's location)? It's been a while since I used Cocos2d, and it's changed significantly since the early days so I'm not sure on this without cracking open the latest version and taking a look. If changing the position of the CCSprite is also changing the position of the physics body, then this is a bad thing to do - all movement should be controlled by the physics simulation (so if you want to move a physics body around, you should be applying a force or impulse to it, not setting the position directly). Changing the position of the body outside of the physics will likely cause oscillations or incorrect impulses applied to a body when the next step of the physics simulation runs. If you want to change the position of a sprite without upsetting the physics simulation, then consider removing the physics body associated with that sprite from the physics simulation for all of the time you want to set the position directly, and then re-add it later if you want it to act under physics. This might mean deleting the physics body and recreating it later if there is no clean way to add/remove it from the physics world. </p>
+
+<p>Another solution would be to create a joint between the bodies that you want to move together. A distance join or weld joint would be most appropriate. This will cause them to be connected, so when you move one around then the other will move too, maintaining the same distance between the two bodies. In this case, they will both be acting under the physics simulation.</p>
+
+<p>Actually, just occurred to me that you might be changing the positions of the physics bodies of both the character and the CCSprite it is standing on top of. In which case, not only is this bad because the physics simulation is not in control, but your position calculations might also be causing the two bodies to overlap slightly, so when the physics simulation next runs it applies a big force to both of the bodies to force them apart, but then you change the positions back to be overlapping again so the next update results in a big force again.</p>
+
+<p>If your changing the position of the CCSprite is not in fact changing the position of the physics body, and you are basically just setting the render position of the player to be in a different position to where the physics body is in the world, then you need to consider what is happening to the physics body. Is it rolling round, falling out of the world, oscillating between some other objects or something else? It's hard for me to judge what might be happening to it without knowing more about your game. But what's happening to it might be affecting your position calculations. Consider removing the physics object from the physics world if you want to move around the sprites without them being subject to the physics simulation. Having some kind of debug draw is invaluable when dealing with physics bodies, so you can see the exact shape and position of each body and what it is interacting with, regardless of any of your own sprites or other artwork. Not sure if the Cocos2D/Box2D combo provides this out of the box, but if not then strongly consider implementing it, with an easy way to toggle it on/off.</p>
+
+<p>One more thing to consider are the two statements:</p>
+
+<pre><code>if (spriteA.position.x - spriteA.boundingBox.size.height*.5 &lt;= spriteB.position.x + spriteB.boundingBox.size.height*.5)
+</code></pre>
+
+<p>and</p>
+
+<pre><code>if (spriteB.position.x - spriteB.boundingBox.size.height*.5 &lt;= spriteA.position.x + spriteA.boundingBox.size.height*.5)
+</code></pre>
+
+<p>Have you tried removing those two statements, so that you set a new position every frame, instead of waiting for some error in the position to build up over a few frames? If you are moving one object around and you want the other to move around as if firmly attached, then you would want to update the position every frame. It could be that you are only passing this conditional say 10 frames out of every 30, so assuming 30 fps this would give a very visible jerky movement as opposed to the smooth movement you want.</p>
+
+<p>Hope something mentioned above solves your issue, or at least gives you a better idea of where to start looking. Providing more info in your question - perhaps responding to some of the assumptions/unknowns that I've mentioned - should help us get to the bottom of your problems :)</p>
+
+<p><strong>EDIT 1</strong></p>
+
+<p>Thanks for filling us in with the extra details - that makes things much clearer. What you're doing makes total sense now that I know you are only doing collision detection with Box2D.</p>
+
+<p>I would say that to fix your problem, in your <code>for</code> loop where you look at the contacts, where you detect that contact has been made, you should just set a flag instead of changing the position of the character at this point e.g. <code>BOOL characterOnPlatform</code> - set it to <code>YES</code> when contact is detected. Outside of that <code>for</code> loop (not necessarily in the same method though - it could be anywhere that is called every frame, and wherever makes most sense) you would check that flag and if <code>characterOnPlatfom == YES</code>, then set the position of the character to the position calculation you are currently doing in the contact listener <code>for</code> loop. i.e. don't do anything in the contact listener <code>for</code> loop <strong>except</strong> change some state that you will refer to elsewhere.</p>
+
+<p>That change will make your character move exactly with the platform. If you still want the character to be able to jump off the platform, you'll need to set that flag back to <code>NO</code> if the player makes an input such as jump, otherwise their desired movement will be overridden by us forcing them into a position on the platform.</p>
+
+<p><strong>EDIT 2</strong></p>
+
+<p>It's not really possible to see exactly what is going on with your new code. For example, what is going on in your <code>resetgravity</code> method? How do you set <code>hasCollided</code> to NO (i.e. how do you detect the character is no longer on the platform)? Is your character still jittering in an up and down motion, or is the flickering you mention different from before?</p>
+
+<p>Assuming you are still getting the up and down movement, I would still expect that this would be due to either the code you've posted is not being called every single frame, or it is fighting with some other positioning code (e.g. wherever you move the character around in response to the player's inputs, where you apply gravity etc). </p>
+
+<p>Make sure that the code that keeps the character on the platform doesn't set the position too high and cause the character to be detected as not on the platform, as then you will end up in a vicious circle of:</p>
+
+<ul>
+<li>character collides with platform</li>
+<li>character position is set to be just above platform</li>
+<li>character is no longer colliding with platform, so positioning code does not run to reposition him on the platform</li>
+<li>character falls downwards due to the effects of gravity (or however you simulate this)</li>
+<li>character collides with platform</li>
+<li>...</li>
+</ul>
+
+<p>If that's the case, then you need to improve the detection of when the character is not colliding with the platform, or offset your positioning code so that the character remains intersecting with the platform slightly (not if this looks bad visually, you might want to offset the sprite slightly from the Box2D shape, so that the physics body intersects slightly with the platform but the character's feet appear to be exactly on the platform.</p>
+
+<p><strong>EDIT 3</strong></p>
+
+<p>It sounds like you've ruled out a lot of things that could be causing the jittering! I asked another game developer and he suggested that your problem could possibly be caused by the conversion from world space to screen space. So you could try logging out the world position of your character, and also the screen position where it is rendered (this might mean changing code in Cocos2D where this conversion is done). At the very least looking at the values logged out might help narrow down some values that are jittering/oscillating. You could also look for any rounding point errors that you might be introducing for example truncating floating point precision to integers. If your jittering looks like it is only in the region of + or - 1 pixel then it could well be worthing looking into world position vs screen position. Logging these values will be much easier to examine than stopping the debugger every frame.</p>

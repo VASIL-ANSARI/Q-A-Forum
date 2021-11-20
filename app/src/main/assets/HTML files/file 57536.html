@@ -1,0 +1,65 @@
+<p>Here's one way how you could handle this:</p>
+
+<p>Setup:</p>
+
+<pre><code>CREATE TABLE #Table1
+    ([Date] date, [Starttime] time, [Stoptime] time)
+;
+
+INSERT INTO #Table1
+    ([Date], [Starttime], [Stoptime])
+VALUES
+    ('2016-04-01', '23:00:00', NULL),
+    ('2016-04-02', NULL, '00:00:00'),
+    ('2016-04-02', '00:00:00', NULL),
+    ('2016-04-02', NULL, '03:00:00'),
+    ('2016-04-02', '05:00:00', NULL),
+    ('2016-04-02', '07:00:00', NULL),
+    ('2016-04-02', NULL, '08:00:00'),
+    ('2016-04-02', '10:00:00', NULL),
+    ('2016-04-02', NULL, '10:15:00')
+;
+</code></pre>
+
+<p>SQL:</p>
+
+<pre><code>select 
+  convert(date, StartTime), 
+  convert(time, dateadd(second, sum(datediff(second, StartTime, EndTime)),0)) 
+from (
+  select
+    min(Time) as StartTime,
+    min(case when Type = 0 then Time end) as EndTime
+  from
+  (
+    select
+      sum(Type) over (order by Time asc, Type Asc) as GRP, *
+    from ( 
+      select
+        isnull(lag(Type) over (order by Time asc, Type Asc), -1) as LagType, *
+      from (
+        select
+          case when Starttime is NULL then 0 else 1 end as Type,
+          case when Starttime is NULL 
+            then convert(datetime, [Date]) + convert(datetime, Stoptime)
+            else convert(datetime, [Date]) + convert(datetime, Starttime) end as Time
+        from
+          #Table1
+      ) A
+    ) B
+    where Type != 1 or LagType != 1 
+  ) C
+  group by GRP
+) D
+group by convert(date, StartTime)
+</code></pre>
+
+<p>Result:</p>
+
+<pre><code>2016-04-01     01:00:00
+2016-04-02     06:15:00
+</code></pre>
+
+<p>This requires that you have start and stop record in your data for each of the days, so you'll need to use union or something like that to add that to your initial data.</p>
+
+<p>The innermost select generates typing (0/1) for the rows and calculates the date + start / end time into a single column. The next one adds TypeLag to the data and it's used to remove the duplicate start records. The next select has a running total over Type, so that start and end records belonging together will have a unique group number. The rest will just pick the start time + earliest end time from each group and calculate the durations.</p>

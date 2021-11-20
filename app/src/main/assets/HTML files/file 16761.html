@@ -1,0 +1,63 @@
+<p>Try this. Sampling from a joint distribution over topics and sentiment labels just means that the entire T x S matrix should sum to 1.</p>
+
+<pre><code>docs=[[0,1],[0,0],[1,0,1]]
+D=len(docs)
+z_d_n=[[0 for _ in xrange(len(d))] for d in docs]
+l_d_n=[[0 for _ in xrange(len(d))] for d in docs]
+
+V=2
+T=2
+S=2
+n_m_j_k=numpy.zeros( (V,T,S) )
+n_j_k_d=numpy.zeros( (T,S,D) )
+n_j_k=numpy.zeros( (T,S) )
+n_k_d=numpy.zeros( (S,D) )
+n_d=numpy.zeros( (D) )
+
+beta=.1
+alpha=.1
+gamma=.1
+
+for d, doc in enumerate(docs): #d: doc id
+    for n, m in enumerate(doc): #i: index of the word inside document, m: id of the word in the vocabulary
+        # j is the topic
+        j = z_d_n[d][n]
+        # k is the sentiment
+        k = l_d_n[d][n]
+        n_m_j_k[m][j][k] += 1
+        n_j_k_d[j][k][d] += 1
+        n_j_k[j][k] += 1
+        n_k_d[k][d] += 1
+        n_d[d] += 1 
+
+for d, doc in enumerate(docs): #d: doc id
+    for n, m in enumerate(doc): #i: index of the word inside document, m: id of the word in the vocabulary
+        # j is the topic
+        j = z_d_n[d][n]
+        # k is the sentiment
+        k = l_d_n[d][n]
+        n_m_j_k[m][j][k] -= 1
+        n_j_k_d[j][k][d] -= 1
+        n_j_k[j][k] -= 1
+        n_k_d[k][d] -= 1
+        n_d[d] -= 1 
+
+        # sample a new topic and sentiment label jointly
+        # T is the number of topics
+        # S is the number of sentiments
+        p_left = (n_m_j_k[m] + beta) / (n_j_k + V * beta) # T x S array
+        p_mid = (n_j_k_d[:,:,d] + alpha) / numpy.tile(n_k_d[:,d] + T * alpha, (T,1) )
+        p_right = numpy.tile(n_k_d[:,d] + gamma,(T,1)) /  numpy.tile(n_d[d] + S * gamma,(T,S))
+        p = p_left * p_mid * p_right
+        p /= numpy.sum(p)
+        new_jk = numpy.random.multinomial(1, numpy.reshape(p, (T*S) )).argmax()
+        j=new_jk/T
+        k=new_jk%T
+
+        z_d_n[d][n]=j
+        l_d_n[d][n]=k
+        n_m_j_k[m][j][k] += 1
+        n_j_k[j][k] += 1
+        n_k_d[k][d] += 1
+        n_d[d] += 1
+</code></pre>

@@ -1,0 +1,105 @@
+<p><strong>UPDATE:</strong> I've created a project on github which wraps up this generating of compile lines by hand. it's called <a href="https://github.com/joe-jordan/complicated_build" rel="nofollow">complicated_build</a>.</p>
+
+<p><strong>UPDATE 2:</strong> in fact, "generating by hand" is a really bad idea as it's platform specific &mdash; the project now reads the values from the <code>distutils.sysconfig</code> module, which is the settings used to compile python (i.e. exactly what we want,) the only setting which is guessed is fortran compiler and file extensions (which are user-configurable). I suspect it is reimplementing a fair bit of distutils now!</p>
+
+<hr>
+
+<p>The way to do this is to write your own compiler lines, and hack them into your <code>setup.py</code>. I show an example below which works for my (very simple) case, which has the following strucutre:</p>
+
+<ul>
+<li>imports</li>
+<li><code>cythonize()</code> any <code>.pyx</code> files, so you only have fortran and C files.</li>
+<li>define a <code>build()</code> function which compiles your code:
+<ul>
+<li>maybe some easy-to-change constants, like compiler names and architecture</li>
+<li>list up the fortran and C files</li>
+<li>generate the shell commands that will build the modules</li>
+<li>add the linker line</li>
+<li>run the shell commands.</li>
+</ul></li>
+<li>if the command was <code>install</code> and the target doesn't exist yet, build it.</li>
+<li>run setup (which will build the pure python sections)</li>
+<li>if the command was <code>build</code>, run the build now.</li>
+</ul>
+
+<p>my implementation of this is shown below. It's designed for only one extension module, and it recompiles all the files every time, so may require further extension to be of more general use. Also note that I've hard coded various unix <code>/</code>s, so if you're porting this to windows make sure you adapt or replace with <code>os.path.sep</code>.</p>
+
+<pre><code>from distutils.core import setup
+from distutils.sysconfig import get_python_inc
+from Cython.Build import cythonize
+import sys, os, shutil
+
+cythonize('delaunay/sphere.pyx')
+
+target = 'build/lib/delaunay/sphere.so'
+
+def build():
+  fortran_compiler = 'gfortran'
+  c_compiler = 'gcc'
+  architecture = 'x86_64'
+  python_h_location = get_python_inc()
+  build_temp = 'build/custom_temp'
+  global target
+
+  try:
+    shutil.rmtree(build_temp)
+  except OSError:
+    pass
+
+  os.makedirs(build_temp) # if you get an error here, please ensure the build/ ...
+  # folder is writable by this user.
+
+  c_files = ['delaunay/sphere.c']
+  fortran_files = ['delaunay/stripack.f90']
+
+  c_compile_commands = []
+
+  for cf in c_files:
+    # use the path (sans /s), without the extension, as the object file name:
+    components = os.path.split(cf)
+    name = components[0].replace('/', '') + '.'.join(components[1].split('.')[:-1])
+    c_compile_commands.append(
+      c_compiler + ' -arch ' + architecture + ' -I' + python_h_location + ' -o ' +
+      build_temp + '/' + name + '.o -c ' + cf
+    )
+
+  fortran_compile_commands = []
+
+  for ff in fortran_files:
+    # prefix with f in case of name collisions with c files:
+    components = os.path.split(ff)
+    name = components[0].replace('/', '') + 'f' + '.'.join(components[1].split('.')[:-1])
+    fortran_compile_commands.append(
+      fortran_compiler + ' -arch ' + architecture + ' -o ' + build_temp + 
+      '/' + name + '.o -c ' + ff
+    )
+
+  commands = c_compile_commands + fortran_compile_commands + [
+    fortran_compiler + ' -arch ' + architecture + 
+    ' -bundle -undefined dynamic_lookup ' + build_temp + '/*.o -o ' + target
+  ]
+
+  for c in commands:
+    os.system(c)
+
+
+if 'install' in sys.argv and not os.path.exists(target):
+  try:
+    os.makedirs('build/lib/delaunay')
+  except OSError:
+    # we don't care if the containing folder already exists.
+    pass
+  build()
+
+setup(
+  name="delaunay",
+  version="0.1",
+  ...
+  packages=["delaunay"]
+)
+
+if 'build' in sys.argv:
+  build()
+</code></pre>
+
+<p>This could be wrapped up into a new <code>Extension</code> class I guess, with it's own <code>build_ext</code> command - an exercise for the advanced student ;)</p>

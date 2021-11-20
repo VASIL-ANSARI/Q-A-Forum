@@ -1,0 +1,35 @@
+<p>Make your <code>matrix</code> (and your <code>vector</code>) into numpy <code>array</code>s instead of Python <code>list</code>s. That will make it take much less memory (and also run faster).</p>
+
+<p>To understand why:</p>
+
+<p>A Python <code>list</code> is a list of Python object instances. Each one of these has type information, pointers, and all kinds of other stuff to keep around beyond just the 8-byte number. Let's say each one ends up being 64 bytes instead of 8. So, that's 64 bytes per element, times 25M elements, equals 1600M bytes!</p>
+
+<p>By contrast, a numpy <code>array</code> is a list of just the raw values, together with a single copy of all that extra information (in the <code>dtype</code>). So, instead of 64 * 25M bytes, you've got 8 * 25M + 64 bytes, which is only 1/8th the size.</p>
+
+<p>As for the speed increase: If you iterate over a 5000x5000 matrix, you're calling some code in the inner loop 25M times. If you're doing a numpy expression like <code>m + m</code>, the code inside the loop is a few lines of C code that get compiled down to a few dozen machine-code operations, which is blazingly fast. If you're doing the loop explicitly in Python, the inside of that loop has to drive the Python interpreter every time through the loop, which is much, much slower. (On top of that, the C compiler will optimize the code, and numpy may have some explicit optimizations too.) Depending on how trivial the work inside the loop is, the speedup can be anywhere from 2x to 10000x. So, even if you have to make things a bit convoluted, try to find a way to express each step as an array broadcast rather than a loop, and it will be much faster.</p>
+
+<hr>
+
+<p>So, how do you do that? Simple. Instead of this:</p>
+
+<pre><code>corr_matrix=[]
+for i in range(len(vector)):
+    tmp=[]
+    # â¦
+    for j in range(len(vector)):
+        # â¦
+        tmp.append(w)
+    corr_matrix.append(tmp)
+</code></pre>
+
+<p>Do this:</p>
+
+<pre><code>corr_matrix=np.zeros((len(vector), len(vector))
+for i in range(len(vector)):
+    # â¦
+    for j in range(len(vector)):
+        # â¦
+        corr_matrix[i, j] = w
+</code></pre>
+
+<p>That immediately eliminates all the memory problems caused by the overhead of keeping around 25M Python <code>float</code> objects, and will give you a significant speed boost too. You can't reduce the memory any further except by not keeping the whole <code>array</code> in memory at once, but you should be fine already. (You can boost the speed even more by using broadcast operations in place of loops, but if the memory is your problem, and the performance is fine, it may not be necessary.)</p>

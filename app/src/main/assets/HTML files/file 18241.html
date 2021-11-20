@@ -1,0 +1,27 @@
+<p>Ok I see the problem.</p>
+
+<pre><code>..-&gt;update(
+    array("_id" =&gt; $idob),
+    array(
+       '$inc'      =&gt; array($type =&gt; (int) 1),
+       '$addToSet' =&gt; array("x"   =&gt; (int) $user_id)
+    )
+);
+</code></pre>
+
+<p>The problem is that you need a conditional <code>$inc</code> there so that it only <code>$inc</code>s if it does add to set.</p>
+
+<p>This is not possible with a unique index since unique indexes work from the root of the document atm. Also you probably want to use the <code>$inc</code> as a form of pre-aggregation or what not.</p>
+
+<p>One method could be:</p>
+
+<pre><code>update(
+    array('_id' =&gt; $idob, 'x' =&gt; array('$nin' =&gt; array($user_id))), 
+    array(
+        '$inc' =&gt; array($type =&gt; 1),
+        '$push' =&gt; array('x' =&gt; (int)$user_id)
+    )
+)
+</code></pre>
+
+<p>This will only do the update if that user_id does not already exist in <code>x</code>.</p>

@@ -1,0 +1,90 @@
+<ol>
+<li><blockquote>
+  <p>Is it practical to store in indexes string columns, that needed only as data? For example table with 20 columns, and we often need strcolumn, that is searched by intcolumn. Is it good to create index like (intcolumn,strcolumn) or we realy need only (intcolumn) here?</p>
+</blockquote>
+
+<p>This is known as a <em>covering index</em>; it has the performance benefit of being able to retrieve the selected columns from the index file without having to lookup values from amongst the records in the table data.</p>
+
+<p>As with everything, its use is a tradeoff which may be appropriate in some circumstances but not in others.</p></li>
+<li><blockquote>
+  <p>Does mysql in innodb engine really does some extra actions for retrieving the data (when we see "Using where; Using index")?</p>
+</blockquote>
+
+<p>The sqlfiddle to which your question links shows <code>Using where; Using index</code> for all four queries.  As documented under <a href="http://dev.mysql.com/doc/en/explain-output.html#explain-extra-information"><code>EXPLAIN</code> Extra Information</a>:</p>
+
+<blockquote>
+  <p>The <code>Extra</code> column of <a href="http://dev.mysql.com/doc/en/explain.html"><code>EXPLAIN</code></a> output contains additional information about how MySQL resolves the query. The following list explains the values that can appear in this column.</p>
+
+<pre>[ <strong><em>deletia</em></strong> ]</pre>
+  
+  <ul>
+  <li><p><code>Using index</code></p>
+  
+  <p>The column information is retrieved from the table using only information in the index tree without having to do an additional seek to read the actual row. This strategy can be used when the query uses only columns that are part of a single index.</p>
+  
+  <p>If the <code>Extra</code> column also says <code>Using where</code>, it means the index is being used to perform lookups of key values. Without <code>Using where</code>, the optimizer may be reading the index to avoid reading data rows but not using it for lookups. For example, if the index is a covering index for the query, the optimizer may scan it without using it for lookups.</p></li>
+  </ul>
+</blockquote>
+
+<p>Therefore, <em>all</em> of your queries are using covering indexes for both lookups and data retrieval, irrespective of the storage engine that is used.</p>
+
+<p>It is not clear to me to what you are referring when you say "<em>innodb engine really does some extra actions for retrieving the data</em>".  The only difference in the <code>EXPLAIN</code> output that I can see is that the InnoDB queries show a <em>lower</em> value in the <code>Rows</code> column; however, <a href="http://dev.mysql.com/doc/en/explain-output.html#explain_rows">as documented</a>:</p>
+
+<blockquote>
+  <p>The <code>rows</code> column indicates the number of rows MySQL believes it must examine to execute the query.</p>
+  
+  <p>For <a href="http://dev.mysql.com/doc/en/innodb-storage-engine.html"><code>InnoDB</code></a> tables, this number is an estimate, and may not always be exact.</p>
+</blockquote></li>
+<li><blockquote>
+  <p>Also same happens for ENUMs. It happens, because Enum_field`s real_type returns MYSQL_TYPE_STRING. Does it do same for enums?</p>
+</blockquote>
+
+<p>Again, it is not clear to me to what you are referring when you say that "<em>same happens</em>".  However, as discussed above, <code>Using where; Using index</code> merely indicates that a covering index has been used both for lookups and for data retrieval.</p>
+
+<p>Furthermore, <code>ENUM</code> fields have a <code>real_type</code> of <code>MYSQL_TYPE_ENUM</code>, not <code>MYSQL_TYPE_STRING</code>.  See <a href="http://bazaar.launchpad.net/~mysql/mysql-server/5.1/view/head:/sql/field.h#L1873"><code>sql/field.h:1873</code></a>:</p>
+
+<pre class="lang-c prettyprint-override"><code>  enum_field_types real_type() const { return MYSQL_TYPE_ENUM; }
+</code></pre></li>
+<li><blockquote>
+  <p>Can we then assume, that enums is super evil and we should always use just simple reference table instead?</p>
+</blockquote>
+
+<p>There are <a href="http://komlenic.com/244/8-reasons-why-mysqls-enum-data-type-is-evil/">many reasons</a> to avoid <code>ENUM</code>, but I don't think your question has touched on any of them.</p></li>
+<li><blockquote>
+  <p>For MyISAM it's undertandable, as it stores in index not all values. But then why do it's stores two values -- not one?</p>
+</blockquote>
+
+<p>The <code>egrep</code> results are leading you to draw false conclusions.  Just because a case-insensitive search for the pattern <code>"tobeornottobe"</code> finds two matching strings in the <code>.myi</code> file <em>does not</em> mean that the MyISAM index has two records.  The data structure is a tree, as follows:</p>
+
+<pre>
+              /\
+             /  \
+Tobeornottobe    toBeornottobe
+                   /\
+                  /  \
+     tobeOrnottobe    tobeorNottobe
+                       \
+                        \
+                         tobeornotTobe
+</pre>
+
+<p>One gets a hint of this from viewing all strings <code>.myi</code> index file:</p>
+
+<pre>
+$ strings mysql_index_reading_myisam.MYI
+Tobeornottobe
+toBeornottobe
+beOrnottobe
+orNottobe
+notTobe
+</pre>
+
+<p>Therefore, had you performed a (case insensitive) search for the pattern <code>"nottobe"</code>, you would have found five matches rather than two.</p>
+
+<p>You can read more about the storage format of MyISAM's index structures in <a href="http://dev.mysql.com/doc/internals/en/the-myi-file.html">The <code>.MYI</code> File</a>.</p></li>
+<li><blockquote>
+  <p>If this is all really happens -- is it just current restrisctions of mysql kernel, that does not depend of concrete handler implementation?</p>
+</blockquote>
+
+<p>I'm afraid that I have no idea what is being asked here.</p></li>
+</ol>

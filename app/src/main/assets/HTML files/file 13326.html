@@ -1,0 +1,46 @@
+<p>You can track the time spent on each field and send it to your server before the form is submitted. The below example tracks the time-with-focus for each field and stores it in a custom attribute in the field itself. Just before submitting the form, we assemble the tracking data into one JSON string and post it to server, after which form submission can proceed as usual.</p>
+
+<p>i.e. Something like:</p>
+
+<pre><code>$(document).ready(function() {
+
+  $('#id-of-your-form').find('input, select, textarea').each(function() { // add more field types as needed
+
+    $(this).attr('started', 0);
+    $(this).attr('totalTimeSpent', 0); // this custom attribute stores the total time spent on the field
+
+    $(this).focus(function() {
+      $(this).attr('started', (new Date()).getTime());
+    });
+
+    $(this).blur(function() {
+      // recalculate total time spent and store in it custom attribute
+      var timeSpent = parseDouble($(this).attr('totalTimeSpent')) + ((new Date()).getTime() - parseDouble($(this).attr('started')));
+      $(this).attr('totalTimeSpent', timeSpent);
+    });
+
+  });
+
+  $('#id-of-your-form').submit(function() {
+
+    // generate tracking data dump from custom attribute values stored in each field
+    var trackingData = [];
+    $(this).find('input, select, textarea').each(function(i) { // add more field types as needed
+
+      // tracking data can contain the index, id and time spent for each field
+      trackingData.push({index: i, id: $(this).attr('id'), millesecs: $(this).attr('totalTimeSpent')});
+
+    });
+
+    // post it (NOTE: add error handling as needed)
+    $.post('/server/trackFieldTimes', {trackingData: JSON.stringify(trackingData)}, function(data) {
+      // tracking data submitted
+    });
+
+    // return true so that form submission can continue.
+    return true;
+
+  });
+
+});
+</code></pre>

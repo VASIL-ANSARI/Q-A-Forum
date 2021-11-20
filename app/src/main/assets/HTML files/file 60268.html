@@ -1,0 +1,46 @@
+<p>There is probably something odd in your benchmarking setup. What comes to mind first is that your sender might not write fast enough.</p>
+
+<p>The following benchmark (using <a href="https://github.com/evanphx/benchmark-ips" rel="nofollow">benchmark-ips</a>) resulted in approximately one read every 1.3 micro-seconds on my 4-years-old Macbook on Ruby 2.2.5.</p>
+
+<p>This benchmark contains additional code to verify that we are reading exactly 1000-character strings. This makes the benchmark almost 50% slower, but still <em>much</em> faster than you claim.</p>
+
+<pre><code>require 'benchmark/ips'
+
+sysread_1k_strings = 0
+read_1k_strings = 0
+
+Benchmark.ips do |x|
+  input = ''
+
+  x.warmup = 0
+
+  x.report('sysread') {
+    STDIN.sysread(1000, input)
+    sysread_1k_strings += 1 if input.length == 1000
+  }
+
+  x.report('read') {
+    STDIN.read(1000, input)
+    read_1k_strings += 1 if input.length == 1000
+  }
+
+end
+
+puts "Comparison --------------------------------------"
+puts "sysread".rjust(20) + "#{sysread_1k_strings.to_s.rjust(11)} 1000 byte strings read"
+puts "read".rjust(20) + "#{read_1k_strings.to_s.rjust(11)} 1000 byte strings read"
+</code></pre>
+
+<p>When reading from <code>/dev/zero</code> this resulted in the following benchmark result:</p>
+
+<pre><code>$ ruby benchmark.rb &lt; /dev/zero
+Warming up --------------------------------------
+             sysread     1.000  i/100ms
+                read     1.000  i/100ms
+Calculating -------------------------------------
+             sysread    210.517k (Â±13.5%) i/s -    915.780k in   4.529414s
+                read    475.210k (Â±10.4%) i/s -      1.956M in   4.209967s
+Comparison --------------------------------------
+             sysread     915780 1000 byte strings read
+                read    1955737 1000 byte strings read
+</code></pre>

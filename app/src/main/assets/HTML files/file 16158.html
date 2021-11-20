@@ -1,0 +1,60 @@
+<p>You should use <a href="http://doc.qt.nokia.com/4.7-snapshot/stylesheet-reference.html" rel="nofollow">Qt Style Sheet</a>, which allows us to customize UI of many controls to give unique look and feel across platforms. <a href="http://doc.qt.nokia.com/4.7-snapshot/stylesheet-examples.html#customizing-qprogressbar" rel="nofollow">Check this</a>.</p>
+
+<p>Create a new simple Qt Gui project, open UI Form editor and add a Progress Bar control from under 'Display Widgets' in tool window. Now write following code in constructor of <code>MainWindow</code>..</p>
+
+<pre><code>MainWindow::MainWindow(QWidget *parent) :
+    QMainWindow(parent), ui(new Ui::MainWindow)
+{
+    ui-&gt;setupUi(this);
+
+    // Customize progress-bar's style..
+
+    QString style = "QProgressBar {border: 2px solid grey; border-radius: 5px; text-align: center;}";
+    style += "QProgressBar::chunk {background-color: #CD96CD; width: 10px; margin: 0.5px;}";
+
+    // Assuming objectName is 'progressBar'..
+    ui-&gt;progressBar-&gt;setStyleSheet(style);
+}
+</code></pre>
+
+<p>Compile and run.</p>
+
+<p>If you just want to change that single <code>QProgressBar</code> control, then above method is sufficient, but if you want to apply styles at application level (say all <code>QProgressBar</code> controls and some other controls), then proper way is to create a <code>*.css</code> file, write styles using <a href="http://doc.qt.nokia.com/4.7-snapshot/stylesheet-reference.html" rel="nofollow">Qt Style Sheet Reference</a> and then read that file in Qt and call</p>
+
+<p><code>QApplication::setStyleSheet(QString style)</code>.</p>
+
+<p>Besides, style sheet uses the same syntax as CSS and also supports various selectors.</p>
+
+<p><em><strong>Edit:</em></strong></p>
+
+<p>I agree that above method works only with controls and not delegates. I found something for delegates also. Try following <code>paint</code> function.</p>
+
+<pre><code>void ProgressBarDelegate::paint(QPainter *painter, const QStyleOptionViewItem &amp;option, const QModelIndex &amp;index) const
+{
+    if (index.column() == 2)
+    {
+        QProgressBar renderer;
+        int progressPercentage = index.model()-&gt;data(index, Qt::DisplayRole).toInt();
+
+        // Customize style using style-sheet..
+
+        QString style = "QProgressBar { border: 2px solid grey; border-radius: 5px; }";
+        style += "QProgressBar::chunk { background-color: #05B8CC; width: 20px; }";
+
+        renderer.resize(option.rect.size());
+        renderer.setMinimum(0);
+        renderer.setMaximum(100);
+        renderer.setValue(progressPercentage);
+
+        renderer.setStyleSheet(style);
+        painter-&gt;save();
+        painter-&gt;translate(option.rect.topLeft());
+        renderer.render(painter);
+        painter-&gt;restore();
+    }
+    else
+        QStyledItemDelegate::paint(painter, option, index);
+}
+</code></pre>
+
+<p>So here the point is that instead of using <code>QStyleOption</code>, we can use directly the control itself as a renderer. Hope this helps..</p>

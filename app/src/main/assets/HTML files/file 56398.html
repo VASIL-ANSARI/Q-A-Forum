@@ -1,0 +1,71 @@
+<p>Group by <code>R_GROUP</code>, <code>YEAR</code> and <code>MONTH</code> first then use the analytical query:</p>
+
+<pre><code>SELECT t.*,
+       SUM( sales ) OVER ( PARTITION BY r_group ORDER BY year, month ) - sales
+         AS opening,
+       SUM( sales ) OVER ( PARTITION BY r_group ORDER BY year, month ) AS closing
+FROM   (
+  SELECT r_group,
+         year,
+         month,
+         SUM( sales ) AS sales
+  FROM   data
+  GROUP BY r_group, year, month
+) t
+ORDER BY year, month
+</code></pre>
+
+<p><strong>Update</strong>:</p>
+
+<p>This will also include the name in the output:</p>
+
+<pre><code>SELECT t.*,
+       SUM( sales ) OVER ( PARTITION BY r_group, dt ) AS r_group_month_sales,
+       COALESCE(
+         SUM( sales ) OVER (
+           PARTITION BY r_group
+           ORDER BY dt
+           RANGE BETWEEN UNBOUNDED PRECEDING AND INTERVAL '1' MONTH PRECEDING
+         ),
+         0
+       ) AS opening,
+       SUM( sales ) OVER (
+         PARTITION BY r_group
+         ORDER BY dt
+         RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) AS closing
+FROM   (
+  SELECT d.*,
+         TO_DATE( year || month, 'YYYYMM' ) AS dt
+  FROM   data d
+) t
+ORDER BY dt
+</code></pre>
+
+<p><strong>Output</strong>:</p>
+
+<pre><code>ID NAME R_GROUP   YEAR MONTH SALES DT         R_GROUP_MONTH_SALES OPENING CLOSING
+-- ---- --------- ---- ----- ----- ---------- ------------------- ------- -------
+ 1 A    fruit     2007 04        5 2007-04-01                 104       0     104
+ 2 Z    fruit     2007 04       99 2007-04-01                 104       0     104
+ 3 A    fruit     2008 05       10 2008-05-01                  10     104     114
+ 4 B    vegetable 2008 07       20 2008-07-01                  20       0      20
+</code></pre>
+
+<p>You can then do whatever processing you want on the output of this query.</p>
+
+<p>Maybe something like this:</p>
+
+<pre><code>SELECT year,
+       month,
+       r_group,
+       MAX( r_group_month_sales ) AS sales,
+       MAX( opening ) AS opening,
+       MAX( closing ) AS closing,
+       YOUR_THIRD_PARTY_AGGREGATION_FUNCTION( column_names ) AS other
+FROM   (
+  -- insert the query above
+)
+GROUP BY year, month, r_group
+ORDER BY year, month
+</code></pre>

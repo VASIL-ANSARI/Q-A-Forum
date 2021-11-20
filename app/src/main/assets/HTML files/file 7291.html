@@ -1,0 +1,43 @@
+<p>I think the <code>typedef</code> is confusing GCC.  These sorts of attributes seem to work best when applied directly to variable definitions.</p>
+
+<p>This version of your class works for me (GCC 4.6.0):</p>
+
+<pre><code>template&lt;class T&gt; class Lightweight
+{
+private:
+  //  typedef T __attribute((__may_alias__)) T_may_alias;
+
+public:
+  Lightweight() : _isObjectConstructed(false) {/* empty */}
+
+  ~Lightweight()
+  {
+    // call object's destructor, only if we ever constructed it
+    if (_isObjectConstructed) {
+      T * __attribute__((__may_alias__)) p
+        = (reinterpret_cast&lt;T *&gt;(_optionalObject._buf));
+      p-&gt;~T();
+    }
+  }
+
+  void MethodThatGetsCalledOften()
+  {
+    // Imagine some useful code here
+  }
+
+  void MethodThatGetsCalledRarely()
+  {
+    T * __attribute__((__may_alias__)) p
+      = (reinterpret_cast&lt;T *&gt;(_optionalObject._buf));
+    if (_isObjectConstructed == false)
+      {
+        // demand-construct the heavy object, since we actually need to use it now
+
+        (void) new (p) T();
+        _isObjectConstructed = true;
+      }
+      p-&gt;DoSomething();
+  }
+
+  [etc.]
+</code></pre>

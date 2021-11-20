@@ -1,0 +1,85 @@
+<h1>SIMPLE:</h1>
+
+<p>Try out <code>throw new WebFaultException(HttpStatusCode.InternalServerError);</code></p>
+
+<p>To specify an error details:</p>
+
+<pre><code>throw new WebFaultException&lt;string&gt;("Custom Error Message!", HttpStatusCode.InternalServerError);
+</code></pre>
+
+<hr>
+
+<h1>ADVANCED:</h1>
+
+<p>If you want better exception handling with defining <a href="http://msdn.microsoft.com/en-us/library/system.net.httpstatuscode.aspx" rel="nofollow">HTTP status</a> for each exception you'll need to create a custom ErrorHandler class for example:</p>
+
+<pre><code>class HttpErrorHandler : IErrorHandler
+{
+   public bool HandleError(Exception error)
+   {
+      return false;
+   }
+
+   public void ProvideFault(Exception error, MessageVersion version, ref Message fault)
+   {
+      if (fault != null)
+      {
+         HttpResponseMessageProperty properties = new HttpResponseMessageProperty();
+         properties.StatusCode = HttpStatusCode.InternalServerError;
+         fault.Properties.Add(HttpResponseMessageProperty.Name, properties);
+      }
+   }
+}
+</code></pre>
+
+<p>Then you need to create a service behaviour to attach to your service:</p>
+
+<pre><code>class ErrorBehaviorAttribute : Attribute, IServiceBehavior
+{
+   Type errorHandlerType;
+
+   public ErrorBehaviorAttribute(Type errorHandlerType)
+   {
+      this.errorHandlerType = errorHandlerType;
+   }
+
+   public void Validate(ServiceDescription description, ServiceHostBase serviceHostBase)
+   {
+   }
+
+   public void AddBindingParameters(ServiceDescription description, ServiceHostBase serviceHostBase, Collection&lt;ServiceEndpoint&gt; endpoints, BindingParameterCollection parameters)
+   {
+   }
+
+   public void ApplyDispatchBehavior(ServiceDescription description, ServiceHostBase serviceHostBase)
+   {
+      IErrorHandler errorHandler;
+
+      errorHandler = (IErrorHandler)Activator.CreateInstance(errorHandlerType);
+      foreach (ChannelDispatcherBase channelDispatcherBase in serviceHostBase.ChannelDispatchers)
+      {
+         ChannelDispatcher channelDispatcher = channelDispatcherBase as ChannelDispatcher;
+         channelDispatcher.ErrorHandlers.Add(errorHandler);
+      }
+   }
+}
+</code></pre>
+
+<p>Attaching to behaviour:</p>
+
+<pre><code>[ServiceContract]
+public interface IService
+{
+   [OperationContract(Action = "*", ReplyAction = "*")]
+   Message Action(Message m);
+}
+
+[ErrorBehavior(typeof(HttpErrorHandler))]
+public class Service : IService
+{
+   public Message Action(Message m)
+   {
+      throw new FaultException("!");
+   }
+}
+</code></pre>

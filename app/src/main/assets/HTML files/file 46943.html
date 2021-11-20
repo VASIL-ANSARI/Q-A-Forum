@@ -1,0 +1,19 @@
+<p>This is definitely not a bug and is done like this by design. It is hard to answer this type of question without being a developer on the .NET library but my guess is that they wanted to keep interfaces simple. Maybe someone on the .NET team will see this and chime in. Backwards compatibility issues will be tied to the interface/concrete implementation, which is also definitely a possibility in this scenario. However, this reasoning probably will not carry over to why IList/ICollection does not define those.</p>
+
+<p>One argument is that by adding AddRange (as well as RemoveRange/InsertRange) to the interface, you are forcing the implementer to define those methods. Interfaces should be simple and easy to define. AddRange, etc methods should really only exist on concrete collections where you can see performance improvements. For example, a List can optimize its AddRange by properly increasing its internal capacity, etc. Where a simple loop over items and calling Add maybe be more costly (e.g. via an Extension method). </p>
+
+<p>They probably do this for the same reason IList, ICollection, etc do not have an AddRange on the interface directly but do on the concrete implementations. </p>
+
+<p>There is a workaround for this, and that is to abstract both the interface and the concrete class using your own interface/class. You can give your interface an AddRange and extend DBSet/implement your interface in another class. This may or may not work depending on how you are using IDBSet/DBSet in your code. Although, a little refactoring can make this work. Something like this --</p>
+
+<pre><code>public class MyDbSet&lt;TEntity&gt; : DbSet&lt;TEntity&gt;, IMyDbSet&lt;TEntity&gt; where TEntity : class
+{
+}
+
+public interface IMyDbSet&lt;TEntity&gt; : IDbSet&lt;TEntity&gt; where TEntity : class
+{
+    IEnumerable&lt;TEntity&gt; AddRange(IEnumerable&lt;TEntity&gt; items);
+}
+</code></pre>
+
+<p>Now, you can just use IMyDbSet in your code. No need to implement AddRange as it is already implemented by extending DbSet. External methods that only accept IDbSet/DbSet should still accept MyDbSet/IMyDbSet.</p>

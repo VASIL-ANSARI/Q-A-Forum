@@ -1,0 +1,47 @@
+<h1>Exception cause</h1>
+
+<p>First of all - this service is using <strong>SOAP 1.1</strong> <em>not</em> <strong>SOAP 1.2</strong>. Change your <code>$client</code> specification to:</p>
+
+<pre><code>$client = new SoapClient('http://graphical.weather.gov/xml/DWMLgen/wsdl/ndfdXML.wsdl', array(
+            'cache_wsdl'  =&gt; WSDL_CACHE_NONE,
+            'exceptions' =&gt; 1,
+            'trace' =&gt; 1,
+            'stream_context' =&gt; $stream_context,
+            'soap_version'=&gt; SOAP_1_1,//&lt;-- note change here
+            'connection_timeout' =&gt; 5 //seconds
+));//SoapClient
+</code></pre>
+
+<h1>Service Definition</h1>
+
+<p>As it is stated in your <a href="http://graphical.weather.gov/xml/SOAP_server/ndfdXMLserver.php?wsdl" rel="nofollow">WSDL service specification</a>, you can find that <code>LatLonListZipCode</code> function is defined as:</p>
+
+<pre><code>&lt;operation name="LatLonListZipCode"&gt;
+    &lt;documentation&gt;Returns a list of latitude and longitude pairs with each pair corresponding to an input zip code.&lt;/documentation&gt;
+    &lt;input  message="tns:LatLonListZipCodeRequest"/&gt;
+    &lt;output message="tns:LatLonListZipCodeResponse"/&gt;
+&lt;/operation&gt;
+</code></pre>
+
+<p>and expected parameters are defined as:</p>
+
+<pre><code>&lt;xsd:simpleType name="zipCodeListType"&gt;
+    &lt;xsd:restriction base='xsd:string'&gt;
+        &lt;xsd:pattern value="\d{5}(\-\d{4})?( \d{5}(\-\d{4})?)*" /&gt;
+    &lt;/xsd:restriction&gt;
+&lt;/xsd:simpleType&gt;
+</code></pre>
+
+<h1>Proper call</h1>
+
+<p>So we know, that server demands only one <code>string</code> parameter named <code>zipCodeList</code>. Now we can deduct that your code should be like this:</p>
+
+<pre><code>$args = array("zipCodeList"=&gt;'10001');
+try {
+$z = $client-&gt;LatLonListZipCode($args);
+} catch (SoapFault $e) {
+    echo $e-&gt;faultcode;
+}
+</code></pre>
+
+<p>Note that i'm catching <code>SoapFault</code> exception. It will help you to understand server-side errors. Read more about it in <a href="http://php.net/manual/pl/soapfault.soapfault.php" rel="nofollow">PHP documentation</a>.</p>

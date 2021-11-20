@@ -1,0 +1,37 @@
+<p>For our tests, I developed a method which allows to use a simulated/fake login, which allows you to use the App without ADFS and without redirections. Of course, this should be disabled in production. Next time you record the test, you start straight away with the fake login.</p>
+
+<p>We use ASP.NET MVC so I can only show you how that works in ASP.NET MVC.</p>
+
+<h3>Controller Action</h3>
+
+<pre><code>    [AllowAnonymous]
+    public ActionResult Impersonate([Bind(Prefix = "id")]string email)
+    {
+        Impersonalisator.ImpersonateByEMail(email, Request);
+        return RedirectToRoute("Default", new { action = string.Empty, controller = string.Empty });
+    }
+</code></pre>
+
+<p>(So you can execute: /Home/Impersonate/demouser@example.com</p>
+
+<h3>Impersonalisator.ImpersonateByEMail</h3>
+
+<pre><code>    public static void ImpersonateByEMail(string email, HttpRequestBase request)
+    {
+        // you don't need this if clause, or you introduce this appsetting in your web.config
+        if ("true" == ConfigurationManager.AppSettings["EnableImpersonate"])
+        {
+            var impersonatedIdentity = new ClaimsIdentity("ApplicationCookie");
+
+            impersonatedIdentity.AddClaim(new Claim(ClaimTypes.Email, email));
+
+            // Add other claims you might need
+
+            var owinContext = request.GetOwinContext();
+            owinContext.Authentication.SignOut("ApplicationCookie");
+            owinContext.Authentication.SignIn(impersonatedIdentity);
+        }
+    }
+</code></pre>
+
+<p>You can start logged in without going over ADFS, you don't want to have ADFS or other Authentication services in your tests anyway, e.g. in load tests you might "attack" those services and cause failures etc.</p>

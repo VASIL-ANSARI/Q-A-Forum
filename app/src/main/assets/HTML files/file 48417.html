@@ -1,0 +1,57 @@
+<pre><code>UNIQUE(a,b,c)
+INDEX (a)
+</code></pre>
+
+<p>DROP the INDEX, since the UNIQUE key is an INDEX <em>and</em> the INDEX is a prefix of the UNIQUE.</p>
+
+<pre><code>PRIMARY KEY(d)
+UNIQUE(a,b,c)
+</code></pre>
+
+<p>Why have <code>d</code> at all?  Simply say <code>PRIMARY KEY(a,b,c)</code>.</p>
+
+<pre><code>FROM ( SELECT ... )
+JOIN ( SELECT ... ) ON ...
+</code></pre>
+
+<p>optimizes poorly (until 5.6.6).  Whenever possible turn <code>JOIN ( SELECT )</code> into a JOIN with the table.  As you suggested, using tmp tables <em>may</em> be better, <em>if</em> you can add a suitable index to the tmp table.  Best is to try to avoid more than <em>one</em> "table" that is a subquery.</p>
+
+<p>In a many-to-many relation table, don't include an id for the table, instead have <em>only</em></p>
+
+<pre><code>PRIMARY KEY (a,b),  -- for enforcing uniqueness, providing a PK, and going one direction
+INDEX       (b,a)   -- for going the other way.
+</code></pre>
+
+<p>The EXPLAIN does not seem to match the SELECT you provided.  Each is useless without the other.</p>
+
+<p>Another approach that <em>might</em> help...  Instead of </p>
+
+<pre><code>SELECT ..., s2.foo, ...
+    ...
+    JOIN ( SELECT ... FROM x WHERE ... ) AS s2 ON s2.account_id = a.account_id
+</code></pre>
+
+<p>see if you can reformulate it as:</p>
+
+<pre><code>SELECT ..., 
+       ( SELECT foo FROM x WHERE ... AND related = a.account_id) AS foo, ...
+    ...
+</code></pre>
+
+<p>That is, replace the JOIN subquery with a correlated subquery for the one value you need.</p>
+
+<p>The bottom line is that the EAV model sucks.</p>
+
+<p>Hmmm...  I don't see the need for this at all, since <code>r</code> is not used elsewhere in he query...</p>
+
+<pre><code>INNER JOIN df_field_to_client_relation AS r ON r.field_id = p.field_id
+    WHERE p.field_id = '19' AND r.client_id = '7'
+</code></pre>
+
+<p>It seems to be equivalent to</p>
+
+<pre><code>WHERE EXISTS ( SELECT * FROM df_field_to_client_relation 
+               WHERE field_id = '19' AND client_id = '7' )
+</code></pre>
+
+<p>but why bother checking for existence?</p>

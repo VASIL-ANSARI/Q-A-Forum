@@ -1,0 +1,50 @@
+<p>The <a href="http://pubs.opengroup.org/onlinepubs/007908775/xsh/brk.html" rel="nofollow">standard for <code>brk</code> and <code>sbrk</code></a> explicitly does not specify whether the returned address is aligned in any way. On Mac OS X (and maybe other BSD systems) the sizes/addresses are page-aligned, but on Linux no such rounding takes place as can easily be tested with this little program:</p>
+
+<pre><code>#include &lt;unistd.h&gt;
+#include &lt;stdio.h&gt;
+
+int main() {
+        void *p;
+        p = sbrk(0);
+        printf("Initial brk: %p\n", p);
+        p = sbrk(1); // Increase the brk (returns OLD brk!)
+        p = sbrk(0); // Get the new brk
+        printf("New brk: %p\n", p);
+
+        return 0;
+}
+</code></pre>
+
+<p>On one of my systems, the output was:</p>
+
+<pre><code>Initial brk: 0x602000
+New brk: 0x602001
+</code></pre>
+
+<p>But you asked for the <em>initial</em> call. The Linux man-page states:</p>
+
+<blockquote>
+  <p>brk()  and  sbrk()  change the location of the program break, which defines the end of the process's data segment (i.e., the program break is the first location after the end of the uninitialized data segment).  Increasing the program break has the effect of allocating memory to the process; decreasing the break deallocates memory.</p>
+</blockquote>
+
+<p>The unitialized data segment is also known as BSS. The keyword here is <em>segment</em>, so it's very likely the initial value is always page-aligned.</p>
+
+<p>If you want to be on the safe side and check, you can verify the initial address by taking the modulo with the page size (which you can query via <a href="http://pubs.opengroup.org/onlinepubs/7908799/xsh/getpagesize.html" rel="nofollow"><code>getpagesize</code></a>).</p>
+
+<hr>
+
+<p><strong>Update:</strong> So I was curious and dug around a bit more. In the man-page, I already read that <code>brk</code> and <code>sbrk</code> are implemented atop the kernel's <code>sys_brk</code>. Its implementation in the kernel source can be found in <code>mm/mmap.c</code> (or <code>mm/nommu.c</code> for systems without a Memory Management Unit; we'll ignore this one). In the <code>brk</code> implementation in <code>mm/mmap.c</code>, we find this line:</p>
+
+<pre><code>newbrk = PAGE_ALIGN(brk);
+</code></pre>
+
+<p>("brk" here is the argument, not the function.) So the kernel <em>does</em> do page aligningâ¦ sort of: while the calculations are done with the page-aligned values and any necessary memory allocation is page-aligned, the value <em>stored</em> for the brk is actually the pointer value you passed:</p>
+
+<pre><code>mm-&gt;brk = brk;
+</code></pre>
+
+<p>So in the user-space it doesn't look like any page-algning took place even though the kernel did. I looked at versions 3.17.5 and 2.4.37, the behaviour is the same.</p>
+
+<p>Regarding the initial value, in <code>fs/binfmt_elf.c</code> (which implements ELF linking) we find a function <code>set_brk</code> which sets the initial "brk" value (<code>mm-&gt;start_brk</code>). This value is explicitly page-aligned. The same is true for <code>fs/binfmt_aout.c</code> which handles the old a.out format and <code>fs/binfmt_som.c</code> which handles HP-UX SOM format (never heard of it before). There's also <code>fs/binfmt_flat.c</code> which sets the initial brk value but doesn't align explicitly; the value is implicitly aligned here. So it looks like the initial value is <em>always</em> page-aligned. At least it's guaranteed to be page-aligned for ELF files, which is what we care about for "normal" systems.</p>
+
+<p>The glibc simply wraps <code>sys_brk</code> and adds bookkeeping to correctly implement <code>sbrk</code>. So glibc's <code>brk</code> behaviour is that of the kernel, the return value <code>sys_brk</code> is stored in an internal hidden variable <code>__curbrk</code> so that <code>sbrk</code> can calculate the new address correctly.</p>

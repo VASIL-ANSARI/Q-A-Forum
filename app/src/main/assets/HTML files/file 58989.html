@@ -1,0 +1,176 @@
+<p>You have a few problem.<br>
+1. <code>while((y=getchar())!=EOF){</code> : Discarded one character.<br>
+2. <code>fwrite(r,sizeof(struct root),1,fp);</code> : Only nodes of the root is stored. Pointer can not be reproduced at the time of reading.<br>
+3. <code>struct root *srch(struct root *r, int a){
+   if(r-&gt;val&gt;a){</code> : First, you need to NULL check.  </p>
+
+<h2>Examples of changes:</h2>
+
+<p>bst.h:</p>
+
+<pre><code>#ifndef BST_H
+#define BST_H
+
+#define BST_TEXT_FILE "texts/ans.txt"
+#define BST_BIN_FILE  "texts/bst.dat"
+
+struct root{
+    int val;
+    struct root *left;
+    struct root *right;
+};
+
+#endif
+</code></pre>
+
+<hr>
+
+<p>input_store.h:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include "bst.h"
+
+typedef enum ftype { Bin, Text } Ftype;
+
+int fprint_bst(FILE *fp, struct root *r, Ftype type ){
+    if(r){
+        int count = 0;
+
+        count += fprint_bst(fp, r-&gt;left, type);
+        if(type == Text)
+            fprintf(fp, "%d\n", r-&gt;val);//write text
+        else
+            fwrite(&amp;r-&gt;val, sizeof(r-&gt;val), 1, fp);write bin
+        count += fprint_bst(fp, r-&gt;right, type);
+        return count + 1;//count elements then it return
+    }
+    return 0;
+}
+
+void fwrite_bst(struct root *r){
+    FILE *fp;
+    int n;
+
+    fp = fopen(BST_TEXT_FILE, "wt");
+    n = fprint_bst(fp, r, Text);
+    fclose(fp);
+
+    fp = fopen(BST_BIN_FILE, "wb");
+    fwrite(&amp;n, sizeof(n), 1, fp);//store number of elements
+    fprint_bst(fp, r, Bin);
+    fclose(fp);
+}
+
+struct root *insert(struct root *r, int val){
+    if(r == NULL){
+        r = malloc(sizeof(*r));
+        r-&gt;val = val;
+        r-&gt;left = r-&gt;right = NULL;
+    } else {
+        if(val &lt; r-&gt;val)
+            r-&gt;left = insert(r-&gt;left, val);
+        else if(val &gt; r-&gt;val)
+            r-&gt;right = insert(r-&gt;right, val);
+    }
+    return r;
+}
+
+void free_bst(struct root *r){
+    if(r){
+        free_bst(r-&gt;left);
+        free_bst(r-&gt;right);
+        free(r);
+    }
+}
+
+int main(void){
+    int val;
+    struct root *r = NULL;
+
+    printf("Enter the number:  \n");
+
+    while(1 == scanf("%d", &amp;val)){
+        r = insert(r, val);
+    }
+    fprint_bst(stdout, r, Text);
+    fwrite_bst(r);
+    free_bst(r);
+
+    return 0;
+}
+</code></pre>
+
+<hr>
+
+<p>search.c:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include "bst.h"
+
+struct root *search(struct root *r, int a){
+    if(r == NULL)//need NULL check
+        return NULL;//and return NULL
+    if(r-&gt;val &gt; a)
+        return search(r-&gt;left, a);
+    else if(r-&gt;val &lt; a)
+        return search(r-&gt;right,a);
+    else
+        return r;
+}
+
+struct root *new_node(int val){
+    struct root *node = malloc(sizeof(*node));
+    if(!node){
+        fprintf(stderr, "fail malloc\n");
+        exit(EXIT_FAILURE);
+    }
+    node-&gt;val = val;
+    node-&gt;left = node-&gt;right = NULL;
+    return node;
+}
+
+struct root *create_bst(int n, int data[n]){
+    if(n == 0)
+        return NULL;
+    else if(n == 1)
+        return new_node(data[0]);
+
+    int mid = n / 2;//split [left part] mid [right part]
+    struct root *r = new_node(data[mid]);
+    r-&gt;left  = create_bst(mid,  data);
+    r-&gt;right = create_bst(n - mid -1, data+mid+1);
+    return r;
+}
+
+struct root *load(void){
+    int n;
+    FILE *fp = fopen(BST_BIN_FILE, "rb");
+    fread(&amp;n, sizeof(n), 1, fp);//read number of elements
+    int *data = malloc(n * sizeof(*data));
+    fread(data, sizeof(*data), n, fp);
+    fclose(fp);
+
+    struct root *r = create_bst(n, data);
+    free(data);
+    return r;
+}
+
+int main(void){
+    int num;
+    struct root *f, *r = load();//Constitute the tree from the file
+
+    printf("Enter the Number: ");
+    scanf("%d", &amp;num);
+    f = search(r, num);
+
+    if(f)
+        puts("Found");
+    else 
+        puts("Not Found");
+
+    //free_bst(r);//Omitted because it is the same
+    return 0;
+}
+</code></pre>

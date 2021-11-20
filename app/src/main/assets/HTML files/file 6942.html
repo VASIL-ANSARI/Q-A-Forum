@@ -1,0 +1,132 @@
+<p>You can parse the xml attribute value back to an enum type with:</p>
+
+<pre><code>var value = Enum.Parse(typeof(Fuel), "B");
+</code></pre>
+
+<p>But I don't think you will get really far with your "special" values (<code>3</code>, <code>a/</code> etc.).
+Why don't you define your enum as</p>
+
+<pre><code>enum Fuel
+{
+    Benzine,
+    Diesel,
+    // ...
+    Three,
+    ASlash,
+    // ...
+}
+</code></pre>
+
+<p>And write a static method to convert a string to an enum member?</p>
+
+<p>One thing you could look into for implementing such a method would be to add custom attributes to the enum members containing their string representation - if a value doesn't have an exact counterpart in the enumeration, look for a member with the attribute.</p>
+
+<p>Creating such an attribute is easy:</p>
+
+<pre><code>/// &lt;summary&gt;
+/// Simple attribute class for storing String Values
+/// &lt;/summary&gt;
+public class StringValueAttribute : Attribute
+{
+    public string Value { get; private set; }
+
+    public StringValueAttribute(string value)
+    {
+        Value = value;
+    }
+}
+</code></pre>
+
+<p>And then you can use them in your enum:</p>
+
+<pre><code>enum Fuel
+{
+    [StringValue("B")]        
+    Benzine,
+    [StringValue("D")]
+    Diesel,
+    // ...
+    [StringValue("3")]
+    Three,
+    [StringValue("/")]
+    Slash,
+    // ...
+}
+</code></pre>
+
+<p>These two methods will help you parse a string into an enum member of your choice:</p>
+
+<pre><code>    /// &lt;summary&gt;
+    /// Parses the supplied enum and string value to find an associated enum value (case sensitive).
+    /// &lt;/summary&gt;
+    public static object Parse(Type type, string stringValue)
+    {
+        return Parse(type, stringValue, false);
+    }
+
+    /// &lt;summary&gt;
+    /// Parses the supplied enum and string value to find an associated enum value.
+    /// &lt;/summary&gt;
+    public static object Parse(Type type, string stringValue, bool ignoreCase)
+    {
+        object output = null;
+        string enumStringValue = null;
+
+        if (!type.IsEnum)
+        {
+            throw new ArgumentException(String.Format("Supplied type must be an Enum.  Type was {0}", type));
+        }
+
+        //Look for our string value associated with fields in this enum
+        foreach (FieldInfo fi in type.GetFields())
+        {
+            //Check for our custom attribute
+            var attrs = fi.GetCustomAttributes(typeof (StringValueAttribute), false) as StringValueAttribute[];
+            if (attrs != null &amp;&amp; attrs.Length &gt; 0)
+            {
+                enumStringValue = attrs[0].Value;
+            }                       
+
+            //Check for equality then select actual enum value.
+            if (string.Compare(enumStringValue, stringValue, ignoreCase) == 0)
+            {
+                output = Enum.Parse(type, fi.Name);
+                break;
+            }
+        }
+
+        return output;
+    }
+</code></pre>
+
+<p>And while I'm at it: here is the other way round ;)</p>
+
+<pre><code>    /// &lt;summary&gt;
+    /// Gets a string value for a particular enum value.
+    /// &lt;/summary&gt;
+    public static string GetStringValue(Enum value)
+    {
+        string output = null;
+        Type type = value.GetType();
+
+        if (StringValues.ContainsKey(value))
+        {
+            output = ((StringValueAttribute) StringValues[value]).Value;
+        }
+        else
+        {
+            //Look for our 'StringValueAttribute' in the field's custom attributes
+            FieldInfo fi = type.GetField(value.ToString());
+            var attributes = fi.GetCustomAttributes(typeof(StringValueAttribute), false);
+            if (attributes.Length &gt; 0)
+            {
+                var attribute = (StringValueAttribute) attributes[0];
+                StringValues.Add(value, attribute);
+                output = attribute.Value;
+            }
+
+        }
+        return output;
+
+    }
+</code></pre>

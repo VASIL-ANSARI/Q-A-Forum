@@ -1,0 +1,74 @@
+<p><strong>Quick answer:</strong></p>
+
+<pre><code>foreach(//do some stuff)
+{
+     foreach(//do some stuff)
+     {
+          if(//check some condition)
+          {
+                goto end; // I'd probably add a comment here
+          }
+     }
+     // *1
+}
+end:
+{} // the rest of your code.
+</code></pre>
+
+<p><strong>But, but SESE...</strong></p>
+
+<p>SESE violations are violations of the Single Entry Single Exit principle. It's quite easy to fix, by using an extra condition:</p>
+
+<pre><code>bool found = false;
+for (int i=0; i&lt;foo.Count &amp;&amp; !found; ++i)
+{
+    for (int j=0; j&lt;bar.Count; ++j) 
+    {
+        if (...) { found = true; }
+    }
+    // *1 
+    if (!found) { ... }
+}
+</code></pre>
+
+<p><strong>So why use a GOTO here?</strong></p>
+
+<p>I believe that creating proper, maintainable code means that you use the language constructs that most closely describes your intent. "Code" here is always composed of two things:</p>
+
+<ul>
+<li><em>Control flow</em>, which is expressed through things like <code>for</code>, <code>while</code>, <code>break</code> and <code>goto</code>.</li>
+<li><em>Data flow</em>, which is expressed through expressions, variables, and other memory access.</li>
+</ul>
+
+<p>The intent of the OP is to break out of a nested loop, which is the equivalent of a control flow operation. I therefore believe you should use the control flow operation that most closely represents what the intent is - which is in this case a <code>goto</code>.</p>
+
+<p>Note that this is not at all a reason you should abuse for introducing <code>goto</code> statements all over the place; if you do, the code will become very hard to read, which has nothing to do with maintainability and readability. You should consider the <code>goto</code> statement as a 'last resort control flow' statement, which is very rarely used in properly crafted code.</p>
+
+<p>That said, in this case, this means that you shouldn't create local variables to handle control flow, unless that's absolutely necessary (e.g. if there's no language construct available that can express your intent clearly). For the same reason, I wouldn't have used Linq in this particular scenario.</p>
+
+<p><strong>I want performance. What should I do?</strong></p>
+
+<p>I believe most abuse of language constructs results from not understanding how the compiler deals with code, which is why I make it a habit of explaining parts of how it works internally. Please keep in mind that I recommend using a <code>goto</code> because it most clearly describes your intent, not because it might be a bit faster. Here goes:</p>
+
+<p>Imagine being the compiler. You have a ton of code at the point of *1 in your code and cannot use <code>return</code>. Now there's two options: </p>
+
+<ol>
+<li>You can use a goto.</li>
+<li>You can use the extra flag. </li>
+</ol>
+
+<p>Option 1 will compile to a field, which has memory. Memory is 'scarse' in the sense that compilers will do their best to consume as little memory as possible, preferable in registers. That's where your performance originates from. So, the compiler will attempt to eliminate the flag.</p>
+
+<p>To do this, your compiler will do a ton of flow analysis and other stuff, <em>in an attempt to determine</em> that there are actually two code paths: the one is when the flag is set and the other one if it's not. </p>
+
+<p>Now, if you're lucky the compiler will have its 'aha' moment and change your code from (2) to a simple GOTO, in which case the sky is still blue and everyone is happy.</p>
+
+<p>However, if you're not lucky (and there are a ton of practical reasons for this to happen), it will not detect this from flow analysis and won't create the GOTO. Since your flag is used in the inner loop, it might even allocate a register for this, which might be the worst case scenario.</p>
+
+<p>If you would have used the <code>goto</code> in the first place, there's no need for all this. You simply give the compiler the right solution. Simple.</p>
+
+<p><strong>Hrm do you have more details about how the compiler does this?</strong></p>
+
+<p>Yes, look at this 2 hour video of Chandler that explains a lot on how compilers work: <a href="https://www.youtube.com/watch?v=FnGCDLhaxKU" rel="nofollow">https://www.youtube.com/watch?v=FnGCDLhaxKU</a></p>
+
+<p><em>-updated-</em> Apparently some people misintepreted my story as was pointed out by @Groo. I've made some adjustments to clarify what I meant to say.</p>

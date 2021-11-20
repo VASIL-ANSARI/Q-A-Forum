@@ -1,0 +1,43 @@
+<p>You can create a subclass of <code>ObservableCollecton&lt;T&gt;</code> and add your own custom event when the Count hasn't changed between calls to <code>CollectionChanged</code> events. So you basically keep a private field that stores the Count of the collection and on the next CollectionChanged event you compare the current Count with the previous count. If they are equal you raise your custom event.</p>
+
+<p>A possible implementation looks like this:</p>
+
+<pre><code>public delegate void CountEqual(object sender, EventArgs e);
+
+public class ObservableCountCollection&lt;T&gt;: ObservableCollection&lt;T&gt;
+{
+    public CountEqual CountUnchanged;
+
+    private int _previousCount;
+    private object locker = new object();
+
+    public ObservableCountCollection()
+    {
+        this.CollectionChanged += ObservableCountCollection_CollectionChanged;
+        _previousCount = 0;
+    }
+
+    void ObservableCountCollection_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        bool raiseEvent = false;
+        var unchanged = CountUnchanged;
+        lock(locker)
+        {
+            raiseEvent = _previousCount == this.Count;
+            _previousCount = this.Count;
+        }
+        if (raiseEvent &amp;&amp; unchanged!=null)
+        {
+            unchanged(this, new EventArgs());
+        }
+    }
+}
+</code></pre>
+
+<p>Notice that the <code>NotifyCollectionChangedEventArgs</code> type does have an <a href="https://msdn.microsoft.com/en-us/library/system.collections.specialized.notifycollectionchangedaction(v=vs.110).aspx" rel="nofollow"><code>Action</code></a> property. For this collection I think you could also do </p>
+
+<pre><code>raiseEvent = (e.Action == NotifyCollectionChangedAction.Replace || 
+              e.Action == NotifyCollectionChangedAction.Move);
+</code></pre>
+
+<p>so you wouldn't need to keep the count and lock construct but I didn't test how that works if you're able to call <code>AddRange</code> on a collection. I leave that for any follow-up questions.</p>

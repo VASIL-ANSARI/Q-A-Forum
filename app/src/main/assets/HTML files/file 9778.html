@@ -1,0 +1,67 @@
+<p>Here's my class to extract parts from a single line of an svn:externals property:</p>
+
+<pre><code>from urlparse import urlparse
+import re
+class SvnExternalsLine:
+    '''Consult https://subversion.apache.org/docs/release-notes/1.5.html#externals for parsing algorithm.
+    The old svn:externals format consists of:
+        &lt;local directory&gt; [revision] &lt;absolute remote URL&gt;
+
+    The NEW svn:externals format consists of:
+        [revision] &lt;absolute or relative remote URL&gt; &lt;local directory&gt;
+
+    Therefore, "relative" remote paths always come *after* the local path.
+    One complication is the possibility of local paths with spaces.
+    We just assume that the remote path cannot have spaces, and treat all other
+    tokens (except the revision specifier) as part of the local path.
+    '''
+
+    REVISION_ARGUMENT_REGEXP = re.compile("-r(\d+)")
+
+    def __init__(self, original_line):
+        self.original_line = original_line
+
+        self.pinned_revision_number = None
+        self.repo_url = None
+        self.local_pathname_components = []
+
+        for token in self.original_line.split():
+
+            revision_match = self.REVISION_ARGUMENT_REGEXP.match(token)
+            if revision_match:
+                self.pinned_revision_number = int(revision_match.group(1))
+            elif urlparse(token).scheme or any(map(lambda p: token.startswith(p), ["^", "//", "/", "../"])):
+                self.repo_url = token
+            else:
+                self.local_pathname_components.append(token)
+
+    # ---------------------------------------------------------------------
+    def constructLine(self):
+        '''Reconstruct the externals line in the Subversion 1.5+ format'''
+
+        tokens = []
+
+        # Update the revision specifier if one existed
+        if self.pinned_revision_number is not None:
+            tokens.append( "-r%d" % (self.pinned_revision_number) )
+
+        tokens.append( self.repo_url )
+        tokens.extend( self.local_pathname_components )
+
+        if self.repo_url is None:
+            raise Exception("Found a bad externals property: %s; Original definition: %s" % (str(tokens), repr(self.original_line)))
+
+        return " ".join(tokens)
+</code></pre>
+
+<p>I use the <code>pysvn</code> library to iterate recursively through all of the directories possessing the svn:externals property, then split that property value by newlines, and act upon each line according to the parsed <code>SvnExternalsLine</code>.</p>
+
+<p>The process must be performed on a local checkout of the repository.  Here's how <code>pysvn</code> (<a href="http://pysvn.tigris.org/docs/pysvn_prog_ref.html#pysvn_client_propget" rel="nofollow">propget</a>) can be used to retrieve the externals:</p>
+
+<pre><code>client.propget( "svn:externals", base_checkout_path, recurse=True)
+</code></pre>
+
+<p>Iterate through the return value of this function, and and after modifying the property on each directory, </p>
+
+<pre><code>client.propset("svn:externals", new_externals_property, path)
+</code></pre>

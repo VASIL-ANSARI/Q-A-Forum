@@ -1,0 +1,103 @@
+<p>You are working too hard. Never do manual adjustments for offsets and time zones, never be adding or subtracting minutes to a date-time value for that purpose. Let a decent date-time library do that work.</p>
+
+<h1>java.time</h1>
+
+<p>The Joda-Time team advises us to migrate to the java.time framework built into Java 8 and later.</p>
+
+<p>The <a href="http://docs.oracle.com/javase/8/docs/api/java/time/ZoneOffset.html" rel="nofollow"><code>ZoneOffset</code></a> class represents an <a href="https://en.wikipedia.org/wiki/UTC_offset" rel="nofollow">offset-from-UTC</a>. Keep in mind that in some areas an offset may involve not only a number of hours but also minutes and even seconds.</p>
+
+<p>The <a href="https://docs.oracle.com/javase/8/docs/api/java/time/OffsetDateTime.html" rel="nofollow"><code>OffsetDateTime</code></a> class represents a a moment in the timeline with an assigned offset.</p>
+
+<pre><code>int hours = 3;  // input by user
+
+ZoneOffset offset = ZoneOffset.ofHours( hours );
+OffsetDateTime odt = OffsetDateTime.now( offset );
+</code></pre>
+
+<p>The standard ISO 8601 formats are used by the toString methods in java.time.</p>
+
+<pre><code>String output = odt.toString();
+</code></pre>
+
+<p>Generally the best practice is to do your business logic and data storage in UTC. Convert to/from an offset or zoned value only for interaction with user.</p>
+
+<p>In java.time a moment on the timeline in <a href="https://en.wikipedia.org/wiki/Coordinated_Universal_Time" rel="nofollow">UTC</a> is represented by the <a href="https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html" rel="nofollow"><code>Instant</code></a> class. You can extract an <code>Instant</code> object from the <code>OffsetDateTime</code>.</p>
+
+<pre><code>Instant instant = odt.toString();
+</code></pre>
+
+<p>Both this <code>Instant</code> and this <code>OffsetDateTime</code> represent the <strong>same simultaneous moment</strong> on the timeline. They present different <a href="https://en.wikipedia.org/wiki/Wall_clock_time" rel="nofollow">wall-clock times</a>.</p>
+
+<p>It may be more clear to skip the use of the <a href="http://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html#now-java.time.ZoneId-" rel="nofollow"><code>OffsetDateTime.now</code></a> convenience method and start with <code>Instant</code>.</p>
+
+<pre><code>Instant instant = Instant.now();  // Always in UTC, by definition.
+ZoneOffset offset = ZoneOffset.ofHours( hours );
+OffsetDateTime odt = OffsetDateTime.ofInstant( instant , offset );  // Same moment but presenting alternate wall-clock time.
+</code></pre>
+
+<h2>Handling input</h2>
+
+<p>If the user is inputting date-time values as strings, we need to parse. In java.time that means the <a href="http://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html" rel="nofollow"><code>DateTimeFormatter</code></a> class. The formatting codes are similar to the outmoded <code>java.text.SimpleDateFormat</code> but not exactly identical, so be sure to study the doc.</p>
+
+<pre><code>DateTimeFormatter formatter = DateTimeFormatter.ofPattern( "dd MMM uuuu HH:mm";
+</code></pre>
+
+<p>Since the offset-from-UTC is given separately, we parse this input string as a <a href="http://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html" rel="nofollow"><code>LocalDateTime</code></a> devoid of time zone information.</p>
+
+<pre><code>LocalDateTime ldt = LocalDateTime.parse( inputString , formatter );
+</code></pre>
+
+<p>To view, create a String object formatted in ISO 8601 format by calling <code>ldt.toString()</code>.</p>
+
+<blockquote>
+  <p>2016-01-02T12:34:45</p>
+</blockquote>
+
+<p>Apply the pre-determined <code>ZoneOffset</code> object to yield a <code>OffsetDateTime</code> object.</p>
+
+<pre><code>OffsetDateTime odt = ldt.atOffset( offset );
+</code></pre>
+
+<blockquote>
+  <p>2016-01-12T12:34:45+03:00</p>
+</blockquote>
+
+<h2>Think in UTC</h2>
+
+<p>Handling date-time values is a headache. <a href="https://en.wikipedia.org/wiki/Coordinated_Universal_Time" rel="nofollow">UTC</a> is your aspirin. </p>
+
+<p>When a programmer arrives at the office, she should take off her âUK citizen / London residentâ hat, and put on her âUTCâ hat. Forget all about your own local time zone. Learn to think in UTC (and 24-hour clock). Add another clock to your desk or computer, set to UTC (or <a href="https://en.wikipedia.org/wiki/Reykjav%C3%ADk" rel="nofollow">ReykjavÃ­k</a> Iceland), or at least bookmark a page like <a href="http://time.is/UTC" rel="nofollow">time.is/UTC</a>. Do all your logging, business logic, data serialization, data-exchange, and debugging in UTC.</p>
+
+<p>Make <code>Instant</code> your first-thought, your go-to class. It's value is always in UTC by definition.</p>
+
+<pre><code>Instant instant = Instant.now();
+</code></pre>
+
+<p>Look at the <code>Instant</code> extracted from the <code>OffsetDateTime</code> value we saw above whose String representation was <code>2016-01-12T12:34:45+03:00</code>. Being in UTC means 9 AM rather than noon, same moment but three hours difference in wall-clock time. The <code>Z</code> is short for <code>Zulu</code> and means UTC.</p>
+
+<pre><code>String output = odt.toInstant().toString();
+</code></pre>
+
+<blockquote>
+  <p>2016-01-12T09:34:45Z</p>
+</blockquote>
+
+<p>Adjust into an offset or time zone only as needed, when expected by a user or data sink. FYI, a time zone is an offset-from-UTC <em>plus</em> a set of rules for handling anomalies such as Daylight Saving Time (DST). <strong>Use a time zone in preference to a mere offset</strong> wherever possible. </p>
+
+<p>The <code>Europe/London</code> time zone is the same as UTC in the summer, but in winter uses Daylight Saving Time nonsense, and is one hour ahead of UTC. So using the same <code>Instant</code> seen just above, the London wall-clock time is 10 AM rather than 9 AM in UTC, and different from the noon we saw with an offset of <code>+03:00</code>.</p>
+
+<pre><code>ZoneId zoneId = ZoneId.of( "Europe/London" );
+ZonedDateTime zdt = ZonedDateTime.ofInstant( instant , zoneId );
+</code></pre>
+
+<blockquote>
+  <p>2016-01-12T10:34:45+01:00[Europe/London]</p>
+</blockquote>
+
+<p>Always specify the desired/required offset or time zone; never rely on the implicit current default by omitting this optional argument. (Ditto for <a href="http://docs.oracle.com/javase/8/docs/api/java/util/Locale.html" rel="nofollow"><code>Locale</code></a> by the way.) Note how in all the code of this answer the fact that your <a href="https://en.wikipedia.org/wiki/Java_virtual_machine" rel="nofollow">JVM</a> has a current default time zone (<a href="http://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html#systemDefault--" rel="nofollow"><code>ZoneId.systemDefault</code></a>) of <a href="https://en.wikipedia.org/wiki/Europe/London" rel="nofollow"><code>Europe/London</code></a> and the fact that my JVM has a current default time zone of <a href="https://en.wikipedia.org/wiki/America/Los_Angeles" rel="nofollow"><code>America/Los_Angeles</code></a> is <em>completely irrelevant</em>. The code runs the same, gets the same results, regardless of whatever machine you use to develop, test, and deploy.</p>
+
+<h1>Locale</h1>
+
+<p>Specify a <code>Locale</code> object when generating a textual representation of a date-time value that involves a name of month or day, commas or periods and so on. The <code>Locale</code> determines (a) the human language to use when translating such names, and (b) the cultural norms to follow in deciding issues such as punctuation marks.</p>
+
+<p>The <code>Locale</code> has nothing to do with time zones and offset-from-UTC. For example, you could use <a href="http://docs.oracle.com/javase/8/docs/api/java/util/Locale.html#CANADA_FRENCH" rel="nofollow"><code>Locale.CANADA_FRENCH</code></a> with a date-time zoned for <a href="https://en.m.wikipedia.org/wiki/Asia/Kolkata" rel="nofollow"><code>Asia/Kolkata</code></a> if you had a <a href="https://en.m.wikipedia.org/wiki/Qu%C3%A9b%C3%A9cois_(word)" rel="nofollow">QuÃ©bÃ©cois</a> user in India.  </p>

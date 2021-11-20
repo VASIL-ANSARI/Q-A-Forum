@@ -1,0 +1,19 @@
+<p>You told you have used this post: <a href="http://stackoverflow.com/questions/10341860/mpi-io-reading-and-writing-block-cyclic-matrix">MPI IO Reading and Writing Block Cyclic Matrix</a>.
+We must assume some things - such as dimensions of matrix MatC: let's assume ther are m rows and n columns.
+Dimensions of block in MatC, let's assume they are m_b and n_b. Let's assume number of processors is nproc, and that rank of proc is saved in variable node. Also, we must know dimensions of 2D-torus (processor grid), for our example p and q. Here's how you do that:</p>
+
+<pre><code>    int dims[]={m, n}, dargs[]={m_b, n_b}, distribs[]={MPI_DISTRIBUTE_CYCLIC, MPI_DISTRIBUTE_CYCLIC}, nproc, dim[]={p, q};
+    char nat[]="native";
+    MPI_Datatype dcarray, compa; //don't know what type compa is
+    ...
+    MPI_Type_create_darray(nproc, node, 2, dims, distribs, dargs, dim, MPI_ORDER_C, compa, &amp;dcarray); 
+    MPI_Type_commit(&amp;dcarray);
+    rc=MPI_File_open(comm, rez, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &amp;cFile);
+    if(rc){printf("Failed to open file! Error: %d \n", rc);MPI_Finalize(); fflush(stdout);}
+    else
+    {
+        MPI_File_set_view(cFile, 0, compa, dcarray, nat, MPI_INFO_NULL);
+        MPI_File_write_all(cFile, MatC, locrC*loccC, compa, &amp;status);    
+    }
+    MPI_File_close(&amp;cFile);
+</code></pre>

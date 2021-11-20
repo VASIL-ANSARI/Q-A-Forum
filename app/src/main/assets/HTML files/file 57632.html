@@ -1,0 +1,42 @@
+<p>All of these regular expression patterns that you can supply to the code generator are patterns that match schemas, tables, or columns either by their <em>unqualified</em> name (e.g. <code>version</code>) or by their <em>fully qualified</em> name (e.g. <code>public.users.version</code>). You cannot use partially qualified names like <code>users.version</code>.</p>
+
+<p>To answer your concrete question, the following are examples that will work:</p>
+
+<pre><code>&lt;!-- Will match version columns in all tables --&gt;
+&lt;recordVersionFields&gt;version&lt;/recordVersionFields&gt;
+
+&lt;!-- Will match version columns in all user tables. 
+     Notice that schema names are matched by .* --&gt;
+&lt;recordVersionFields&gt;.*\.user\.version&lt;/recordVersionFields&gt;
+
+&lt;!-- Will match version columns only in that particular public.user table --&gt;
+&lt;recordVersionFields&gt;public\.user\.version&lt;/recordVersionFields&gt;
+</code></pre>
+
+<p>This will generate the relevant meta information into your <code>UserRecord</code> for optimistic locking to be enabled on <code>UserRecord.store()</code>, <code>update()</code>, and <code>delete()</code> calls.</p>
+
+<h3>Side note: Your compilation error</h3>
+
+<p>In your question, you referred to a compilation error that seems to happen because you're matching all version columns in all tables:</p>
+
+<pre><code>&lt;!-- Will match version columns in all tables --&gt;
+&lt;recordVersionFields&gt;version&lt;/recordVersionFields&gt;
+</code></pre>
+
+<p>This will also match "wrong" version columns, e.g. in the <code>schema_version</code> table, which is of type <code>VARCHAR</code> not <code>INTEGER</code>. Perhaps, you should be more explicit with your regular expression to do exact matching.</p>
+
+<h3>Side note: Case sensitivity</h3>
+
+<p>All of these regular expressions are case sensitive. If you're using PostgreSQL, then the following is probably wrong:</p>
+
+<pre><code>&lt;inputSchema&gt;PUBLIC&lt;/inputSchema&gt;
+</code></pre>
+
+<p>Instead, write any of these:</p>
+
+<pre><code>&lt;!-- use lower-case in PostgreSQL by default --&gt;
+&lt;inputSchema&gt;public&lt;/inputSchema&gt;
+
+&lt;!-- use case-insensitive regular expressions to "stay safe" --&gt; 
+&lt;inputSchema&gt;(?i:PUBLIC)&lt;/inputSchema&gt;
+</code></pre>

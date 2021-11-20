@@ -1,0 +1,57 @@
+<p>The issue you are having is due to Content scrubbing in the Api. Scrubbing the contents is a security measure to prevent malicious code from executing.</p>
+
+<p>When a feature balloon's description contents are scrubbed, the following code is removed:</p>
+
+<ul>
+<li>JavaScript </li>
+<li>CSS </li>
+<li><code>&lt;iframe&gt;</code> tags</li>
+<li><code>&lt;embed&gt;</code> tags</li>
+<li><code>&lt;object&gt;</code> tags</li>
+</ul>
+
+<p>If you take a look at the markup in a debugger you will see that you are actually getting something like the following:</p>
+
+<pre><code>&lt;div style="font-family: Arial,sans-serif; font-size: small;"&gt;
+    &lt;div id="iw_kml"&gt;
+      First Line Information&lt;br&gt; 
+      California addresss&lt;br&gt;
+      Peak valley&lt;br&gt; 
+      &lt;div&gt;Telephone&lt;br&gt;Office 9089YUHJT General: (2457TYGFR&lt;/div&gt; 
+    &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>You don't say how you are opening the info windows, but something like the following should work for you. Basically you suppress the default info window and then build your own custom one.</p>
+
+<pre><code>function initialize() {
+  var myLatlng = new google.maps.LatLng(0, 0);
+  var myOptions = {
+    zoom: 12,
+    center: myLatlng,
+    mapTypeId: google.maps.MapTypeId.ROADMAP
+  };
+
+  var map = new google.maps.Map(
+      document.getElementById("map_canvas"),
+      myOptions);
+
+  var layer= new google.maps.KmlLayer(
+      'http://www.yourserver.com/some.kml',
+      { suppressInfoWindows: true,
+         map: map });
+
+  google.maps.event.addListener(layer, 'click', function(kmlEvent) {
+    showInContentWindow(kmlEvent.featureData.description);
+  });
+
+  function showInContentWindow(text) {
+    var content = "&lt;div style='margin-left:-20px;border:2px dotted #897823;'&gt;" + text + "&lt;/div&gt;";
+    var infowindow = new google.maps.InfoWindow({
+        content: content 
+    })
+  }
+}
+</code></pre>
+
+<p>Obvioulsy you can replace <code>style='...'</code> with <code>class="infoWindow"</code> which would then allow you to define the CSS style in an external file.</p>

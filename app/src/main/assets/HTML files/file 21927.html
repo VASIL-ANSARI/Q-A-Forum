@@ -1,0 +1,41 @@
+<p>You should be able to do this in code using constraintWithItem:attribute:relatedBy:toItem:attribute:multiplier:constant:. Using the multiplier and constant together should work. Set the width of your label to be equal to the width of its superview, but with a multiplier of say 0.7 or 0.8 and then a constant that gives you the right width at the smaller size of the view. As the view grows, that constant value will make up a smaller portion of the overall width. For instance, with a multiplier of .7 and  a constant of 20, if the superview were 100 points wide, the label would be 90 points (100*.7 +20). If the view grows to 200, the label would be 160 wide (or 80% of the superview).</p>
+
+<p><strong>After Edit:</strong></p>
+
+<p>Actually, I think the method I mention above won't work. In the WWDC 2012 talk, "Best Practices For Mastering Auto Layout", they talk about using core animation or animating the constraints directly.  I think this is a case where you have to do the latter. If you use core animation, the label jumps to its new size while the view animates, even if both are within an animation block (at least it did for me -- Rob, if you know better, please post). To animate the constraints directly (in IOS) you have to use a timer, and increment the constraint constant. You could use an NSTimer, but I found that to be a bit jerky because of the limitations of its resolution (50-100 mSec). A smoother way is to use a CADisplayLink which is tied to the display refresh rate (I think that's 16.7 mSec). So here's the code I used. My setup in IB is a view that's 190 wide with a 170 wide label inside. I have width constraints on both (you need to add the QuartzCore framework for this).</p>
+
+<pre><code>#import "ViewController.h"
+#import &lt;QuartzCore/QuartzCore.h&gt;
+
+@interface ViewController ()
+@property (strong,nonatomic) CADisplayLink *displayLink;
+@end
+
+@implementation ViewController {
+
+    IBOutlet NSLayoutConstraint *labelWidthCon;
+    IBOutlet NSLayoutConstraint *viewWidthCon;
+}
+
+
+-(IBAction)startViewTimer:(id)sender {
+    [self startDisplayLink];
+}
+
+-(void)startDisplayLink {
+    self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(expandView:)];
+    [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+}
+
+- (void)stopDisplayLink {
+    [self.displayLink invalidate];
+    self.displayLink = nil;
+}
+
+
+-(void)expandView:(CADisplayLink *) link {
+    labelWidthCon.constant += 5;
+    viewWidthCon.constant +=10;
+    if (viewWidthCon.constant &gt; 370) [self stopDisplayLink];
+}
+</code></pre>

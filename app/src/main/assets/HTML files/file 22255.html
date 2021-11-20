@@ -1,0 +1,52 @@
+<p>I think your problem is misunderstanding of that âthread-local dataâ. According to <a href="http://msdn.microsoft.com/en-us/library/dd783299.aspx" rel="nofollow">the documentation of <code>Parallel.For()</code></a>, it's:</p>
+
+<blockquote>
+  <p>[â¦] some local state that may be shared amongst iterations that execute on the same thread.</p>
+</blockquote>
+
+<p>What this means is that some iterations of your loop will share the same <code>Cluster</code> object, which will cause incorrect results for you. If the <code>localInit</code> and <code>localFinally</code> executed for each iteration, then they would be useless, because you could do exactly the same thing by moving their code to the beginning and end of the loop.</p>
+
+<p>The reason why the delegates are there is that you can use them for <em>optimization</em>. With them, you don't have to access shared state (in your case <code>this.Clusters</code>) as often, which can improve performance.</p>
+
+<p>If you don't need this optimization, don't use the two delegates and instead write the body of your loop like this:</p>
+
+<pre><code>i =&gt;
+{
+    var cluster = new Cluster { Id = i };
+
+    // rest of the loop here
+
+    if (cluster.Blobs.Count &gt; 2)
+    {
+        lock (this.Clusters)
+        {
+            this.Clusters.Add(cluster);
+        }
+    }
+}
+</code></pre>
+
+<p>(In the above code, I also switched the <code>lock</code> with the <code>if</code> as an optimization.)</p>
+
+<p>If you think the optimization using thread-local data would be useful for you (i.e. it would actually speed things up), you can use it. But the data in question would have to be a list of <code>Cluster</code>s, not just a single <code>Cluster</code>. Something like:</p>
+
+<pre><code>() =&gt; new List&lt;Cluster&gt;(),
+(i, loop, clusters) =&gt;
+{
+    var cluster = new Cluster { Id = i };
+
+    // rest of the loop here
+
+    if (cluster.Blobs.Count &gt; 2)
+        clusters.Add(cluster);
+
+    return clusters;
+},
+clusters =&gt;
+{
+    lock (this.Clusters)
+    {
+        this.Clusters.AddRange(clusters);
+    }
+}
+</code></pre>

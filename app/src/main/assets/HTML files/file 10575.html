@@ -1,0 +1,175 @@
+<p>The meaning of <code>input()</code> has changed.</p>
+
+<p>In Python 3.2: <a href="http://docs.python.org/py3k/library/functions.html#input" rel="nofollow">http://docs.python.org/py3k/library/functions.html#input</a></p>
+
+<p>In Python 2.7.2: <a href="http://docs.python.org/library/functions.html#input" rel="nofollow">http://docs.python.org/library/functions.html#input</a></p>
+
+<p>You can see this far easier with two small testing programs. The only difference is one uses the Python 2.7 interpreter and the other uses the Python 3.2 interpreter:</p>
+
+<pre><code>$ cat input27.py 
+#!/usr/bin/python2.7
+data = input("")
+
+for l in data.split("\n"):
+    print(l)
+$ cat input32.py 
+#!/usr/bin/python3.2
+data = input("")
+
+for l in data.split("\n"):
+    print(l)
+$ ./input27.py &lt; names.txt 
+Traceback (most recent call last):
+  File "./input27.py", line 2, in &lt;module&gt;
+    data = input("")
+  File "&lt;string&gt;", line 1
+    Victor Bertha Amy Diane Erika Clare
+                ^
+SyntaxError: invalid syntax
+$ ./input32.py &lt; names.txt 
+Victor Bertha Amy Diane Erika Clare
+$ 
+</code></pre>
+
+<p>Note that even though the Python 3.2 version doesn't throw errors, it also doesn't print all the lines in <code>names.txt</code> as one might expect.</p>
+
+<p>I don't think the <code>input()</code> method is worth using. Easier would use the new-fangled <a href="http://docs.python.org/library/stdtypes.html#file.next" rel="nofollow"><code>for line in file:</code></a> approach instead:</p>
+
+<pre><code>$ cat fixed_input27.py 
+#!/usr/bin/python2.7
+
+import sys
+
+for line in sys.stdin:
+    print(line.split()[0])
+$ cat fixed_input32.py 
+#!/usr/bin/python3.2
+
+import sys
+
+for line in sys.stdin:
+    print(line.split()[0])
+$ ./fixed_input27.py &lt; names.txt 
+Victor
+Wyatt
+Xavier
+Yancey
+Zeus
+Amy
+Bertha
+Clare
+Diane
+Erika
+$ ./fixed_input32.py &lt; names.txt 
+Victor
+Wyatt
+Xavier
+Yancey
+Zeus
+Amy
+Bertha
+Clare
+Diane
+Erika
+$ 
+</code></pre>
+
+<p>(I removed the one blank line from the <code>names.txt</code> because it caused this simple program to throw an error. It won't actually be an issue in your full-fledged program, because you properly handle the blank line.)</p>
+
+<p>I can't explain why <code>input()</code> <em>did</em> work under Windows, but <code>input()</code> feels like a horrible enough interface (who thought running the user-supplied input through <code>eval</code> was a good idea?!? sheesh) to just re-write it.</p>
+
+<p><strong>Update</strong></p>
+
+<p>Okay, I was intrigued enough to solve this all the way. I took all your debugging code back out and switched to using the <code>for l in sys.stdin:</code> approach:</p>
+
+<pre><code>$ ./GS.py 
+Victor Bertha Amy Diane Erika Clare
+Wyatt Diane Bertha Amy Clare Erika
+Xavier Bertha Erika Clare Diane Amy
+Yancey Amy Diane Clare Bertha Erika
+Zeus Bertha Diane Amy Erika Clare
+
+Amy Zeus Victor Wyatt Yancey Xavier
+Bertha Xavier Wyatt Yancey Victor Zeus
+Clare Wyatt Xavier Yancey Zeus Victor
+Diane Victor Zeus Yancey Xavier Wyatt
+Erika Yancey Wyatt Zeus Xavier Victor
+
+Wyatt Clare
+Xavier Bertha
+Yancey Erika
+Zeus Diane
+Victor Amy
+$ cat GS.py 
+#!/usr/bin/python3.2
+
+if __name__ == "__main__":
+    import sys
+
+    ## Data Dictionary
+
+    ''' Name : Preferences '''
+    men = dict()
+    women = dict()
+
+    ''' List of unmatched men '''
+    freeMen = list()
+
+    ''' Name : How far down in preferences '''
+    count = dict()
+
+    ''' Name : Current Match '''
+    wife = dict()
+    husband = dict()
+
+    ## Reading Input
+    readingMen = True
+    for l in sys.stdin:
+        line = l.split()
+        if len(line) &gt; 1:
+            newPerson = line[0]
+            newPersonPreferences = list()
+            for i in range(1,len(line)):
+                newPersonPreferences.append(line[i])
+            if readingMen:
+                men[newPerson] = newPersonPreferences
+                wife[newPerson] = 0
+                count[newPerson] = 0
+                freeMen.append(newPerson)
+            else:
+                women[newPerson] = newPersonPreferences
+                husband[newPerson] = 0
+        elif len(line) == 1:
+            raise IOError(l + "\nis an invalid line.")
+        else:
+            readingMen = False
+
+    ## Proposing
+    while len(freeMen) != 0:
+        m = freeMen[0]
+        w = men[m][count[m]]
+        count[m] += 1
+        if husband[w] == 0:
+            husband[w] = m
+            wife[m] = w
+            freeMen.remove(m)
+        else:
+            try:
+                if women[w].index(husband[w], women[w].index(m)):
+                    freeMen.append(husband[w])
+                    wife[husband[w]] = 0
+                    husband[w] = m
+                    wife[m] = w
+                    freeMen.remove(m)
+            except ValueError:
+                pass
+
+    ## Match Printing
+    print()
+    for m in wife:
+        print(m, wife[m])
+
+$ 
+</code></pre>
+
+<p>Note that you have to hit <code>^D</code> when you're done pasting in the input if you run it this way. (I <em>much</em> prefer IO redirection <code>./GS.py &lt; names.txt</code>, but if your professor will copy and paste, then make sure your prof knows to hit <code>^D</code> to signal the end of input.)</p>

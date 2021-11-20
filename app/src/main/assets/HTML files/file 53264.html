@@ -1,0 +1,141 @@
+<p><em>Non-FXML Based Sample</em></p>
+
+<p>Here is some sample code, it doesn't use FXML, but the principles are the same whether you have FXML involved or not.  You just add a listener to the relevant property and take action as it changes.  I didn't format the duration as you have in your question, but that is trivial and different from the problem of responding to changes in the listener.</p>
+
+<p><a href="http://i.stack.imgur.com/ARMcT.png" rel="nofollow"><img src="http://i.stack.imgur.com/ARMcT.png" alt="sample"></a></p>
+
+<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
+import javafx.scene.media.*;
+import javafx.stage.Stage;
+
+public class VideoPlayerExample extends Application {
+    private static final String MEDIA_LOC =
+            "http://download.oracle.com/otndocs/products/javafx/oow2010-2.flv";
+
+    @Override
+    public void start(final Stage stage) throws Exception {
+        final MediaPlayer oracleVid = new MediaPlayer(
+                new Media(MEDIA_LOC)
+        );
+
+        Label progress = new Label();
+        oracleVid.currentTimeProperty().addListener(observable -&gt; {
+            progress.setText(
+                    oracleVid.getCurrentTime()
+                            + " / "
+                            + oracleVid.getTotalDuration()
+            );
+        });
+
+        VBox layout = new VBox(10, progress, new MediaView(oracleVid));
+        stage.setScene(new Scene(layout, 540, 208));
+        stage.show();
+
+        oracleVid.play();
+    }
+
+    public static void main(String[] args) throws Exception {
+        launch(args);
+    }
+}
+</code></pre>
+
+<blockquote>
+  <p>where should I place the listener? </p>
+</blockquote>
+
+<p>It's difficult to recommend without seeing full code, so I'll just make some assumptions and provide advice on that to get you started.  So, let's assume that:</p>
+
+<ol>
+<li>You are defining and embedding your custom media player control in FXML similar to the mechanism outlined in:
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/29444698/how-to-create-an-fxml-file-for-an-already-created-new-component-in-java-than-add">How to create an FXML file for an already created new component in java than add it to scene builder?</a> </li>
+</ul></li>
+<li>The duration tracking label is (for some reason) not part of the custom media control.</li>
+<li>Your encompassing FXML therefore includes two components, your custom media player and the duration label.</li>
+</ol>
+
+<p>In this case the listener is situated in the controller for the encompassing FXML file that includes the media player and the duration label and is set up during the <code>initialize()</code> call for that controller.</p>
+
+<p><em>FXML Based Sample</em></p>
+
+<p>In general, for something like this for generic reuse you might create a custom control as outlined previously, but for brevity this sample will just use the in-built MediaView and Label controls rather than a custom control.</p>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+
+&lt;?import javafx.scene.control.Label?&gt;
+&lt;?import javafx.scene.layout.VBox?&gt;
+&lt;?import javafx.scene.media.MediaView?&gt;
+&lt;VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" spacing="10.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="plot.VideoPlayerController"&gt;
+   &lt;children&gt;
+      &lt;Label fx:id="progress" text="Label" /&gt;
+      &lt;MediaView fx:id="mediaView" fitHeight="208.0" fitWidth="540.0" /&gt;
+   &lt;/children&gt;
+&lt;/VBox&gt;
+</code></pre>
+
+<p><em>App</em></p>
+
+<pre><code>import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+public class VideoPlayerApp extends Application {
+    @Override
+    public void start(final Stage stage) throws Exception {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("player.fxml"));
+        Parent root = loader.load();
+
+        stage.setScene(new Scene(root));
+        stage.show();
+    }
+
+    public static void main(String[] args) throws Exception {
+        launch(args);
+    }
+}
+</code></pre>
+
+<p><em>Controller</em></p>
+
+<pre><code>import javafx.fxml.FXML;
+import javafx.scene.control.Label;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+
+public class VideoPlayerController {    
+    private static final String MEDIA_LOC =
+            "http://download.oracle.com/otndocs/products/javafx/oow2010-2.flv";
+
+    @FXML
+    MediaView mediaView;
+
+    @FXML
+    Label progress;
+
+    public void initialize() {
+        final MediaPlayer oracleVid = new MediaPlayer(
+                new Media(MEDIA_LOC)
+        );
+
+        oracleVid.currentTimeProperty().addListener(observable -&gt; {
+            progress.setText(
+                    oracleVid.getCurrentTime()
+                            + " / "
+                            + oracleVid.getTotalDuration()
+            );
+        });
+
+        mediaView.setMediaPlayer(oracleVid);
+
+        oracleVid.play();
+    }    
+}
+</code></pre>

@@ -1,0 +1,35 @@
+<blockquote>
+  <p>I assume that <code>n_destination_hops</code> is the number of times the string <code>destination_hops</code> appears in the message.</p>
+</blockquote>
+
+<p>Yep.</p>
+
+<blockquote>
+  <p>I had kept <code>addresscount</code> for that purpose and i guess thats not required.</p>
+</blockquote>
+
+<p>Right.</p>
+
+<blockquote>
+  <p><code>char **destination_hops</code> is a pointer to an array of <code>char *</code> pointers. Each index can be of different length. How will protobuf know the size of each <code>char *</code> pointer when it has packed this into a stream.</p>
+</blockquote>
+
+<p>In the wire representation of the string, it is preceded by the string's length, coded as a packed integer. In memory, they are just ordinary zero-terminated C strings, so:</p>
+
+<ul>
+<li><p><code>NUL</code> is not a valid character in the string</p></li>
+<li><p>the length can be computed with <code>strlen</code></p></li>
+</ul>
+
+<p>Protobuf requires that the value of a <code>string</code> be a sequence of UTF-8 encoded characters. If you want to include <code>NUL</code> or bytes which are not part of a valid UTF-8 sequence, use <code>bytes</code> instead of <code>string</code>. If you do that, the in-memory datastructure will include an explicit length.</p>
+
+<blockquote>
+  <p>Shouldn't i be able to set <code>char *destination_hops[0]</code> = <code>"abc"</code></p>
+</blockquote>
+
+<p>I suppose you mean that you should be able to write:</p>
+
+<pre><code>destination_hops[0] = "abc";
+</code></pre>
+
+<p>That's valid C, but it requires that <code>destination_hops</code> have at least one element. A newly initialized <code>foo</code> will have <code>n_destination_hops = 0;</code> and <code>destination_hops = NULL;</code>, in which case trying to access <code>destination_hops[0]</code> will try to dereference <code>NULL</code>, which is a segfault. (Or UB, if you prefer.9</p>

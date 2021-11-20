@@ -1,0 +1,51 @@
+<p>You're being fooled by two things:</p>
+
+<ol>
+<li>Your <code>var</code>s inside the loop are hoisted to the surrounding function, they're not local to the loop.</li>
+<li>Your <code>success</code> handlers are triggered asynchronously and they're closures over <strong>exactly the same <code>folderOrder</code></strong>.</li>
+</ol>
+
+<p>For the first one, your loop actually looks like this as far as JavaScript is concerned:</p>
+
+<pre><code>function whateverItIsCalled() {
+    var folderId, folderOrder, folder, query, ii;
+    //...
+    for(ii = 0; ii &lt; result.length; ii++) {
+        //...
+        folderOrder = ii;
+        //...
+    }
+    //...
+}
+</code></pre>
+
+<p>so there is only one <code>folderOrder</code> for the entire function and your loop simply assigns <code>ii</code> to it on each iteration.</p>
+
+<p>The second problem is the usual "AJAX in a loop" problem: you're constructing a series of anonymous functions which are closures over the same <code>folderOrder</code> variable. The result of that is that the all three of your <code>success</code> handlers end up referencing the same <code>folderOrder</code> value and, by the time they are triggered, the loop will be finished and <code>folderOrder</code> will have its last value from the loop; the last value in your case is two.</p>
+
+<p>To solve your problem, you just need to get separate <code>folderOrder</code> values into the various <code>success</code> handlers. One way is to use a function to generate your success handlers:</p>
+
+<pre><code>function makeSuccess(folderOrder) {
+    return function(folder) {
+        folder.set('order', folderOrder);
+        folder.save();
+    }
+}
+</code></pre>
+
+<p>and then:</p>
+
+<pre><code>query.get(folderId, {
+    success: makeSuccess(folderOrder)
+});
+</code></pre>
+
+<p>Another common approach is to use a self-executing function to effectively creating a distinct scope for the loop's body:</p>
+
+<pre><code>for(var ii = 0; ii &lt; result.length; ii++)
+    (function(ii) {
+        // Same stuff you currently have...
+    })(ii);
+</code></pre>
+
+<p>Which approach you take is a matter of personal preference.</p>

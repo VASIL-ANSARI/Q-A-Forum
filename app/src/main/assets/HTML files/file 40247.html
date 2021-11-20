@@ -1,0 +1,62 @@
+<p>This vagrantfile fixes the issues:</p>
+
+<pre><code>require 'yaml'
+
+settings = YAML.load_file "vagrant_config.yml"
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  settings.each do |name, cfg|
+    config.vm.define name do |agent|
+      agent.vm.box = name
+      cfg['forwards'].each do |port|
+        agent.vm.network "forwarded_port", guest: port['guest'], host: port['host']
+      end
+      agent.vm.provider :vmware_fusion do |v, override|
+        v.box = name + "_fusion"
+        v.box_url = cfg['providers']['vmware_fusion']
+        cfg['properties'].each do |prop, val|
+          if prop == "cpus"
+            prop = "numvcpus"
+          elsif prop == "memory"
+            prop = "memsize"
+          end
+          v.vmx[prop] = val
+        end
+        v.vmx['fixed-address'] = cfg['ip']
+      end
+      agent.vm.provider :virtualbox do |v, override|
+        override.vm.box = name + "_vb"
+        override.vm.box_url = cfg['providers']['virtualbox']
+        override.vm.network :private_network, ip: cfg['ip']
+        cfg['properties'].each do |prop, val|
+          if prop == "numvcpus"
+            prop = "cpus"
+          elsif prop == "memsize"
+            prop = "memory"
+          end
+          v.customize ["modifyvm", :id, "--#{prop}", "#{val}"]
+        end
+      end
+      cfg['provisions'].each do |prov|
+        agent.vm.provision prov['provision'] do |p|
+          # setup keys that do not directly map
+          if prov.has_key?('recipes')
+            prov['recipes'].each do |r|
+              p.add_recipe r
+            end
+            prov.delete('recipes')
+          end
+          # setup 1:1 mapping keys
+          prov.each do |key, val|
+            if key != 'provision'
+              p.instance_variable_set("@#{key}", val)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+</code></pre>

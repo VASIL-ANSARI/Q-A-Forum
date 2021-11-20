@@ -1,0 +1,47 @@
+<p>You could assign a psuedo-row number to each row in both tables and order by those, but you'd have to use in-line views:</p>
+
+<pre><code>SELECT t1.column_value, t2.column_value
+FROM 
+  (
+    SELECT column_value, ROW_NUMBER() OVER (ORDER BY null) AS rn
+    FROM TABLE(NUMBER_ARRAY(4,3,2,1))
+  ) t1
+LEFT OUTER JOIN
+  (
+    SELECT column_value, ROW_NUMBER() OVER (ORDER BY null) AS rn
+    FROM TABLE(NUMBER_ARRAY(3))
+  ) t2
+ON t1.column_value=t2.column_value
+ORDER BY t1.rn, t2.rn;
+
+COLUMN_VALUE COLUMN_VALUE
+------------ ------------
+           4              
+           3            3 
+           2              
+           1              
+</code></pre>
+
+<p>But a nested table, even one you build like this, has no inherent ordering. It looks like it does and behaves like it does (at least as far as I've ever seen, anecdotally), but it isn't guaranteed to always do so; so you could get unexpected results one day. Only varrays are ordered. So you could declare your type like this instead:</p>
+
+<pre><code>create or replace TYPE NUMBER_ARRAY IS VARRAY(10) OF NUMBER;
+/
+</code></pre>
+
+<p>... and the same query gives the same results. But you'd then be limited by the size you've given it, so really you'd need to know how many elements you'd expect to have (and setting it very high to cover all possibilities would incur memory costs).</p>
+
+<hr>
+
+<p>The PL/SQL <a href="http://docs.oracle.com/cd/E11882_01/appdev.112/e25519/composites.htm#LNPLS443" rel="nofollow">documentation for varrays says</a> "When you store and retrieve a varray from the database, its indexes and element order remain stable". But <a href="http://docs.oracle.com/cd/E11882_01/appdev.112/e25519/composites.htm#LNPLS99981" rel="nofollow">for nested tables it says</a> "The indexes and row order of a nested table might not remain stable as you store and retrieve the nested table from the database".</p>
+
+<p>You're not storing and retrieving here really, but there's nothing there that seems to state that the order will always be stable even while it's memory - it seems like that it would be, and as I say it seems to always be; but I wouldn't want to rely on it.</p>
+
+<p>Also in a storage context, <a href="https://asktom.oracle.com/pls/asktom/f?p=100:11:0::::P11_QUESTION_ID:1583117527730#6572230639238" rel="nofollow">Tom Kyte said</a>:</p>
+
+<blockquote>
+  <p>Unless you have something to order by -- don't expect anything to be ordered.</p>
+  
+  <p>If you DON'T try to turn these into "columns" -- just leave them stuffed in the array in the first place -- order will be maintained (for varrays, not nested tables). simple select * from table would return the arrays in the order they went in.</p>
+</blockquote>
+
+<p>The "not nested tables" part would make me avoid relying on that apparent ordering, though again this about something that is stored and retrieved from a table.</p>

@@ -1,0 +1,54 @@
+<p>Juan's answer is correct: member functions have an implicit first parameter, which is a pointer to the type of which they are a member.  The reason your code fails to compile is that your map supports function pointers with type <code>int (*)(int)</code>, but the type of f2 is <code>int (IntFunctionMap::*)(int)</code>.</p>
+
+<p>In the specific case that you show here, you can use <code>std::function</code>, which implements types erasure, to present free functions and member functions as the same type.  Then you could do what you are trying to do.  Note: this requires C++11.</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;map&gt;
+#include &lt;cassert&gt;
+#include &lt;function&gt;
+#include &lt;bind&gt;
+
+using namespace std; 
+
+int f(int x) { return 2 * x; }
+int g(int x) { return -3 * x; }
+
+typedef std::function&lt;int (int)&gt; F;
+
+// function factory
+template &lt;typename T&gt;
+class FunctionMap {
+public: 
+    void registerFunction(string name, T fp) {
+        FunMap[name] = fp;
+    }
+    T getFunction(string name) {
+        assert(FunMap.find(name) != FunMap.end());
+        return FunMap[name];
+    }
+private:
+    map&lt;string, T&gt; FunMap;
+};
+
+// specific to integer functions 
+class IntFunctionMap : public FunctionMap&lt;F&gt; {
+public:
+    int f2(int x) { return 2 * x; }
+    int g2(int x) { return -3 * x; }
+
+    IntFunctionMap() {
+        registerFunction("f", f); // This works
+        registerFunction("f2", std::bind(&amp;f2, this, _1)); // This should work, too!
+    }
+};
+
+int main()
+{
+     FunctionMap&lt;F&gt; fmap; // using the base template class directly works
+     fmap.registerFunction("f", f);
+     F fun = fmap.getFunction("f");
+     cout &lt;&lt; fun(10) &lt;&lt; endl; 
+     return 0;
+}
+</code></pre>

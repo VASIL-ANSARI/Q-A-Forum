@@ -1,0 +1,57 @@
+<p>Try calling <code>quit()</code> or <code>exit()</code> as static class members (you don't need to pass your <code>QApplication</code> around):</p>
+
+<blockquote>
+  <p>For any GUI application using Qt, there is precisely one QApplication object, no matter whether the application has 0, 1, 2 or more windows at any given time. For non-GUI Qt applications, use QCoreApplication instead, as it does not depend on the QtGui library.
+  The QApplication object is accessible through the instance() function that returns a pointer equivalent to the global qApp pointer.</p>
+</blockquote>
+
+<pre><code>void End_Page::restartProgram(){
+    flag = 1;
+    QApplication::quit();  
+}
+</code></pre>
+
+<p>But, the main problem in your application is that you are emmiting <code>closeSignal()</code> in your <code>closeEvent()</code> and the slot connected to it will call <code>exit(0);</code> system call, which is, I think, completely unnecessary, and which will "kill" the current process.</p>
+
+<p>Here is a completely working example:</p>
+
+<pre><code>#include &lt;QApplication&gt;
+#include &lt;qtimer&gt;
+#include &lt;iostream&gt;
+
+/* Move this into h file and moc it! */
+class Window:public QObject
+{
+    Q_OBJECT
+public slots:
+    void closeApp(){ QApplication::quit(); flag = 500; }
+public:
+    int flag;
+};
+
+
+
+int main(int argc, char *argv[])
+{
+    QApplication a(argc, argv);
+    Window win;
+    QTimer::singleShot(5000, &amp;win, SLOT(closeApp()));
+    a.exec();
+
+    std::cout &lt;&lt; "Flag: " &lt;&lt; win.flag &lt;&lt; std::endl;
+
+    return 0;
+}
+</code></pre>
+
+<p><strong>Edit</strong></p>
+
+<p>Why are you doing this:</p>
+
+<pre><code>if(end.flag == 1) // flag is set to 1 in restartProgram slot
+{
+    return 1; 
+} //end if
+</code></pre>
+
+<p>This will exit your <code>main()</code> function, and it will not restart program.</p>

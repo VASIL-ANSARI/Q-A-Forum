@@ -1,0 +1,60 @@
+<p>I never tried xamarin before. But I think it would be possible if you use type converters with generic type parameters.</p>
+
+<p>for exmple,</p>
+
+<pre><code>public class StringToDoubleTypeConverter&lt;T&gt; : TypeConverter where T : IConvertible
+{
+  // Other methods
+  ...
+
+  // Returns whether the type converter can convert an object from the specified type 
+  // to the type of this converter.
+  public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+  {
+      return sourceType.GetInterface("IConvertible", false) != null;
+  }
+
+  // Returns whether the type converter can convert an object to the specified type.
+  public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+  {
+      return destinationType.GetInterface("IConvertible", false) != null;
+  }
+
+  public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+  {
+      try
+      {
+          var convertible = (IConvertible)value;
+          if (convertible != null) return convertible.ToType(typeof(T), culture);
+      }
+      catch (FormatException)
+      {
+          if (value != null &amp;&amp; value.ToString().Equals("Small"))
+          {
+              return MyConstants.Small;
+          }
+          throw;
+      }
+      return null;
+  }
+
+  // Converts the specified value object to the specified type.
+  public override object ConvertTo(ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
+  {
+      return ((IConvertible)value).ToType(destinationType, culture);
+  }
+}
+</code></pre>
+
+<p>Then use it in your FontSize property.</p>
+
+<pre><code>[TypeConverter(typeof(StringToDoubleTypeConverter&lt;double&gt;))]
+public double FontSize
+{
+    get { return (double)GetValue(FontSizeProperty); }
+    set { SetValue(FontSizeProperty, value); }
+}
+</code></pre>
+
+<p>Reference:
+<a href="http://www.kunal-chowdhury.com/2013/02/autotodouble-typeconverter-for-xaml-silverlight-wpdev.html" rel="nofollow">http://www.kunal-chowdhury.com/2013/02/autotodouble-typeconverter-for-xaml-silverlight-wpdev.html</a></p>

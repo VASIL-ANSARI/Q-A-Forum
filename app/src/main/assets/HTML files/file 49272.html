@@ -1,0 +1,38 @@
+<p>In my humble opinion and based on <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/p0121r0.pdf" rel="nofollow">Concepts TS</a> <em>Â§5.1.4/c4 Requires expressions [expr.prim.req]</em> (<strong>Emphasis Mine</strong>):</p>
+
+<blockquote>
+  <p><strong>A requires-expression shall appear only within a concept definition (7.1.7), or within the requires-clause of a template-declaration
+  (Clause 14) or function declaration (8.3.5).</strong></p>
+</blockquote>
+
+<p>The above quote specifically dictates the contexts where a <code>requires</code> clause can appear and lambdas is not one of them.</p>
+
+<p>Concequently,</p>
+
+<pre><code>[](auto x) requires C1&lt;decltype(x)&gt; &amp;&amp; C2&lt;decltype(x)&gt; {
+    // ...
+}
+</code></pre>
+
+<p>Is not valid.</p>
+
+<p>However, in <em>Â§5.1.2 Lambda expressions [expr.prim.lambda]</em> there's the following example:</p>
+
+<pre><code>template&lt;typename T&gt; concept bool C = true;
+auto gl = [](C&amp; a, C* b) { a = *b; }; // OK: denotes a generic lambda
+</code></pre>
+
+<p>So I guess, you could accomplish what you want in the following manner:</p>
+
+<pre><code>template &lt;class T&gt; concept bool C1 = true;                                        
+template &lt;class T&gt; concept bool C2 = true;
+template &lt;class T&gt; concept bool C3 = C1&lt;T&gt; &amp;&amp; C2&lt;T&gt;; // Define a concept that combines 
+                                                     // `C1` and `C2` requirements.                   
+
+int main() {                                                                      
+  auto f = [](C3 x)  { /* Do what ever */ }; // OK generic lambda that requires input 
+                                             // argument satisfy `C1` and `C2`                                                                                                                          
+} 
+</code></pre>
+
+<p><a href="http://melpon.org/wandbox/permlink/MOF6tAej0eQp95Op" rel="nofollow"><strong>Live Demo</strong></a></p>

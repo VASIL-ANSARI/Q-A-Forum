@@ -1,0 +1,101 @@
+<p>By url, do you mean image?  Also is <code>PopulateTopicsListView</code> in the code-behind?  If so, the Image type is Windows.UI.Xaml.Control.Image, which cannot be used with <strong>await</strong>.  See the following <a href="http://msdn.microsoft.com/library/windows/apps/windows.ui.xaml.controls.image.source.aspx" rel="nofollow">MSDN documentation</a> on why <strong>await</strong> cannot be used here.  </p>
+
+<p>First, to answer your question: In a ListView, </p>
+
+<blockquote>
+  <p>By default, a data item is displayed in the list or grid as the string
+  representation of the data object itâs bound to.</p>
+</blockquote>
+
+<p>For more information see the ListView <a href="http://msdn.microsoft.com/library/windows/apps/windows.ui.xaml.controls.listview.aspx" rel="nofollow">here</a> (under Remarks).  Because GetImage cannot return an Windows.UI.Xaml.Control.Image, the string representation of the Image is whatâs displayed.  Remove 'async' and 'await', and in fact just set the thumbnail property to the url of the image (done).</p>
+
+<p>So what to do?</p>
+
+<p>Now, it is unclear whether you are binding to the CollectionViewSource or the ListView in this scenario, as they both have the same name.  I would change the name of one of them.  If you bind the ListView to the CollectionViewSource and populate the latter in the code-behind, then all you have to do to display the items is bind to pTopics with itemsViewSource:</p>
+
+<pre><code>&lt;CollectionViewSource x:Name="itemsViewSource" Source="{Binding pTopics}" /&gt;
+</code></pre>
+
+<p>then bind the ListView to the CollectionViewSource: </p>
+
+<pre><code>&lt;ListView x:Name="topicsListView" ItemsSource="{Binding Source={StaticResource itemsViewSource}}" ...
+</code></pre>
+
+<p>And bind the Image to the thumbnail property:</p>
+
+<pre><code>&lt;Image Source="{Binding thumbnail}"  Stretch="UniformToFill" /&gt;
+</code></pre>
+
+<p>And last, but not least, for the <code>TextBlock</code> I've created a text property in whatever class pTopics is composed of (I'm calling it Topic), and bind to that:</p>
+
+<pre><code>&lt;TextBlock Text="{Binding text}" Style="{StaticResource BodyTextBlockStyle}" /&gt;
+</code></pre>
+
+<p>Here is the complete code, for anyone else who wants to see it in action, starting with the Topic class: </p>
+
+<pre><code>public class Topic
+{
+    public string title { get; set; }
+    public string thumbnail { get; set; }
+    public string author { get; set; }
+    public string text { get; set; }
+    public int timeposted { get; set; }
+    public int points { get; set; }
+    public int commentCount { get; set; }
+    public int subreddit { get; set; }
+}
+</code></pre>
+
+<p>XAML: </p>
+
+<pre><code>&lt;Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"&gt;
+    &lt;Grid.Resources&gt;
+        &lt;CollectionViewSource x:Name="itemsViewSource" Source="{Binding pTopics}" /&gt;
+    &lt;/Grid.Resources&gt;
+    &lt;ListView x:Name="topicsListView" ItemsSource="{Binding Source={StaticResource itemsViewSource}}" FontStretch="Condensed" HorizontalAlignment="Left" Height="1007" VerticalAlignment="Top" Width="546" Margin="0,73,0,0" FontSize="36" Background="#FF1D1C1C"&gt;
+        &lt;ListView.ItemTemplate&gt;
+            &lt;DataTemplate&gt;
+                &lt;Grid Height="80" Margin="6"&gt;
+                    &lt;Grid.ColumnDefinitions&gt;
+                        &lt;ColumnDefinition Width="Auto" /&gt;
+                        &lt;ColumnDefinition Width="*" /&gt;
+                    &lt;/Grid.ColumnDefinitions&gt;
+                    &lt;Border Background="{StaticResource ListViewItemPlaceholderBackgroundThemeBrush}"  Width="80" Height="80" &gt;
+                        &lt;Image Source="{Binding thumbnail}"  Stretch="UniformToFill" /&gt;
+                    &lt;/Border&gt;
+                    &lt;StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="10,0,0,0"&gt;
+                        &lt;TextBlock Text="{Binding text}" Style="{StaticResource BodyTextBlockStyle}" /&gt;
+                    &lt;/StackPanel&gt;
+                &lt;/Grid&gt;
+            &lt;/DataTemplate&gt;
+        &lt;/ListView.ItemTemplate&gt;
+    &lt;/ListView&gt;
+&lt;/Grid&gt;
+</code></pre>
+
+<p>and finally <code>PopulateTopicsListView</code>: </p>
+
+<pre><code>    private void PopulateTopicsListView()
+    {
+        pTopics = new List&lt;Topic&gt;
+        {
+            new Topic () { thumbnail = "http://www.google.com/images/srpr/logo11w.png", title = "Google", author = "Larry Page", timeposted = 2, points = 41 },
+            new Topic () { thumbnail = "http://cdn.sstatic.net/stackoverflow/img/apple-touch-icon@2.png", title = "Stackoverflow", author = "Jeff Atwood", timeposted = 4, points = 45},
+            new Topic () { thumbnail = "http://i.msdn.microsoft.com/Areas/Centers/Themes/StandardDevCenter/Content/Images/microsoftLogoForHeader.png", title = "MSDN", author = "Bill Gates", timeposted = 5, points = 60 }
+        };
+
+        for (int i = 0; i &lt; pTopics.Count; i++)
+        {
+            //if (!String.IsNullOrEmpty(pTopics[i].thumbnail) &amp;&amp; pTopics[i].thumbnail.Contains("http"))
+            //{
+                pTopics[i].text = pTopics[i].title +"\n" + pTopics[i].author + " " + pTopics[i].timeposted + " hours ago" + "\n" + pTopics[i].points + " points\t";
+            //}
+            //else
+            //{
+            //    pTopics[i].text = pTopics[i].title + "\n" + pTopics[i].author;
+            //}
+        }
+    }
+</code></pre>
+
+<p>Notice I've commented out the if statement, as it is really unnecessary here, because the thumb Image object has been separated out already.  I'm aware that this is an old post, but I spent some time on this for my own self-education, and it works.  I have strived to change the original code as little as possible to preserve the OPs solution and his intent.  You should be able to fire up Visual Studio and paste this into any Windows Metro store app and and see how it works.</p>

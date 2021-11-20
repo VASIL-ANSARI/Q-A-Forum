@@ -1,0 +1,43 @@
+<p>Let's start off a bit smaller, since the query you are looking to create is somewhat complex. We will create your query from the bottom up. First off, you want to eliminate categories that do not have any child categories with at least one or more activities. Let's make a <code>Predicate</code> to return <code>true</code> for those that should be included and <code>false</code> for those that should be excluded, at a single level. We will do this in two stages. First, let's make a predicate that returns <code>true</code> for categories that have activities:</p>
+
+<pre><code>Predicate&lt;Category&gt; hasActivities = cat =&gt; cat.Activities.Any();
+</code></pre>
+
+<p>Second, let's make a <code>Predicate</code> to return <code>true</code> for those categories with child categories that have activities:</p>
+
+<pre><code>Predicate&lt;Category&gt; hasChildWithActivities = 
+    parentCat =&gt; parentCat.Children.Any(hasActivities);
+</code></pre>
+
+<p><br>
+Now let's create the filter query that will filter a given <code>Category</code>'s descendants. To do this, we will create a <code>Func</code> that takes a parent <code>Category</code>, performs the logic and returns the updated <code>Category</code>:</p>
+
+<pre><code>Func&lt;Category, Category&gt; getFilteredCategory =
+    parentCat =&gt; 
+    {
+        parentCat.Children = parentCat.Children
+            .Where(hasChildWithActivities)
+            .Select(getFilteredCategory);
+
+        return parentCat;
+    });
+</code></pre>
+
+<p>Note that this is equivalent to:</p>
+
+<pre><code>Func&lt;Category, Category&gt; getFilteredCategory = delegate(Category parentCat)
+{
+    parentCat.Children = parentCat.Children
+        .Where(hasChildWithActivities)
+        .Select(getFilteredCategory);
+
+    return parentCat;
+};
+</code></pre>
+
+<p><br/>
+In your OP, you mentioned that you wanted to filter parents as well. You can use this same logic on the parents by traversing up to the top level and running this query, or by creating a separate query with "joins" or more complex "select" statements. IMHO, the latter would likely be messy and I would advise against it. If you need to apply the logic to parents as well, then first traverse up the tree. Either way, this should give you a good start.</p>
+
+<p><br/></p>
+
+<p>Let me know if you have any questions. Good luck and happy coding! :)</p>

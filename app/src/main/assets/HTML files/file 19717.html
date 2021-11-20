@@ -1,0 +1,232 @@
+<p>I did a stall detection on a command line script not too long ago.  It sounds like a few things need to happen...</p>
+
+<p>1) Add a timeout for the http:// request within that command you're running</p>
+
+<p>2) You can monitor it using a while() statement, you'll have to use something like this:</p>
+
+<pre><code>$stillRunning = true;
+while ($stillRunning) {
+    exec('ps -ef | grep httpdocs/shell/run.php', $processes); //will get all process which contain the path to the file
+
+    //loop through all processes to determine if it's still running.  If so, grab the process ID and kill it'
+
+    exec('kill '.$processId);
+
+    //if it's still there, this will do the job
+    if ($this-&gt;_ifProcessExists($processId)) {
+        exec('kill -9 '.$processId);
+    }
+
+    sleep(2);
+}
+</code></pre>
+
+<p>Here's the class I built to detect stalling to meet our needs...</p>
+
+<pre><code>&lt;?php
+/**
+ * GMC Management Class
+ * 
+ */
+
+class GMC {
+
+    private $executablePath = '/usr/local/PNetT/PNetTCNetClient',
+            $outPath = '/usr/local/PNetT/tmpData/SOB/',
+            $workflowPath = '',
+            $graphicPath = '',
+            $logRecipient = 'my@email.com',
+            $stalledThreshold = 10, //in seconds
+            $originalProcesses = array(),
+            $processes = array(),
+            $log = array();
+
+    public function __construct () {
+        $this-&gt;workflowPath = $this-&gt;outPath.'workflows/';
+        $this-&gt;graphicPath = $this-&gt;outPath.'graphics/';
+    }
+
+    /**
+     * Adds an image to the GMC graphics directory
+     * 
+     * @param string $imgPath The absolute path of the image to add
+     */
+    public function addImage ($imgPath) {
+        exec('cp '.$imgPath.' '.$this-&gt;graphicPath);
+    }
+
+    /**
+     * Determines if a process is stalled
+     */
+    public function isStalled ($processes = false) {
+        if ($processes === false) {
+            $processes = $this-&gt;_getProcesses();
+            $this-&gt;originalProcesses = $processes;
+        }
+
+        foreach ($processes as $process) {
+            if (array_key_exists('duration', $process) &amp;&amp; $process['duration'] &lt;= (time() - $this-&gt;stalledThreshold)) {
+                $this-&gt;_addLog("detected #".$process['processId']." as a stalled process");
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Fixes GMC's being stalled
+     * Will also report the document that caused the stall
+     */
+    public function fixStalled () {
+        $this-&gt;_restart();
+
+        $this-&gt;reportLog();
+    }
+
+    /**
+     * Sends the log to the development team for review
+     */
+    public function reportLog () {
+        $body = "Here's a report how GMC was handled during this last stall:
+
+Oldest process:\n
+        ID | COMMAND\n";
+
+        $oldest = $this-&gt;_getOldestProcess();
+        $body .= "        ".$oldest['processId']." | ".$oldest['command']."\n";
+
+        $body .= "
+Logs:\n";
+
+        foreach ($this-&gt;log as $log) {
+            $body .= "        ".$log."\n";
+        }
+
+        $body .= "
+Processes:\n
+        ID | COMMAND\n";
+
+        foreach ($this-&gt;processes as $process) {
+            $body .= "        ".$process['processId']." | ".$process['command']."\n";
+        }
+
+        mail($this-&gt;logRecipient, 'GMC Stalled Report', $body);
+    }
+
+    /**
+     * Restarts GMC
+     * Must be conducted after GMC's stalled processes have been killed
+     */
+    private function _restart () {
+        //kill all GMC processes
+        foreach ($this-&gt;_getProcesses(true) as $process) {
+            $this-&gt;_killProcess($process['processId']);
+        }
+
+        //restart GMC
+        exec('bash /usr/local/PNetT/pnet.sh');
+
+        $this-&gt;_addLog("GMC has been restarted");
+    }
+
+    /**
+     * Restarts GMC
+     * Must be conducted after GMC's stalled processes have been killed
+     */
+    private function _getOldestProcess () {
+        $oldest = array(
+            'timestamp' =&gt; 0,
+            'processId' =&gt; 0
+        );
+        foreach ($this-&gt;_getProcesses() as $process) {
+            if ($process['user'] == 'wwwuser' &amp;&amp; $process['duration'] &gt; $oldest['timestamp']) {
+                $oldest = array(
+                    'timestamp' =&gt; $process['duration'],
+                    'processId' =&gt; $process['processId']
+                );
+            }
+        }
+
+        return $this-&gt;processes[$oldest['processId']];
+    }
+
+    /**
+     * Get a list of all GMC processes
+     */
+    private function _getProcesses ($newList = false) {
+        if ($newList == true || count($this-&gt;processes) == 0) {
+            //exec('ps -ef | grep GMC', $processes);
+            //sample processes for testing, above command is for live usage
+            $processes = array(
+                'ps -ef | grep GMC',
+                'wwwuser   1767 31199  0 12:40 ?        00:00:00 /scripts/GMC/PNetT-5.1-SP1/PNetTCNetClient.bin -o /usr/local/PNetT/tmpData/SOB/workflows/master_ppo_sob_3col.wfd -e PDF -f /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP_temp.pdf -useincluded * -difDataInput1 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP.txt -difDataInput2 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP-table.txt',
+                'wwwuser   2364  1207  0 12:41 ?        00:00:00 /scripts/GMC/PNetT-5.1-SP1/PNetTCNetClient.bin -o /usr/local/PNetT/tmpData/SOB/workflows/master_ppo_sob_3col.wfd -e PDF -f /usr/local/PNetT/tmpData/SOB/Master PPO-LP2045 mock up_temp.pdf -useincluded * -difDataInput1 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2045 mock up.txt -difDataInput2 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2045 mock up-table.txt',
+                'wwwuser   2465  2378  0 12:42 ?        00:00:00 /scripts/GMC/PNetT-5.1-SP1/PNetTCNetClient.bin -o /usr/local/PNetT/tmpData/SOB/workflows/master_ppo_sob_3col.wfd -e PDF -f /usr/local/PNetT/tmpData/SOB/Master PPO-PBARR Test 12-20_temp.pdf -useincluded * -difDataInput1 /usr/local/PNetT/tmpData/SOB/Master PPO-PBARR Test 12-20.txt -difDataInput2 /usr/local/PNetT/tmpData/SOB/Master PPO-PBARR Test 12-20-table.txt',
+                'wwwuser  19370  7900  0 13:17 ?        00:00:00 /scripts/GMC/PNetT-5.1-SP1/PNetTCNetClient.bin -o /usr/local/PNetT/tmpData/SOB/workflows/master_ppo_sob_3col.wfd -e PDF -f /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069_temp.pdf -useincluded * -difDataInput1 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069.txt -difDataInput2 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069-table.txt',
+                'root     19948 19508  0 13:18 pts/6    00:00:00 grep GMC',
+                'wwwuser  26685 17061  0 12:25 ?        00:00:00 /scripts/GMC/PNetT-5.1-SP1/PNetTCNetClient.bin -o /usr/local/PNetT/tmpData/SOB/workflows/diff_report.wfd -e PDF -f /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP_differences.pdf -useincluded * -difDataInput1 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP-report.txt -difDataInput2 /usr/local/PNetT/tmpData/SOB/Master PPO-LP2069 Solution PPO 1500-15-20 MOCKUP-table-report.txt',
+                'root     32017     1 89 May03 ?        12-18:02:22 /scripts/GMC/PNetT-5.1-SP1/PNetTNetServer.bin -tempdir /usr/local/GMC/PNetT-5.1-SP1/tmpData -D'
+            );
+
+            $this-&gt;processes = array();
+            foreach ($processes as $idx =&gt; $process) {
+                if ($idx &gt; 1) {
+                    $pieces = preg_split("/\s+/", $process, 8);
+
+                    //skip the grep filter process
+                    if ($pieces[7] != 'grep GMC') {
+                        $this-&gt;processes[$pieces[1]] = array(
+                            'user' =&gt; $pieces[0],
+                            'processId' =&gt; $pieces[1],
+                            'duration' =&gt; strtotime($pieces[4]),
+                            'command' =&gt; $pieces[7]
+                        );
+                    }
+                }
+            }
+        }
+
+        return $this-&gt;processes;
+    }
+
+    /**
+     * Kills a process
+     * 
+     * @param int $processId The process to be killed
+     */
+    private function _killProcess ($processId) {
+        //nicely
+        exec('kill '.$processId);
+
+        //if it's still there, this will do the job
+        if ($this-&gt;_ifProcessExists($processId)) {
+            exec('kill -9 '.$processId);
+
+            $this-&gt;_addLog("process #".$processId." wasn't nicely killed, I had to force it");
+        } else {
+            $this-&gt;_addLog("process #".$processId." was nicely killed");
+        }
+    }
+
+    /**
+     * Determines if a process is still running
+     * 
+     * @param int $processId The process to be checked
+     */
+    private function _ifProcessExists ($processId) {
+        exec('ps '.$processId, $return);
+
+        return count($return) &gt; 1;
+    }
+
+    /**
+     * Adds a message to the log
+     */
+    private function _addLog ($message) {
+        $this-&gt;log[] = $message;
+    }
+}
+
+?&gt;
+</code></pre>

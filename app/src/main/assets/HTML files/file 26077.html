@@ -1,0 +1,73 @@
+<p>I remember coming across this exactly problem just last week. I spent a long time figuring out how do this and I managed to come up with the following DQL. Add a new method to your Question's repository class.</p>
+
+<p>I've had to tweak my own code to match the question so no guarantee it work work but give it a try.</p>
+
+<pre><code>&lt;?php
+
+namespace Acme\CMSBundle\Entity;
+
+use Doctrine\ORM\EntityRepository;
+
+class QuestionRepository extends EntityRepository
+{
+    /**
+     * @return array
+     */
+    public function findAverageScoresPerQuestion()
+    {
+        $dql = &lt;&lt;&lt;SQL
+SELECT
+    q question,
+    AVG(s.score) average
+FROM
+    Acme\CMSBundle\Entity\Question q,
+    Acme\CMSBundle\Entity\Score s
+WHERE
+    s.question = q.id
+GROUP BY q.id
+ORDER BY q.id ASC
+SQL;
+
+        $q = $this-&gt;_em-&gt;createQuery($dql);
+
+        return $q-&gt;getResult();
+    }
+}
+</code></pre>
+
+<p>When rendering the result with Twig from the controller, the <code>question</code> properties are nested one level deeper </p>
+
+<pre><code>public function averageScoresAction()
+{
+    $em = $this-&gt;getDoctrine()-&gt;getManager();
+    $questions = $em-&gt;getRepository('AcmeCMSBundle:Question')-&gt;findAverageScoresPerQuestion();
+
+    return $this-&gt;render('AcmeCMSBundle:Question:questions.html.twig', array(
+        'questions' =&gt; $questions
+    ));
+}
+</code></pre>
+
+<p>In <code>questions.html.twig</code></p>
+
+<pre><code>  &lt;table&gt;
+    &lt;thead&gt;
+      &lt;tr&gt;
+        &lt;th&gt;Question
+        &lt;th&gt;Average Score
+      &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+    {% for q in questions %}
+      &lt;tr&gt;
+        &lt;td&gt;{{ q.question.question }}
+        &lt;td&gt;{{ q.average }}
+      &lt;/tr&gt;
+    {% else %}
+      &lt;tr&gt;
+        &lt;td colspan="2"&gt;No results found
+      &lt;/tr&gt;
+    {% endfor %}
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+</code></pre>

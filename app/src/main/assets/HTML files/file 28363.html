@@ -1,0 +1,29 @@
+<p>The difference is that one function expects a callback. The callback is passed to a low-level binding, so the function will be asynchronous regardless of the flags that you pass to it, hence the reason for the documentation to state that the flag "doesn't turn <code>fs.open()</code> into a synchronous blocking call". Take this example:</p>
+
+<pre><code>var fs = require('fs');
+var file = './file';
+
+// fd will always be defined
+var fd = fs.openSync(file, 'r');
+
+// fd is undefined because the function returns a
+// binding, and the actually fs is passed in a callback
+var fd = fs.open(file, 'rs');
+</code></pre>
+
+<p>Event if we don't pass a callback to the asynchronous function, the method isn't structured to return the resultant file descriptor. This is what the sources of the two functions look like:</p>
+
+<pre><code>fs.open = function(path, flags, mode, callback) {
+  callback = makeCallback(arguments[arguments.length - 1]);
+  mode = modeNum(mode, 438 /*=0666*/);
+
+  if (!nullCheck(path, callback)) return;
+  binding.open(pathModule._makeLong(path), stringToFlags(flags), mode, callback);
+};
+
+fs.openSync = function(path, flags, mode) {
+  mode = modeNum(mode, 438 /*=0666*/);
+  nullCheck(path);
+  return binding.open(pathModule._makeLong(path), stringToFlags(flags), mode);
+};
+</code></pre>

@@ -1,0 +1,89 @@
+<p>I had the same issue just this past week - Try this!</p>
+
+<pre><code>Video model:
+    has_attached_file :video, styles: {
+        :medium =&gt; {
+          :geometry =&gt; "640x480",
+          :format =&gt; 'mp4'
+        },
+        :thumb =&gt; { :geometry =&gt; "160x120", :format =&gt; 'jpeg', :time =&gt; 10}
+    }, :processors =&gt; [:transcoder]
+    validates_attachment_content_type :video, content_type: /\Avideo\/.*\Z/
+</code></pre>
+
+<p>Make sure you already bundled:</p>
+
+<pre><code>gem 'paperclip', '~&gt; 4.3.1'
+gem 'aws-sdk', '&lt; 2.0'
+gem 'paperclip-av-transcoder'
+gem "paperclip-ffmpeg", "~&gt; 1.2.0"
+</code></pre>
+
+<p>Run the paperclip migration:</p>
+
+<pre><code>rails g paperclip model video
+</code></pre>
+
+<p>Be sure to add in post_controller.rb:</p>
+
+<pre><code>private
+
+    def bscenes_params
+        params.require(:post).permit(:video)
+    end
+</code></pre>
+
+<p>Upload form:</p>
+
+<pre><code>&lt;%= f.file_field :video %&gt;
+</code></pre>
+
+<p>Show page:</p>
+
+<pre><code>&lt;%= video_tag bscene.video.url(:medium), controls: true, style: "max-width: 100%;" %&gt;
+</code></pre>
+
+<p>At this point you should get this error:</p>
+
+<blockquote>
+  <p>Av::UnableToDetect (Unable to detect any supported library):</p>
+</blockquote>
+
+<p><strong>For Mac</strong></p>
+
+<p>Go to your terminal and type in:</p>
+
+<pre><code>brew options ffmpeg
+</code></pre>
+
+<p>Then run the following to install ffmpeg:</p>
+
+<pre><code>brew install ffmpeg --with-fdk-aac --with-ffplay --with-freetype --with-frei0r --with-libas
+</code></pre>
+
+<p><strong>For Linux Mint / Ubuntu / Debian based Linux</strong></p>
+
+<p>Open a terminal (Ctrl + Alt + T) and execute following commands one by one to install ffmpeg.</p>
+
+<pre><code>sudo add-apt-repository ppa:mc3man/trusty-media
+sudo apt-get update
+sudo apt-get dist-upgrade
+sudo apt-get install ffmpeg
+</code></pre>
+
+<p><strong>At this point Video uploads will work locally</strong></p>
+
+<p>Now for remote uploads you will need to setup <a href="https://devcenter.heroku.com/articles/buildpacks" rel="nofollow">https://devcenter.heroku.com/articles/buildpacks</a></p>
+
+<p><strong>This should now bring you to your error</strong></p>
+
+<blockquote>
+  <p>Av::UnableToDetect (Unable to detect any supported library)</p>
+</blockquote>
+
+<p>You will need to create a Procfile in the root of your app directory more information about <strong>Procfile</strong> here: <a href="https://devcenter.heroku.com/articles/procfile" rel="nofollow">https://devcenter.heroku.com/articles/procfile</a></p>
+
+<pre><code>touch Procfile
+</code></pre>
+
+<p>Hope this helps!</p>

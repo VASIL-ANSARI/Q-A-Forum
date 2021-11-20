@@ -1,0 +1,49 @@
+<p>Without the actual XML this is reading the <em>magic glass bulb</em>, but I'll give it a try:</p>
+
+<p>Your call to</p>
+
+<pre><code>.nodes('/ETS/WellTours/WellTour/DayTours/DayTour/Tours/Tour/TimeLogs/TimeLog')
+</code></pre>
+
+<p>tells me, that there is one XML with a root node <em>ETS</em> and a nested <em>1:n-structure</em> of <em>WellTours</em>, <em>DayTours</em>, <em>Tours</em> and <em>TimeLogs</em>.</p>
+
+<p>You might try something like this:</p>
+
+<pre><code>;WITH XMLNAMESPACES(DEFAULT 'http://www.adc.ca/ETS/v3')
+INSERT INTO [CC-DB].[dbo].[TourTimeLogs] ([Rig],[Job],[Date],[Sheet],[Rev],[TourID],[StartTime],[EndTime],[Mins],[Code],[Detail])
+SELECT 
+    RIG = WT.value('(Rig/RigId)[1]', 'varchar(100)'),
+    JOB = WT.value('(JobNo)[1]', 'varchar(100)'),
+    [DATE] = DT.value('(Date)[1]', 'date'),
+    SHEET = DT.value('(SheetNo)[1]', 'varchar(100)'),
+    REV = DT.value('(Revision)[1]', 'varchar(100)'),
+    TOURID = T.value('@tourId', 'varchar(100)'),
+    STARTTIME = TL.value('(FromTime)[1]', 'datetime'),  
+    ENDTIME = TL.value('(ToTime)[1]', 'datetime'),
+    MINS = datediff(minute, TL.value('(FromTime)[1]', 'datetime'), TL.value('(ToTime)[1]', 'datetime')),
+    TIMECODE = TL.value('(TimeCodeNo)[1]', 'varchar(100)'),
+    DETAIL = TL.value('(Detail)[1]', 'varchar(100)')    
+FROM 
+     [CC-DB].[dbo].[XmlSourceTable] SRC
+CROSS APPLY
+    SRC.XmlData.nodes('/ETS/WellTours/WellTour') AS A(WT)
+CROSS APPLY
+    WT.nodes('DayTours/DayTour') AS B(DT)
+CROSS APPLY
+    DT.nodes('Tours/Tour') AS C(T)
+CROSS APPLY
+    T.nodes('TimeLogs/TimeLog') AS D(TL)
+</code></pre>
+
+<p><strong>attention</strong> If there is nothing returned, try the same with <code>OUTER APPLY</code>. Without a real XML to test this, it is a <em>blind flight</em> ...</p>
+
+<p>Read as such: </p>
+
+<ul>
+<li>Find all <code>&lt;WellTour&gt;</code>-elements</li>
+<li>Find all <code>&lt;DayTour&gt;</code>-elements below each <code>&lt;WellTour&gt;</code></li>
+<li>Find all <code>&lt;Tour&gt;</code>-elements below each <code>&lt;DayTour&gt;</code></li>
+<li>Find all <code>&lt;TimeLog&gt;</code>-elements below each <code>&lt;Tour&gt;</code></li>
+</ul>
+
+<p>Read the data from the actual level. Do not jump backwards. XML is best to be read <em>forward-only</em> (if possible).</p>

@@ -1,0 +1,48 @@
+<p>The conceptual algorithm that you described can be interpreted in two different ways:</p>
+
+<ol>
+<li><p>Identify all pairs of elements {x, y} in the collection that satisfy some condition <strong>pred</strong>(x, y). After all such pairs have been identified, remove all elements participating in them.</p></li>
+<li><p>The exact imperative pseudocode version that you presented. Elements are removed as soon as it becomes clear that they should be removed.</p></li>
+</ol>
+
+<p>The difference of 2. from 1. is that after you remove element <strong>x</strong> as soon as you detect that it satisfies your predicate when paired with element <strong>y</strong>, you eliminate the chance for that element to form a satisfying pair with another element <strong>z</strong>, and it may turn out that no other element will form such a satisfying pair with <strong>z</strong>.</p>
+
+<p>The solution for the 1st interpretation follows:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+
+// Finds in the container 'c' pairs of elements {x, y} such that
+//           pred(x, y) == true
+// and removes any such elements.
+// The remaining elements may be reordered.
+// pred is assumed to be commutative, i.e.
+//        pred(x, y) == pred(y, x)
+template&lt;class C, class Pred&gt;
+void remove_element_pairs(C&amp; c, Pred pred)
+{
+    typedef typename C::iterator It;
+    typedef typename C::value_type X;
+    It e = c.end();
+    for ( It it = c.begin(); it != e; )
+    {
+        const X&amp; a = *it;
+        const auto boundPred = [&amp;pred, a](const X&amp; x) -&gt; bool { pred(a, x); };
+        if ( c.end() == find_if(std::next(it), c.end(), boundPred) )
+            ++it;
+        else
+            std::swap(*it, *--e);
+    }
+    c.erase(e, c.end());
+}
+
+int main()
+{
+    std::vector&lt;int&gt; v{1, 2, 7, 0, 0, 4, 4, 5};
+    remove_element_pairs(v, [](int a, int b) -&gt; bool { return a + b == 8; });
+    for(int x : v)
+        std::cout &lt;&lt; x &lt;&lt; " ";
+    return 0;
+}
+</code></pre>

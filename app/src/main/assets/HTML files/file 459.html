@@ -1,0 +1,39 @@
+<p>Without any optimization on, the flow through your code is linear.  If you are on line 5 and single step, you step to line 6.  With optimization on, you can get instruction re-ordering, loop unrolling and all sorts of optimizations.<br>
+For example:</p>
+
+<pre><code>
+void foo() {
+1:  int i;
+2:  for(i = 0; i &lt 2; )
+3:    i++;
+4:  return;
+</code></pre>
+
+<p>In this example, without optimization, you could single step through the code and hit lines 1, 2, 3, 2, 3, 2, 4</p>
+
+<p>With optimization on, you might get an execution path that looks like: 2, 3, 3, 4 or even just 4! (The function does nothing after all...)</p>
+
+<p>Bottom line, debugging code with optimization enabled can be a royal pain! Especially if you have large functions.</p>
+
+<p>Note that turning on optimization changes the code! In certain environment (safety critical systems), this is unacceptable and the code being debugged has to be the code shipped. Gotta debug with optimization on in that case.</p>
+
+<p>While the optimized and non-optimized code should be "functionally" equivalent, under certain circumstances, the behavior will change.<br>
+Here is a simplistic example:<br>
+<code><pre>
+    int* ptr = 0xdeadbeef;  // some address to memory-mapped I/O device
+    *ptr = 0;   // setup hardware device
+    while(*ptr == 1) {    // loop until hardware device is done
+       // do something
+    }
+</pre></code></p>
+
+<p>With optimization off, this is straightforward, and you kinda know what to expect.
+However, if you turn optimization on, a couple of things might happen:</p>
+
+<ul>
+<li>The compiler might optimize the while block away (we init to 0, it'll never be 1)</li>
+<li>Instead of accessing memory, pointer access might be moved to a register->No I/O Update</li>
+<li>memory access might be cached (not necessarily compiler optimization related)</li>
+</ul>
+
+<p>In all these cases, the behavior would be drastically different and most likely wrong.</p>

@@ -1,0 +1,11 @@
+<p>The Tomcat log shows you have another slf4j-1.7.7.jar on the classpath:</p>
+
+<p>Using CLASSPATH:       /usr/local/Cellar/tomcat/8.0.18/libexec/bin/jul-to-slf4j-1.7.7.jar:<strong>/usr/local/Cellar/tomcat/8.0.18/libexec/bin/slf4j-api-1.7.7.jar</strong>:/usr/local/Cellar/tomcat/8.0.18/libexec/bin/logback-classic-1.1.2.jar:/usr/local/Cellar/tomcat/8.0.18/libexec/bin/logback-core-1.1.2.jar:/usr/local/Cellar/tomcat/8.0.18/libexec/bin/logback-config/:/usr/local/Cellar/tomcat/8.0.18/libexec/bin/bootstrap.jar:/usr/local/Cellar/tomcat/8.0.18/libexec/bin/tomcat-juli.jar</p>
+
+<p>When Tomcat is been initialized, it initialize jul-to-slf4j and slf4j-api. These jars are been loading by the Classloader which loaded the Tomcat jars (sun/misc/Launcher$AppClassLoader).</p>
+
+<p>When your application tries to access the slf4j-api classes, it uses the WebApplication Classloader (org/apache/catalina/loader/WebappClassLoader), which by default search for classes definition on the app classpath before the system classpath. Note this can be changed: <a href="https://tomcat.apache.org/tomcat-8.0-doc/class-loader-howto.html">https://tomcat.apache.org/tomcat-8.0-doc/class-loader-howto.html</a></p>
+
+<p>In Java, the class signature is composed of the class full qualified name and the classloader that loaded the class. If a class is loaded two times from two different classloaders (same hierarchy), there will be two different classes for the JVM. Trying to point a object reference of one class to a variable of the other will trhow a ClassCastException. Check this blog post (item 5) for more info on this: <a href="https://techblug.wordpress.com/2012/03/17/classloader-tips/">https://techblug.wordpress.com/2012/03/17/classloader-tips/</a></p>
+
+<p>So, as far as I know, you can fix this by removing the slf4j-*.jar from the Tomcat classpath, or if you have more then one webapp using the same version of slf4j, you can remove the jars from the webapp, so it will use those loaded by Tomcat classloader.</p>

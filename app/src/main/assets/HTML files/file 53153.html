@@ -1,0 +1,41 @@
+<p>I don't see that you initialize your <code>dbContext</code> variable on your <code>GenericRepository</code> class, try initializing this variable in the constructor:</p>
+
+<pre><code> public GenericRepository()
+{
+ _dbContext=new FrameworkContext();
+}
+</code></pre>
+
+<h2>Update</h2>
+
+<p>Well there are many ways to solve your second exception, the problem is because your context doesn't know about your entity:</p>
+
+<p>A solution could be declaring a property on your context as follow:</p>
+
+<pre><code>public DbSet&lt;Car&gt; Cars{get;set;}
+</code></pre>
+
+<p>Or using Fluent Api, for example, overriding <code>OnModelCreating</code> method and doing something like this:</p>
+
+<pre><code> modelBuilder.Entity&lt;Car&gt;().HasKey(c=&gt;c.Id);
+</code></pre>
+
+<p>But the best way is create a mapping class for each entity:</p>
+
+<pre><code>public class CarMap : EntityTypeConfiguration&lt;Car&gt;
+{
+    public CarMap()
+    {
+        // Primary Key
+        this.HasKey(t =&gt; t.Id);
+    }
+}
+</code></pre>
+
+<p>An later you only need to do this in your <code>OnModelCreating</code> method to discover all the mappings:</p>
+
+<pre><code> protected override void OnModelCreating(DbModelBuilder modelBuilder)
+ {
+        modelBuilder.Configurations.AddFromAssembly(typeof(FrameworkContext).Assembly);// set here the asembly where there are all your mapping classes.
+ }
+</code></pre>

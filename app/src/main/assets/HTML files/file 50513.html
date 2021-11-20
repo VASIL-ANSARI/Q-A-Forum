@@ -1,0 +1,146 @@
+<p>You cannot this with Python only. You need a JavaScript engine API like <a href="http://phantomjs.org/" rel="nofollow">PhantomJS</a></p>
+
+<p>With Phantom, will be very easy to setup the web scraping of all the page contents, static and dynamic JavaScript contents (like Ajax calls results in your case). Infact you can register page event handlers to your page parser like (this is a node.js + phantom.js example)</p>
+
+<pre><code>/*
+     * Register Page Handlers as functions
+
+    {
+        onLoadStarted : onLoadStarted,
+        onLoadFinished: onLoadFinished,
+        onError : onError,
+        onResourceRequested : onResourceRequested,
+        onResourceReceived : onResourceReceived,
+        onNavigationRequested : onNavigationRequested,
+        onResourceError : onResourceError
+    }
+
+    */
+    registerHandlers : function(page, handlers) {
+        if(handlers.onLoadStarted) page.set('onLoadStarted',handlers.onLoadStarted)
+        if(handlers.onLoadFinished) page.set('onLoadFinished',handlers.onLoadFinished)
+        if(handlers.resourceError) page.set('onResourceError', handlers.resourceError)
+        if(handlers.onResourceRequested) page.set('onResourceRequested',handlers.onResourceRequested)
+        if(handlers.onResourceReceived) page.set('onResourceReceived',handlers.onResourceReceived)
+        if(handlers.onNavigationRequested) page.set('onNavigationRequested',handlers.onNavigationRequested)
+        if(handlers.onError) page.set('onError',handlers.onError)
+
+    }
+</code></pre>
+
+<p>At this point you have full control of what is going on and when in the page you have to download like:</p>
+
+<pre><code>var onResourceError = function(resourceError) {
+                        var errorReason = resourceError.errorString;
+                        var errorPageUrl = resourceError.url;
+                }
+                var onResourceRequested = function (request) {
+                    var msg = '  request: ' + JSON.stringify(request, undefined, 4);
+                };
+                var onResourceReceived = function(response) {
+                    var msg = '  id: ' + response.id + ', stage: "' + response.stage + '", response: ' + JSON.stringify(response);
+                };
+                var onNavigationRequested = function(url, type, willNavigate, main) {
+                    var msg = '  destination_url: ' + url;
+                    msg += '  type (cause): ' + type;
+                    msg += '  will navigate: ' + willNavigate;
+                    msg += '  from page\'s main frame: ' + main;
+                };
+                page.onResourceRequested(
+                function(requestData, request) {
+                        //request.abort()
+                        //request.changeUrl(url)
+                        //request.setHeader(key,value)
+                        var msg = '  request: ' + JSON.stringify(request, undefined, 4);
+                        //console.log( msg )
+                    },
+                function(requestData) {
+                        //console.log(requestData.url)
+                })
+        PageHelper.registerHandlers(page,
+                    {
+                        onLoadStarted : onLoadStarted,
+                        onLoadFinished: onLoadFinished,
+                        onError : null, // onError THIS HANDLER CRASHES PHANTOM-NODE
+                        onResourceRequested : null, // MUST BE ON PAGE OBJECT
+                        onResourceReceived : onResourceReceived,
+                        onNavigationRequested : onNavigationRequested,
+                        onResourceError : onResourceError
+                    });
+</code></pre>
+
+<p>As you can see you can define you page handlers and take control of the flow and so of the resources loaded on that page. So you can be sure that all data are ready and set, before you take the whole page source like:</p>
+
+<pre><code>var Parser = {
+  parse : function(page) {
+
+    var onSuccess = function (page) { // page loaded
+        var pageContents=page.evaluate(function() {
+            return document.body.innerText;
+        });
+      }
+    var onError = function (page,elapsed) { // error
+    }
+    page.evaluate(function(func) {
+            return func(document);
+        }, function(dom) {
+            return true;
+        });
+
+  }
+} // Parser
+</code></pre>
+
+<p>Here you can see the whole page contents loaded in the onSuccess callback:</p>
+
+<pre><code>var pageContents=page.evaluate(function() {
+                return document.body.innerText;
+            });
+</code></pre>
+
+<p>The page comes from Phantomjs directly like in the following snippet:</p>
+
+<pre><code>phantom.create(function (ph) {
+            ph.createPage(function (page) {
+                Parser.parse(page)
+            })
+        },options)
+</code></pre>
+
+<p>Of course this to give you and idea of what you can do with node.js + Phantomjs, that are super powerful when combined together.</p>
+
+<p>You can run phantomjs in a Python env, calling it like</p>
+
+<pre><code>try:
+            output = ''
+            for result in runProcess([self.runProcess,
+            self.runScript,
+            self.jobId,
+            self.protocol,
+            self.hostname,
+            self.queryString]):
+                output += '' + result
+                print output
+        except Exception as e:
+            print e
+            print(traceback.format_exc())
+</code></pre>
+
+<p>where you use subprocess Popen to execute the binary:</p>
+
+<pre><code>def runProcess(exe):
+    p = subprocess.Popen(exe, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    while(True):
+      retcode = p.poll() #returns None while subprocess is running
+      line = p.stdout.readline()
+      yield line
+      if(retcode is not None):
+        break
+</code></pre>
+
+<p>Of course the process to run is node.js in this case</p>
+
+<pre><code>self.runProcess='node'
+</code></pre>
+
+<p>with the args you need as params.</p>

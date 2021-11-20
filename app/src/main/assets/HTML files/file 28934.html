@@ -1,0 +1,30 @@
+<p>The first example uses Apache <code>EntityUtils</code> to read the stream in a String. From the code, what it does is it uses a <code>Reader</code> to read in a fixed size <code>char[]</code> the content from the <code>entity.getContent()</code>, and appends it to a form of Buffer.</p>
+
+<p>The second example reads line by line using a <code>BufferedReader</code>.</p>
+
+<ol>
+<li><p>The <code>BufferedReader</code> may not take more space in itself, but the amount of space necessary to bufferize is unknown, because it requires reading a line (i.e. until a line break is found), and there may not be any line break in the response. This entire line is buffered, then read to a String, then appended, making it present 3 times in memory.</p></li>
+<li><p>Agreed</p></li>
+<li><p>The code of the <code>BufferedReader</code> example is obviously longer.</p></li>
+<li><p>Any approach that does not use a third part method is more flexible, because you can work on the content of the stream without waiting to have read the entire thing</p></li>
+<li><p>The <code>readLine</code> approach has another defect, which is of loosing the line break characters. In some cases they may carry information.</p></li>
+</ol>
+
+<p>If you want an efficient yet flexible approach, look at the actual implementation from apache <a href="http://grepcode.com/file/repo1.maven.org/maven2/org.apache.httpcomponents/httpcore/4.1/org/apache/http/util/EntityUtils.java#EntityUtils.toString%28org.apache.http.HttpEntity,java.lang.String%29" rel="nofollow">EntityUtils</a>. It uses a fixed size char[] for buffering, ensuring that you know the amount of memory overhead, and it reads all the characters, including the line breaks.</p>
+
+<p><code>readLine</code> really is useful only when you need to read a line. (!)</p>
+
+<p>(The relevant part of the implementation:)</p>
+
+<pre><code>    Reader reader = new InputStreamReader(instream, charset);
+    CharArrayBuffer buffer = new CharArrayBuffer(i);
+    try {
+        char[] tmp = new char[1024];
+        int l;
+        while((l = reader.read(tmp)) != -1) {
+            buffer.append(tmp, 0, l);
+        }
+    } finally {
+        reader.close();
+    }
+</code></pre>

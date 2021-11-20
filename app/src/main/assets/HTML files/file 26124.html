@@ -1,0 +1,34 @@
+<p>After much wrangling with the Linkedin API Beast, I found the issue to be in the way things are encoded, a long story, in OAuthLoginView.m in method 'requestTokenFromProvider' I needed to include the param 'scope' with the relevant permissions in a OARequestParameter object.</p>
+
+<p>(based off the github repo -> <a href="https://github.com/synedra/LinkedIn-OAuth-Sample-Client" rel="nofollow">https://github.com/synedra/LinkedIn-OAuth-Sample-Client</a>)</p>
+
+<p>After that, wherever you're making your api call, (in OAuthStarterKit for example) like in ProfileTabView::profileApiCall you can fire off URL posts like this: using:<a href="http://api.linkedin.com/v1/group-memberships" rel="nofollow">http://api.linkedin.com/v1/group-memberships</a>; or if you need their email address, it appears (as long as you've got permission to access email, you can grab that too as simply as this:</p>
+
+<p>NSURL *url = [NSURL URLWithString:@"<a href="http://api.linkedin.com/v1/people/~:(id,first-name,last-name,industry,email-address)" rel="nofollow">http://api.linkedin.com/v1/people/~:(id,first-name,last-name,industry,email-address)</a>"];</p>
+
+<p>See the code for using a OARequestParameter in the URL request below...</p>
+
+<pre><code>- (void)requestTokenFromProvider
+{
+    OAMutableURLRequest *request = 
+            [[[OAMutableURLRequest alloc] initWithURL:requestTokenURL
+                                             consumer:self.consumer
+                                                token:nil   
+                                             callback:linkedInCallbackURL
+                                    signatureProvider:nil] autorelease];
+
+    [request setHTTPMethod:@"POST"];
+
+    OARequestParameter * scopeParameter=[OARequestParameter requestParameter:@"scope" value:@"r_fullprofile r_contactinfo r_emailaddress"];
+
+    [request setParameters:[NSArray arrayWithObject:scopeParameter]];
+
+    OADataFetcher *fetcher = [[[OADataFetcher alloc] init] autorelease];
+    [fetcher fetchDataWithRequest:request
+                         delegate:self
+                didFinishSelector:@selector(requestTokenResult:didFinish:)
+                  didFailSelector:@selector(requestTokenResult:didFail:)];    
+}
+</code></pre>
+
+<p>Hope this answer will help a lot of developers looking for <code>Linkedin</code> Integration in iPhone.</p>

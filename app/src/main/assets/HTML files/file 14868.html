@@ -1,0 +1,27 @@
+<p>Many of your statements involve session configuration settings; those can usually be moved in either the server's <code>php.ini</code> or a top-level <code>.htaccess</code> (Apache).</p>
+
+<pre><code>session.name = PHPSESSID
+session.gc_maxlifetime = 10000
+
+session.gc_probability = 1
+session.gc_divisor = 1000
+
+session.cookie_domain =
+session.cookie_path = /
+session.cookie_httponly = 1
+session.cookie_lifetime = 0
+</code></pre>
+
+<p>You shouldn't make sessions last as long as you do (expiry in 2038); sessions are normally perpetuated with session cookies (which last until the browser is closed, technically). If you want to implement a "remember me" feature, I suggest you add that on top of your sessions, like explained here: <a href="http://jaspan.com/improved_persistent_login_cookie_best_practice">http://jaspan.com/improved_persistent_login_cookie_best_practice</a></p>
+
+<p>I find it important to distinguish between starting a new session and resuming an existing one, especially in cases whereby sessions are only created as part of a sign in process. When a session can't be resumed, something went wrong and the user should be redirected back to the login page (or homepage).</p>
+
+<p>PHP doesn't understand that difference, <code>session_start</code> will automatically create a session if it's not there, and worse, if an arbitrary session ID is given; the latter allows for session adoption attacks as outlined here: <a href="http://gihyo.jp/dev/serial/01/php-security/0025">http://gihyo.jp/dev/serial/01/php-security/0025</a> - it's in Japanese, you will have to translate it with your browser.</p>
+
+<p>To find out whether a session can be resumed, you need to prime every new session by adding a special key (e.g. <code>$_SESSION['_id'] = session_id()</code>). If that key is found, the session already exists and you can resume it; if not, the session either didn't exist or someone is trying to feed you a wrong ID.</p>
+
+<p>To start a new session, you first see whether it can be resumed; if not, you use <code>session_regenerate_id(true)</code> to change the session ID (this makes it harder for an attacker to hijack a session).</p>
+
+<p>Lastly, session save paths on a shared server can be written under your own home folder, but this only makes sense if your shared host runs with a dedicated user per virtual host (i.e. <code>suexec</code>). Otherwise, to protect your session from snooping attacks you will have to encode the session data (and maybe the keys too). Check out the <code>mcrypt</code> extension: <a href="http://sg.php.net/mcrypt">http://sg.php.net/mcrypt</a> - you should be able to find examples online.</p>
+
+<p>I hope this more or less answers your question. Let me know if you think anything's amiss.</p>

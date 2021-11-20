@@ -1,0 +1,29 @@
+<p>It looks like some of the predicates in the correlated subquery could be moved to the outer query. For example, I believe this is equivalent:</p>
+
+<pre><code>UPDATE store s 
+   SET s.reservation = 1
+ WHERE s.reservation = 0
+   AND s.status != 9
+   AND s.id != 0
+   AND EXISTS ( SELECT 1
+                  FROM item i
+                 WHERE i.store_id = s.id
+              )
+</code></pre>
+
+<p>For best performance of that, at a minimum, we'd want an index on <code>store</code> that has <code>reservation</code> as the leading column. Also including the <code>status</code> and <code>id</code> columns would mean those conditions could be checked from the index page, without a lookup of the underlying page in the table.</p>
+
+<p>And for that correlated subquery (dependent query), we'd want an index on <code>item</code> with a <code>store_id</code> as the leading column.</p>
+
+<p>As another option, consider re-writing the correlated subquery as a JOIN operation, for example:</p>
+
+<pre><code>UPDATE store s
+  JOIN item i
+    ON i.store_id = s.id
+   SET s.reservation = 1
+ WHERE s.reservation = 0
+   AND s.status != 9
+   AND s.id != 0
+</code></pre>
+
+<p>If you're running MySQL 5.5 or earlier, you can't get an EXPLAIN on an UPDATE statement. The closest we can get is rewriting the query as a SELECT, and getting an EXPLAIN on that. MySQL 5.6 does support EXPLAIN on an UPDATE statement.</p>

@@ -1,0 +1,36 @@
+<p>This is generally the result of one of two things - either (a) your <code>OnStart()</code> method is throwing an exception or (b) the <code>OnStart()</code> method is not kicking off a thread to do work.</p>
+
+<p>If the problem is (a), then the obvious solution is to debug the service to identify what is going wrong.  At a minimum, put a <code>try-catch</code> block around the contents of the <code>OnStart()</code> method and log an error to the system event log when an exception occurs.  Then you can see the details in the Windows Event Viewer.</p>
+
+<p>If the problem is (b), then you need to create a thread that actually does something.  The thread needs to be a foreground thread (as opposed to a background thread) to prevent the service from shutting down.  A typical <code>OnStart()</code> method looks like this:</p>
+
+<pre><code>private System.Threading.Thread _thread;
+
+protected override void OnStart(string[] args)
+{
+    try
+    {
+        // Uncomment this line to debug...
+        //System.Diagnostics.Debugger.Break();
+
+        // Create the thread object that will do the service's work.
+        _thread = new System.Threading.Thread(DoWork);
+
+        // Start the thread.
+        _thread.Start();
+
+        // Log an event to indicate successful start.
+        EventLog.WriteEntry("Successful start.", EventLogEntryType.Information);
+    }
+    catch (Exception ex)
+    {
+        // Log the exception.
+        EventLog.WriteEntry(ex.Message, EventLogEntryType.Error);
+    }
+}
+
+private void DoWork()
+{
+    // Do the service work here...
+}
+</code></pre>

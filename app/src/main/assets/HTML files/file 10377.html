@@ -1,0 +1,95 @@
+<p>When writing a network application using asynchronous techniques, you <em>wait</em> by recording your state somewhere and then letting the main loop continue.  At some future time, the data you're waiting for will become available, the main loop will notify you of that fact, and you can combine the new data with the recorded state to complete whatever task you are working on.  Depending on the specific task, you may need to go through this cycle many times before your task is actually done.</p>
+
+<p>These ideas are basically the same regardless of what asynchronous system you're using.  However, <a href="http://twistedmatrix.com/" rel="nofollow">Twisted</a> is <a href="http://stackoverflow.com/questions/4384360/which-python-async-library-would-be-best-suited-for-my-code-asyncore-twisted">a vastly superior system</a> to <a href="http://docs.python.org/library/asynchat.html" rel="nofollow">asynchat</a>, so I'm not going to try to explain any of the asynchat details.  Instead, here's an example that does the kind of thing you're asking about, using Twisted:</p>
+
+<pre><code>from twisted.internet.defer import Deferred
+from twisted.internet.protocol import Protocol, Factory
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.internet import reactor
+
+# Stream-oriented connections like TCP are handled by an instance 
+# of a Protocol subclass
+class SomeKindOfClient(Protocol):
+
+     # When a new connection is established, the first thing that
+     # happens is this method is called.
+     def connectionMade(self):
+         # self.transport is set by the superclass, and lets us 
+         # send data over the connection
+         self.transport.write("GREETING")
+
+         # a Deferred is a generic, composable API for specifying
+         # callbacks
+         self.greetingComplete = Deferred()
+
+         # Here's some local state
+         self._buffer = ""
+
+     # Whenever bytes arrive on the TCP connection, they're passed
+     # to this method
+     def dataReceived(self, bytes):
+
+         # Incorportate the network event data into our local state.
+         #  This kind of buffering is always necessary with TCP, because
+         # there's no guarantees about how many bytes will be delivered
+         # at once (except that it will be at least 1), regardless of
+         # the size of the send() the peer did.
+         self._buffer += bytes
+
+         # Figure out if we're done - let's say the server response is 32
+         # bytes of something
+         if len(self._buffer) &gt;= 32:
+             # Deliver it to whomever is waiting, by way of the Deferred
+             # object
+             greeting, self._buffer = self._buffer[:32], self._buffer[32:]
+             complete = self.greetingComplete
+             self.greetingComplete = None
+             complete.callback(greeting)
+
+         # Otherwise we'll keep waiting until dataReceived is called again
+         # and we have enough bytes.
+
+
+# One of the normal ways to create a new client connection
+f = Factory()
+f.protocol = SomeKindOfClient
+e = TCP4ClientEndpoint(reactor, "somehost", 1234)
+
+# Connect returns one of those Deferreds - letting us specify a function
+# to call when the connection is established.  The implementation of
+# connect is also doing basically the same kind of thing as you're asking
+# about.
+d = e.connect(f)
+
+# Execution continues to this point before the connection has been
+# established.  Define a function to use as a callback when the connection
+# does get established.
+def connected(proto):
+    # proto is an instance of SomeKindOfClient.  It has the 
+    # greetingComplete attribute, which we'll attach a callback to so we
+    # can "wait" for the greeting to be complete.
+    d = proto.greetingComplete
+
+    def gotGreeting(greeting):
+        # Note that this is really the core of the answer.  This function
+        # is called *only* once the protocol has decided it has received
+        # some necessary data from the server.  If you were waiting for a
+        # session identifier of some sort, this is where you might get it
+        # and be able to proceed with the remainder of your application
+        # logic.
+        print "Greeting arrived", repr(greeting)
+
+    # addCallback is how you hook a callback up to a Deferred - now
+    # gotGreeting will be called when d "fires" - ie, when its callback
+    # method is invoked by the dataReceived implementation above.
+    d.addCallback(gotGreeting)
+
+# And do the same kind of thing to the Deferred we got from 
+# TCP4ClientEndpoint.connect
+d.addCallback(connected)
+
+# Start the main loop so network events can be processed
+reactor.run()
+</code></pre>
+
+<p>To see how this behaves, you can launch a simple server (eg <code>nc -l 1234</code>) and point the client at it.  You'll see the greeting arrive and you can send some bytes back.  Once you've sent back 30, the client will print them (and then hang around indefinitely, because I implemented no further logic in that protocol).</p>

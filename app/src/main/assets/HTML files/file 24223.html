@@ -1,0 +1,65 @@
+<p>Here is an idea.  How about a name from person and a comma delimited list of all persons they have worked with?  Here is the syntax in MySQL:</p>
+
+<pre><code>SELECT pp.p1, pp.p1.name, group_concat(distinct p2.name)
+FROM (select p1.id as p1, p1.name as p1name, p2.id as p2, p2.name as p2name
+      from person p1 cross join
+           person p2
+      where p1.id &lt;&gt; p2.id
+     ) pp join
+     project pr1
+     on pr1.personid = pp.p1 join
+     project pr2
+     on pr2.personid = pp.p2 and
+        pr2.id = pr1.id
+group by pp.p1, pp.p1name;
+</code></pre>
+
+<p>The idea starts with a master list of all pairs of people.  It then joins in all the projects that the first person is on, and all the matching projects for the second person.  These are concatenated together, using <code>group concat</code>.</p>
+
+<p>If you are happy with lists of the pairs, here is an example that runs in SQL Server:</p>
+
+<pre><code>with person as (
+      select 1 as id, 'a' as name union all
+      select 2, 'b' union all
+      select 3, 'c' union all
+      select 4, 'd' union all
+      select 5, 'e'
+     ),
+     project as (
+      select 1 as id, 1 as personid union all
+      select 1 as id, 2 as personid union all
+      select 1 as id, 3 union all
+      select 2, 4 union all
+      select 2, 5 union all
+      select 3, 1 union all
+      select 3, 5
+     )
+SELECT distinct pp.p1name, pp.p2name
+FROM (select p1.id as p1, p1.name as p1name, p2.id as p2, p2.name as p2name
+      from person p1 cross join
+           person p2
+      where p1.id &lt;&gt; p2.id
+     ) pp join
+     project pr1
+     on pr1.personid = pp.p1 join
+     project pr2
+     on pr2.personid = pp.p2 and
+        pr2.id = pr1.id;
+</code></pre>
+
+<p>EDIT:</p>
+
+<p>Here is another way of thinking about the problem (if my interpretation is correct).  I'm not sure why I didn't go in this direction first.  You are looking for all (distinct)  pairs of people who worked together on a project.  Getting pairs from such a list is a self join.  This leads to the following query:</p>
+
+<pre><code>SELECT distinct p1.name, p2.name
+FROM project pr1 join
+     project pr2
+     on pr1.id = pr2.id and
+        pr1.personid &lt;&gt; pr2.personid join
+     person p1
+     on pr1.personid = p1.id join
+     person p2
+     on pr2.personid = p2.id;
+</code></pre>
+
+<p>(You can add the <code>group_concat()</code> if you like to put rows into a comma-separated list.)</p>

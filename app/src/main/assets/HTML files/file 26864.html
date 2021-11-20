@@ -1,0 +1,23 @@
+<p>Great that you included all scripts to recreate your situation.</p>
+
+<p>Put your results from your current query into a subquery, the trick with the @rank doesn't work with <code>GROUP BY</code>.</p>
+
+<p>With this script I get the correct results:</p>
+
+<pre><code>SELECT *,  (@rank := @rank + 1) AS rank 
+FROM ( SELECT @rank := 0 ) as r ,
+(SELECT m.monster,
+    (SUM(CASE WHEN 
+            (b.monster_h = m.id_monster AND b.score_h &gt; b.score_a) OR 
+            (b.monster_a = m.id_monster AND b.score_a &gt; b.score_h) THEN 3 ELSE 0 END) +
+    SUM(CASE WHEN
+        (b.monster_h = m.id_monster  OR b.monster_a = m.id_monster) AND
+        b.score_a = b.score_h THEN 1 ELSE 0 END)) as pt,
+    (SUM(CASE WHEN 
+        (b.monster_h= m.id_monster OR b.monster_a= m.id_monster) THEN 1 ELSE 0 END)) as pl
+FROM monsters as m
+LEFT JOIN battles as b ON m.id_monster IN (b.monster_a,b.monster_h)
+where b.played = 1
+GROUP BY m.monster) as result
+order by result.pt DESC
+</code></pre>

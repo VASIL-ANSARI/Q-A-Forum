@@ -1,0 +1,139 @@
+<p>I use the following class to do JSR-303 and HibernateValidator bean validation manually with a Spring validator.  Perhaps it can be useful.</p>
+
+<p><strong>BeanValidator.java</strong></p>
+
+<pre><code>import java.util.Locale;
+import java.util.Set;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
+import org.springframework.stereotype.Component;
+import org.springframework.validation.Errors;
+
+public class BeanValidator implements org.springframework.validation.Validator, InitializingBean {
+
+private static final Logger log = LoggerFactory.getLogger(BeanValidator.class.getName());
+
+private Validator validator;
+
+@Autowired
+MessageSource messageSource;
+
+@Override
+public void afterPropertiesSet() throws Exception {
+    ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
+    validator = validatorFactory.usingContext().getValidator();
+}
+
+@Override
+public boolean supports(Class clazz) {
+    return true;
+}
+
+@Override
+public void validate(Object target, Errors errors) {
+    Set&lt;ConstraintViolation&lt;Object&gt;&gt; constraintViolations = validator.validate(target);
+    for (ConstraintViolation&lt;Object&gt; constraintViolation : constraintViolations) {
+        String propertyPath = constraintViolation.getPropertyPath().toString();
+        String message;
+        try {
+            message = messageSource.getMessage(constraintViolation.getMessage(), new Object[]{}, Locale.getDefault());
+        } catch (NoSuchMessageException e) {
+            log.error(String.format("Could not interpolate message \"%s\" for validator. "
+                    + e.getMessage(), constraintViolation.getMessage()), e);
+            message = constraintViolation.getMessage();
+        }
+        errors.rejectValue(propertyPath, "", message);
+    }
+}
+}
+</code></pre>
+
+<p><strong>SpringMessageSourceMessageInterpolator.java</strong></p>
+
+<pre><code>import javax.validation.MessageInterpolator;
+import org.hibernate.validator.messageinterpolation.ResourceBundleMessageInterpolator;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
+import org.springframework.context.MessageSourceAware;
+import org.springframework.context.NoSuchMessageException;
+
+public class SpringMessageSourceMessageInterpolator extends ResourceBundleMessageInterpolator implements MessageInterpolator, MessageSourceAware, InitializingBean {
+
+@Autowired
+private MessageSource messageSource;
+
+@Override
+public String interpolate(String messageTemplate, Context context) {
+    try {
+        return messageSource.getMessage(messageTemplate, new Object[]{}, Locale.getDefault());
+    } catch (NoSuchMessageException e) {
+        return super.interpolate(messageTemplate, context);
+    }
+}
+
+@Override
+public String interpolate(String messageTemplate, Context context, Locale locale) {
+    try {
+        return messageSource.getMessage(messageTemplate, new Object[]{}, locale);
+    } catch (NoSuchMessageException e) {
+        return super.interpolate(messageTemplate, context, locale);
+    }
+}
+
+@Override
+public void setMessageSource(MessageSource messageSource) {
+    this.messageSource = messageSource;
+}
+
+@Override
+public void afterPropertiesSet() throws Exception {
+    if (messageSource == null) {
+        throw new IllegalStateException("MessageSource was not injected, could not initialize "
+                + this.getClass().getSimpleName());
+    }
+}
+}
+</code></pre>
+
+<p><strong>applicationContext.xml</strong></p>
+
+<pre><code>&lt;bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource" p:basename="messages"/&gt;
+
+&lt;bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean"&gt;
+    &lt;property name="messageInterpolator"&gt;
+        &lt;bean class="com.company.utils.spring.SpringMessageSourceMessageInterpolator" /&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<p><strong>Example bean property</strong></p>
+
+<pre><code>@NotNull(message = "validation.mandatoryField")
+private ClientGroup clientGroup;
+</code></pre>
+
+<p><strong>Example validation</strong></p>
+
+<pre><code>@Controller
+public class MyController {
+
+@Autowired
+private BeanValidator validator;
+
+@RequestMapping("/foo", method=RequestMethod.POST)
+public void processFoo(ModelAttribute("foo") Foo foo, BindingResult result, Model model) {
+    //...
+    validator.validate(foo, result);
+}
+</code></pre>
+
+<p>}</p>

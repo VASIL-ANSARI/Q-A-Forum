@@ -1,0 +1,19 @@
+<p>To use <code>with</code> construct, the object used inside must have <code>__enter__</code> and <code>__exit__</code> methods. The error says that the <code>Pool</code> class (or instance) doesn't have these so you can't use it in the <code>with</code> statement.
+Try this (just removed the with statement):</p>
+
+<pre><code>import glob, multiprocessing, shutil
+
+filenames = [gz for gz in glob.glob('.' + '*.gz')]
+
+def uncompress(path):
+    with gzip.open(path, 'rb') as src, open(path.rstrip('.gz'), 'wb') as dest:
+        shutil.copyfileobj(src, dest)
+
+
+for _ in multiprocessing.Pool().imap_unordered(uncompress, filenames, chunksize=1):
+    pass
+</code></pre>
+
+<p><strong>EDIT</strong></p>
+
+<p>I agree with @dhke, unless all (or most) of gz files are physically located adjacently, frequent disk reads for different locations (which are called more frequently when using multiprocessing) will be slower as compared to doing these operations file by file one by one (serially).</p>

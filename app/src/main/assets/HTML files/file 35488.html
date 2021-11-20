@@ -1,0 +1,57 @@
+<p>Here you go :)</p>
+
+<pre><code>SELECT
+  id_user,
+  SUM(cod = 'A') as A,
+  SUM(cod = 'B') as B,
+  SUM(cod = 'A' &amp;&amp; is_repeating) AS A_repeating,
+  SUM(cod = 'B' &amp;&amp; is_repeating) AS B_repeating
+FROM
+(
+select
+l.*
+, @is_repeating := if(@prev_id_user = id_user &amp;&amp; @prev_cod = cod &amp;&amp; @prev_info = info, 1, 0) as is_repeating
+, @prev_id_user := id_user
+, @prev_cod := cod
+, @prev_info := info
+from
+Log l
+, (select @prev_id_user:=null, @prev_cod:=null, @prev_info:=null, @is_repeating:=0) var_init
+order by id_user, cod, id
+) Log  
+GROUP BY
+  id_user
+</code></pre>
+
+<ul>
+<li>see it working live in an <kbd><a href="http://sqlfiddle.com/#!2/6eb36/3/0" rel="nofollow">sqlfiddle</a></kbd></li>
+</ul>
+
+<p>I need to add though, that I added an auto_increment column which I used in the order by (which is important!). Like I said already in my comment above there is no order in a database table unless you specify it. You can not rely on the same order from a select without an order by clause, even when it looks like you can do.</p>
+
+<p><strong>UPDATE:</strong></p>
+
+<p>It seems I misunderstood you a little. Here's a corrected version with your desired result of 3 for A_repeating:</p>
+
+<pre><code>SELECT
+  id_user,
+  SUM(cod = 'A') as A,
+  SUM(cod = 'B') as B,
+  SUM(cod = 'A' &amp;&amp; is_repeating) AS A_repeating,
+  SUM(cod = 'B' &amp;&amp; is_repeating) AS B_repeating
+FROM
+(
+select
+l.*
+, @is_repeating := if(@prev_id_user = id_user &amp;&amp; @prev_cod = cod &amp;&amp; @prev_info = info, 1, 0) as is_repeating
+, @prev_id_user := id_user
+, @prev_cod := cod
+, @prev_info := info
+from
+Log l
+, (select @prev_id_user:=null, @prev_cod:=null, @prev_info:=null, @is_repeating:=0) var_init
+order by id_user, cod, info
+) Log  
+GROUP BY
+  id_user
+</code></pre>

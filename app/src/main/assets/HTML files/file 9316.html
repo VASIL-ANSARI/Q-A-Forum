@@ -1,0 +1,57 @@
+<p>You could write a custom validation attribute:</p>
+
+<pre><code>public class MustBeTrueAttribute : ValidationAttribute, IClientValidatable
+{
+    protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+    {
+        if (value is bool &amp;&amp; (bool)value)
+        {
+            return ValidationResult.Success;
+        }
+        return new ValidationResult(String.Format(ErrorMessageString, validationContext.DisplayName));
+    }
+
+    public IEnumerable&lt;ModelClientValidationRule&gt; GetClientValidationRules(ModelMetadata metadata, ControllerContext context)
+    {
+        var rule = new ModelClientValidationRule
+        {
+            ErrorMessage = FormatErrorMessage(metadata.GetDisplayName()),
+            ValidationType = "shouldbetrue"
+        };
+
+        yield return rule;
+    }
+}
+</code></pre>
+
+<p>which would be used to decorate your model:</p>
+
+<pre><code>[MustBeTrue(ErrorMessage = "terms and condition")]
+[Display(Name = "terms")]
+public bool Terms { get; set; }
+</code></pre>
+
+<p>and finally in the view register it:</p>
+
+<pre><code>@model MyViewModel
+
+@using (Html.BeginForm())
+{
+    @Html.CheckBoxFor(m =&gt; m.Terms, new { @class = "cb" }) 
+    &lt;text&gt;Terms &amp;amp; Condition&lt;/text&gt;
+    @Html.ValidationMessageFor(x =&gt; x.Terms)
+
+    &lt;button type="submit" id="btnSubmit" class="btn"&gt;Signup&lt;/button&gt;
+}
+
+&lt;script src="@Url.Content("~/Scripts/jquery.validate.js")" type="text/javascript"&gt;&lt;/script&gt;           
+&lt;script src="@Url.Content("~/Scripts/jquery.validate.unobtrusive.js")" type="text/javascript"&gt;&lt;/script&gt;           
+
+&lt;script type="text/javascript"&gt;
+    jQuery.validator.addMethod('shouldbetruemethod', function (value, element) {
+        return $(element).is(':checked');
+    }, '');
+
+    jQuery.validator.unobtrusive.adapters.addBool('shouldbetrue', 'shouldbetruemethod');
+&lt;/script&gt;
+</code></pre>

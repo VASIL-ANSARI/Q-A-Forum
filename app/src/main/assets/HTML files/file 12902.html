@@ -1,0 +1,54 @@
+<p><strong>EDIT</strong>  SQL updated as per comment.</p>
+
+<pre><code>WITH
+  group_assigned_data AS
+(
+  SELECT
+    ROW_NUMBER() OVER (PARTITION BY customer_status ORDER BY effective_from_date) AS status_sequence_id,
+    ROW_NUMBER() OVER (                             ORDER BY effective_from_date) AS sequence_id,
+    customer_status,
+    effective_from_date
+  FROM
+    your_table
+)
+,
+  grouped_data AS
+(
+  SELECT
+    customer_status,
+    MIN(effective_from_date)   AS min_effective_from_date,
+    MAX(effective_from_date)   AS max_effective_from_date
+  FROM
+    group_assigned_data
+  GROUP BY
+    customer_status,
+    sequence_id - status_sequence_id
+)
+SELECT
+  [current].customer_status,
+  [current].min_effective_from_date       AS effective_from,
+  [next].min_effective_from_date          AS effective_to
+FROM
+  grouped_data   AS [current]
+LEFT JOIN
+  grouped_data   AS [next]
+    ON [current].max_effective_from_date = [next].min_effective_from_date + 1
+ORDER BY
+  [current].min_effective_from_date
+</code></pre>
+
+<p>This isn't recursive, but that's possibly a good thing.</p>
+
+<p><br/></p>
+
+<p>It doesn't deal with gaps in your data.  To deal with that you could create a calendar table, with every relevant date, and join on that to fill missing dates with 'unknown' status, and then run the query against that.  (Infact you cate do it it a CTE that is used by the CTE above).</p>
+
+<p>At present...<br>
+- If row 2 was missing, it would not change the result<br>
+- If row 3 was missing, the end_date of the first row would change  </p>
+
+<p>Different behaviour can be determined by preparing your data, or other methods.  We'd need to know the business logic you need though.</p>
+
+<p><br/></p>
+
+<p>If any one date can have multiple status entries, you need to define what logic you want it to follow.  At present the behaviour is undefined, but you could correct that as simply as adding <code>customer_status</code> to the <code>ORDER BY</code> portions of ROW_NUMBER().</p>

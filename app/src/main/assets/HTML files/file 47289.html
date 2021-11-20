@@ -1,0 +1,35 @@
+<p>The problem seems to be in the way you create packet.</p>
+
+<pre><code>static byte[] createPacket(int id, int type, String command) {
+  ByteBuffer packet = ByteBuffer.allocate(command.length() + 16);
+  packet.order(ByteOrder.LITTLE_ENDIAN);
+  packet.putInt(command.length() + 12).putInt(id).putInt(type).put(command.getBytes()).putInt(0);
+  return packet.array();}
+</code></pre>
+
+<p>One symptom is the fact that you allocate extra 16 bytes, but increase the length only by 12.</p>
+
+<p>From the Steam RCON Protocol page the packet structure is as follows:</p>
+
+<pre><code>Size            32-bit little-endian Signed Integer
+ID              32-bit little-endian Signed Integer
+Type            32-bit little-endian Signed Integer
+Body            Null-terminated ASCII String
+Empty String    Null-terminated ASCII String (0x00)
+</code></pre>
+
+<p>Please note few things, which are missing from your implementation:</p>
+
+<ol>
+<li><p>Your commands are not NULL terminated Strings (Java does not terminate <code>String</code> with <code>null</code>. Steam protocol however requires it. You have to add a single <strong>zero byte</strong> after putting the command into the <code>ByteBuffer</code></p></li>
+<li><p>You are terminating the packet with integer of value zero, rather than a single zero byte.</p></li>
+<li><p>Your size should equal:<br/>
+<strong>3 integers</strong> + <strong>command length</strong> + <strong>1 byte</strong> + <strong>1 byte</strong> == <strong>command length + 14</strong></p></li>
+</ol>
+
+<p>Therefore your packet creation should be:</p>
+
+<pre><code>packet.putInt(command.length() + 14).putInt(id).putInt(type).put(command.getBytes()).put(0).put(0);
+</code></pre>
+
+<p>Hope this helps.</p>

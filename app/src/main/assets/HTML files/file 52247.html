@@ -1,0 +1,66 @@
+<p>Is nothing being inserted into the programs table at all? I think with the current way you are inserting into the programs table you would have rows like this from the first for loop: </p>
+
+<pre><code>channel | title  | start_date | stop_date | button_id | description
+###########################################################################
+chanel1 | title1 | start1     | stop1     | blank     | blank
+</code></pre>
+
+<p>And from your second loop you would have rows like this:</p>
+
+<pre><code>channel | title | start_date | stop_date | button_id | description
+###########################################################################
+blank   | blank | blank      | blank     | id1       | blank
+</code></pre>
+
+<p>I think you may need to insert the button_id and channel info etc. in the same SQL statement like this:</p>
+
+<pre><code>cur.execute("INSERT INTO programs(channel, title, start_date, stop_date, button_id)" + 
+    " VALUES(?, ?, ?, ?)", [channel_name, title, start_time, stop_time, button_id])
+</code></pre>
+
+<p>Or you could update the fields with an update statement like this in your second loop:</p>
+
+<pre><code>cur.execute("UPDATE programs SET button_id = ? WHERE title=?",
+    (button_id, title,) )
+</code></pre>
+
+<p>Where the title (or other field) is your primary key for the table, or insert the button_id first and complete this update statement: </p>
+
+<pre><code>cur.execute("UPDATE programs SET channel=?, title=?, start_date=?, end_date = ? WHERE button_id = ?",
+    (channel, title, start_date, end_date, button_id,) )
+</code></pre>
+
+<p>An example to expand on your comment:</p>
+
+<pre><code>channel_name = 'PBS'
+title = 'planet earth'
+start_date = '2015-01-01'
+end_date = '2016-01-01'
+
+cur.execute("INSERT INTO programs(channel, title, start_date, stop_date)" + 
+    " VALUES(?, ?, ?, ?)", [channel_name, title, start_time, stop_time] )
+
+#yields:    
+#channel | title        | start_date  | stop_date  | button_id | description
+###########################################################################
+#PBS     | planet earth | '2015-01-01'|'2016-01-01'| blank     | blank
+
+button_id = '1'
+title = 'planet earth'
+
+cur.execute("UPDATE programs SET button_id = ? WHERE title=?",
+    (button_id, title,) )
+
+#yields:    
+#channel | title        | start_date  | stop_date  | button_id | description
+###########################################################################
+#PBS     | planet earth | '2015-01-01'|'2016-01-01'| '1'       | blank
+</code></pre>
+
+<p>I think the problem right now is you aren't using button_ids that are linked to your programs yet. Maybe using program.getChannel, etc. would work so that you can insert button_id at the same time. Otherwise from the code posted I am not sure how to 'link' your program to the button id. Does the elem in program_button have a get channel or get title attribute? If so the above could change to: </p>
+
+<pre><code>cur.execute("UPDATE programs SET button_id = ? WHERE title=?",
+    (button_id, elem.getTitle(),) )
+</code></pre>
+
+<p>Or something along those lines.</p>

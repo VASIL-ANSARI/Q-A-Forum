@@ -1,0 +1,51 @@
+<p>The part before an <code>await</code> in an <code>async</code> method is executed synchronously. That's the case for all <code>async</code> methods.</p>
+
+<p>Let's assume that instead of <code>await DoDBWorkAsync()</code> we have <code>await Task.Delay(1000)</code>.</p>
+
+<p>That means <code>MethodOneAsync</code> starts running, executes <code>DoSomeWork</code> and calls <code>MethodTwoAsync</code> which in turn executes <code>DoSomeWork</code> which calls <code>MethodThreeAsync</code> which again executes <code>DoSomeWork</code>.</p>
+
+<p>Then it calls <code>Task.Delay(1000)</code>, gets back an uncompleted <code>Task</code> and awaits it.</p>
+
+<p>That await is logically equivalent to adding a continuation and returning the task back to the caller, which is <code>MethodTwoAsync</code> which does the same and return a <code>Task</code> to the caller and so forth and so forth.</p>
+
+<p>That way when the root delay <code>Task</code> completes all the continuations can run one after the other.</p>
+
+<hr>
+
+<p>If we make your example a bit more complicated:</p>
+
+<pre><code>public static async Task MethodOneAsync()
+{
+    DoSomeWorkOne();
+    await MethodTwoAsync();
+    DoMoreWorkOne();
+}
+
+public static async Task MethodTwoAsync()
+{
+    DoSomeWorkTwo();
+    await MethodThreeAsync();
+    DoMoreWorkTwo();
+}
+
+public static async Task MethodThreeAsync()
+{
+    DoSomeWorkThree();
+    await Task.Delay(1000);
+    DoMoreWorkThree();
+}
+</code></pre>
+
+<p>It would be logically similar to doing this with continuations:</p>
+
+<pre><code>public static Task MethodOneAsync()
+{
+    DoSomeWorkOne();
+    DoSomeWorkTwo();
+    DoSomeWorkThree();
+    return Task.Delay(1000).
+        ContinueWith(_ =&gt; DoMoreWorkThree()).
+        ContinueWith(_ =&gt; DoMoreWorkTwo()).
+        ContinueWith(_ =&gt; DoMoreWorkOne());
+}
+</code></pre>

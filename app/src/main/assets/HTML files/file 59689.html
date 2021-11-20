@@ -1,0 +1,40 @@
+<p>I've never used the <code>AsyncTestCompleter</code>, and I've never seen it used anywhere, except in the Angular source tests. I don't know if it's something that's just meant to be used internally or not, but when I tested I got a different error, saying there is no provider for <code>AsyncTestCompleter</code>.</p>
+
+<p>For your test though, you don't need to use it. There are other ways to handle async tests. One options is to just use <code>async</code></p>
+
+<pre><code>import { async } from '@angular/core/testing'
+
+it('...', async(inject([Http], (http) =&gt; {
+   http.request('data.json').subscribe((res) =&gt; {
+    expect(res.text()).toBe('awesome');
+  });
+})));
+</code></pre>
+
+<p>Here, we don't need to call <code>done</code> anywhere. The test gets wrapped in Zone, and the Zone is aware of all asynchronous tasks, and waits for them to complete before ending the test.</p>
+
+<p>Anther option is <code>fakeAsync</code> where we can force the to wait the ending of tasks <em>synchronously</em> by calling <code>tick</code></p>
+
+<pre><code>import { fakeAsync, tick } from '@angular/core';
+
+it('...', fakeAsync(inject([Http], (http) =&gt; {
+  let data;
+  http.request('data.json').subscribe((res) =&gt; {
+    data = res.text();
+  });
+  tick();
+  expect(res.text()).toBe('awesome');
+})));
+</code></pre>
+
+<p>The other option is to just use the native Jasmine <code>done</code>. I am not sure how to get it to work with <code>inject</code> though, so you can just get the <code>Http</code> just like you are currently doing from the test bed.</p>
+
+<pre><code>it('...', fakeAsync((done) =&gt; {
+  http.request('data.json').subscribe((res) =&gt; {
+    expect(res.text()).toBe('awesome');
+    done();
+  });
+}));
+</code></pre>
+
+<p>This is all explained in the docs you linked to, in the section <a href="https://angular.io/docs/ts/latest/guide/testing.html#!#component-with-async-service" rel="nofollow">Test a component with an async service</a></p>

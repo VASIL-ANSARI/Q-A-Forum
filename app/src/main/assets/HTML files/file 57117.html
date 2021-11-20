@@ -1,0 +1,104 @@
+<p>TL;DR - You can't do that, your initial version of <code>bitSet</code> is how you need to define it. You'll need to save its return value when you use it, e.g., <code>x = x.bitSet(2)</code>. You can create your own mutable number object, though, if you like. (More on that below.)</p>
+
+<p>Just for clarity (you probably know this): JavaScript has both number <em>primitives</em> and <code>Number</code> <em>objects</em>. Normally, you're dealing with primitives. The reason <code>Number.prototype</code> works is that a temporary object is created using the primitive's value when a method is called on it. Unless something explicitly saves the object, though, it's as though we were just dealing with primitives.</p>
+
+<p>Numbers are not mutable in JavaScript.<sup>1</sup> So your <code>bitSet</code> method cannot change the numeric value of what it's called on; instead, it has to return a new number with the changes made (e.g., your original version).</p>
+
+<p>Note that even if you could change a <code>Number</code> object's value, you're almost never dealing with a number object in code outside functions you've assigned to <code>Number.prototype</code>. For instance:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>Number.prototype.bitSet = function(bit) {
+    return this | (1&lt;&lt;bit);
+};
+var x = 32;
+x = x.bitSet(2);
+console.log(x); // 36
+console.log(typeof x); // "number", not "object"
+var o = new Number(36);
+console.log(typeof o); // "object"</code></pre>
+</div>
+</div>
+</p>
+
+<p>In the above, when <code>x = x.bitSet(2);</code> is executed, the number <em>primitive</em> is converted to a temporary <code>Number</code> object, your <code>bitSet</code> method is called, and then the result is whatever your <code>bitSet</code> method returns; unless <code>bitSet</code> does something to store <code>this</code> somewhere, the temporary object is then thrown away. (That's the <em>theory</em>; in fact, your JavaScript engine may well optimize away the object entirely, if it can determine that the code in your function only uses the number as though it were a primitive number.)</p>
+
+<p>So suppose in my code above, we did something to change the state of the <code>Number</code> object in that <code>x.bitSet(2)</code> line. Since that object is <em>temporary</em> and not stored anywhere (unless we store it; it's not in <code>x</code>, <code>x</code> contains a primitive number), whatever we stored on the object would be lost. We can even prove that:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>Number.prototype.test = function() {
+  this.foo = Math.random();
+  console.log("this.foo", this.foo); // some number
+};
+var x = 42;
+x.test();
+console.log(typeof x);       // "number", not "object"
+console.log("x.foo", x.foo); // undefined</code></pre>
+</div>
+</div>
+</p>
+
+<p><code>this</code> was definitely an object, we added a property to it and used that property. But <code>x</code> still had the primitive.</p>
+
+<p>You could have your <em>own</em> mutable number type, though:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function MyNumber(value) {
+    this.value = typeof value === "number" ? value : 0;
+}
+MyNumber.prototype.bitSet = function(bit) {
+    this.value = this.value | (1 &lt;&lt; bit);
+};
+MyNumber.prototype.valueOf = function() {
+    return this.value;
+};
+MyNumber.prototype.toString = function() {
+    return this.value.toString();
+};
+
+// Usage:
+var m = new MyNumber(42);
+m.bitSet(2);
+console.log(String(m)); // "46"
+var n = m + 5;
+console.log(n);         // 51</code></pre>
+</div>
+</div>
+</p>
+
+<p>The <code>valueOf</code> function is called any time the JavaScript engine needs to convert your number object to a number. <code>toString</code> is called when the JavaScript engine needs to convert your number object to a string.</p>
+
+<p>Or in ES2015:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>class MyNumber {
+    constructor(value) {
+      this.value = typeof value === "number" ? value : 0;
+    }
+    bitSet(bit) {
+      this.value = this.value | (1 &lt;&lt; bit);
+    }
+    valueOf() {
+      return this.value;
+    }
+    toString() {
+      return this.value.toString();
+    }
+}
+
+// Usage:
+var m = new MyNumber(42);
+m.bitSet(2);
+console.log(String(m)); // "46"
+var n = m + 5;
+console.log(n); // 51</code></pre>
+</div>
+</div>
+</p>
+
+<hr>
+
+<p><sup>1</sup> <em>"Numbers are not mutable in JavaScript"</em> Technically, that's not true. <em>Primitive</em> numbers are not mutable, but <code>Number</code> objects are&nbsp;&mdash; but their underlying numeric value (what the spec calls its <code>[[NumberData]]</code>) cannot be changed. (<code>Number</code> objects can have other properties with state that can be changed, just not their numeric value.) So "Numbers are not mutable in JavaScript" is a reasonable shorthand statement, if not perfectly correct.</p>

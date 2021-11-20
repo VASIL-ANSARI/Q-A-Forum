@@ -1,0 +1,182 @@
+<p>I ended up doing what @Mark suggested in the comments, I calculate the point that is the height of the curve away along the normal midway between the two points, then calculate the unit vectors from the start point to  the mid point and again from the midpoint to the end. I can then use those to get all the required points.</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="false" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var arrowRadius = 6,
+  arrowPointRadius = arrowRadius * 2,
+  arrowPointHeight = arrowRadius * 3,
+  baseHeight = 30;
+
+// Arrow function
+function CurvedArrow(context, index) {
+  this._context = context;
+  this._index = index;
+}
+CurvedArrow.prototype = {
+  areaStart: function() {
+    this._line = 0;
+  },
+  areaEnd: function() {
+    this._line = NaN;
+  },
+  lineStart: function() {
+    this._point = 0;
+  },
+  lineEnd: function() {
+    if (this._line || (this._line !== 0 &amp;&amp; this._point === 1)) {
+      this._context.closePath();
+    }
+    this._line = 1 - this._line;
+  },
+  point: function(x, y) {
+    x = +x, y = +y; // jshint ignore:line
+    switch (this._point) {
+      case 0:
+        this._point = 1;
+        this._p1x = x;
+        this._p1y = y;
+        break;
+      case 1:
+        this._point = 2; // jshint ignore:line
+      default:
+        var p1x = this._p1x,
+          p1y = this._p1y,
+          p2x = x,
+          p2y = y,
+
+          //Curve figures
+
+          //             mp1
+          //              |
+          //              | height
+          //              |
+          // p1 ----------------------- p2
+          //
+          alpha = Math.floor((this._index - 1) / 2),
+          direction = p1y &lt; p2y ? -1 : 1,
+          height = (baseHeight + alpha * 3 * arrowPointRadius) * direction,
+          c1mx = (p2x + p1x) / 2,
+          c1my = (p2y + p1y) / 2,
+          m1b = (c1mx - p1x) / (p1y - c1my),
+          den1 = Math.sqrt(1 + Math.pow(m1b, 2)),
+          // Perpendicular point from the midpoint.
+          mp1x = c1mx + height * (1 / den1),
+          mp1y = c1my + height * (m1b / den1),
+
+          // Arrow figures
+          dx = p2x - mp1x,
+          dy = p2y - mp1y,
+          dr = Math.sqrt(dx * dx + dy * dy),
+          // Normal unit vectors
+          nx = dy / dr,
+          wy = nx,
+          wx = dx / dr,
+          ny = -wx,
+          ahx = wx * arrowPointHeight,
+          ahy = wy * arrowPointHeight,
+          awx = nx * arrowPointRadius,
+          awy = ny * arrowPointRadius,
+          phx = nx * arrowRadius,
+          phy = ny * arrowRadius,
+
+          // Start arrow offset.
+          sdx = mp1x - p1x,
+          sdy = mp1y - p1y,
+          spr = Math.sqrt(sdy * sdy + sdx * sdx),
+          snx = sdy / spr,
+          sny = -sdx / spr,
+          sphx = snx * arrowRadius,
+          sphy = sny * arrowRadius,
+
+          //             r5
+          //r7         r6|\
+          // ------------  \
+          // ____________  /r4
+          //r1         r2|/
+          //             r3
+
+          r1x = p1x - sphx,
+          r1y = p1y - sphy,
+          r2x = p2x - phx - ahx,
+          r2y = p2y - phy - ahy,
+          r3x = p2x - awx - ahx,
+          r3y = p2y - awy - ahy,
+          r4x = p2x,
+          r4y = p2y,
+          r5x = p2x + awx - ahx,
+          r5y = p2y + awy - ahy,
+          r6x = p2x + phx - ahx,
+          r6y = p2y + phy - ahy,
+          r7x = p1x + sphx,
+          r7y = p1y + sphy,
+          mpc1x = mp1x - phx,
+          mpc1y = mp1y - phy,
+          mpc2x = mp1x + phx,
+          mpc2y = mp1y + phy;
+
+        this._context.moveTo(r1x, r1y);
+        this._context.quadraticCurveTo(mpc1x, mpc1y, r2x, r2y);
+        this._context.lineTo(r3x, r3y);
+        this._context.lineTo(r4x, r4y);
+        this._context.lineTo(r5x, r5y);
+        this._context.lineTo(r6x, r6y);
+        this._context.quadraticCurveTo(mpc2x, mpc2y, r7x, r7y);
+        this._context.closePath();
+
+        break;
+    }
+  }
+};
+
+var w = 600,
+  h = 220;
+var t0 = Date.now();
+
+var points = [{
+  R: 100,
+  r: 3,
+  speed: 2,
+  phi0: 190
+}];
+var path = d3.line()
+  .curve(function(ctx) {
+    return new CurvedArrow(ctx, 1);
+  });
+
+var svg = d3.select("svg");
+var container = svg.append("g")
+  .attr("transform", "translate(" + w / 2 + "," + h / 2 + ")")
+
+container.selectAll("g.planet").data(points).enter().append("g")
+  .attr("class", "planet").each(function(d, i) {
+    d3.select(this).append("circle").attr("r", d.r).attr("cx", d.R)
+      .attr("cy", 0).attr("class", "planet");
+  });
+container.append("path");
+var planet = d3.select('.planet circle');
+
+d3.timer(function() {
+  var delta = (Date.now() - t0);
+  planet.attr("transform", function(d) {
+    return "rotate(" + d.phi0 + delta * d.speed / 50 + ")";
+  });
+
+  var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  g.setAttributeNS(null, "transform", planet.attr('transform'));
+  var matrix = g.transform.baseVal.consolidate().matrix;
+  svg.selectAll("path").attr('d', function(d) {
+    return path([
+      [0, 0],
+      [matrix.a * 100, matrix.b * 100]
+    ])
+  });
+});</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>path {
+  stroke: #11a;
+  fill: #eee;
+}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://d3js.org/d3.v4.min.js"&gt;&lt;/script&gt;
+&lt;svg width="600" height="220"&gt;&lt;/svg&gt;</code></pre>
+</div>
+</div>
+</p>

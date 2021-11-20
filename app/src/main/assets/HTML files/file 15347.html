@@ -1,0 +1,24 @@
+<p>You could look through the source for <code>FileInputFormat.getSplits()</code> - this pulls back the configuration property for <code>mapred.input.dir</code> and then resolves this CSV to an array of Paths.</p>
+
+<p>These paths can still represent folders and regex's so the next thing getSplits() does is to pass the array to a protected method <code>org.apache.hadoop.mapreduce.lib.input.FileInputFormat.listStatus(JobContext)</code>. This actually goes through the dirs / regex's listed and lists the directory / regex matching files (also invoking a <code>PathFilter</code> if configured).</p>
+
+<p>So with this method being protected, you could create a simple 'dummy' extension of FileInputFormat that has a listStatus method, accepting the Mapper.Context as it's argument, and in turn wrap a call to the FileInputFormat.listStatus method:</p>
+
+<pre><code>public class DummyFileInputFormat extends FileInputFormat {
+    public List&lt;FileStatus&gt; listStatus(Context mapContext) throws IOException {
+        return super.listStatus(mapContext);
+    }
+
+    @Override
+    public RecordReader createRecordReader(InputSplit split,
+            TaskAttemptContext context) throws IOException,
+            InterruptedException {
+        // dummy input format, so this will never be called
+        return null;
+    }
+}
+</code></pre>
+
+<p><strong>EDIT</strong>: In fact it looks like <code>FileInputFormat</code> already does this for you, configuring a job property <code>mapreduce.input.num.files</code> at the end of the getSplits() method (at least in 1.0.2, probably introduced in 0.20.203)</p>
+
+<p><a href="https://issues.apache.org/jira/browse/MAPREDUCE-1466" rel="nofollow">Here's the JIRA ticket</a></p>

@@ -1,0 +1,33 @@
+<p>Well, for a start, you're creating your <code>Sample</code> object but not setting it as the <code>DataContext</code> for your view. Either modify the existing <code>ViewModel</code>/<code>DataContext</code> or replace it with the new <code>Sample</code> object you've created.</p>
+
+<pre><code>private void UpdateViewAndViewModel()
+{
+    Sample bfmobj = new BFM(View.CadViewer.radius2, View.CadViewer.model.Blocks,
+                    View.CadViewer.Step, View.CadViewer.StepType, View.CadViewer.StepPosition);
+
+    this.DataContext = bfmobj;
+}
+</code></pre>
+
+<p>However, I think you may also run into issues to do with threading, but I'm not very familiar with Silverlight.</p>
+
+<p>In standard WPF, the framework is waiting for your function to complete before it can update the UI, as your function is running on the UI thread. And since your function effectively doesn't change the value of that bool (it does, but because nothing else can execute before it's finished, the value remains unchanged), the UI stays the same.</p>
+
+<p>You need to run your code that "does the work" on a separate thread, the easiest way to do this is to use a task:</p>
+
+<pre><code>public void GetBFMPart()
+{
+    IsBusy = true;
+
+    var task = Task.Factory.StartNew(delegate
+    {
+        // do your work here then set IsBusy = false
+        for (int i = 0; i &lt; 5; i++)
+        {
+            System.Threading.Thread.Sleep(1000);
+        }
+
+        IsBusy = false;
+    });
+}
+</code></pre>

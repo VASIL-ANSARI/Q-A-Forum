@@ -1,0 +1,23 @@
+<p>I would suggest that you put an autoincrementing id in the table.  When using timestamps, things can be off by a fraction of a second, which can cause problems.</p>
+
+<p>The following will give you a moving average around each point:</p>
+
+<pre><code>select (value + coalesce(tprev.value, 0.0) + coalesce(tnext.value, 0.0)) /
+       ((case when value is not null then 1.0 else 0.0 end) +
+        (case when tprev.value is not null then 1.0 else 0.0 end) +
+        (case when tnext.value is not null then 1.0 else 0.0 end)
+       ) as moving_avg
+from (select t.*,
+             (select max(t2.dt) from t t2 where t2.dt &lt; t.dt) as dt_prev,
+             (select min(t2.dt) from t t2 where t2.dt &gt; t.dt) as dt_next
+      from t
+     ) t left outer join
+     t tprev
+     on t.dt_prev = tprev.dt_prev left outer join
+     t tnext
+     on t.dt_next = tnext.dt_next
+</code></pre>
+
+<p>It assumes that there are no "holes" in the data.  You can fix this by putting in constraints in the subquerys for dt_prev and dt_next . . . for instance, only considering time values that are within 20 minutes of the given value.</p>
+
+<p>This also assumes that <code>value</code> is not null.</p>

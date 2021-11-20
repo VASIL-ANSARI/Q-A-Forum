@@ -1,0 +1,45 @@
+<blockquote>
+  <p>But it does not explain why the s_properties field would need to be static,  </p>
+</blockquote>
+
+<p>The reason <code>s_properties</code> is static is because <strike>you</strike> the developer only wanted one set - a singleton instance - of configuration properties for an application. [<em>And this may be considered typical</em>.] The ConfigurationXXX (ConfigurationManager, for example) classes are static because you should only require one per AppDomain.  </p>
+
+<p>Basically, in the sample:</p>
+
+<pre><code>private static ConfigurationPropertyCollection s_properties;
+static ExampleSection()
+{
+        // Predefine properties here
+        // Add the properties to s_properties
+}
+
+/// Override the Properties collection and return our custom one.
+protected override ConfigurationPropertyCollection Properties
+{
+    get { return s_properties; }
+}
+</code></pre>
+
+<p>the author is assuming you should only have a single instance of <code>s_properties</code>.</p>
+
+<blockquote>
+  <p>So, is there some "hidden" access directly to the static field?  </p>
+</blockquote>
+
+<p>Not sure I follow this question.</p>
+
+<blockquote>
+  <p>Is the Configuration*** object continually created and re-created, such that object-level fields would be lost, and as such is inefficient?  </p>
+</blockquote>
+
+<p>[Edit: <em>Depends ... I was considering the ConfigurationManager. But, say I wanted to have a local copy of my AppSettingsCollection. I would make that a static readonly field declaration. In the context of Sections, etc. Then I would still use a static field inializer, albeit a <code>static Dictionary&lt;string, ConfigurationPropertyCollection&gt; Properties</code>. In the end, I still believe that you would only ever want a single instance of your property settings collection.</em>]  </p>
+
+<p>[Original with other [<em>edits</em>] ]<br>
+No. [<em>Static</em>] ConfigurationXXX objects are not continually created, disposed, and re-created. Like all static objects, a public static initializer/constructor is executed a single time - the first time that object is called. For instance, when I call the following:  </p>
+
+<pre><code>string someValue = ConfigurationManager.AppSettings["SomeKey"];  
+</code></pre>
+
+<p>The static <code>ConfigurationManager</code> class constructor is executed. Since this class is static, it will live for the lifetime of the current AppDomain in which it is executed.  </p>
+
+<p>I would not recommend initializing app domain properties, configuration properties, or property collections as <strike>or within</strike> an instance class. When your program begins execution, you should rely on a static Configuration class in which you wrap and customize interaction with ConfigurationXXX classes, members, and functions.</p>

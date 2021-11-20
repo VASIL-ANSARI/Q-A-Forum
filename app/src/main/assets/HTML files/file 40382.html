@@ -1,0 +1,108 @@
+<p>This sounds like a case of overengineering.  Do you really need this much flexibility at runtime, or do you simply have a lot of commands and you want an easy way to refer to them in a file?</p>
+
+<p>If it's the latter, your text file doesn't need to contain the code;  it just needs to contain symbolic identifiers corresponding to that code.  Those identifiers should exist in your code as enum constants:</p>
+
+<pre><code>public enum Command { FOO, BAR }
+</code></pre>
+
+<p>You should create all of your actions in code, and place those actions in a Map using the enum constants as keys.  Your file can then refer to the actions by those enum constants:</p>
+
+<pre><code>public List&lt;Action&gt; parseActions(Path file)
+throws IOException {
+    List&lt;Action&gt; actions = new ArrayList&lt;&gt;();
+
+    try (BufferedReader reader =
+            Files.newBufferedReader(file, Charset.defaultCharset())) {
+
+        String line;
+        while ((line = reader.readLine()) != null) {
+            Command command = Command.valueOf(line);
+            Action action = getAction(command);
+            actions.add(action);
+        }
+    }
+
+    return actions;
+}
+
+private Map&lt;Command, Action&gt; allActions;
+
+private Action getAction(Command command) {
+    Objects.requireNonNull(command, "Command cannot be null");
+
+    if (allActions == null) {
+        allActions = new EnumMap&lt;&gt;(Command.class);
+        allActions.put(Command.FOO, new AbstractAction() {
+            public void actionPerformed(ActionEvent event) {
+                System.out.println("Hello world!");
+            }
+        };
+        allActions.put(Command.BAR, new AbstractAction() {
+            public void actionPerformed(ActionEvent event) {
+                network.sendOverAFile(new File("test.txt"));
+            }
+        };
+
+        // Safety check
+        if (!allActions.keySet().containsAll(
+                EnumSet.allOf(Command.class))) {
+            throw new RuntimeException(
+                "Not every Command constant has an associated Action");
+        }
+    }
+
+    return allActions.get(command);
+}
+</code></pre>
+
+<p>To conform to the above, your text file would simply contain:</p>
+
+<pre>
+FOO
+BAR
+</pre>
+
+<p>If you really and truly need fully dynamic code that can be read from a text file, bear in mind that it is a tremendous security hole.  In fact, it is the very definition of code injection:  anyone can place arbitrary code (including things like <code>Runtime.getRuntime().exec("rd /s/q C:\\Windows\\System32")</code> or <code>Runtime.getRuntime().exec("rm -rf ~")</code>) in a file and your program will gladly run it.</p>
+
+<p>If you're still sure that you want to do it, you'd probably want to use the JavaScript engine that comes with every Java runtime:</p>
+
+<pre><code>public List&lt;Action&gt; parseActions(Path file)
+throws IOException {
+    List&lt;Action&gt; actions = new ArrayList&lt;&gt;();
+
+    final ScriptEngine engine =
+        new ScriptEngineManager().getEngineByName("JavaScript");
+
+    Bindings bindings = engine.getBindings(ScriptContext.ENGINE_SCOPE);
+    bindings.put("network", myNetwork);
+
+    try (BufferedReader reader =
+            Files.newBufferedReader(file, Charset.defaultCharset())) {
+
+        String line;
+        while ((line = reader.readLine()) != null) {
+            String[] nameAndCode = line.split("\\s+", 2);
+            String name = nameAndCode[0];
+            final String code = nameAndCode[1];
+
+            Action action = new AbstractAction() {
+                public void actionPerformed(ActionEvent event) {
+                    engine.eval(code);
+                }
+            };
+            actions.add(action);
+        }
+    }
+
+    return actions;
+}
+</code></pre>
+
+<p>Each line in your file would contain a command name followed by JavaScript code.  So it might look like this:</p>
+
+<pre>
+Foo importClass(java.lang.System); System.out.println('Hello world!');
+Bar importClass(java.io.File); network.sendOverAFile(new File('test.txt'));
+</pre>
+
+<p>Another major disadvantage of doing this, in my opinion, is that the code won't benefit from compiler checks, and you certainly can't set breakpoints in that code from a debugger.  All in all, it will be a considerable headache to debug and maintain.</p>

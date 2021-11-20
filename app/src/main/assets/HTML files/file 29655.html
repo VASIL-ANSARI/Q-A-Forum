@@ -1,0 +1,34 @@
+<blockquote>
+  <p>But it doesn't catch the interrupt if it was interrupted just before calling that method.</p>
+</blockquote>
+
+<p>So if I'm understanding, your question, then something is swallowing an <code>InterruptedException</code> or clearing the interrupt flag.   The following code always throws <code>InterruptedException</code> for me.</p>
+
+<pre><code>Thread.currentThread().interrupt();
+new LinkedBlockingQueue&lt;String&gt;().take();
+</code></pre>
+
+<p>It is important to realize that when the <code>InterruptException</code> is thrown, the interrupt flag is cleared.  You should always do something like:</p>
+
+<pre><code>try {
+    // other methods where this is needed are Object.wait(...), Thread.join(...)
+    Thread.sleep(100);
+} catch (InterruptedException ie) {
+    // re-interrupt the thread
+    Thread.currentThread().interrupt();
+    // deal with the interrupt by returning or something
+    ...
+}
+</code></pre>
+
+<p>See: <a href="http://stackoverflow.com/questions/4906799/why-invoke-thread-currentthread-interrupt-when-catch-any-interruptexception">Why invoke Thread.currentThread.interrupt() when catch any InterruptException?</a></p>
+
+<p>What often happens is that 3rd party code does not propagate the interrupt status because of bad code.  Then you are often SOL since the interrupt will have been swallowed and the <code>take()</code> method will not throw.</p>
+
+<p>Also, it is important to realize that <code>Thread.interrupted()</code> <em>clears</em> the interrupt flag.  Typically you want to use <code>Thread.currentThread().isInterrupted()</code> to test for the status of the interrupt flag.</p>
+
+<blockquote>
+  <p>Is there an alternative BlockingQueue implementation addresses this issue?</p>
+</blockquote>
+
+<p>I'm not sure there is an issue.</p>

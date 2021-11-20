@@ -1,0 +1,21 @@
+<p>I think I may have solved it with single-object prelink (basically this means it does an <code>ld -r</code> to build a giant object file, then passes that to <code>libtool</code>), although I'm still not sure, and I don't love the solution. So, I will post what I've got as an answer, but hope someone else comes along with a better answer.</p>
+
+<p>To get single-object prelink to work, you need to (in <code>LibB</code>):</p>
+
+<ul>
+<li>Add <code>libLibA.a</code> as a Framework.</li>
+<li>Make sure it does <em>not</em> appear in the Link Binary With Libraries build phase.</li>
+<li>Set "Dead Code Stripping" to No.</li>
+<li>Set "Don't Dead-Strip Inits and Terms" to Yes.</li>
+<li>Set `Perform Single-Object Prelink" to Yes.</li>
+<li>Set "Prelink libraries" to <code>${PROJECT_DIR}/libLibA.a</code></li>
+<li>Set "Preserve Private External Symbols" to Yes.</li>
+</ul>
+
+<p>(The second step is what I was doing wrong earlierâ¦)</p>
+
+<p>Unfortunately, this seems to break the dependency rules completely, so that every build recompiles every .m (and .pch) that's part of the target, even if nothing has changed.</p>
+
+<p>Other than that annoyance, this seems to work for both <code>AppC</code> and my real project just fine. </p>
+
+<p><code>AppC</code> does not need "Preserve Private External Symbols"; my real project does. I believe this is because one of the third-party libraries does an <code>ld -r</code> with an empty <code>-exported_symbols_list</code> explicitly to "transform all symbols to <code>private_extern</code>. Otherwise, class objects don't end up that way. However, I'm not 100% sure I understand this one.</p>

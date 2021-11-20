@@ -1,0 +1,39 @@
+<p>There are 2 Problems in your code.</p>
+
+<ol>
+<li><p>At the current state you <code>close()</code> the <code>InputStream</code> from which all <code>Thread</code> try to read directly after you started them (-> while they are running). To solve this Problem you can call the <code>join()</code> Method of the <code>Thread</code> class. In your case your'd have to call it for all 4 <code>Threads</code> to make sure they are finished.</p></li>
+<li><p>If I understand it correctly you want to seperate the download <code>File</code> into 4 parts downloading at the same time.</p></li>
+</ol>
+
+<p>To do this you need 4 independent <code>InputStreams</code>. (Currently you are using ONE [See also: <a href="http://stackoverflow.com/questions/869033/how-do-i-copy-an-object-in-java">Java Object Copying</a>])</p>
+
+<p>So to change this your code would look something like this:</p>
+
+<pre><code>public class Downloader implements Runnable{
+    private byte[][] fileData;
+    private int index;
+    private int size;
+    private URL url;
+
+    public Downloader(URL url, byte[][] fileData, int index, int size) {
+    this.fileData = fileData;
+    this.index = index;
+    this.size = size;
+    this.url = url;
+    }
+
+    public synchronized void run() {
+    try{
+        URLConnection connection = url.openConnection();
+        DataInputStream inputStream = new DataInputStream(connection.getInputStream());
+        inputStream.skipBytes(index * size);
+        for(int i= 0;i&lt;size;i++){
+        fileData[index][i] = inputStream.readByte();
+        System.out.println("It works : " + index);
+        }
+     }catch(Exception e){
+        System.out.println(e.getMessage());
+     }
+     }
+ }
+</code></pre>

@@ -1,0 +1,62 @@
+<p>Rather than use <code>INFORMATION_SCHEMA</code> I prefer using <code>sys.tables</code> and <code>sys.columns</code>, they <code>JOIN</code> on <code>object_id</code>:</p>
+
+<pre><code>SELECT *
+FROM sys.columns c
+JOIN sys.tables t
+ ON c.object_id = t.object_id
+</code></pre>
+
+<p>Info on views is contained in <code>sys.views</code>.</p>
+
+<p>Something like:</p>
+
+<pre><code>;WITH db1 AS (    SELECT c.*,t.name Table_Name
+                  FROM sys.columns c
+                  JOIN sys.tables t
+                    ON c.object_id = t.OBJECT_ID
+             )
+     ,db2 AS (    SELECT c.*,t.name Table_Name
+                  FROM db2.sys.columns c
+                  JOIN db2.sys.tables t
+                    ON c.object_id = t.OBJECT_ID
+             )           
+SELECT CASE WHEN db1.Table_Name IS NULL AND db1.name IS NULL
+              THEN db2.Table_Name + '.' + db2.name
+            ELSE db1.Table_Name + '.' + db1.name
+       END AS object_name
+FROM  db1 
+FULL JOIN  db2                           
+  ON db1.Table_Name = db2.Table_Name
+   AND db1.name = db2.name
+WHERE db1.max_length     &lt;&gt;  db2.max_length
+  OR  db1.system_type_id &lt;&gt;  db2.system_type_id
+  OR  db1.is_nullable    &lt;&gt;  db2.is_nullable
+  OR  db1.precision      &lt;&gt;  db2.precision
+  OR  db1.scale          &lt;&gt;  db2.scale
+</code></pre>
+
+<p>Or you could just add a <code>JOIN</code> to <code>sys.tables</code> to your current query to weed out views:</p>
+
+<pre><code>SELECT 
+      CASE
+         WHEN src.TABLE_NAME IS NULL AND src.COLUMN_NAME IS NULL
+         THEN
+            tgt.TABLE_NAME + '.' + tgt.COLUMN_NAME
+         ELSE
+            src.TABLE_NAME + '.' + src.COLUMN_NAME
+      END
+         AS object_name,
+FROM [hq193].INFORMATION_SCHEMA.COLUMNS src
+JOIN [hq193].sys.tables t
+  ON src.table_name = t.name
+      FULL JOIN [GDI-193-DEV].INFORMATION_SCHEMA.COLUMNS tgt
+         ON     src.table_name = tgt.table_name
+            AND src.COLUMN_NAME = tgt.COLUMN_NAME
+WHERE    src.CHARACTER_MAXIMUM_LENGTH != tgt.CHARACTER_MAXIMUM_LENGTH
+      OR src.DATA_TYPE != tgt.DATA_TYPE
+      OR src.IS_NULLABLE != tgt.IS_NULLABLE
+      OR src.NUMERIC_PRECISION != tgt.NUMERIC_PRECISION
+      OR src.NUMERIC_SCALE != tgt.NUMERIC_SCALE
+</code></pre>
+
+<p>Might need to switch which db the sys.tables <code>JOIN</code> is on.</p>

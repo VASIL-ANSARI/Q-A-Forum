@@ -1,0 +1,52 @@
+<p>A semi-manual way to do this is to go to each spam user's profile, select <code>Administer User</code> and then at the bottom of the <code>Overview</code> (the default) page, select <code>Delete Posts</code>. This will delete that specific user and all of their associated topics. This is the recommended way.</p>
+
+<p>Another option is to reduce the criteria on your prune user page. Set smaller date windows, set more specific post criteria, etc.</p>
+
+<p>If the above don't work, this <a href="http://www.gaiausers.com/viewtopic.php?f=8&amp;t=24751" rel="nofollow">topic</a> also points out a couple <strong>very dangerous</strong> queries that may be helpful, but it only removes topics that don't have associated users. This is likely the case if you ran your query and it timed out. A portion of the query ran.</p>
+
+<p>Remember, PHPBB does <strong>NOT</strong> recommend running queries directly. The first two options I provided are their recommended method of removing mass users and posts. These are <strong>dangerous</strong> to run against your database (translation: make a backup first)</p>
+
+<p>Query 1 - Removes search results:</p>
+
+<pre><code>delete from phpbb_search_wordmatch where post_id in
+(SELECT post_id
+    FROM `phpbb_posts`
+    WHERE topic_id
+    IN (
+       SELECT topic_id
+       FROM phpbb_topics
+       WHERE `topic_poster` NOT
+       IN (
+           SELECT user_id
+           FROM phpbb_users
+       )
+    )
+)
+</code></pre>
+
+<p>Query 2 - Removes Topics: </p>
+
+<pre><code>DELETE
+FROM `phpbb_topics`
+WHERE `topic_poster` NOT
+IN (
+    SELECT user_id
+    FROM phpbb_users
+)
+</code></pre>
+
+<p>Query 3 - Removes Posts:</p>
+
+<pre><code>DELETE
+FROM `phpbb_posts`
+WHERE topic_id
+IN (
+    SELECT topic_id
+    FROM phpbb_topics
+    WHERE `topic_poster` NOT
+    IN (
+        SELECT user_id
+        FROM phpbb_users
+    )
+)
+</code></pre>

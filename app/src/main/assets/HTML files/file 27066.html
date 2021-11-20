@@ -1,0 +1,46 @@
+<p>I notice that it appeared in 9.2. In version 9.1, the out field was named <code>procpid</code>:</p>
+
+<pre>
+ parameter_mode |  parameter_name  
+----------------+------------------
+ IN             | pid
+ OUT            | datid
+ OUT            | procpid
+ OUT            | usesysid
+ ...
+</pre>
+
+<p>Looking for the change in postgres git history leads to this commit:</p>
+
+<pre>
+commit 4f42b546fd87a80be30c53a0f2c897acb826ad52
+Author: Magnus Hagander 
+Date:   Thu Jan 19 14:19:20 2012 +0100
+
+    Separate state from query string in pg_stat_activity
+
+    This separates the state (running/idle/idleintransaction etc) into
+    it's own field ("state"), and leaves the query field containing just
+    query text.
+
+    The query text will now mean "current query" when a query is running
+    and "last query" in other states. Accordingly,the field has been
+    renamed from current_query to query.
+
+    Since backwards compatibility was broken anyway to make that, the procpid
+    field has also been renamed to pid - along with the same field in
+    pg_stat_replication for consistency.
+
+    Scott Mead and Magnus Hagander, review work from Greg Smith
+</pre>
+
+<p>Among the lines that changed, here is the one of interest:</p>
+
+<pre>
+-DATA(insert OID = 2022 (  pg_stat_get_activity         PGNSP PGUID 12 1 100 0 0 f f f f t s 1 0 2249 "23" "{23,26,23,26,25,25,16,1184,1184,1184,869,25,23}" "{i,o,o,o,o,o,o,o,o,o,o,o,o}" "{pid,datid,procpid,usesysid,application_name,current_query,waiting,xact_start,query_start,backend_start,client_addr,client_hostname,client_port}" _null_ pg_stat_get_activity _null_ _null_ _null_ ));
++DATA(insert OID = 2022 (  pg_stat_get_activity         PGNSP PGUID 12 1 100 0 0 f f f f t s 1 0 2249 "23" "{23,26,23,26,25,25,25,16,1184,1184,1184,1184,869,25,23}" "{i,o,o,o,o,o,o,o,o,o,o,o,o,o,o}" "{pid,datid,pid,usesysid,application_name,state,query,waiting,xact_start,query_start,backend_start,state_change,client_addr,client_hostname,client_port}" _null_ pg_stat_get_activity _null_ _null_ _null_ ));
+ </pre>
+
+<p>In this pre-digested form, it's plausible that the authors didn't notice the double-use of <code>pid</code>, or else they didn't care since it's harmless in practice.</p>
+
+<p>It is let through because these internal functions are created by <code>initdb</code> in a fast path that skips the create checks of normal user functions.</p>

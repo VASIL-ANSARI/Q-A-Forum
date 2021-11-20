@@ -1,0 +1,32 @@
+<p>To accommodate exactly what you are trying to do, <code>realloc(NULL, size)</code> does the same thing as <code>malloc(size)</code>.  You can write your loop like this:</p>
+
+<pre><code>int *h = 0;
+size_t avail = 0;
+
+for (size_t i = 0; more_data_available(); i++) {
+    if ((i+1) * sizeof(int) &gt; avail) {
+        avail = avail == 0 ? 8*sizeof(int) : avail*2;
+        int *nh = realloc(h, avail);
+        if (!nh) abort();
+        h = nh;
+   }
+   h[i] = next_data_item();
+}
+</code></pre>
+
+<p>But note the convoluted <code>?:</code> expression I had to use to enlarge <code>avail</code>.  That would be cleaner if I start the loop with some space already allocated; and then I can just use <code>malloc</code> normally:</p>
+
+<pre><code>size_t avail = 8 * sizeof(int);
+int *h = malloc(avail);
+if (!h) abort();
+
+for (size_t i = 0; more_data_available(); i++) {
+    if ((i+1) * sizeof(int) &gt; avail) {
+        avail *= 2;
+        int *nh = realloc(h, avail);
+        if (!nh) abort();
+        h = nh;
+    }
+    h[i] = next_data_item();
+}
+</code></pre>

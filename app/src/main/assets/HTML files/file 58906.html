@@ -1,0 +1,13 @@
+<blockquote>
+  <p>Is there another data structure in .NET that allows this, or do I have to implement my own dynamic array?</p>
+</blockquote>
+
+<p>Neither.</p>
+
+<p>There isn't, and <em>can't be</em>, a data structure in .NET that avoids the structure copy, because deep integration with the C# language is needed to get around the "indexed getter makes a copy" issue.  So you're right to think in terms of directly accessing the array.</p>
+
+<p>But you don't have to build your own dynamic array from scratch.  Many <code>List&lt;T&gt;</code>-like operations such as <code>Resize</code> and bulk movement of items are provided for you as static methods on type <code>System.Array</code>.  They come in generic flavors, so no boxing is involved.</p>
+
+<p>The unfortunate thing is that the high-performance <code>Buffer.BlockCopy</code>, which <em>should</em> work on any blittable type, actually contains a hard-coded check for primitive types and refuses to work on any structure.</p>
+
+<p>So just go with <code>T[]</code> (plus <code>int Count</code> -- array length isn't good enough because trying to keep capacity equal to count is very inefficient) and use <code>System.Array</code> static methods when you would otherwise use methods of <code>List&lt;T&gt;</code>.  If you wrap this as a <code>PublicList&lt;T&gt;</code> class, you can get reusability and both the convenience of methods for <code>Add</code>, <code>Insert</code>, <code>Sort</code> as well as direct element access by indexing directly on the array.  Just exercise some restraint and never store the handle to the internal array, because it will become out-of-date the next time the list needs to grow its capacity.  Immediate direct access is perfectly fine though.</p>

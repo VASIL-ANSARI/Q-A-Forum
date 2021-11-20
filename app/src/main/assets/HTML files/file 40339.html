@@ -1,0 +1,54 @@
+<p>You should clean up your property definition as your iVar is getting mixed up with your property.  If you declare a property you don't need to declare an iVar.  You also don't need <code>@synthesize</code> unless you want a specific name for the backing variable.  If you use the <code>self.</code> notation then you can be sure that you are referring to the property and not an iVar.</p>
+
+<p>Your .h file should be -</p>
+
+<pre><code>@import CoreBluetooth;
+
+@interface BlueToothLEManager : NSObject &lt; CBCentralManagerDelegate, CBPeripheralDelegate&gt;
+
+@property (strong, retain) CBCentralManager *mBTCentralManager;
+
+-(void) initializeCBCentralManager;
+
+@end
+</code></pre>
+
+<p>Then your .m file will be</p>
+
+<pre><code>#import "BlueToothLEManager.h"
+#import "Constants.h"
+
+@implementation BlueToothLEManager
+
+
+-(void)initializeCBCentralManager{
+    NSLog(@"initializing CBCentral Manager"); 
+    self.mBTCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+
+}
+
+#pragma mark - CBCentralManagerDelegate
+
+// method called whenever you have successfully connected to the BLE peripheral
+- (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral
+{
+}
+
+// CBCentralManagerDelegate - This is called with the CBPeripheral class as its main input parameter. This contains most of the information there is to know about a BLE peripheral.
+- (void)centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary *)advertisementData RSSI:(NSNumber *)RSSI
+{
+    NSLog(@"Discovered %@ at %@", peripheral.name, RSSI); 
+}
+
+-(void)centralManagerDidUpdateState:(CBCentralManager *)central{
+    NSLog(@"Start scan"); 
+
+    if(central.state == CBCentralManagerStatePoweredOn){
+        NSLog(@"Scanning for BTLE device"); 
+        [central scanForPeripheralsWithServices:@[[CBUUID UUIDWithString:DEVICE_NAME]] options:@{ CBCentralManagerScanOptionAllowDuplicatesKey : @YES }];
+    }
+}
+@end
+</code></pre>
+
+<p>I have tested this and it works</p>

@@ -1,0 +1,56 @@
+<p>As a starting point, based on <a href="http://stackoverflow.com/a/16682549/2363712">a solution by TreviÃ±o</a>, here is a quick and (mostly) dirty way to capture keyboard events and report the timings:</p>
+
+<pre><code>import struct
+
+FORMAT = 'llHHI'
+EVENT_SIZE = struct.calcsize(FORMAT)
+EV_KEY = 0x01
+
+KEY_DOWN = 1
+KEY_AUTO = 2
+KEY_UP = 0
+
+devname = "/dev/input/event0"
+
+def dt(sec_a, usec_a, sec_b, usec_b):
+    return (sec_a+usec_a/1000000.) - (sec_b+usec_b/1000000)
+
+
+with open(devname, "rb") as infile:
+    kdtime = {}
+
+    while True:
+        event = infile.read(EVENT_SIZE)
+        (tv_sec, tv_usec, typ, code, value) = struct.unpack(FORMAT, event)
+        if typ == EV_KEY:
+            if value == KEY_DOWN:
+                kdtime[code] = (tv_sec, tv_usec)
+            if value == KEY_UP and code in kdtime:
+                print(code, dt(tv_sec, tv_usec, *kdtime[code]))
+                del kdtime[code] # Not strictly required
+</code></pre>
+
+<hr>
+
+<p>From <a href="https://www.kernel.org/doc/Documentation/input/input.txt" rel="nofollow">Documentation/input/input.txt</a> events are reported by the kernel as:</p>
+
+<pre><code>struct input_event {
+    struct timeval time;
+    unsigned short type;
+    unsigned short code;
+    unsigned int value;
+};
+</code></pre>
+
+<p>Struct timeval is is its turn defined in <a href="http://www.gnu.org/software/libc/manual/html_node/Elapsed-Time.html#index-struct-timeval" rel="nofollow"><code>bits/time.h</code></a> as:</p>
+
+<pre><code>struct timeval
+  {
+    __time_t tv_sec;            /* Seconds.  */
+    __suseconds_t tv_usec;      /* Microseconds.  */
+  };
+</code></pre>
+
+<p>So the corresponding Python struct format for an event is <code>llHHI</code>. Once you have that, you mostly have to loop to read events with type <code>EV_KEY</code>, then remember key down time, and calculate the key pressed time when you get back the key up code.</p>
+
+<p>Please note that you cannot assume that a key up event match the previous key down event (think about pressing several keys at once). So I keep track of the key code and the corresponding key pressed time in a dictionary. Obviously, you will have to adapt that to your needs. But as I said, this is only a starting point.</p>

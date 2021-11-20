@@ -1,0 +1,84 @@
+<p>There is no buit-in function to do what you want, so I've written a python script to answer your question (the comments explain the code):</p>
+
+<pre><code>import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
+
+
+fig = plt.figure()
+
+width=4.467    # width in inches of my figure
+height=4.344   # height in inches of my figure
+DPI=90         # dots per inch
+
+xmin=0
+xmax=2*np.pi
+xx_step=1.0*(xmax-xmin)/(width*DPI)
+print "xx_step:", xx_step
+xx=np.arange(xmin, xmax+xx_step, xx_step)
+
+ymin=-1
+ymax=1
+yy_step=1.0*(ymax-ymin)/(height*DPI)
+print "yy_step:", yy_step
+yy=np.arange(ymin, ymax+yy_step, yy_step)
+
+x_surf, y_surf = np.meshgrid(xx, yy)                   # generate a mesh
+z_surf = np.zeros(x_surf.shape)+float('+inf')          # to paint with white color the regions that will not contain the function's curve (the default value depends on your colormap)
+
+y_dots=np.sin(xx)
+colors=[i for i in range(len(xx))]                     # colors of each point of the function, in this example they vary linearly
+
+def find(my_list, func):
+    # this find() method is from:
+    # http://stackoverflow.com/questions/5957470/matlab-style-find-function-in-python
+    return [j for (j, value) in enumerate(my_list) if func(value)]
+
+def insert_dot(x, y, color):
+    global z_surf
+    def insert_except_at_contours(x, y, color):
+        try:
+            z_surf[y, x]=color
+        except:
+            pass
+    insert_except_at_contours(x-1, y, color)
+    insert_except_at_contours(x, y-1, color)
+    insert_except_at_contours(x, y, color)
+    insert_except_at_contours(x, y+1, color)
+    insert_except_at_contours(x+1, y, color)
+
+flag=0
+delta_y=0
+for i in range(len(xx)):   # for each pair of values in xx and the corresponding function that is stored in y_dots, find the corresponding indices in the mesh
+    xx_index=i
+    cur_array=abs(y_dots[i]-yy)
+    cmp_test=min(cur_array)
+    yy_index=find(cur_array, lambda x: (x==cmp_test))[0]
+    if not flag:
+        insert_dot(xx_index, yy_index, colors[i])
+        flag=1
+    else:       # this "else" part (and the corresponding flag) paints a straight line between the given dots, to improve the resolution (optional).
+        delta_y=np.sign(last_yy_index-yy_index)
+        if delta_y==0:
+            delta_y=1
+            last_yy_index+=1
+        for j in range(yy_index, last_yy_index, delta_y):
+            insert_dot(xx_index, j, colors[i])
+    last_yy_index=yy_index
+
+print "in pcolor()..."
+obj=plt.pcolor(x_surf, y_surf, z_surf, cmap=cm.hot)     # plot the graph
+print "done!"
+plt.clim(min(colors), max(colors))
+fig.colorbar(obj)
+
+axis=plt.gca()
+axis.set_xlim([min(xx), max(xx)])
+axis.set_ylim([min(yy), max(yy)])
+
+plt.show()
+</code></pre>
+
+<p>result:</p>
+
+<p><img src="http://i.stack.imgur.com/WTjCu.png" alt="http://s14.postimg.org/tt44e4uqp/graph_CM.png"></p>

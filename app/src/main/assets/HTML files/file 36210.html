@@ -1,0 +1,130 @@
+<h1>TL;DR</h1>
+
+<p>The answer for all questions and doubts above is: <em>because it's <code>BIT</code> data type, so it stores <strong>bits</strong></em>. Bits are exactly what any data in any storage is. Thus, you can not just look at them as on their representation. Bits are only content and "shape" of what they are depends of what is the context.</p>
+
+<h1>What <code>BIT</code> actually is?</h1>
+
+<p><strong>Some definitions</strong></p>
+
+<p>Well, as it stated in <a href="http://dev.mysql.com/doc/refman/5.0/en/bit-type.html" rel="nofollow">documentation</a>, it stores values as plain bits. What does that mean? That means: data is stored as bit sequence and there is <strong>no information</strong> about what kind of data is stored. DBMS simply doesn't care about <strong>type of data</strong> - there is no definition of that and "<code>BIT</code>" should not confuse you. "<code>BIT</code>" does not point to any real data type, but instead it claims that data inside is nothing more than sequence of bits.</p>
+
+<p><strong>What "sequence of bits" means</strong></p>
+
+<p>Storing sequence of bits means that real sense of that sequence <em>will depend from context</em>. You can not really say what certain sequence mean without pointing to the context. For instance, integers and strings. What is integer? Well, it's a number which is stored as sequence of bits. What is string? It's .. sequence of bits too. So how to distinct them? That's exactly why do we have <em>data types</em>. Each type is a structure, which determines how to deal with certain value - and that value is always sequence of bits. </p>
+
+<p>Now, "<code>BIT</code> data-type" is really terrible naming because in fact, there's no "data type" at all. It just tells that it stores data, without binding of what that data means. Let's illustrate with some examples. Let's say, we want to store string <code>"s"</code>. How will it be interpreted? With bit sequence, and we may restore it's "internal" view:</p>
+
+<pre><code>mysql&gt; SELECT ORD("s");
++----------+
+| ORD("s") |
++----------+
+|      115 |
++----------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>So now we know "numeric" representation. Next:</p>
+
+<pre><code>mysql&gt; SELECT CONV(115, 10, 2);
++------------------+
+| CONV(115, 10, 2) |
++------------------+
+| 1110011          |
++------------------+
+1 row in set (0.01 sec)
+</code></pre>
+
+<p>Ok, it is our "bits" as we wanted. I enquoted "bits" because it's only visualization, not real data. Finally, we can insert it as a bit-literal:</p>
+
+<pre><code>mysql&gt; INSERT INTO bit_demo (mybit) VALUES (b'1110011');
+Query OK, 1 row affected (0.02 sec)
+</code></pre>
+
+<p>And now, some <em>"magic"</em>:</p>
+
+<pre><code>mysql&gt; SELECT * FROM bit_demo;
++-------+
+| mybit |
++-------+
+|  s    |
++-------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>Tada! As you can see, I <strong>didn't make any conversions</strong> - but I can see valid <code>"s"</code> string on the screen. Why? Because when you're "selecting" something and MySQL client displays that, it does it, interpreting incoming data as <strong>strings</strong>. So that's why "it worked" - we just written bit sequence that may be interpreted as <code>"s"</code> - and, since client was trying to do it (so, interpret incoming data as string), all went well and we saw our string.</p>
+
+<p><strong>More for strings: encodings</strong></p>
+
+<p>Now, strings are very good sample also because they too has issue of <em>how to interpret</em> symbols because of <a href="http://en.wikipedia.org/wiki/Character_encoding" rel="nofollow">encodings</a>. Symbol is nothing more as sequence of bits and what you see on the screen when symbols is shown is nothing more than the corresponding graphical shape for chosen encoding. To illustrate:</p>
+
+<pre><code>mysql&gt; insert into bit_demo values(b'0111111111');
+Query OK, 1 row affected (0.02 sec)
+</code></pre>
+
+<p>Let it be our value, and now, first case:</p>
+
+<pre><code>mysql&gt; SET NAMES UTF8;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; select * from bit_demo;
++-------+
+| mybit |
++-------+
+| ï¿½    |
++-------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>and second case:</p>
+
+<pre><code>mysql&gt; SET NAMES cp1251;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; select * from bit_demo;
++-------+
+| mybit |
++-------+
+| Ñ    |
++-------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>As you can see, what certain "symbol" actually means depends from which encoding did we use. Bits, which are just values, knows <strong>nothing</strong> of what those values should mean.</p>
+
+<p><strong>Integer operations</strong></p>
+
+<p>So, now, this is about same issue with <code>CONV()</code>. Your values, passed to that functions, are interpreted just as integer values. No information about such things as "radix" is given, and, more, it's just not applicable here - your bits are storing just <em>value</em>, it will be same for any radix, thus, it doesn't matter what radix you will convert "from" - value in bits won't change. That is why for any arbitrary input radix (so, <code>2..36</code>) you will see same conversion result if destination radix is same. </p>
+
+<p>Value in bits, when used as an integer, immediately became that "integer" type, but they also will become values, defined by those data types. Again, let's illustrate (for this sample, I'm using 64-bit length):</p>
+
+<pre><code>mysql&gt; INSERT INTO bit_demo VALUES (b'1111111111111111111111111111111111111111111111111111111111111101');
+Query OK, 1 row affected (0.07 sec)
+</code></pre>
+
+<p>Let's see "what" is it:</p>
+
+<pre><code>mysql&gt; SELECT CAST(mybit AS SIGNED) FROM bit_demo;
++-----------------------+
+| CAST(mybit AS SIGNED) |
++-----------------------+
+|                    -3 |
++-----------------------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>And:</p>
+
+<pre><code>mysql&gt; SELECT CAST(mybit AS UNSIGNED) FROM bit_demo;
++-------------------------+
+| CAST(mybit AS UNSIGNED) |
++-------------------------+
+|    18446744073709551613 |
++-------------------------+
+1 row in set (0.00 sec)
+</code></pre>
+
+<p>Pretty huge difference, right? Again, that's because with certain data type we've defined rules for stored value, but value itself has no clue how it will be used &amp; represented.</p>
+
+<h1>Conclusion</h1>
+
+<p>You may think about "<code>BIT</code> data type" as about "no-type" values. Because it really doesn't specify any information about what value means, it only stores that value. How to work with it and how to interpret it is just another thing. You should keep in mind that when using this type - as well as any value, no matter what it is and where it is - in the end is just bits sequence. </p>

@@ -1,0 +1,20 @@
+<p>The problem turned out to be caused by Data being created in one thread and then deallocated in another one. It is so because of malloc arenas in glibc <a href="https://siddhesh.in/posts/malloc-per-thread-arenas-in-glibc.html" rel="nofollow">(for reference see this)</a>. It can be nicely demonstrated by doing:</p>
+
+<pre><code>executor1 = concurrent.futures.ThreadPoolExecutor(1)
+executor2 = concurrent.futures.ThreadPoolExecutor(1)
+
+numbers = await loop.run_in_executor(executor1, _test.generate)
+moved_numbers = await loop.run_in_executor(executor2, _test.move, numbers)
+</code></pre>
+
+<p>which would take twice the memory allocated by <code>_test.generate</code> and</p>
+
+<pre><code>executor = concurrent.futures.ThreadPoolExecutor(1)
+
+numbers = await loop.run_in_executor(executor, _test.generate)
+moved_numbers = await loop.run_in_executor(executor, _test.move, numbers)
+</code></pre>
+
+<p>which wound't.</p>
+
+<p>This issue can be solved either by rewriting the code so it doesn't move the elements from one container to another (my case) or by setting environment variable <code>export MALLOC_ARENA_MAX=1</code> which will limit number of malloc arenas to 1. This however might have some performance implications involved (There is a good reason for having multiple arenas).</p>

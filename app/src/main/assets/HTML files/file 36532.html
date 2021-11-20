@@ -1,0 +1,91 @@
+<p>You're setting the OnClickListener for the whole fragment, not the actual views you are querying in the switch-statement. Of course the specific code parts are never reached! 
+This approach should work (and is <a href="http://developer.android.com/guide/topics/ui/ui-events.html#EventListeners" rel="nofollow">officially supported by Google</a> and <a href="http://stackoverflow.com/a/14571018/2964379">well received by users on Stack Overflow</a>):</p>
+
+<pre><code>public class HomeFragment extends Fragment implements View.OnClickListener {
+
+public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    Log.i("HomeFragment", "OK");
+    View rootView = inflater.inflate(R.layout.fragment_home, container, false);
+    rootView.findViewById(R.id.rec_prod1).setOnClickListener(this);
+    rootView.findViewById(R.id.rec_prod2).setOnClickListener(this);
+    rootView.findViewById(R.id.rec_prod3).setOnClickListener(this);
+    return rootView;
+}
+
+@Override
+public void onClick(View v) {
+    Log.i("HomeFragment", "OK0");
+    switch (v.getId()) {
+    case R.id.rec_prod1:
+        Log.i("HomeFragment", "OK1");
+        Intent intent1 = new Intent(getActivity(), SingleItemActivity.class);
+        startActivity(intent1);
+        break;
+    case R.id.rec_prod2:
+        Log.i("HomeFragment", "OK2");
+        Intent intent2 = new Intent(getActivity(), SingleItemActivity.class);
+        startActivity(intent2);
+        break;
+    case R.id.rec_prod3:
+        Log.i("HomeFragment", "OK3");
+        Intent intent3 = new Intent(getActivity(), SingleItemActivity.class);
+        startActivity(intent3);
+        break;
+    }
+}
+}
+</code></pre>
+
+<p><strong>For further reading:</strong></p>
+
+<p>Setting the onClick via XML would also work, but sadly, only in activities, not in fragments: The method is invoked on the fragment's parent activity (see <a href="http://stackoverflow.com/questions/6091194/how-to-handle-button-clicks-using-the-xml-onclick-within-fragments/14571018">How to handle button clicks using the xml onClick within Fragments</a>). </p>
+
+<p>Still, the above approach has a disadvantage: onClick is public and thus could be called from outside. For example, the parent activity could call</p>
+
+<pre><code>((View.OnClickListener) homeFragment).onClick(
+    homeFragment.getView().findViewById(R.id.rec_prod1));
+</code></pre>
+
+<p>This would fire an onClick event for rec_prod1. IMO, the readability and convenience this approach brings outweighs this. Of course, there are other approaches with their own advantages and disadvantages. Most importantly, to prevent this public access, you can create an anonymous class for each listener (see Nick's answer and <a href="http://periplanisi.com/android/2013/11/avoid-anonymous-classes/" rel="nofollow">its disadvantages</a>) or use the code below instead:</p>
+
+<pre><code>public class HomeFragment extends Fragment {
+
+public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    Log.i("HomeFragment", "OK");
+    View rootView = inflater.inflate(R.layout.fragment_home, container, false);
+    View.OnClickListener onClick = new RecProdClickListener();
+    rootView.findViewById(R.id.rec_prod1).setOnClickListener(onClick);
+    rootView.findViewById(R.id.rec_prod2).setOnClickListener(onClick);
+    rootView.findViewById(R.id.rec_prod3).setOnClickListener(onClick);
+    return rootView;
+}
+
+private class RecProdClickListener implements View.OnClickListener {
+    @Override
+    public void onClick(View v) {
+        Log.i("HomeFragment", "OK0");
+        switch (v.getId()) {
+        case R.id.rec_prod1:
+            Log.i("HomeFragment", "OK1");
+            Intent intent1 = new Intent(getActivity(), SingleItemActivity.class);
+            startActivity(intent1);
+            break;
+        case R.id.rec_prod2:
+            Log.i("HomeFragment", "OK2");
+            Intent intent2 = new Intent(getActivity(), SingleItemActivity.class);
+            startActivity(intent2);
+            break;
+        case R.id.rec_prod3:
+            Log.i("HomeFragment", "OK3");
+            Intent intent3 = new Intent(getActivity(), SingleItemActivity.class);
+            startActivity(intent3);
+            break;
+        }
+    }
+}
+}
+</code></pre>
+
+<p>Beside all that several anonymous click listeners will lead to more memory usage and a little bit longer intialization time, whereas reusing a click listener with a switch-statement will make performance a <a href="http://stackoverflow.com/a/16177863/2964379">negligibly worse due to cyclomatic complexity</a>.</p>
+
+<p>But you can even mix the different approaches. Ultimately, it's up to your taste. Discussing what's best under what circumstances would belong to programmers.stackexchange and surely is an interesting topic for clean code in Android development.</p>

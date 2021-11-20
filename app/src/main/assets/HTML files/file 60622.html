@@ -1,0 +1,459 @@
+<p>Next update but don't work. I need save availability of fullcalendar custom in wp job manager user as a field and update to availabity woo commerce booking calendar product. If anyone has a good idea on how to do this better, </p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>$(function() {
+	
+	 /* initialize the external events
+    -----------------------------------------------------------------*/
+
+    $('#external-events div.external-event').each(function() {
+    //console.log($(this));
+        // events drags
+        var eventObject = {
+            title: $.trim($(this).text()),
+            className: $(this).attr('className'),
+            color: $(this).attr('color'),
+            type: $(this).attr('type'),
+            textColor: $(this).attr('textColor'),
+        };
+        
+        // store the Event Object in the DOM element so we can get to it later
+        $(this).data('eventObject', eventObject);
+        $.fullCalendar.formatDate(eventObject.start,'yyyy-MM-dd');
+        
+        // make the event draggable using jQuery UI
+        $(this).draggable({
+            zIndex: 999,
+            revert: true,      // will cause the event to go back to its
+            revertDuration: 0  //  original position after the drag
+        });
+        
+    });
+	// inti calendar   
+	
+        $('#calendar').fullCalendar({
+        header: {
+            left: 'today',
+            center: 'title',
+            right: 'prev,next',
+        },
+        height: 350,
+        aspectRatio: 1,
+        //contentHeight: 600,
+        editable: true,
+        droppable: true,
+
+        events: $('#calendar').attr('values'),
+
+        // on dropping
+        drop: function(date, allDay) { // this function is called when something is dropped
+        
+            // retrieve the dropped element's stored Event Object
+            var originalEventObject = $(this).data('eventObject');
+            
+            // we need to copy it, so that multiple events don't have a reference to the same object
+            var copiedEventObject = $.extend({}, originalEventObject);
+            
+            // assign it the date that was reported
+            copiedEventObject.start = $.fullCalendar.formatDate(date,'yyyy-MM-dd');
+            copiedEventObject.end = $.fullCalendar.formatDate(date,'yyyy-MM-dd');
+            copiedEventObject.allDay = allDay;
+            
+            // render the event on the calendar
+            $('#calendar').fullCalendar('renderEvent', copiedEventObject, true);  
+
+            // Get currents dates
+            var startCurrent = new Date(copiedEventObject.start);
+            if (copiedEventObject.end == null) {
+                var endCurrent = startCurrent;
+            } else {
+                var endCurrent = new Date(copiedEventObject.end);
+            }
+
+            // Get events dates
+            var pulledEvents = $('#calendar').fullCalendar( 'clientEvents');
+            // Compare to events dates
+            var nbEventCheck = pulledEvents.length-1;
+            for (var i = 0; i &lt; nbEventCheck; i++) {
+                var startPulled = new Date(pulledEvents[i].start);
+                var endPulled = new Date(pulledEvents[i].end);
+                if (endPulled.getTime() == 0) {
+                    endPulled = startPulled;
+                }
+                // containing
+                if (startCurrent &gt;= startPulled &amp;&amp; endCurrent &lt;= endPulled) {
+                    // begin
+                    if (startCurrent.getTime() == startPulled.getTime()) {
+                        // start pulledEvent later
+                        pulledEvents[i].start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                        // if same remove
+                        if (endCurrent.getTime() == endPulled.getTime()) {
+                            $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id);
+                        }
+                    }
+                    // finish
+                    else if (endCurrent.getTime() == endPulled.getTime()) {
+                        // finish pulledEvent earlier
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                    }
+                    // contain
+                    else {
+                        // copy pulledEvent to the end
+                        var copiedpulledEvent = $.extend({}, pulledEvents[i]);
+                        copiedpulledEvent._id = "copy"+Math.floor((Math.random()*1000)+1);;
+                        copiedpulledEvent.source = null;
+                        copiedpulledEvent.start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        copiedpulledEvent.end = pulledEvents[i].end;
+                        $('#calendar').fullCalendar('renderEvent', copiedpulledEvent, true);
+                        // cut beginning pulledEvent
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('addEventSource', pulledEvents[i]);
+                        $('#calendar').fullCalendar('renderEvent', pulledEvents[i], true);
+                        
+                    }
+                }
+            }
+        },
+
+        // on dropping from calendar
+        eventDrop: function(event, dayDelta, minuteDelta, allDay, revertFunc, jsEvent, ui, view) {
+
+            // Get currents dates
+            var startCurrent = new Date(event.start);
+            if (event.end == null) {
+                var endCurrent = startCurrent;
+            } else {
+                var endCurrent = new Date(event.end);
+            }
+            
+            // Get events dates
+            var pulledEvents = $('#calendar').fullCalendar( 'clientEvents');
+            // Compare to events dates
+            var nbEventCheck = pulledEvents.length;
+            for (var i = 0; i &lt; nbEventCheck; i++) {
+                // avoid to compare to the same copy element
+                if (event._id == pulledEvents[i]._id) {
+                    i++;
+                    if (i &gt;= nbEventCheck) {
+                        break;
+                    }
+                }
+                var startPulled = new Date(pulledEvents[i].start);
+                var endPulled = new Date(pulledEvents[i].end);
+                if (endPulled.getTime() == 0) {
+                    endPulled = startPulled;
+                }
+
+                // containing
+                if (startCurrent &gt;= startPulled &amp;&amp; endCurrent &lt;= endPulled) {
+                    // begin
+                    if (startCurrent.getTime() == startPulled.getTime()) {
+                        // start pulledEvent later
+                        pulledEvents[i].start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                        // if same remove
+                        if (endCurrent.getTime() == endPulled.getTime()) {
+                           $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id)
+                        }
+                    }
+                    // finish
+                    else if (endCurrent.getTime() == endPulled.getTime()) {
+                        // finish pulledEvent earlier
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                    }
+                    // contain
+                    else {
+                        // copy pulledEvent to the end
+                        var copiedpulledEvent = $.extend({}, pulledEvents[i]);
+                        copiedpulledEvent._id = "copy"+Math.floor((Math.random()*1000)+1);
+                        copiedpulledEvent.source = null;
+                        copiedpulledEvent.start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        copiedpulledEvent.end = pulledEvents[i].end;
+                        $('#calendar').fullCalendar('renderEvent', copiedpulledEvent, true);
+                        // cut beginning pulledEvent
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('addEventSource', pulledEvents[i]);
+                        $('#calendar').fullCalendar('renderEvent', pulledEvents[i], true);
+                    }
+                    // update pulledEvent
+                    var startPulled = new Date(pulledEvents[i].start);
+                    var endPulled = new Date(pulledEvents[i].end);
+                }
+
+                // externing
+                if (startCurrent &lt;= endPulled &amp;&amp; endCurrent &gt;= startPulled) {
+                     // left
+                    if (endCurrent &lt;= endPulled) {
+                        pulledEvents[i].start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                        // if same remove
+                        if (endCurrent.getTime() == endPulled.getTime()) {
+                           $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id)
+                        }
+
+                    }
+                    // right
+                    else if (startCurrent &gt;= startPulled) {
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                        if (startCurrent.getTime() == startPulled.getTime()) {
+                           $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id)
+                        }
+                    }
+                    // surround
+                    else
+                    {
+                        $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id);
+                    }
+                }
+               
+            }
+
+        },
+
+        // on event resizing
+        eventResize: function (event, dayDelta, minuteDelta, revertFunc) {
+
+            // Get currents dates
+            var startCurrent = new Date(event.start);
+            if (event.end == null) {
+                var endCurrent = startCurrent;
+            } else {
+                var endCurrent = new Date(event.end);
+            }
+
+            // Get events dates
+            var pulledEvents = $('#calendar').fullCalendar( 'clientEvents');
+            // Compare to events dates
+            var nbEventCheck = pulledEvents.length;
+            for (var i = 0; i &lt; nbEventCheck; i++) {
+                // avoid to compare to the same copy element
+                if (event._id == pulledEvents[i]._id) {
+                    i++;
+                    if (i &gt;= nbEventCheck) {
+                        break;
+                    }
+                }
+                var startPulled = new Date(pulledEvents[i].start);
+                var endPulled = new Date(pulledEvents[i].end);
+                if (endPulled.getTime() == 0) {
+                    endPulled = startPulled;
+                }
+
+                // externing
+                if (startCurrent &lt;= endPulled &amp;&amp; endCurrent &gt;= startPulled) {
+                     // left
+                    if (endCurrent &lt; endPulled) {
+                        pulledEvents[i].start = new Date(endCurrent.getTime() + (1000 * 60 * 60 * 24 * 1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                    }
+                    // right
+                    else if (startCurrent &gt; startPulled) {
+                        pulledEvents[i].end = new Date(startCurrent.getTime() + (1000 * 60 * 60 * 24 * -1));
+                        $('#calendar').fullCalendar('updateEvent', pulledEvents[i]);
+                    }
+                    // surround
+                    else
+                    {
+                        $('#calendar').fullCalendar('removeEvents',pulledEvents[i]._id);
+                    }
+                }
+            }
+        },
+
+        // on click on event
+        eventClick: function(calEvent, jsEvent, view) {
+            if (confirm('Remove this event ?')) {
+                $('#calendar').fullCalendar('removeEvents',calEvent._id);
+            }
+        }
+	});
+   // get localized date format using Moment.js
+   // var lang = jQuery('html').attr('lang') || 'en';
+ //   var locale = moment().locale(lang);
+    var dateFormat = "d-m-y";
+
+    // get origin date format from query string
+    var originFormat = dateFormat;
+   // if (originFormat) {
+    //    originFormat = convertPHPFormatMoment(originFormat);
+ // }
+
+
+    // reformat date for current locale if different of origin format
+    if (originFormat &amp;&amp; originFormat != dateFormat) {
+        var startField = $("#datepicker-start"),
+            endField = $("#datepicker-end"),
+            startDate = moment(startField.val(), originFormat),
+            endDate = moment(endField.val(), originFormat);
+        startField.val( startDate.format(dateFormat) );
+        endField.val( endDate.format(dateFormat) );
+    }
+
+    // add hidden date_format field
+    $("#datepicker-start").closest('form').append('&lt;input type="hidden" name="date_format" id="date_format" value="'+ dateFormat +'"&gt;');
+
+    $("#datepicker-start").datepicker({
+            dateFormat: dateFormat,
+            minDate: 0,
+            showButtonPanel: true,
+            onClose: function (selectedDate) {
+                $("#datepicker-end").datepicker("option", "minDate", selectedDate);
+                $("#datepicker-end").focus();
+            }
+        });
+
+        $("#datepicker-end").datepicker({
+            dateFormat: dateFormat,
+            minDate: 0,
+            showButtonPanel: true,
+            onClose: function (selectedDate) {
+                $("#datepicker-start").datepicker("option", "maxDate", selectedDate);
+            }
+        });
+
+
+	
+        $('#calendar').fullCalendar('renderEvent', newEvent, true);
+
+        $('#calendar').fullCalendar('gotoDate', newEvent.start);
+
+        var color = $("#default-events label.active input").attr("color");
+        $('td.fc-day').css('background-color', color);
+
+        // empty date
+        $('#datepicker-start').val('');
+        $('#datepicker-end').val('');
+
+        // reset bounds dates
+        $('#datepicker-start').datepicker("option", "maxDate", null);
+        $('#datepicker-end').datepicker("option", "minDate", null);
+ 
+   
+});</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/i18n/jquery.ui.datepicker-fr.js"&gt;&lt;/script&gt;
+&lt;link href="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/jquery-ui-1.10.3.custom.min.css" media="screen" rel="stylesheet" type="text/css"&gt;
+&lt;link href="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/fullcalendar.css" media="screen" rel="stylesheet" type="text/css"&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/moment.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/jquery-ui.custom.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/jquery-ui-1.10.3.custom.datepicker.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/fullcalendar-gtg.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/datepicker-custom.js"&gt;&lt;/script&gt;
+&lt;script src="https://free-communiity.com/wp-content/themes/listable-172/listable/fullcalendar/fullcalendar.min.js"&gt;&lt;/script&gt;
+
+
+
+
+&lt;div class="tab-pane fade active in" id="calendar_home" style="display:initial;"&gt;
+                                                                                        
+                            &lt;div id="progress"&gt;
+                                &lt;div class="bar bar-photo-edit" style="display:none;"&gt;
+                                    &lt;span&gt;Chargement en coursâ¦&lt;/span&gt;
+                                &lt;/div&gt;
+                            &lt;/div&gt;
+
+                            &lt;div id="alert-box"&gt;
+                                &lt;div id="calendar-not-uptodate" class="alert alert-warning alert-calendar" style="display: initial;"&gt;
+                                   Vous n'avez aucune pÃ©riode selectionnÃ©  
+                                &lt;/div&gt;
+                                &lt;div style="display: none;" class="alert alert-success alert-calendar" id="calendar-updated"&gt;
+                                    Votre calendrier a Ã©tÃ© mis Ã  jour
+                                &lt;/div&gt;
+                            &lt;/div&gt;
+
+                            &lt;div class="clearfix"&gt;&lt;/div&gt;
+
+                            &lt;!-- date picker --&gt;
+                            &lt;div id="datepicker-event" class="form-inline"&gt;
+
+                                &lt;label class="home_type"&gt;CrÃ©er une nouvelle pÃ©riode de disponibilitÃ©&lt;/label&gt;
+
+                                &lt;div&gt;
+                                    &lt;div class="form-group calendar-edition"&gt;
+
+
+                                    &lt;input id="datepicker-start" class="form-control " type="text"  placeholder="Du" /&gt;
+                                    &lt;/div&gt;
+
+                                    &lt;div class="form-group calendar-edition"&gt;
+                                    &lt;input id="datepicker-end" class="form-control " type="text"  placeholder="jusqu'au" /&gt;
+                                    &lt;/div&gt;
+
+                                    &lt;div class="form-group"&gt;
+                                        &lt;select class="form-control"&gt;
+                                            &lt;option value="0" disabled="" selected=""&gt;Type de disponibilitÃ©&lt;/option&gt;
+                                            &lt;option title="Disponible" classname="event-available" color="#d4f2e6" value="5"&gt;Disponible&lt;/option&gt;
+                                            &lt;option title="Flexible" classname="event-ask-me" color="#CDE5f9" value="3"&gt;Flexible me contacter&lt;/option&gt;
+                                            &lt;option title="Indisponible" classname="external-events event-unavailable" color="#E7E7E7" value="1"&gt;Indisponible&lt;/option&gt;
+                                        &lt;/select&gt;
+                                    &lt;/div&gt;
+
+                                    &lt;input class="btn btn-default calendar-edition" type="button" id="add_date"  value="submit"&gt;
+                                &lt;/div&gt;
+
+                            &lt;/div&gt;
+                            &lt;!-- #datepicker-event --&gt;
+                            &lt;div id="datepicker-event"&gt;&lt;/div&gt;
+                            &lt;!-- popup period delete --&gt;
+                            &lt;div class="modal fade" id="deletePeriod" style="display: none;"&gt;
+                                &lt;div class="modal-dialog"&gt;
+                                    &lt;div class="modal-content"&gt;
+                                        &lt;div class="modal-header"&gt;
+                                            &lt;button type="button" class="close" data-dismiss="modal" aria-label="Close"&gt;
+                                                &lt;span aria-hidden="true"&gt;Ã&lt;/span&gt;
+                                            &lt;/button&gt;
+                                            &lt;h4 class="modal-title" id="myModalLabel"&gt;Etes-vous sÃ»r?&lt;/h4&gt;
+                                        &lt;/div&gt;
+                                        &lt;div class="modal-body"&gt;
+                                            &lt;p&gt;Etes-vous sÃ»r de vouloir supprimer cette pÃ©riode ?&lt;/p&gt;
+                                        &lt;/div&gt;
+                                        &lt;div class="modal-footer"&gt;
+                                            &lt;button type="button" class="btn btn-default btn-basic" data-dismiss="modal"&gt;Annuler&lt;/button&gt;
+                                            &lt;button type="button" class="btn btn-primary" data-dismiss="modal" id="delete_period"&gt;Supprimer&lt;/button&gt;
+                                        &lt;/div&gt;
+                                    &lt;/div&gt;
+                                &lt;/div&gt;
+                            &lt;/div&gt;
+
+                            &lt;!-- calendar --&gt;
+                            &lt;div id="calendar" class="" value=""&gt;
+							&lt;/div&gt;
+                            &lt;!-- default value --&gt;
+                            &lt;div id="default-events"&gt;
+                                &lt;label class=""&gt;DisponibilitÃ© par dÃ©faut &lt;span class="grey-color small italic text-default-value"&gt;Choisissez l'option qui dÃ©crit le mieux la disponibilitÃ© de votre maison durant l'annÃ©e&lt;/span&gt;&lt;/label&gt;
+
+                                &lt;label class="radio default-available active"&gt;
+                                    &lt;input type="radio" color="#d4f2e6" name="default-date" id="default-date-4" value="4"&gt;
+                                    &lt;span class="color-available small"&gt;Disponible&lt;/span&gt;
+                                    Ma maison est  gÃ©nÃ©ralement disponible 
+                                &lt;/label&gt;
+                                &lt;label class="radio default-ask-me"&gt;
+                                    &lt;input type="radio" color="#CDE5f9" name="default-date" id="default-date-2" value="2" &gt;
+                                    &lt;span class="color-ask-me small"&gt;Demandez moi&lt;/span&gt;
+                                    Mes dates sont flexibles
+                                &lt;/label&gt;
+                                &lt;label class="radio default-unavailable"&gt;
+                                    &lt;input type="radio" color="#E7E7E7" name="default-date" id="default-date-0" value="0"&gt;
+                                    &lt;span class="color-unavailable small"&gt;Indisponible&lt;/span&gt;
+                                    Ma maison est habituellement indisponible
+                                &lt;/label&gt;
+                                &lt;label class="default-guestwanted"&gt;
+                                    &lt;span class="color-wanted small"&gt;test&lt;/span&gt;
+                                    Je recherche activement des InvitÃ©s &lt;br&gt;
+                                    &lt;small&gt;&lt;em&gt;(pÃ©riode non disponible par dÃ©faut)&lt;/em&gt;&lt;/small&gt;
+                                &lt;/label&gt;
+                            &lt;/div&gt;
+
+                            &lt;div class="clearfix"&gt;&lt;/div&gt;
+
+                            &lt;div id="return-message"&gt;&lt;/div&gt;
+
+                        &lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>

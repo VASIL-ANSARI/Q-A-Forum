@@ -1,0 +1,61 @@
+<p>Just to give you a heads up, these solutions are based on string comparisons, are not optimized &amp; cannot use indexes. you should consider normalizing your tables differently. (See <a href="http://mikehillyer.com/articles/managing-hierarchical-data-in-mysql/" rel="nofollow">Managing Hierarchical Data in MySQL</a>)</p>
+
+<p>Regarding some of the questions:</p>
+
+<hr>
+
+<p><strong>Select all children of id 9:</strong></p>
+
+<p>Since the <code>Path</code> column does not include the leading &amp; trailing slashes, you need to concatenate them to the path:</p>
+
+<pre><code>SELECT * 
+FROM tester
+WHERE CONCAT('/', path, '/') LIKE '%/9/%';
+</code></pre>
+
+<hr>
+
+<p><strong>select an aggregate count of 9's children, x levels deep:</strong></p>
+
+<p>We need to group by the number of slashes in the path, minus the number of slashes in the parent path:</p>
+
+<pre><code>SELECT (LENGTH(c.Path) - LENGTH(REPLACE(c.Path, '/', '')))
+    - (LENGTH(p.Path) - LENGTH(REPLACE(p.Path, '/', ''))) AS Level,
+    COUNT(*)
+FROM tester c
+    JOIN tester p ON c.Parent = p.ID
+WHERE CONCAT('/', path, '/') LIKE '%/9/%';
+GROUP BY 1
+</code></pre>
+
+<p>For simplicity i used the query above to show all the levels, If you want to limit x levels deep, use the <code>WHERE</code> predicate from the query below.</p>
+
+<hr>
+
+<p><strong>select 9's children's id's down to x levels, with the level relative to 9:</strong></p>
+
+<p>We search the <code>Path</code> column up to a x number of levels, while taking the parents level into consideration:</p>
+
+<pre><code>SELECT c.*
+FROM tester c
+    JOIN tester p ON c.Parent = p.ID
+WHERE CONCAT(
+    '/',
+    SUBSTRING_INDEX(
+        Path, 
+        '/', 
+        (LENGTH(p.Path) - LENGTH(REPLACE(p.Path, '/', ''))) + 4
+    ),
+'/') LIKE '%/9/%'
+</code></pre>
+
+<p>The steps we are taking:</p>
+
+<ol>
+<li>We need to find out how deep the parent is, we can find that by counting the slashes in the parent's path. (<code>LENGTH(p.Path) - LENGTH(REPLACE(p.Path, '/', ''))</code>)</li>
+<li>We need to add 1 to that number, since a path with 1 slash is 2 levels deep.</li>
+<li>We add the x number of desired levels.</li>
+<li>Grab the path column up to the level total, (Use the <a href="http://dev.mysql.com/doc/refman/5.0/en/string-functions.html#function_substring-index" rel="nofollow"><code>SUBSTRING_INDEX</code></a> function).</li>
+<li>Add the leading and trailing slash.</li>
+<li>Search the final string for 9.</li>
+</ol>

@@ -1,0 +1,64 @@
+<p>There are two mainly issues with this.
+1. Performance
+Your UDF will need get the HTTP resource in every cell, in which it is stored.
+2. HTML
+Unfortunately there is no HTML parser in OpenOffice or LibreOffice. There is only a XML parser. Thats why we cannot parse HTML directly with the UDF.</p>
+
+<p>This will work, but slow and not very universal:</p>
+
+<pre><code>Public Function FETCHHOUSE(sHouse as String) as String
+
+   sURL = "http://awoiaf.westeros.org/index.php/House_" &amp; sHouse
+
+   oSimpleFileAccess = createUNOService ("com.sun.star.ucb.SimpleFileAccess")
+   oInpDataStream = createUNOService ("com.sun.star.io.TextInputStream")
+   on error goto falseHouseName
+   oInpDataStream.setInputStream(oSimpleFileAccess.openFileRead(sUrl))
+   on error goto 0
+   dim delimiters() as long
+   sContent = oInpDataStream.readString(delimiters(), false)
+
+   lStartPos = instr(1, sContent, "&lt;table class=" &amp; chr(34) &amp; "infobox infobox-body" )
+   if lStartPos = 0 then
+     FETCHHOUSE = "no infobox on page"
+     exit function
+   end if   
+   lEndPos = instr(lStartPos, sContent, "&lt;/table&gt;")
+   sTable = mid(sContent, lStartPos, lEndPos-lStartPos + 8)
+
+   lStartPos = instr(1, sTable, "Words" )
+   if lStartPos = 0 then
+     FETCHHOUSE = "no Words on page"
+     exit function
+   end if        
+   lEndPos = instr(lStartPos, sTable, "&lt;/tr&gt;")
+   sRow = mid(sTable, lStartPos, lEndPos-lStartPos + 5)
+
+   oTextSearch = CreateUnoService("com.sun.star.util.TextSearch")
+   oOptions = CreateUnoStruct("com.sun.star.util.SearchOptions")
+   oOptions.algorithmType = com.sun.star.util.SearchAlgorithms.REGEXP
+   oOptions.searchString = "&lt;td[^&lt;]*&gt;"
+   oTextSearch.setOptions(oOptions)
+   oFound = oTextSearch.searchForward(sRow, 0, Len(sRow))
+   If  oFound.subRegExpressions = 0 then 
+     FETCHHOUSE = "Words header but no Words content on page"
+     exit function   
+   end if
+   lStartPos = oFound.endOffset(0) + 1
+   lEndPos = instr(lStartPos, sRow, "&lt;/td&gt;")
+   sWords = mid(sRow, lStartPos, lEndPos-lStartPos)
+
+   FETCHHOUSE = sWords
+   exit function
+
+   falseHouseName:
+   FETCHHOUSE = "House name does not exist"
+
+End Function
+</code></pre>
+
+<p>The better way would be, if you could get the needed informations from a Web API that would offered from the Wiki. You know the people behind the Wiki? If so, then you could place this there as a suggestion.</p>
+
+<p>Greetings</p>
+
+<p>Axel</p>

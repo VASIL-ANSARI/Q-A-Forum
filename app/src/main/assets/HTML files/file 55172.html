@@ -1,0 +1,55 @@
+<p>If I understand correctly Project 2 is some shared project which is used in other projects which use Unity for Dependency Injection. Unity uses property injection in this case by annoting the property with the <code>DependencyAttribute</code>.</p>
+
+<p>Simple Injector is capable of doing property injection. Property injection however should only be used for optional dependencies. And as you're running into a <code>NullReferenceException</code> this dependency is not optional!</p>
+
+<p>So you should move the <code>IGenericRepo&lt;ServiceObj&gt;</code> to the constructor of <code>IService</code>. This makes it clear to users of <code>IService</code> that it needs a repository to function correctly. This becomes especially useful when you would unittest <code>IService</code> as the constructor will in this case clearly communicates that it needs a repository.  </p>
+
+<p>By moving the dependency to the constructor Simple Injector will inject the repository correctly or throw an <code>ActivationException</code> if the configuration is not valid. </p>
+
+<p>You can test, and I recommend doing this, by calling <code>container.Verify()</code> as you can read here: <a href="https://simpleinjector.readthedocs.io/en/latest/howto.html#verify-the-container-s-configuration" rel="nofollow">Verify the containerâs configuration</a>. This will make the application to <a href="https://en.wikipedia.org/wiki/Fail-fast" rel="nofollow">fail fast</a>.</p>
+
+<p>If project 2 can't be refactored or for some other compelling reason  constructor injection is not an option, Simple Injector does support property injection. It does however not support this out-of-the-box. One of the design principles of Simple Injector is <a href="https://simpleinjector.readthedocs.io/en/latest/principles.html#never-fail-silently" rel="nofollow">to never fail silently</a> and therefore only <a href="https://simpleinjector.readthedocs.io/en/latest/advanced.html#property-injection" rel="nofollow">Explicit property injection</a> is advised. This will gives the container the opportunity to use its <a href="https://simpleinjector.readthedocs.io/en/latest/diagnostics.html" rel="nofollow">Diagnostic Services</a> and fail fast if the configuration is invalid.  </p>
+
+<p>As you can read in the referenced documentation, there are 2 ways of doing it property injection:</p>
+
+<ol>
+<li>By registering an initializer with a call to
+<code>container.RegisterInitializer()</code> </li>
+<li>By implementing <code>IPropertySelectionBehavior</code></li>
+</ol>
+
+<p>Option 2 will let Simple Injector check the dependencies using the <a href="https://simpleinjector.readthedocs.io/en/latest/diagnostics.html" rel="nofollow">Diagnostics Services</a> automatically. When verifying all 'initializers' are executed also, but the code in lambda isn't checked for lifestyles etc. </p>
+
+<p>Simple Injector does not encourage its users to take a dependency on the container and it therefore does not contain any <code>Atrributes</code> which you can use out-of-the-box such as Unity has the <code>DependencyAttribute</code>.</p>
+
+<p>So you have 2 options here: </p>
+
+<ol>
+<li>Let project 1 also take a dependency on Unity (which it indirectly already has!, yuck) and create an implementation of <code>IPropertySelectionBehavior</code> to search for the Unity <code>DependencyAttribute</code></li>
+<li>Create your own custom <code>Attribute</code> in project 2 and annotate <code>_serviceRepo</code> which this custom attribute also.</li>
+</ol>
+
+<p>The only difference between 1 and 2 is which attribute is searched for.
+If you can't touch project 2, option 2 isn't possible. Implementing <code>IPropertySelectionBehavior</code> is straightforward:</p>
+
+<pre><code>// custom attribute only for option 1
+public class ImportAttribute : Attribute { }
+
+class UnityDependencyPropertySelectionBehavior : IPropertySelectionBehavior 
+{
+     public bool SelectProperty(Type type, PropertyInfo prop) 
+     {
+         return prop.GetCustomAttributes(typeof(DependencyAttribute)).Any();
+     }
+}
+</code></pre>
+
+<p>You can configure the container using this custom <code>IPropertySelectionBehavior</code> by:</p>
+
+<pre><code>container.Options.PropertySelectionBehavior = 
+               new UnityDependencyPropertySelectionBehavior();
+</code></pre>
+
+<p>To summarize:
+Move the dependency to the constructor as it is not a optional dependency. In other words use constructor injection! 
+If there are compelling reasons not to do this implement <code>IPropertySelectionBehavior</code></p>

@@ -1,0 +1,51 @@
+<p>As always start by defining your model:</p>
+
+<pre><code>public class Item
+{
+    public string Id { get; set; }
+    public string Label { get; set; }
+}
+</code></pre>
+
+<p>Then your repository:</p>
+
+<pre><code>public interface IRepository
+{
+    IEnumerable&lt;Item&gt; GetItems();
+}
+</code></pre>
+
+<p>Then implement this repository:</p>
+
+<pre><code>public class MySQLRepository: IRepository
+{
+    public IEnumerable&lt;Item&gt; GetItems()
+    {
+        using (var conn = new MySqlConnection("SOME CONNECTION STRING"))
+        using (var cmd = conn.CreateCommand())
+        {
+            conn.Open(); 
+            cmd.CommandText = "SELECT id, name FROM items;";
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    yield return new Item
+                    {
+                        Id = reader.GetString(0),
+                        Label = reader.GetString(1),
+                    };
+                }
+            }
+        }
+    }
+}
+</code></pre>
+
+<p>And finally use an instance of this repository in your form to fetch data:</p>
+
+<pre><code>myDDL.DataSource = repository.GetItems();
+myDDL.DataValueField = "Id";
+myDDL.DataTextField = "Label";
+myDDL.DataBind();
+</code></pre>

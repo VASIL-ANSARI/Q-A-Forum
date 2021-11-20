@@ -1,0 +1,106 @@
+<p>add <a href="https://github.com/stig/json-framework/" rel="nofollow">sbjson</a> library in your project.and try to using this code instead of yours.
+in .h file</p>
+
+<pre><code>NSMUtableArray * idArray;
+</code></pre>
+
+<p>and in .m file</p>
+
+<pre><code>        #import "SBJson.h"
+
+- (void)viewDidLoad
+{       
+
+idArray = [[NSMutableArray alloc] init];
+
+ NSString *post =@"";
+
+                NSURL *url=[NSURL URLWithString:@"http://blog.bigwavemedia.co.uk/?json=get_recent_posts"];
+
+                NSData *postData = [post dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES];
+
+                NSString *postLength = [NSString stringWithFormat:@"%d", [postData length]];
+
+                NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
+                [request setURL:url];
+                [request setHTTPMethod:@"POST"];
+                [request setValue:postLength forHTTPHeaderField:@"Content-Length"];
+                //[request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+                // [request setValue:@"application/x-www-form-urlencoded" forHTTPHeaderField:@"Content-Type"];
+                [request setHTTPBody:postData];
+
+                //[NSURLRequest setAllowsAnyHTTPSCertificate:YES forHost:[url host]];
+
+                NSError *error = [[NSError alloc] init];
+                NSHTTPURLResponse *response = nil;
+                NSData *urlData=[NSURLConnection sendSynchronousRequest:request returningResponse:&amp;response error:&amp;error];
+
+
+
+                //NSLog(@"Response code: %d", [response statusCode]);
+                if ([response statusCode] &gt;=200 &amp;&amp; [response statusCode] &lt;300)
+                {
+                    NSString *responseData = [[NSString alloc]initWithData:urlData encoding:NSUTF8StringEncoding];
+                    // NSLog(@"Response ==&gt; %@", responseData);                    
+
+                    SBJsonParser *jsonParser = [SBJsonParser new];
+                    NSDictionary *jsonData = (NSDictionary *) [jsonParser objectWithString:responseData error:nil];
+
+
+                    //NSLog(@"json data is : %@",jsonData);
+
+                    NSArray *allDataArray = [[NSArray alloc]init];
+                    allDataArray= [jsonData objectForKey:@"posts"];
+
+
+                    for(int i=0;i&lt;[allDataArray count];i++)
+                    {
+                        NSDictionary *tempDictionary = [allDataArray objectAtIndex:i];
+
+
+                        if([tempDictionary objectForKey:@"id"]!=nil)
+                        {
+
+                            [idArray addObject:[tempDictionary objectForKey:@"id"]];
+                        }
+
+                    }
+
+                } else {
+                    if (error) NSLog(@"Error: %@", error);
+                    [self alertStatus:@"Connection Failed" :@"Does not find any data!"];
+                }
+
+
+            }
+            @catch (NSException * e) {
+                NSLog(@"Exception: %@", e);
+                [self alertStatus:@"Data not found." :@"Does not find any data!"];
+            }
+[super viewDidLoad];
+}
+</code></pre>
+
+<p><strong>UPDATE</strong></p>
+
+<p>And for tableview add this</p>
+
+<pre><code>-(int)numberOfSectionsInTableView:(UITableView *)tableView{
+    return  1;
+}
+
+-(int)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section{
+    return [news count];
+}
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath{
+
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MainCell"];
+    if (cell == nil) {
+        cell = [[UITableViewCell alloc]initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"MainCell"];
+    }
+
+    cell.textLabel.text = [idArray objectAtIndex:indexPath.row];
+
+    return cell;
+}
+</code></pre>

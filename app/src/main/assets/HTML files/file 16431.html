@@ -1,0 +1,43 @@
+<p>I'm not aware of a way to do this using a <code>System.Timer</code>. However you can resort to a <code>System.Windows.Forms.Timer</code> in order to have a timer that runs in a specific thread that you create this way allowing you to set its priority explicitly. </p>
+
+<p>This works because the <code>Tick</code> event of a <code>System.Windows.Forms.Timer</code> is always triggered in the thread that created it, normally the UI thread, but you can have a thread without UI running a message loop and achieve the same.</p>
+
+<p>See if the following is acceptable:</p>
+
+<pre><code>static void Main(string[] args)
+{
+    var monitorContext = new System.Windows.Forms.ApplicationContext();
+
+    var monitor = new Thread(Monitor) { Priority = ThreadPriority.Highest };
+
+    monitor.Start(monitorContext); // Start monitor
+
+    Thread.Sleep(5500); // ...
+
+    monitorContext.ExitThread(); // Terminates monitor
+}
+
+public static void Monitor(object context)
+{
+    var timer = new System.Windows.Forms.Timer()
+    {
+        Enabled = true,
+        Interval = 1000
+    };
+
+    timer.Tick += new EventHandler(Monitor_Tick);
+
+    System.Windows.Forms.Application.Run(
+        (System.Windows.Forms.ApplicationContext)context);
+}
+
+private static void Monitor_Tick(object sender, EventArgs e)
+{
+    Debug.WriteLine(
+        "{0}|{1}", 
+        DateTime.UtcNow.ToString(),
+        Thread.CurrentThread.Priority);
+}
+</code></pre>
+
+<p>The only thing you need to consider is that if a tick event is fired while a previous one is still being processed then it will be discarded, so make sure what you do in the tick event does not take longer than the interval configured for the timer.</p>

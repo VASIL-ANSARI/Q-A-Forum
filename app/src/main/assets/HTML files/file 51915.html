@@ -1,0 +1,47 @@
+<p>Marco,</p>
+
+<p>Don't use NSMutableURLRequests, use sessions... the former is being deprecated by Apple.</p>
+
+<p>Here is an example ..</p>
+
+<pre><code>func getMetaData(lePath:String, completion: (string: String?, error: ErrorType?) -&gt; Void) {
+// **** get_metadata ****
+    let request = NSMutableURLRequest(URL: NSURL(string: "https://api.dropboxapi.com/2/files/get_metadata")!)
+    let session = NSURLSession.sharedSession()
+    request.HTTPMethod = "POST"
+
+    request.addValue("Bearer ab-blah", forHTTPHeaderField: "Authorization")
+    request.addValue("application/json",forHTTPHeaderField: "Content-Type")
+    request.addValue("path", forHTTPHeaderField: lePath)
+    let cursor:NSDictionary? = ["path":lePath]
+    do {
+        let jsonData = try NSJSONSerialization.dataWithJSONObject(cursor!, options: [])
+        request.HTTPBody = jsonData
+        print("json ",jsonData)
+    } catch {
+        print("snafoo alert")
+    }
+
+    let task = session.dataTaskWithRequest(request, completionHandler: {data, response, error -&gt; Void in
+        if let error = error {
+            completion(string: nil, error: error)
+            return
+        }
+        let strData = NSString(data: data!, encoding: NSUTF8StringEncoding)
+        print("Body: \(strData)\n\n")
+        do {
+            let jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options:NSJSONReadingOptions.MutableContainers);
+            self.jsonParser(jsonResult,field2file: "ignore")
+            for (key, value) in self.parsedJson {
+                print("key2 \(key) value2 \(value)")
+            }
+
+            completion(string: "", error: nil)
+        } catch {
+            completion(string: nil, error: error)
+        }
+    })
+    task.resume()
+
+}
+</code></pre>

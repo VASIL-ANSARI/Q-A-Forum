@@ -1,0 +1,30 @@
+<p>The difference is that you <em>should</em> be using the syntax <code>WITH (NOLOCK)</code> (or <code>WITH (&lt;any table hint&gt;)</code>). Why?</p>
+
+<ol>
+<li><p>Without <code>WITH</code> is deprecated. From <a href="http://technet.microsoft.com/en-us/library/ms187373.aspx" rel="nofollow">Table Hints on MSDN</a>:</p>
+
+<blockquote>
+  <p>Omitting the WITH keyword is a deprecated feature: This feature will be removed in a future version of Microsoft SQL Server. Avoid using this feature in new development work, and plan to modify applications that currently use this feature.</p>
+</blockquote></li>
+<li><p><code>from table1 nolock</code> does not apply a hint at all - that's an alias. For example:</p>
+
+<pre><code>SELECT nolock.name FROM sys.objects nolock ORDER BY nolock.name;
+</code></pre>
+
+<p>Notice that I can use <code>nolock</code> as an alias. No hint is applied here.</p></li>
+<li><p><code>from table1 as mytable nolock</code> is invalid syntax in modern versions of SQL Server.</p>
+
+<blockquote>
+  <p>Msg 1018, Level 15, State 1, Line 12<br>
+  Incorrect syntax near 'nolock'. If this is intended as a part of a table hint, A WITH keyword and parenthesis are now required. See SQL Server Books Online for proper syntax.</p>
+</blockquote></li>
+</ol>
+
+<p>You should also consider using the session-level hint, <code>SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED</code>, because then you don't have the syntax issue above, and you also don't have 15 <code>WITH (NOLOCK)</code>s littering your query. These make it harder to replace with a different isolation level later (like RCSI, which is far more practical than <code>READ UNCOMMITTED</code> IMHO), whereas the single batch-level statement is a very easy one-liner to replace.</p>
+
+<p>Also, and this is for other readers more so than for the OP, please be absolutely sure you understand the risks of using <code>NOLOCK</code>, which include getting corrupted data in a single row <em>that never existed</em>:</p>
+
+<ul>
+<li><a href="http://blogs.sqlsentry.com/aaronbertrand/bad-habits-nolock-everywhere/" rel="nofollow">Bad habits : Putting NOLOCK everywhere</a></li>
+<li><a href="http://sqlperformance.com/2015/04/t-sql-queries/the-read-uncommitted-isolation-level" rel="nofollow">The Read Uncommitted Isolation Level (Paul White)</a></li>
+</ul>

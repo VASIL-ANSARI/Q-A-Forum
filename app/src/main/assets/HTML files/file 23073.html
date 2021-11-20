@@ -1,0 +1,31 @@
+<p>I am not sure if you have found the answer or not.  They have changed the way DI works in SignalR as of version 1.0.0 and the SignalR.Ninject packages doesn't work - I have written a small blog post on this: <a href="http://myrandomcodesnippets.wordpress.com/2013/03/29/ninject-dependency-injection-with-signalr-1-0-1/" rel="nofollow">http://myrandomcodesnippets.wordpress.com/2013/03/29/ninject-dependency-injection-with-signalr-1-0-1/</a></p>
+
+<p>Basically you need to create your own implementation of this which is the same as the SignalR.Ninject implementation:</p>
+
+<pre><code>GlobalHost.DependencyResolver = new SignalRNinjectDependencyResolver(kernel);
+</code></pre>
+
+<p>When you create the new class it will want to inherit from IDependancyResolver don't bother with this and use:</p>
+
+<pre><code>public class SignalRNinjectDependencyResolver : DefaultDependencyResolver
+{
+    private readonly IKernel _kernel;
+
+    public SignalRNinjectDependencyResolver(IKernel kernel)
+    {
+        _kernel = kernel;
+    }
+
+    public override object GetService(Type serviceType)
+    {
+        return _kernel.TryGet(serviceType) ?? base.GetService(serviceType);
+    }
+
+    public override IEnumerable&lt;object&gt; GetServices(Type serviceType)
+    {
+        return _kernel.GetAll(serviceType).Concat(base.GetServices(serviceType));
+    }
+}
+</code></pre>
+
+<p>Hope this helps.</p>

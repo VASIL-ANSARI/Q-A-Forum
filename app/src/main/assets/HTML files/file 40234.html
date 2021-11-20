@@ -1,0 +1,26 @@
+<p>You're not passing the link to <code>mysqli_query()</code>. You need to either do that, or use the object oriented style and call <code>query()</code> on the connection.</p>
+
+<p>You also have a possible SQL injection there, because <code>$user_account</code> could contain "<code>foo' OR 1 OR '</code>", returning all rows (and that's just a simple, not very evil case), so you should escape that using <code>mysqli_real_escape_string()</code>, or even better, use prepared statements.</p>
+
+<p>Finally, instead of <code>or die()</code>, how about extracting error information properly, or even configuring mysqli to throw exceptions?</p>
+
+<pre><code>&lt;?php
+$url = parse_url(getenv("CLEARDB_DATABASE_URL"));
+
+$server = $url["host"];
+$username = $url["user"];
+$password = $url["pass"];
+$db = substr($url["path"], 1);
+
+$conn = new mysqli($server, $username, $password, $db);
+
+$sql = "SELECT * FROM `user_info` WHERE `user_account`='".$conn-&gt;real_escape_string($user_account)."'";
+
+if($result = $conn-&gt;query($sql)) {
+    foreach($result as $row) {
+        // ...
+    }
+} else {
+    throw new Exception($conn-&gt;error);
+}
+</code></pre>

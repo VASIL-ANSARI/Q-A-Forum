@@ -1,0 +1,186 @@
+<p>I've bumped into this before. The only way I could make this work was to call <code>RevertToParent()</code> on the <code>system.webServer/httpErrors</code> section and commit the changes before making any changes, e.g.:</p>
+
+<pre><code>ConfigurationSection httpErrorsSection = 
+           config.GetSection("system.webServer/httpErrors");
+
+// Save a copy of the errors collection first (see pastebin example)
+ httpErrorsCollectionLocal = 
+            CopyLocalErrorCollection(httpErrorsSection.GetCollection()
+            .Where(e =&gt; e.IsLocallyStored)
+            .ToList&lt;ConfigurationElement&gt;());
+
+httpErrorsSection.RevertToParent();
+serverManager.CommitChanges();
+</code></pre>
+
+<p>You have to commit after <code>RevertToParent() is called because the errors collection remains intact until</code>CommitChanges()` is called.</p>
+
+<p>You then have to re-add the saved copy of the local errors collection removing or updating the custom errors as they are re-added.</p>
+
+<p>I've pasted a full working example below. The code works on the site root <code>web.config</code> but with a bit of tinkering you could add support for <code>web.config</code> files in subfolders:</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Microsoft.Web.Administration;
+
+namespace IIS7_HttpErrorSectionClearing
+{
+  class Program
+  {
+    static void Main(string[] args)
+    {
+      long siteId = 60001;
+
+      // Add some local custom errors
+      CustomErrorManager.SetCustomError(siteId, 404, -1, ResponseMode.File, @"D:\websites\60001\www\404.html");
+      CustomErrorManager.SetCustomError(siteId, 404, 1, ResponseMode.File, @"D:\websites\60001\www\404-1.html");
+      CustomErrorManager.SetCustomError(siteId, 404, 5, ResponseMode.File, @"D:\websites\60001\www\404-5.html");
+
+      // Change existing local custom error
+      CustomErrorManager.SetCustomError(siteId, 404, 1, ResponseMode.ExecuteURL, "/404-5.aspx");
+
+      // Revert to inherited
+      CustomErrorManager.RevertCustomError(siteId, 404, 5);
+      CustomErrorManager.RevertCustomError(siteId, 404, -1);
+      CustomErrorManager.RevertCustomError(siteId, 404, 1);
+    }
+  }
+
+  public enum ResponseMode
+  {
+    File,
+    ExecuteURL,
+    Redirect
+  }  
+
+  public static class CustomErrorManager
+  {
+    public static void RevertCustomError(long siteId, int statusCode, int subStatusCode)
+    {
+      List&lt;Error&gt; httpErrorsCollectionLocal = CopyLocalsAndRevertToInherited(siteId);
+      int index = httpErrorsCollectionLocal.FindIndex(e =&gt; e.StatusCode == statusCode &amp;&amp; e.SubStatusCode == subStatusCode);
+      if(index &gt; -1)
+      {
+        httpErrorsCollectionLocal.RemoveAt(index);
+      }
+      PersistLocalCustomErrors(siteId, httpErrorsCollectionLocal);
+    }
+
+    public static void SetCustomError(long siteId, long statusCode, int subStatusCode, 
+                                          ResponseMode responseMode, string path)
+    {
+      SetCustomError(siteId, statusCode, subStatusCode, responseMode, path, null);
+    }
+
+    public static void SetCustomError(long siteId, long statusCode, int subStatusCode, 
+                                          ResponseMode responseMode, string path, string prefixLanguageFilePath)
+    {
+      List&lt;Error&gt; httpErrorsCollectionLocal = CopyLocalsAndRevertToInherited(siteId);
+      AddOrUpdateError(httpErrorsCollectionLocal, statusCode, subStatusCode, responseMode, path, prefixLanguageFilePath);
+      PersistLocalCustomErrors(siteId, httpErrorsCollectionLocal);
+    }
+
+    private static void PersistLocalCustomErrors(long siteId, List&lt;Error&gt; httpErrorsCollectionLocal)
+    {
+      using (ServerManager serverManager = new ServerManager())
+      {
+        Site site = serverManager.Sites.Where(s =&gt; s.Id == siteId).FirstOrDefault();
+        Configuration config = serverManager.GetWebConfiguration(site.Name);
+        ConfigurationSection httpErrorsSection = config.GetSection("system.webServer/httpErrors");
+        ConfigurationElementCollection httpErrorsCollection = httpErrorsSection.GetCollection();
+
+        foreach (var localError in httpErrorsCollectionLocal)
+        {
+          ConfigurationElement remove = httpErrorsCollection.CreateElement("remove");
+          remove["statusCode"] = localError.StatusCode;
+          remove["subStatusCode"] = localError.SubStatusCode;
+          httpErrorsCollection.Add(remove);
+
+          ConfigurationElement add = httpErrorsCollection.CreateElement("error");
+          add["statusCode"] = localError.StatusCode;
+          add["subStatusCode"] = localError.SubStatusCode;
+          add["responseMode"] = localError.ResponseMode;
+          add["path"] = localError.Path;
+          add["prefixLanguageFilePath"] = localError.prefixLanguageFilePath;
+          httpErrorsCollection.Add(add);
+        }
+        serverManager.CommitChanges();
+      }
+    }
+
+    private static List&lt;Error&gt; CopyLocalsAndRevertToInherited(long siteId)
+    {
+      List&lt;Error&gt; httpErrorsCollectionLocal;
+      using (ServerManager serverManager = new ServerManager())
+      {
+        Site site = serverManager.Sites.Where(s =&gt; s.Id == siteId).FirstOrDefault();
+        Configuration config = serverManager.GetWebConfiguration(site.Name);
+        ConfigurationSection httpErrorsSection = config.GetSection("system.webServer/httpErrors");
+        ConfigurationElementCollection httpErrorsCollection = httpErrorsSection.GetCollection();
+
+        // Take a copy because existing elements can't be modified.
+        httpErrorsCollectionLocal = CopyLocalErrorCollection(httpErrorsSection.GetCollection()
+                                      .Where(e =&gt; e.IsLocallyStored).ToList&lt;ConfigurationElement&gt;());
+
+        httpErrorsSection.RevertToParent();
+
+        // Have to commit here because RevertToParent won't clear the collection until called.
+        serverManager.CommitChanges();
+        return httpErrorsCollectionLocal;
+      }
+    }
+
+    private static List&lt;Error&gt; CopyLocalErrorCollection(List&lt;ConfigurationElement&gt; collection)
+    {
+      List&lt;Error&gt; errors = new List&lt;Error&gt;();
+      foreach (var error in collection)
+      {
+        errors.Add(new Error()
+        {
+          StatusCode = (long)error["statusCode"],
+          SubStatusCode = (int)error["subStatusCode"],
+          ResponseMode = (ResponseMode)error["responseMode"],
+          Path = (string)error["path"],
+          prefixLanguageFilePath = (string)error["prefixLanguageFilePath"]
+        });
+      }
+      return errors;
+    }
+
+    private static void AddOrUpdateError(List&lt;Error&gt; collection, long statusCode, int subStatusCode, 
+                                             ResponseMode responseMode, string path, string prefixLanguageFilePath)
+    {
+      // Add or update error
+      Error error = collection.Find(ce =&gt; ce.StatusCode == statusCode &amp;&amp; ce.SubStatusCode == subStatusCode);
+      if (error == null)
+      {
+        collection.Add(new Error()
+        {
+          StatusCode = statusCode,
+          SubStatusCode = subStatusCode,
+          ResponseMode = responseMode,
+          Path = path,
+          prefixLanguageFilePath = prefixLanguageFilePath
+        });
+      }
+      else
+      {
+        error.ResponseMode = responseMode;
+        error.Path = path;
+        error.prefixLanguageFilePath = prefixLanguageFilePath;
+      }
+    }
+
+    private class Error
+    {
+      public long StatusCode { get; set; }
+      public int SubStatusCode { get; set; }
+      public ResponseMode ResponseMode { get; set; }
+      public string Path { get; set; }
+      public string prefixLanguageFilePath { get; set; }
+    }  
+  }
+}
+</code></pre>

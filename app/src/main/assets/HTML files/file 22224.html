@@ -1,0 +1,72 @@
+<p><strong>NOTE: See update below for a change of answer</strong></p>
+
+<p>I'm assuming that what you want is to have a table with this information as the plain text in a column.</p>
+
+<p>A basic table definition</p>
+
+<pre><code> CREATE TABLE WhoIsData
+ (
+     Id INT PRIMARY KEY IDENTITY(1,1),
+     WhoIsData NVARCHAR(MAX)
+ )
+</code></pre>
+
+<p>I don't know what <code>st</code> is (which is the data you send to the service, it may be useful in your table if you also want to store that too).</p>
+
+<p>C# code (roughly - I've not tested it)</p>
+
+<pre><code>string st = TextBox1.Text;
+wservices.whois myservices = new wservices.whois();
+string textData = myservices.GetWhoIS(st);
+TextBox2.Text = textData;
+using(SqlConnection conn = new SqlConnection(connectionString));
+{
+  SqlCommand cmd = new SqlCommand("INSERT INTO WhoIsData(WhoIsData) VALUES(@text);");
+  cmd.Connection = conn;
+  cmd.Parameters.AddWithValue("@text", textData);
+  conn.Open();
+  cmd.ExecuteNonQuery();
+}
+</code></pre>
+
+<p>I'd separate out the SQL Calls from your user interface classes in real life. But for the sake of the example I've put it all together. Also, I've not renamed your text boxes, although <code>TextBox1</code> and <code>TextBox2</code> are really bad names.</p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Okay - You want to store the content in a text file, but I'm assuming you want to store a link to the text file in the database (you've not been very specific)</p>
+
+<p>The Table definition:</p>
+
+<pre><code>CREATE TABLE WhoIsData
+(
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    DomainName NVARCHAR(256),
+    WhoIsFile NVARCHAR(256)
+)
+</code></pre>
+
+<p>The C# code:</p>
+
+<pre><code>string st = TextBox1.Text;
+wservices.whois myservices = new wservices.whois();
+string textData = myservices.GetWhoIS(st);
+TextBox2.Text = textData;
+
+string fileName = Guid.NewGuid().ToString();
+using(var file = File.OpenWrite(fileName))
+{
+    file.Write(textData);
+}
+
+using(SqlConnection conn = new SqlConnection(connectionString));
+{
+  SqlCommand cmd = new SqlCommand("INSERT INTO WhoIsData(DomainName, WhoIsFile) VALUES(@domainName, @fileName);");
+  cmd.Connection = conn;
+  cmd.Parameters.AddWithValue("@fileName", fileName);
+  cmd.Parameters.AddWithValue("@domainName", domainName);
+  conn.Open();
+  cmd.ExecuteNonQuery();
+}
+</code></pre>
+
+<p>Again, I've not tested this, but it is roughly what you want to do. Also, you need to provide a mechanism for generating the file name, I've just used a guid as it pretty much guarantees uniqueness.</p>

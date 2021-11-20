@@ -1,0 +1,56 @@
+<p>In this specific case, the solution is relatively simple: make <code>Wait()</code> return just the integer:</p>
+
+<pre><code>public IEnumerable Update()
+{
+    while (true)
+    {
+        ShootAtPlayer();
+        yield return Wait(30);
+    }
+}
+
+private int Wait(int x)
+{
+    return removeScript ? -1 : x;
+}
+</code></pre>
+
+<p>In more complicated cases, you can use <code>foreach</code>, though this makes the syntax much more verbose:</p>
+
+<pre><code>public IEnumerable Update()
+{
+    while (true)
+    {
+        ShootAtPlayer();
+
+        foreach (var x in Wait(30))
+            yield return x;
+    }
+}
+
+private IEnumerable Wait(int x)
+{
+    yield return removeScript ? -1 : x;
+}
+</code></pre>
+
+<p>As you can see, you can (ab)use <code>yield return</code> to implement fibers, but <code>yield return</code> was never meant for this, so it won't work that well.</p>
+
+<p>What was made for this kind of asynchronous continuations is the new <code>async</code>-<code>await</code>. With that, your code could look for example something like this:</p>
+
+<pre><code>public async Task Update()
+{
+    while (true)
+    {
+        ShootAtPlayer();
+        await Wait(30);
+    }
+}
+
+private async Task Wait(int x)
+{
+    await fiber.Wait(removeScript ? -1 : x);
+}
+</code></pre>
+
+<p>As a final note, I think the way you're using <code>removeScript</code> is not a good idea. End of a script should be signified by the <code>Update()</code> method actually completing (the enumerable doesn't have any more items, or the <code>Task</code> completes), not by returning a magic value.</p>

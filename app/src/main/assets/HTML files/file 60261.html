@@ -1,0 +1,55 @@
+<p>You're using two features together - in-line keys and key generators. I'll explain them both separately then how they compose.</p>
+
+<p><strong>In-Line and Out-of-Line Keys</strong></p>
+
+<p><em>In-line keys</em> have the key value appear in the record itself - a store with a keyPath uses in-line keys. By contrast, <em>out-of-line keys</em> have the key value separate.</p>
+
+<pre><code>var storeWithOutOfLineKeys = db.createObjectStore('s1');
+storeWithOutOfLineKeys.put({name: 'alice'}, 1);
+
+var storeWithInLineKeys = db.createObjectStore('s2', {keyPath: 'id'});
+storeWithInLineKeys.put({name: 'bob', id: 1});
+</code></pre>
+
+<p>Calls to <code>put()</code> and <code>add()</code> will fail if you don't supply an explicit key for a store with out-of-line keys. Calls to <code>put()</code> and <code>add()</code> will fail if you <em>do</em> supply an explicit key to a store with in-line keys, and will fail if the record does not contain the in-line key value (e.g. missing the <code>id</code> property in the above example)</p>
+
+<p><strong>Key Generators</strong></p>
+
+<p>When you specify <code>autoIncrement: true</code> you're using what the spec calls a <em>key generator</em>. For each record added, if not specified otherwise then the first will get <code>1</code>, the second <code>2</code>, etc. You can find out what key was used by looking at the result of the <code>put()</code> or <code>add()</code> request, e.g.</p>
+
+<pre><code>var request = store.put({name: 'alice'});
+request.onsuccess = function() {
+  console.log('put got generated key: ' + request.result;
+};
+</code></pre>
+
+<p><strong>Both In-Line Keys and Key Generators</strong></p>
+
+<p>When a key generator is used, the behavior of <code>add()</code> and <code>put()</code> change:</p>
+
+<p><em>Key generator and out-of-line keys:</em> it is not necessary to pass an explicit key when calling <code>add()</code> or <code>put()</code>; if omitted, the generated key is used:</p>
+
+<pre><code>var storeWithOutOfLineKeys = db.createObjectStore('s1', {autoIncrement: true});
+storeWithOutOfLineKeys.put({name: 'alice'});
+</code></pre>
+
+<p>If an explicit key is passed it <em>will</em> be used, either overwriting a previous record or adding a new one. (If the key passed happens to be a number higher than the generator value, the generator will be set to that number.)</p>
+
+<p><em>Key generator and in-line keys:</em> it is not necessary to specify the key in the record when calling <code>add()</code> or <code>put()</code>; if omitted, the generated key is injected into the value.</p>
+
+<pre><code>var storeWithInLineKeys = db.createObjectStore('s2', {keyPath: 'id'});
+storeWithInLineKeys.put({name: 'bob'}).onsuccess = function(e) {
+  var id = e.target.result;
+  storeWithInLineKeys.get(id).onsuccess = function(e) {
+    console.log(JSON.stringify(e.target.result));
+    // {"name": "bob", "id": 1}
+  });
+});
+</code></pre>
+
+<p>Similarly though, if the record <em>does</em> contain a key value it will be used instead. (And if it's a number higher than the key generator state, the key generator will be adjusted.)</p>
+
+<p>I believe this last case matches what your code is doing - both in-line keys and a key generator. You can use the result of <code>add()</code> and <code>put()</code> requests to determine the key that was added, and update records by specifying the key explicitly in the record:</p>
+
+<pre><code>storeWithInLineKeys.put({name: 'eve', id: 1}); // overwrites old #1
+</code></pre>

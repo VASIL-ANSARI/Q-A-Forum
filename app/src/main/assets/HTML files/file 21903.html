@@ -1,0 +1,15 @@
+<p>In the code snippet provided, you never perform the <code>alloc</code> and <code>init</code> of <code>oggetto2</code>. Thus, it is <code>nil</code>, and thus attempts to set its properties will achieve nothing.</p>
+
+<p>In addition to your existing <code>NSLog</code> statements, I'd also suggest doing a <code>NSLog</code> of the <code>htmlString</code> right before you perform <code>loadHTMLString</code>, because it's easier to see what's going on with your HTML by looking at the source, rather than trying to make inferences from a blank web view.</p>
+
+<hr>
+
+<p>Unrelated to your problem, but you probably should not have code that could potentially reusing your static <code>sqlite3_stmt</code> after you've finalized it. The first time you call <code>carica_ID</code> you would initialize the static <code>leggiStatement</code>. But you end up doing a <code>sqlite_finalize</code> but don't set <code>leggiStatement</code> to <code>nil</code>. If you ever called this method a second time, it won't <code>sqlite3_prepare_v2</code> again, but you will have freed the resources associated with your prior <code>leggiStatement</code>.</p>
+
+<p>A couple of easy fixes:</p>
+
+<ul>
+<li><p>do not make <code>leggiStatement</code> a static global, but rather make it a local, non-static variable of the method;</p></li>
+<li><p>if you do <code>sqlite3_finalize</code>, make sure you set <code>leggiStatement</code> to <code>nil</code> as well; or</p></li>
+<li><p>don't call <code>sqlite3_finalize</code>, but rather just call <code>sqlite3_reset</code>, which will reset the prepared statement, but won't release its resources.</p></li>
+</ul>

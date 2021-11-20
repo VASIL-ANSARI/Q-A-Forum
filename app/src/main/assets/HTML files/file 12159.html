@@ -1,0 +1,45 @@
+<p>How about not attempting an insert if today's date is less than the enddate you are inserting?</p>
+
+<pre><code>If Date.Today &lt;= now5 Then
+   Throw New Exception("Invalid Date")
+Else
+  strInsert = String.Format("Insert into Reservation (VehicleID, startDate, enddate) VALUES ('{0}','{1}','{2}')", vID, now, now5)
+End If
+</code></pre>
+
+<p><strong>UPDATE</strong></p>
+
+<p>If you are implementing this all in SQL, then I recommend using a stored procedure, but in either case the logic is the same. Check to see if any reservations exist that overlap today and if they do, throw an exception from SQL.</p>
+
+<p>Note that <code>GETDATE()</code> is not quite the right value to use since it returns the current timestamp, but without know how the values are stored, it is used as an approximation and can be cleaned up later.</p>
+
+<pre><code>CREATE PROCEDURE s_AddReservation
+    @VehicleID   INT ,
+    @StartDate   DATETIME ,
+    @EndDate     DATETIME
+AS
+    IF EXISTS(SELECT 1
+                FROM Reservation
+               WHERE VehicleID = @VehicleID
+                 AND StartDate &lt;= GETDATE()
+                 AND EndDate &gt;= GETDATE())
+      BEGIN
+        RAISERROR('This care has already been rented', 16, 1);
+      END
+    ELSE
+      BEGIN
+        Insert into Reservation (VehicleID, startDate, enddate) VALUES (@VehicleID, @StartDate, @EndDate)
+      END
+GO
+</code></pre>
+
+<p>To call this stored procedure from your code:</p>
+
+<pre><code>var oCommand = new SqlCommand('s_AddReservation', conn);
+oCommand.CommandType = CommandType.StoredProcedure;
+oCommand.Parameters.AddWithValue("@VehicleID", vID);
+oCommand.Parameters.AddWithValue("@StartDate", now);
+oCommand.Parameters.AddWithValue("@EndDate", now5);
+
+oCommand.ExecuteNonQuery();
+</code></pre>

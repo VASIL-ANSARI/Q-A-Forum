@@ -1,0 +1,106 @@
+<p>What is spotted right after looking at your code,
+you init <code>backNode</code> and <code>frontNode</code> with NULL value,
+but after that in <code>push_back</code> you use <code>operator-&gt;</code> for them,
+you need allocate memory for them, before usage.</p>
+
+<p>Little modification of your algorithm to make it works:</p>
+
+<pre><code>#include &lt;cassert&gt;
+#include &lt;cstdlib&gt;
+
+template &lt;typename T&gt; struct cNode {
+  T nodeVal;
+  cNode&lt;T&gt; *next;
+  cNode&lt;T&gt; *prev;
+
+  cNode&lt;T&gt;(const T &amp;v = T(), cNode&lt;T&gt; *n = NULL, cNode&lt;T&gt; *p = NULL)
+      : nodeVal(v), next(n), prev(p) {}
+};
+
+template &lt;typename T&gt; class cList {
+private:
+  cNode&lt;T&gt; head_;
+  size_t sizeOfList_;
+  typedef cNode&lt;T&gt; NT;
+
+public:
+  cList() : sizeOfList_(0) {
+    head_.next = &amp;head_;
+    head_.prev = &amp;head_;
+  }
+  ~cList() {
+    for (NT *p = begin(); p != end();) {
+      NT *next = p-&gt;next;
+      delete p;
+      p = next;
+    }
+  }
+  cNode&lt;T&gt; *cbegin() const { return head_.next; }
+  cNode&lt;T&gt; *begin() { return head_.next; }
+  cNode&lt;T&gt; *end() { return &amp;head_; }
+  bool empty() const { return head_.next == &amp;head_; }
+
+  void push_back(const T &amp;val) {
+    NT *newNode = new NT(val);
+    NT *prev_end = end()-&gt;prev;
+    prev_end-&gt;next = newNode;
+    newNode-&gt;prev = prev_end;
+    newNode-&gt;next = end();
+    end()-&gt;prev = newNode;
+    ++sizeOfList_;
+  }
+
+  void pop_front() {
+    if (empty())
+      return;
+    NT *next_in_list = begin()-&gt;next;
+    NT *prev_in_list = begin()-&gt;prev;
+    delete begin();
+    head_.next = next_in_list;
+    if (prev_in_list == end())
+      end()-&gt;prev = end();
+    --sizeOfList_;
+  }
+  T front() const {
+    assert(!empty());
+    return cbegin()-&gt;nodeVal;
+  }
+  size_t size() const { return sizeOfList_; }
+};
+
+int main() {
+  cList&lt;int&gt; l;
+  assert(l.size() == 0);
+  assert(l.empty());
+  l.push_back(10);
+  assert(!l.empty());
+  assert(l.size() == 1);
+  assert(l.front() == 10);
+  l.pop_front();
+  assert(l.size() == 0);
+  assert(l.empty());
+
+  for (int i = 5; i &lt; 17; ++i)
+    l.push_back(i);
+  assert(l.size() == (17 - 5));
+  assert(l.front() == 5);
+  assert(!l.empty());
+  {
+    cNode&lt;int&gt; *p;
+    int i;
+    for (p = l.begin(), i = 5; p != l.end(); p = p-&gt;next, ++i) {
+      assert(p-&gt;nodeVal == i);
+    }
+    assert(i == 17);
+  }
+  l.pop_front();
+  assert(l.size() == (17 - 5 - 1));
+  assert(l.front() == 6);
+  assert(!l.empty());
+
+  l.pop_front();
+  assert(l.size() == (17 - 5 - 2));
+  assert(l.front() == 7);
+  assert(!l.empty());
+}
+</code></pre>

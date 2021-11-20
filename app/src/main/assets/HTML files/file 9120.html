@@ -1,0 +1,35 @@
+<p><code>[[carries_dependency]]</code> is used to allow dependencies to be carried across function calls. This potentially allows the compiler to generate better code when used with <code>std::memory_order_consume</code> for transferring values between threads on platforms with weakly-ordered architectures such as IBM's POWER architecture.</p>
+
+<p>In particular, if a value read with <code>memory_order_consume</code> is passed in to a function, then without <code>[[carries_dependency]]</code>, then the compiler may have to issue a memory fence instruction to guarantee that the appropriate memory ordering semantics are upheld. If the parameter is annotated with <code>[[carries_dependency]]</code> then the compiler can assume that the function body will correctly carry the dependency, and this fence may no longer be necessary.</p>
+
+<p>Similarly, if a function returns a value loaded with <code>memory_order_consume</code>, or derived from such a value, then without <code>[[carries_dependency]]</code> the compiler may be required to insert a fence instruction to guarantee that the appropriate memory ordering semantics are upheld. With the <code>[[carries_dependency]]</code> annotation, this fence may no longer be necessary, as the caller is now responsible for maintaining the dependency tree.</p>
+
+<p>e.g.</p>
+
+<pre><code>void print(int * val)
+{
+    std::cout&lt;&lt;*p&lt;&lt;std::endl;
+}
+
+void print2(int * [[carries_dependency]] val)
+{
+    std::cout&lt;&lt;*p&lt;&lt;std::endl;
+}
+
+std::atomic&lt;int*&gt; p;
+int* local=p.load(std::memory_order_consume);
+if(local)
+    std::cout&lt;&lt;*local&lt;&lt;std::endl; // 1
+
+if(local)
+    print(local); // 2
+
+if(local)
+    print2(local); // 3
+</code></pre>
+
+<p>In line (1), the dependency is explicit, so the compiler knows that <code>local</code> is dereferenced, and that it must ensure that the dependency chain is preserved in order to avoid a fence on POWER.</p>
+
+<p>In line (2), the definition of <code>print</code> is opaque (assuming it isn't inlined), so the compiler must issue a fence in order to ensure that reading <code>*p</code> in <code>print</code> returns the correct value.</p>
+
+<p>On line (3), the compiler can assume that although <code>print2</code> is also opaque then the dependency from the parameter to the dereferenced value is preserved in the instruction stream, and no fence is necessary on POWER. Obviously, the definition of <code>print2</code> must actually preserve this dependency, so the attribute will also impact the generated code for <code>print2</code>.</p>

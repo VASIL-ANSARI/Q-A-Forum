@@ -1,0 +1,43 @@
+<p>I admit, this question stumped me for quite awhile. I think I've finally found a repro, though.</p>
+
+<p>Looking through the <a href="http://en.wikipedia.org/wiki/GNUstep">GNUstep</a> <a href="http://svn.gna.org/svn/gnustep/libs/base/trunk/Source/GSString.m">code that emulates this behavior</a>, I found the following source code:</p>
+
+<pre><code>if (enc == NSASCIIStringEncoding
+    &amp;&amp; isByteEncoding(internalEncoding))
+    {
+      unsigned  i;
+
+      if (bytes &gt; self-&gt;_count)
+    {
+      bytes = self-&gt;_count;
+    }
+      for (i = 0; i &lt; bytes; i++)
+    {
+      unsigned char c = self-&gt;_contents.c[i];
+
+      if (c &gt; 127)
+        {
+          [NSException raise: NSCharacterConversionException
+              format: @"unable to convert to encoding"];
+        }
+      buffer[i] = c;
+    }
+      buffer[bytes] = '\0';
+      if (bytes &lt; self-&gt;_count)
+    {
+      return NO;
+    }
+      return YES;
+    }
+...
+</code></pre>
+
+<p>Obviously, this code isn't one-to-one with your error message. <em>However,</em> I note this from your error repro: </p>
+
+<blockquote>
+  <p><code>reason: 'Unable to convert bytes in string 0x10004d430 to</code><strong><code>_NSCStringEncoding'</code></strong></p>
+</blockquote>
+
+<p>Well, <a href="http://en.wikipedia.org/wiki/C_string">we all know what a C String is</a>, and if you use the wrong encoding method (for example, Wide where ASCII is expected or vice versa), you're going to end up with exactly this problem. Thus: have you tried varying ASCII and Wide data types in your application to fix this issue? </p>
+
+<p>Due to how common this behavior happens to be, it very likely indicates that it's a handled case by the application sandbox. I can't yet find documentation to this effect, however. This should be something explicitly noted by <code>sandboxd</code>, as I raised in the question errata.</p>

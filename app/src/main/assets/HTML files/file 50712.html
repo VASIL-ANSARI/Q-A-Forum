@@ -1,0 +1,44 @@
+<p>You could do this by having <code>SendPrinterDocument</code> return you an object which raises appropriate events, and perhaps expose appropriate methods to do what you needs.</p>
+
+<p>I'll use (semi-)pseudo code, as I cant see all the code you say you have access to and can change - I assume you will be able to implement this idea.</p>
+
+<p>If <code>SendPrinterDocument</code> returned immediatly with an object which implemented this example interface:</p>
+
+<pre><code>public interface ISendPrinterDocumentResponse
+{
+    event EventHandler PrintingFinished;
+    event EventHandler&lt;PrintingInterruptedEventArgs&gt; PrintingInterrupted;
+    void Retry();
+}
+
+public class PrintingInterruptedEventArgs: EventArgs
+{
+     public string Reason { get;set; }
+}
+</code></pre>
+
+<p>You would be able to use it such as:</p>
+
+<pre><code>var response = SendPrinterDocument("p100.pdf");
+response.PrintingFinished = (s,ea) =&gt; MessageBox.Show("Finished");
+response.PrintingInterrupted = (s,ea) =&gt; {
+    MessageBox.Show("Printing stopped, hit ok to retry (reason:" + ea.Reason + ")");
+    response.Retry();
+};
+</code></pre>
+
+<hr>
+
+<p>Edit, based on comments:</p>
+
+<p>The idea above breaks down quite quickly if your actual functionality is quick enough that it finishes before you have actually assigned the event handlers, in this case, you probably want a second parameter for your function, which provides some "callbacks" which get called when relevant events occur. You can use the same sort of setup:</p>
+
+<pre><code>public void SendPrinterDocument(string documentName, ISendPrinterEvents events);
+{
+     // when interrupted
+     if(events.PrintingInterrupted != null)
+     {
+           events.PrintingInterrupted(this, new PrintingInterruptedEventArgs{Reason = "Out of paper"});
+     }
+}
+</code></pre>

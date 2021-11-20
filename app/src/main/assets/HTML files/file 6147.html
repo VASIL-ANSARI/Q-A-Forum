@@ -1,0 +1,38 @@
+<p>I have encountered with this problem before. In fact, NSTimer does not run in another thread, it always run in the thread which it is started. There is a runloop concept in iphone sdk, you should read it from <a href="http://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html#//apple_ref/doc/uid/10000057i-CH16-SW1" rel="nofollow">here</a> to understand timers. In this concept, you push some jobs into runloop and runloop implements them sequentially. The main thread is always a run loop and ui jobs are run there. So if you start your timer in the main thread, it will be affected by ui processing. You should start a new thread, configure it as a run loop and start your timers there.</p>
+
+<p>Edit: Here is a sample code from the link that I posted. threadMain is the first function which the thread starts. </p>
+
+<pre><code>
+- (void) threadMain
+{
+    NSRunLoop* myRunLoop = [NSRunLoop currentRunLoop];
+
+    // Create and schedule the timer.
+    [NSTimer scheduledTimerWithTimeInterval:0.1 target:self
+                selector:@selector(doFireTimer:) userInfo:nil repeats:YES];
+
+    NSInteger loopCount = 10;
+
+    do
+    {
+        // Run the run loop 10 times to let the timer fire.
+        [myRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1]];
+        loopCount--;
+    }
+    while (loopCount);
+}
+</code></pre>
+
+<p>if you want runloop to run infinitely, but terminate it with a condition, use this instead</p>
+
+<pre><code>
+BOOL shouldKeepRunning = YES;        // global
+
+NSRunLoop *theRL = [NSRunLoop currentRunLoop];
+
+[NSTimer scheduledTimerWithTimeInterval:0.1 target:self
+      selector:@selector(doFireTimer:) userInfo:nil repeats:YES];
+
+while (shouldKeepRunning && [theRL runMode:NSDefaultRunLoopMode 
+      beforeDate:[NSDate distantFuture]]);
+</code></pre>

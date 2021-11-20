@@ -1,0 +1,88 @@
+<p>I have made an alternative method to above which appears to be much faster.  It is mainly based on mikeB's excellent code given in this question.</p>
+
+<p><a href="http://stackoverflow.com/questions/667951/how-to-get-nodes-lying-inside-a-range-with-javascript">How to get nodes lying inside a range with javascript?</a></p>
+
+<ol>
+<li><p>I first split the start and end nodes creating new text nodes with
+only the text which falls with the given range.  I adjust the range
+for the new nodes.</p></li>
+<li><p>I use a slightly modified version of the code at the above link to
+return an array of <code>text nodes</code> contained within the range.</p></li>
+<li><p>I loop through the array and put spans with styles around each text
+node.</p></li>
+</ol>
+
+<p>As far as I've tested the code works well.  When applying styles to a number of ranges simultaneously there is still a delay but its much better than before.  I'd be interested to know if anyone has any improvements. </p>
+
+<p>My code:</p>
+
+<pre><code>function styleRange(range, style) // the style is a string of css styles. eg."background-color:darkblue; color:blue;"
+{    
+    // Get the start and end nodes and split them to give new start and end nodes with only text that falls inside the range.
+    var startNode = range.startContainer.splitText(range.startOffset);
+    var endNode = range.endContainer.splitText(range.endOffset).previousSibling;
+
+    // Adjust the range to contain the new start and end nodes
+    // The offsets are not really important anymore but might as well set them correctly
+    range.setStart(startNode,0);
+    range.setEnd(endNode,endNode.length);
+
+    // Get an array of all text nodes within the range
+    var nodes = getNodesInRange(range);
+
+    // Place span tags with style around each textnode
+    for (i = 0; i &lt; nodes.length; i++)
+    {
+        var span = document.createElement('span');
+        span.setAttribute("style", style);
+        span.appendChild( document.createTextNode(nodes[i].nodeValue));
+        nodes[i].parentNode.replaceChild( span, nodes[i] );
+    }
+}
+</code></pre>
+
+<p>Modified code from mikeB's code:</p>
+
+<pre><code>function getNodesInRange(range)
+{
+    var start = range.startContainer;
+    var end = range.endContainer;
+    var commonAncestor = range.commonAncestorContainer;
+    var nodes = [];
+    var node;
+
+    // walk parent nodes from start to common ancestor
+    for (node = start.parentNode; node; node = node.parentNode)
+    {
+        if (node.nodeType == 3) //modified to only add text nodes to the array
+            nodes.push(node);
+        if (node == commonAncestor)
+            break;
+    }
+    nodes.reverse();
+
+    // walk children and siblings from start until end is found
+    for (node = start; node; node = getNextNode(node))
+    {
+        if (node.nodeType == 3) //modified to only add text nodes to the array
+            nodes.push(node);
+        if (node == end)
+            break;
+    }
+
+    return nodes;
+}
+
+
+function getNextNode(node, end)
+{
+    if (node.firstChild)
+        return node.firstChild;
+    while (node)
+    {
+        if (node.nextSibling)
+            return node.nextSibling;
+        node = node.parentNode;
+    }
+}
+</code></pre>

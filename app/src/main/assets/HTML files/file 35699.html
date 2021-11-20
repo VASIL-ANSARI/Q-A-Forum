@@ -1,0 +1,82 @@
+<p>If you are using the default <code>vboxsf</code> synced folder type, you may consider using the new rsync based synced folder to work around the issue.</p>
+
+<p><code>rsync</code> type will monitor the folders between host and guest, copy files directories to keep them in sync.</p>
+
+<p>The difference between default <code>vboxsf</code> and <code>rsync</code> is that the latter will cause the guest Linux to run the application (grunt in your case) from its native file system (e.g. <code>ext4</code>) instead of <code>vboxsf</code> (provided by VirtualBox Guest Additions, after all the files are on Windows).</p>
+
+<p><code>rsync</code> synced folder basically make use of <code>rsync</code> CLI utility to copy / sync files and directories between hosts. So there are 2 copies of everything. When you run your <code>grunt</code> against the file system within the guest, it is native Linux file system and should not be affected by long path (but ext4 does have a max <strong>filename</strong> length of 255 bytes).</p>
+
+<p>By default, Vagrant only syncs the folders on <code>vagrant up</code> or <code>vagrant reload</code>. But you can run <code>vagrant rsync</code> to manually force sync or <code>vagrant rsync-auto</code> to monitor changes and sync in real time.</p>
+
+<p>Reference: <a href="http://docs.vagrantup.com/v2/synced-folders/rsync.html" rel="nofollow">http://docs.vagrantup.com/v2/synced-folders/rsync.html</a></p>
+
+<p>You can set synced folder type to rsync in your <code>Vagrantfile</code> below</p>
+
+<pre class="lang-rb prettyprint-override"><code>Vagrant.configure("2") do |config|
+  config.vm.synced_folder ".", "/vagrant", type: "rsync",
+    rsync__exclude: ".git/"
+end
+</code></pre>
+
+<p>Update</p>
+
+<p>Tested creating the directory tree structure and a file, no problem opening it from a Linux perspective, the file system is ext4. I suspect this is a problem with npm.</p>
+
+<pre class="lang-sh prettyprint-override"><code>terry@arch:/$ uname -a
+Linux arch.apac.lab 3.14.1-1-ARCH #1 SMP PREEMPT Mon Apr 14 20:40:47 CEST 2014 x86_64 GNU/Linux
+terry@arch:/$ cat /u01/aa/bb/build/share/app-core/app-ui/node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-wrapper/node_modules/download/node_modules/request/node_modules/form-data/node_modules/combined-stream/test/integration/test-delayed-streams-and-buffers-and-strings.js
+test
+</code></pre>
+
+<p>Update - rsync synced folder test</p>
+
+<p>I did the previous test on a physical Linux installation. The following is on a quick test on Mac, guest is the same as above.</p>
+
+<p>rsync synced folder configuration</p>
+
+<pre class="lang-rb prettyprint-override"><code>config.vm.synced_folder ".", "/u01/aa/bb/build/share/app-core/app-ui/           node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-   wrapper/node_modules/download/node_modules/request/node_modules/form-data/        node_modules/combined-stream/test/integration", type: "rsync 
+</code></pre>
+
+<blockquote>
+  <p>NOTE: I <code>chown -R vagrant:vagrant /u01/</code> recursively beforehand to avoid permission issues when syncing. </p>
+</blockquote>
+
+<p>sync on <code>vagrant up</code>
+</p>
+
+<pre><code>$ vagrant up
+Bringing machine 'default' up with 'virtualbox' provider...
+==&gt; default: Clearing any previously set forwarded ports...
+==&gt; default: Clearing any previously set network interfaces...
+==&gt; default: Preparing network interfaces based on configuration...
+    default: Adapter 1: nat
+==&gt; default: Forwarding ports...
+    default: 22 =&gt; 2222 (adapter 1)
+==&gt; default: Running 'pre-boot' VM customizations...
+==&gt; default: Booting VM...
+==&gt; default: Waiting for machine to boot. This may take a few minutes...
+    default: SSH address: 127.0.0.1:2222
+    default: SSH username: vagrant
+    default: SSH auth method: private key
+    default: Warning: Connection timeout. Retrying...
+    default: Warning: Connection timeout. Retrying...
+    default: Warning: Connection timeout. Retrying...
+==&gt; default: Machine booted and ready!
+==&gt; default: Checking for guest additions in VM...
+==&gt; default: Rsyncing folder: /ops/arch64/ =&gt; /u01/aa/bb/build/share/app-core/app-ui/node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-wrapper/node_modules/download/node_modules/request/node_modules/form-data/node_modules/combined-stream/test/integration
+==&gt; default: Mounting shared folders...
+    default: /vagrant =&gt; /ops/arch64
+==&gt; default: VM already provisioned. Run `vagrant provision` or use `--provision` to force it
+
+$ vagrant ssh
+Last login: Sun Apr 27 10:36:10 2014 from 10.0.2.2
+vagrant@archlinux:~$ cd /u01/aa/bb/build/share/app-core/app-ui/node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-wrapper/node_modules/download/node_modules/request/node_modules/form-data/node_modules/combined-stream/test/integration
+vagrant@archlinux:/u01/aa/bb/build/share/app-core/app-ui/node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-wrapper/node_modules/download/node_modules/request/node_modules/form-data/node_modules/combined-stream/test/integration$ ls -l
+total 12
+-rw-r----- 1 vagrant vagrant   14 Apr 27 10:35 test-delayed-streams-and-buffers-and-strings.js
+-rw-r----- 1 vagrant vagrant 5018 Apr 27 10:22 Vagrantfile
+vagrant@archlinux:/u01/aa/bb/build/share/app-core/app-ui/node_modules/grunt-contrib-imagemin/node_modules/pngquant-bin/node_modules/bin-wrapper/node_modules/download/node_modules/request/node_modules/form-data/node_modules/combined-stream/test/integration$ cat test-delayed-streams-and-buffers-and-strings.js
+stackoverflow
+</code></pre>
+
+<p>Result is the same. As mentioned earlier, I suspect that this may be a npm issue.</p>

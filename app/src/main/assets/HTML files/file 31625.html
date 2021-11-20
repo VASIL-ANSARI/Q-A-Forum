@@ -1,0 +1,75 @@
+<p>Defining a member inside the constructor (such as: <code>this.name</code>) gives only that instance of the object access to that member.</p>
+
+<p>Defining a member inside the prototype allows all instances to "share" that property.</p>
+
+<p>A way that helped me understand this was to define an array (or any other member that is not a method) inside the prototype, like so:</p>
+
+<pre><code>function Animal() {}
+
+Animal.prototype = {
+    kids: [],
+    giveBirth: function() {
+        for(var i = 0; i &lt; arguments.length; i++) {
+            this.kids.push(arguments[0]);
+        }
+    }
+}
+
+var cat = new Animal();
+var giraffe = new Animal();
+
+cat.giveBirth('kitten','another kitten','yet another kitten');
+
+// cat.kids === ['kitten','another kitten','yet another kitten'];
+// giraffe.kids === ['kitten','another kitten','yet another kitten'];
+</code></pre>
+
+<p>If you notice, the giraffe's kids were set (as kittens).  Why is this?  Because in this case, <code>.giveBirth()</code> accesses the <strong>prototype's</strong> <code>kids</code> array, which is shared by all instances.</p>
+
+<p>What if we don't want to share the members, because the members are unique?  You can do like so:</p>
+
+<pre><code>function Animal() {
+    this.kids = [];
+}
+
+Animal.prototype = {
+    giveBirth: function() {
+        for(var i = 0; i &lt; arguments.length; i++) {
+            this.kids.push(arguments[0]);
+        }
+    }
+}
+
+var cat = new Animal();
+var giraffe = new Animal();
+
+cat.giveBirth('kitten');
+
+// cat.kids === ['kitten']
+// giraffe.kids == undefined
+
+giraffe.giveBirth('baby giraffe');
+
+// cat.kids === ['kitten']
+// giraffe.kids === ['baby giraffe']
+</code></pre>
+
+<p>As you pointed out in the comments, part of how you decide to define the properties plays into memory usage; another part plays into what members you want to be "shared" across all instances.</p>
+
+<p>To get a little more insight into prototypes (through understanding how <code>new</code> works), see <a href="http://stackoverflow.com/questions/1646698/what-is-the-new-keyword-in-javascript">What is the 'new' keyword in JavaScript?</a>, on StackOverflow.</p>
+
+<p>Here's a quote from there:</p>
+
+<blockquote>
+  <p>After a lot of searching, I have finally found out exactly what the
+  new keyword does, and it is 4 things:</p>
+  
+  <ol>
+  <li>It creates a new object. The type of this object, is simply object.</li>
+  <li>It sets this new object's internal, inaccessible, [[prototype]] property to be the constructor function's external, accessible,
+  prototype object.</li>
+  <li>It executes the constructor function, using the newly created object whenever this is mentioned.</li>
+  <li>It returns the newly created object, unless the constructor function returns a non-primitive value. In this case, that
+  non-primitive value will be returned.</li>
+  </ol>
+</blockquote>

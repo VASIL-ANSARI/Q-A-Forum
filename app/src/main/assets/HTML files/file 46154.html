@@ -1,0 +1,24 @@
+<p><a href="http://en.cppreference.com/w/cpp/memory/raw_storage_iterator" rel="nofollow"><code>std::raw_storage_iterator</code></a> uses a <em>placement-new</em> operator on assignment, and since currently it defines only one assignment operator taking a const lvalue reference:</p>
+
+<p>Â§ 20.7.10 [storage.iterator]/p1:</p>
+
+<pre><code>raw_storage_iterator&amp; operator=(const T&amp; element);
+</code></pre>
+
+<p>which always calls a copy constructor (even when invoked with an rvalue).</p>
+
+<p>This case has been reported as <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/lwg-active.html#2127" rel="nofollow"><strong>LWG issue 2127</strong></a> which adds support for move-constructible types by introducing another assignment operator taking an rvalue reference, meaning it <strong>will be</strong> possible to move-construct elements to an uninitialized memory once the proposed change is adopted. Until that update takes place, you need to rely on your own for-loop. Alternatively, you could leverage the <a href="http://en.cppreference.com/w/cpp/memory/uninitialized_copy" rel="nofollow"><code>std::uninitialized_copy</code></a> algorithm defined as follows:</p>
+
+<p>Â§ 20.7.12.2 [uninitialized.copy]/p1:  </p>
+
+<pre><code>for (; first != last; ++result, ++first)
+    ::new (static_cast&lt;void*&gt;(&amp;*result))
+        typename iterator_traits&lt;ForwardIterator&gt;::value_type(*first);
+</code></pre>
+
+<p>Once you wrap your input iterators using the <a href="http://en.cppreference.com/w/cpp/iterator/make_move_iterator" rel="nofollow"><code>std::make_move_iterator</code></a> helper function, you'll get the same effect as your hand-written for-loop:</p>
+
+<pre><code>std::uninitialized_copy(std::make_move_iterator(first)
+                      , std::make_move_iterator(last)
+                      , dest);
+</code></pre>

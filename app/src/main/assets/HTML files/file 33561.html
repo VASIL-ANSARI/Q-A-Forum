@@ -1,0 +1,106 @@
+<p>Try this:</p>
+
+<pre><code>$walker = new Grouped_Walker_Nav_Menu();
+
+wp_nav_menu(array(
+  'menu'       =&gt; 'primary',
+  'walker'     =&gt; $walker,
+  'depth'      =&gt; 0,
+  'container'  =&gt; false,
+  'items_wrap' =&gt; '&lt;ul id="%1$s" class="%2$s"&gt;'.$walker-&gt;groups_open."\n".'%3$s' //&lt;/ul&gt;'
+));
+
+$walker-&gt;finish();
+
+
+
+class Grouped_Walker_Nav_Menu extends Walker_Nav_Menu {  
+  private $counters = array(0,0,0,0,0,0);
+  private $pergroup = array(3,3,3,3,3,3);
+  public  $groups_open  = '&lt;li class="menu-groups"&gt;';
+  private $groups_close = '&lt;/li&gt;';
+  private $group_open  = '&lt;ul class="menu-group"&gt;';
+  private $group_close = '&lt;/ul&gt;';
+
+  function start_lvl( &amp;$output, $depth = 0, $args = array() ) {
+    $indent = str_repeat("\t", ($depth + 1 ) * 2 );
+    $output .= "\n$indent&lt;ul class=\"sub-menu\"&gt;{$this-&gt;groups_open}\n";
+    $this-&gt;counters[ $depth ] = 0;
+  }
+
+  function end_lvl( &amp;$output, $depth = 0, $args = array() ) {
+    $indent = str_repeat("\t", ($depth + 1 ) * 2 );
+
+    // close unclosed
+    ++ $depth;
+    if( $this-&gt;pergroup[ $depth ])
+      if( $this-&gt;counters[ $depth ] != 0 )
+        $output .= "$indent\t{$this-&gt;group_close}\n";
+
+    $output .= "$indent{$this-&gt;groups_close}&lt;/ul&gt;";
+  }
+
+  function end_el( &amp;$output, $item, $depth = 0, $args = array() ) {
+    $output .= "&lt;/li&gt;\n";
+    if( $this-&gt;pergroup[ $depth ]){
+      $indent = str_repeat("\t", $depth * 2 + 1 );
+      if( $this-&gt;counters[ $depth ] == 0 ) $output .= "$indent{$this-&gt;group_close}\n";
+    }
+  }
+
+  function finish(){
+    if( $this-&gt;pergroup[0]){
+      $indent = str_repeat("\t", 1 );
+      if( $this-&gt;counters[ 0 ] != 0 ) echo "$indent{$this-&gt;group_close}\n";
+    }
+    echo "{$this-&gt;groups_close}&lt;/ul&gt;";
+  }
+
+  function start_el( &amp;$output, $item, $depth = 0, $args = array(), $id = 0 ) {
+    $indent = str_repeat("\t", $depth * 2 + 1 );
+
+    $class_names = '';
+
+    $classes = empty( $item-&gt;classes ) ? array() : (array) $item-&gt;classes;
+    $classes[] = 'menu-item-' . $item-&gt;ID;
+
+    $class_names = join( ' ', apply_filters( 'nav_menu_css_class', array_filter( $classes ), $item, $args ) );
+    $class_names = $class_names ? ' class="' . esc_attr( $class_names ) . '"' : '';
+
+    $id = apply_filters( 'nav_menu_item_id', 'menu-item-'. $item-&gt;ID, $item, $args );
+    $id = $id ? ' id="' . esc_attr( $id ) . '"' : '';
+
+    if( $this-&gt;pergroup[ $depth ]){
+      if( $this-&gt;counters[ $depth ] == 0 ) $output .= "$indent{$this-&gt;group_open}\n";
+      $this-&gt;counters[ $depth ] = ( $this-&gt;counters[ $depth ] + 1 )  %  $this-&gt;pergroup[ $depth ];
+    }
+
+    $output .= "$indent\t&lt;li" . $id . $class_names .'&gt;';
+
+    $atts = array();
+    $atts['title']  = ! empty( $item-&gt;attr_title ) ? $item-&gt;attr_title : '';
+    $atts['target'] = ! empty( $item-&gt;target )     ? $item-&gt;target     : '';
+    $atts['rel']    = ! empty( $item-&gt;xfn )        ? $item-&gt;xfn        : '';
+    $atts['href']   = ! empty( $item-&gt;url )        ? $item-&gt;url        : '';
+
+    $atts = apply_filters( 'nav_menu_link_attributes', $atts, $item, $args );
+
+    $attributes = '';
+    foreach ( $atts as $attr =&gt; $value ) {
+      if ( ! empty( $value ) ) {
+        $value = ( 'href' === $attr ) ? esc_url( $value ) : esc_attr( $value );
+        $attributes .= ' ' . $attr . '="' . $value . '"';
+      }
+    }
+
+    $item_output = $args-&gt;before;
+    $item_output .= '&lt;a'. $attributes .'&gt;';
+    $item_output .= $args-&gt;link_before . apply_filters( 'the_title', $item-&gt;title, $item-&gt;ID ) . $args-&gt;link_after;
+    $item_output .= '&lt;/a&gt;';
+    $item_output .= $args-&gt;after;
+
+    $output .= apply_filters( 'walker_nav_menu_start_el', $item_output, $item, $depth, $args );
+  }
+
+}
+</code></pre>

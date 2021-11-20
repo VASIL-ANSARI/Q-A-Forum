@@ -1,0 +1,48 @@
+<p><strong>First of all</strong> and most importantly since MySQL triggers are row-based there is no need to recalculate all statistics but rather apply changes one record at a time.</p>
+
+<p><strong>Secondly</strong> you can utilize <code>INSERT INTO ... ON DUPLICATE KEY UPDATE</code> to streamline your code. For it to work properly you <strong>have to have</strong> a <code>PRIMARY KEY</code> or <code>UNIQUE</code> constraint on <code>date</code> column in <code>statistics</code> table.</p>
+
+<p>That being said triggers for <code>INSERT</code>s and <code>DELETE</code>s to and from your <code>transactions</code> table are quite straightforward one-statement triggers(<em>Therefore you don't even need to change <code>DELIMITER</code> and use <code>BEGIN ... END</code> block</em>)</p>
+
+<pre><code>CREATE TRIGGER tg_ai_transactions
+AFTER INSERT ON transactions
+FOR EACH ROW
+  INSERT INTO statistics (date, bought, sold)
+  VALUES (NEW.tran_date, 
+          CASE WHEN NEW.tran_type = 'buy' THEN 1 ELSE 0 END,
+          CASE WHEN NEW.tran_type = 'sale' THEN 1 ELSE 0 END)
+  ON DUPLICATE KEY UPDATE bought = bought + VALUES(bought),
+                          sold = sold + VALUES(sold);
+
+CREATE TRIGGER tg_ad_transactions
+AFTER DELETE ON transactions
+FOR EACH ROW
+  UPDATE statistics
+     SET bought = bought - CASE WHEN OLD.tran_type = 'buy' THEN 1 ELSE 0 END,
+         sold = sold - CASE WHEN OLD.tran_type = 'sale' THEN 1 ELSE 0 END
+   WHERE date = OLD.tran_date;
+</code></pre>
+
+<p>Now <code>UPDATE</code>s are a little bit trickier since both date and transaction type potentially could be changed. Therefore we use <code>OLD</code> values to subtract values for a row in a state before update and then apply <code>NEW</code> values.</p>
+
+<pre><code>DELIMITER $$
+CREATE TRIGGER tg_au_transactions
+AFTER UPDATE ON transactions
+FOR EACH ROW
+BEGIN
+  UPDATE statistics
+     SET bought = bought - CASE WHEN OLD.tran_type = 'buy' THEN 1 ELSE 0 END,
+         sold = sold - CASE WHEN OLD.tran_type = 'sale' THEN 1 ELSE 0 END
+   WHERE date = OLD.tran_date;
+
+  INSERT INTO statistics (date, bought, sold)
+  VALUES (NEW.tran_date, 
+          CASE WHEN NEW.tran_type = 'buy' THEN 1 ELSE 0 END,
+          CASE WHEN NEW.tran_type = 'sale' THEN 1 ELSE 0 END)
+  ON DUPLICATE KEY UPDATE bought = bought + VALUES(bought),
+                          sold = sold + VALUES(sold);
+END$$
+DELIMITER ;
+</code></pre>
+
+<p>Here is <strong><a href="http://sqlfiddle.com/#!2/2be6b/1" rel="nofollow">SQLFiddle</a></strong> demo</p>

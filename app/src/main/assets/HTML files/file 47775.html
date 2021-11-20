@@ -1,0 +1,196 @@
+<h1>UPDATE 24.04.2016.</h1>
+
+<p>I've created tutorial on my page <a href="http://madebydenis.com/ajax-load-posts-on-wordpress/" rel="nofollow">http://madebydenis.com/ajax-load-posts-on-wordpress/</a> about implementing this on Twenty Sixteen theme, so feel free to check it out :)</p>
+
+<h2>EDIT</h2>
+
+<p>I've tested this on Twenty Fifteen and it's working, so it should be working for you.</p>
+
+<p>In <strong>index.php</strong> (assuming that you want to show the posts on the main page, but this should work even if you put it in a page template) I put:</p>
+
+<pre><code>    &lt;div id="ajax-posts" class="row"&gt;
+        &lt;?php
+            $postsPerPage = 3;
+            $args = array(
+                    'post_type' =&gt; 'post',
+                    'posts_per_page' =&gt; $postsPerPage,
+                    'cat' =&gt; 8
+            );
+
+            $loop = new WP_Query($args);
+
+            while ($loop-&gt;have_posts()) : $loop-&gt;the_post();
+        ?&gt;
+
+         &lt;div class="small-12 large-4 columns"&gt;
+                &lt;h1&gt;&lt;?php the_title(); ?&gt;&lt;/h1&gt;
+                &lt;p&gt;&lt;?php the_content(); ?&gt;&lt;/p&gt;
+         &lt;/div&gt;
+
+         &lt;?php
+                endwhile;
+        wp_reset_postdata();
+         ?&gt;
+    &lt;/div&gt;
+    &lt;div id="more_posts"&gt;Load More&lt;/div&gt;
+</code></pre>
+
+<p>This will output 3 posts from category 8 (I had posts in that category, so I used it, you can use whatever you want to). You can even query the category you're in with </p>
+
+<pre><code>$cat_id = get_query_var('cat');
+</code></pre>
+
+<p>This will give you the category id to use in your query. You could put this in your loader (load more div), and pull with jQuery like</p>
+
+<pre><code>&lt;div id="more_posts" data-category="&lt;?php echo $cat_id; ?&gt;"&gt;&gt;Load More&lt;/div&gt;
+</code></pre>
+
+<p>And pull the category with </p>
+
+<pre><code>var cat = $('#more_posts').data('category');
+</code></pre>
+
+<p>But for now, you can leave this out.</p>
+
+<p>Next in <strong>functions.php</strong> I added</p>
+
+<pre><code>wp_localize_script( 'twentyfifteen-script', 'ajax_posts', array(
+    'ajaxurl' =&gt; admin_url( 'admin-ajax.php' ),
+    'noposts' =&gt; __('No older posts found', 'twentyfifteen'),
+));
+</code></pre>
+
+<p>Right after the existing <code>wp_localize_script</code>. This will load wordpress own admin-ajax.php so that we can use it when we call it in our ajax call.</p>
+
+<p>At the end of the functions.php file I added the function that will load your posts:</p>
+
+<pre><code>function more_post_ajax(){
+
+    $ppp = (isset($_POST["ppp"])) ? $_POST["ppp"] : 3;
+    $page = (isset($_POST['pageNumber'])) ? $_POST['pageNumber'] : 0;
+
+    header("Content-Type: text/html");
+
+    $args = array(
+        'suppress_filters' =&gt; true,
+        'post_type' =&gt; 'post',
+        'posts_per_page' =&gt; $ppp,
+        'cat' =&gt; 8,
+        'paged'    =&gt; $page,
+    );
+
+    $loop = new WP_Query($args);
+
+    $out = '';
+
+    if ($loop -&gt; have_posts()) :  while ($loop -&gt; have_posts()) : $loop -&gt; the_post();
+        $out .= '&lt;div class="small-12 large-4 columns"&gt;
+                &lt;h1&gt;'.get_the_title().'&lt;/h1&gt;
+                &lt;p&gt;'.get_the_content().'&lt;/p&gt;
+         &lt;/div&gt;';
+
+    endwhile;
+    endif;
+    wp_reset_postdata();
+    die($out);
+}
+
+add_action('wp_ajax_nopriv_more_post_ajax', 'more_post_ajax');
+add_action('wp_ajax_more_post_ajax', 'more_post_ajax');
+</code></pre>
+
+<p>Here I've added paged key in the array, so that the loop can keep track on what page you are when you load your posts.</p>
+
+<p>If you've added your category in the loader, you'd add:</p>
+
+<pre><code>$cat = (isset($_POST['cat'])) ? $_POST['cat'] : '';
+</code></pre>
+
+<p>And instead of 8, you'd put <code>$cat</code>. This will be in the <code>$_POST</code> array, and you'll be able to use it in ajax.</p>
+
+<p>Last part is the ajax itself. In <strong>functions.js</strong> I put inside the <code>$(document).ready();</code> enviroment</p>
+
+<pre><code>var ppp = 3; // Post per page
+var cat = 8;
+var pageNumber = 1;
+
+
+function load_posts(){
+    pageNumber++;
+    var str = '&amp;cat=' + cat + '&amp;pageNumber=' + pageNumber + '&amp;ppp=' + ppp + '&amp;action=more_post_ajax';
+    $.ajax({
+        type: "POST",
+        dataType: "html",
+        url: ajax_posts.ajaxurl,
+        data: str,
+        success: function(data){
+            var $data = $(data);
+            if($data.length){
+                $("#ajax-posts").append($data);
+                $("#more_posts").attr("disabled",false);
+            } else{
+                $("#more_posts").attr("disabled",true);
+            }
+        },
+        error : function(jqXHR, textStatus, errorThrown) {
+            $loader.html(jqXHR + " :: " + textStatus + " :: " + errorThrown);
+        }
+
+    });
+    return false;
+}
+
+$("#more_posts").on("click",function(){ // When btn is pressed.
+    $("#more_posts").attr("disabled",true); // Disable the button, temp.
+    load_posts();
+});
+</code></pre>
+
+<p>Saved it, tested it, and it works :)</p>
+
+<p>Images as proof (don't mind the shoddy styling, it was done quickly). Also post content is gibberish xD</p>
+
+<p><a href="http://i.stack.imgur.com/CAKv1.png" rel="nofollow"><img src="http://i.stack.imgur.com/CAKv1.png" alt="enter image description here"></a></p>
+
+<p><a href="http://i.stack.imgur.com/1Pkk8.png" rel="nofollow"><img src="http://i.stack.imgur.com/1Pkk8.png" alt="enter image description here"></a></p>
+
+<p><a href="http://i.stack.imgur.com/Le6wZ.png" rel="nofollow"><img src="http://i.stack.imgur.com/Le6wZ.png" alt="enter image description here"></a></p>
+
+<p><strong>UPDATE</strong></p>
+
+<p>For 'infinite load' instead on click event on the button (just make it invisible, with <code>visibility: hidden;</code>) you can try with</p>
+
+<pre><code>$(window).on('scroll', function () {
+    if ($(window).scrollTop() + $(window).height()  &gt;= $(document).height() - 100) {
+        load_posts();
+    }
+});
+</code></pre>
+
+<p>This should run the <code>load_posts()</code> function when you're 100px from the bottom of the page. In the case of the tutorial on my site you can add a check to see if the posts are loading (to prevent firing of the ajax twice), and you can fire it when the scroll reaches the top of the footer</p>
+
+<pre><code>$(window).on('scroll', function(){
+    if($('body').scrollTop()+$(window).height() &gt; $('footer').offset().top){
+        if(!($loader.hasClass('post_loading_loader') || $loader.hasClass('post_no_more_posts'))){
+                load_posts();
+        }
+    }
+});
+</code></pre>
+
+<p>Now the only drawback in these cases is that you could never scroll to the value of <code>$(document).height() - 100</code> or <code>$('footer').offset().top</code> for some reason. If that should happen, just increase the number where the scroll goes to.</p>
+
+<p>You can easily check it by putting <code>console.log</code>s in your code and see in the inspector what they throw out</p>
+
+<pre><code>$(window).on('scroll', function () {
+    console.log($(window).scrollTop() + $(window).height());
+    console.log($(document).height() - 100);
+    if ($(window).scrollTop() + $(window).height()  &gt;= $(document).height() - 100) {
+        load_posts();
+    }
+});
+</code></pre>
+
+<p>And just adjust accordingly ;)</p>
+
+<p>Hope this helps :) If you have any questions just ask.</p>

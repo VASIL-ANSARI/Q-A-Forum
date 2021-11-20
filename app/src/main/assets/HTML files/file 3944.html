@@ -1,0 +1,40 @@
+<p>You'll need to override the paginate method for the Model of the Controller of that page.</p>
+
+<p>I did something similar, maybe this snippet will help:</p>
+
+<pre><code>function paginate($conditions, $fields, $order, $limit, $page = 1, $recursive = null, $extra = array())
+{
+    $pageParams = compact('conditions', 'fields', 'order', 'limit', 'page', 'recursive', 'group');
+    $this-&gt;contain('ModuleType', 'NodeDescriptor');
+    $pageItems = $this-&gt;find('all',$pageParams);
+    $pagesOut = array();
+    foreach($pageItems as $pageItem)
+    {
+        $status = $pageItem['SiteAdmin']['status_id'];
+        $moduleInfo = null;
+        $nodeTitle = $pageItem['NodeDescriptor']['title'];
+        $published = $pageItem['NodeDescriptor']['published'];
+        $pageitemID = $pageItem['SiteAdmin']['id'];
+        $moduleId =  $pageItem['SiteAdmin']['module_id'];
+        $contName =  $pageItem['ModuleType']['controller'];
+        if($moduleId)
+        {
+            $thisModel = ClassRegistry::getObject($moduleType);
+            $thisModel-&gt;contain();
+            $moduleInfo = $thisModel-&gt;read(null,$moduleId);
+            $moduleInfo = $moduleInfo[$moduleType];
+        }
+        $pagesOut[] = array(
+            'status'=&gt;$status,
+            'node'=&gt;$nodeTitle,
+            'published'=&gt;$published,
+            'info'=&gt;$moduleInfo,
+            'module_id'=&gt;$moduleId,
+            'contName'=&gt;$contName,
+            'pageitem_id'=&gt;$pageitemID);
+    }
+    return $pagesOut;
+}
+</code></pre>
+
+<p>By doing it this way, you gain control over the parameters passed to paginate, so you can pass model specific data, control flags etc.</p>

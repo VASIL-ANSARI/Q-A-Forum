@@ -1,0 +1,92 @@
+<p>I'll characterize what SO is doing a bit more closely here:</p>
+
+<p>While I'm not really privy to the implementation details of StackOverflow, you'll note the same behavior when searching for "java" or "hibernate", even though these would have no issues with standard analyzer.  They will be transformed into "[java]" and "[hibernate]".  That just denotes a tag search.  That doesn't happen where searching for "lucene" or "junit" so it probably has to do with the popularity of the tags.  I would definitely suspect that tag titles would be indexed in an un-analyzed form.</p>
+
+<p>For an interesting example, try out "j++".  This dead-end java implementation has a mere 8 questions using the <a href="/questions/tagged/j%2b%2b" class="post-tag" title="show questions tagged &#39;j++&#39;" rel="tag">j++</a> tag on SO, so it won't trigger to automatic tag search.  Search "[j++]", and you'll see those 8.  Search "j++", and you'll have a rough time finding anything relevant to that particular language, but you'll find plenty that reference <a href="/questions/tagged/j" class="post-tag" title="show questions tagged &#39;j&#39;" rel="tag">j</a>.</p>
+
+<p><strong>Onward, to fixing your problem:</strong></p>
+
+<p>Yes, <code>StandardAnalyzer</code> will (speaking imprecisely, see <a href="http://www.unicode.org/reports/tr29/" rel="nofollow">UAX-29</a> for the precise rules) get rid of all your punctuation.  The typical approach to this, is to use the same analyzer when querying.  If you use <code>StandardAnalyzer</code> to analyze your queries as well as the indexed documents, your searched terms will match, the two query terms mentioned above will be reduced to <code>net</code> and <code>c</code>, and you should get results.</p>
+
+<p>But now, you've hit upon perhaps <em>the</em> classic example of a problem with <code>StandardAnalyzer</code>.  This means that <code>c</code>, <code>c++</code>, and <code>c#</code> will all be represented precisely the same in the index, there is no way to search for one without matching the other two!</p>
+
+<p>There are a few ways to deal with this, to my mind:</p>
+
+<ol>
+<li><p><em>Throw the baby out with the bathwater</em>:  Use <a href="http://lucene.apache.org/core/4_7_0/analyzers-common/org/apache/lucene/analysis/core/WhitespaceAnalyzer.html" rel="nofollow"><code>WhitespaceAnalyzer</code></a> or some such, and lose all the nice, fancy things <code>StandardAnalyzer</code> does to help you out.</p></li>
+<li><p><em>Just handle those few little edge cases</em>:  Okay, so Lucene doesn't like punctuation, and you have some known terms that have a problem with that.  Luckily, you have <code>String.Replace</code>.  Replace them with something a little more lucene-friendly, like "c", "cplusplus" and "csharp".  Again, make sure it gets done both at query and index time.  <em>The problem is</em>:  Since you are doing this outside of the analyzer, the transformation will affect the stored version of the field as well, forcing you to reverse it before you display results to the user.</p></li>
+<li><p><em>Do the same as #2, but just a bit fancier</em>:  So #2 might work all right, but you've already got these analyzers handling transforming data for consumption by lucene, which only affect the indexed version of a field, rather than the stored one.  Why not use them?  Analyzer has a call, <code>initReader</code>, in which you can slap a <a href="https://lucene.apache.org/core/4_7_0/core/org/apache/lucene/analysis/CharFilter.html" rel="nofollow"><code>CharFilter</code></a> on the front of the analyzer stack (See the example way down at the bottom of <a href="http://lucene.apache.org/core/4_3_0/core/org/apache/lucene/analysis/package-summary.html" rel="nofollow">the Analysis package documentation</a>).  The text run through the analyzer will be transformed by the <code>CharFilter</code> before the <code>StandardTokenizer</code> (which is what gets rid of the punctuation, among other things) gets it's hands on it.  <a href="http://lucene.apache.org/core/4_7_0/analyzers-common/org/apache/lucene/analysis/charfilter/MappingCharFilter.html" rel="nofollow"><code>MappingCharFilter</code></a>, for instance.</p></li>
+</ol>
+
+<p>You can't subclass <code>StandardAnalyzer</code>, though, the thinking being that you should be implementing Analyzer, rather than subclassing implementations of it (see <a href="https://issues.apache.org/jira/browse/LUCENE-3055" rel="nofollow">the discussion here</a>, if you're interested in a more complete discussion of the thought process there).  So, assuming we want to make sure we get absolutely <em>all</em> the functionality of <code>StandardAnalyzer</code> in the deal, just copy-paste the source code, and add an override of the <code>initReaders</code> method:</p>
+
+<pre class="lang-java prettyprint-override"><code>public class ExtraFancyStandardAnalyzer extends StopwordAnalyzerBase {
+
+    public static final int DEFAULT_MAX_TOKEN_LENGTH = 255;
+
+    private int maxTokenLength = DEFAULT_MAX_TOKEN_LENGTH;
+
+    public static final CharArraySet STOP_WORDS_SET = StopAnalyzer.ENGLISH_STOP_WORDS_SET;
+
+    public ExtraFancyStandardAnalyzer(Version matchVersion,
+            CharArraySet stopWords) {
+        super(matchVersion, stopWords);
+        buildMap();
+    }
+
+    public ExtraFancyStandardAnalyzer(Version matchVersion) {
+        this(matchVersion, STOP_WORDS_SET);
+    }
+
+    public ExtraFancyStandardAnalyzer(Version matchVersion, Reader stopwords)
+            throws IOException {
+        this(matchVersion, loadStopwordSet(stopwords, matchVersion));
+    }
+
+    public void setMaxTokenLength(int length) {
+        maxTokenLength = length;
+    }
+
+    public int getMaxTokenLength() {
+        return maxTokenLength;
+    }
+
+
+    // The following two methods, and a call to buildMap() in the ctor
+    // are the only things changed from StandardAnalyzer
+
+    private NormalizeCharMap map;
+
+    public void buildMap() {
+        NormalizeCharMap.Builder builder = new NormalizeCharMap.Builder();
+        builder.add("c++", "cplusplus");
+        builder.add("c#", "csharp");
+        map = builder.build();
+    }
+
+    @Override
+    protected Reader initReader(String fieldName, Reader reader) {
+        return new MappingCharFilter(map, reader);
+    }
+
+    @Override
+    protected TokenStreamComponents createComponents(final String fieldName,
+            final Reader reader) {
+        final StandardTokenizer src = new StandardTokenizer(matchVersion,
+                reader);
+        src.setMaxTokenLength(maxTokenLength);
+        TokenStream tok = new StandardFilter(matchVersion, src);
+        tok = new LowerCaseFilter(matchVersion, tok);
+        tok = new StopFilter(matchVersion, tok, stopwords);
+        return new TokenStreamComponents(src, tok) {
+            @Override
+            protected void setReader(final Reader reader) throws IOException {
+                src.setMaxTokenLength(ExtraFancyStandardAnalyzer.this.maxTokenLength);
+                super.setReader(reader);
+            }
+        };
+    }
+}
+</code></pre>
+
+<p>Note: This is written and tested in Java, Lucene version 4.7.  The C# implementation shouldn't be too much different.  Copy the <code>StandardAnalyzer</code>, build a <code>MappingCharFilter</code> (which is actually just a hair simpler to deal with in version 3.0.3), and wrap the reader with it in an override of the <code>initReader</code> method.</p>

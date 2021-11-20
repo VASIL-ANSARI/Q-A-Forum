@@ -1,0 +1,59 @@
+<p><strong>TLDR;</strong> Cookies and storages should be assumed to be stored in plain text and accessible by client side script that comes from the same domain. Assume the worst; anything can go wrong with your script due to bugs or XSS attacks. If the data will be used both by the client and the server back again, most definetly sign it. If the data is only relevant to server side code, sign and encrypt it. If the data is only for printing stuff to screen or DOM evaluation, leave it plain text.</p>
+
+<hr>
+
+<p>Let's be clear about what cookies, session storages and local storages are before beginning to an example implementation.</p>
+
+<p>Cookies are data <strong>created by server or client</strong>, stored in plain text by browsers, that is sent on every http request to the server if the path matches. They are good for storing authentication tokens, meta data regarding tracking, analytic, website interface preferences, shopping carts and many other.</p>
+
+<p>Storages are - as indicated by their name - storage space assigned to your domain and only <strong>scripts from your domain and XSS attacks</strong> can alter it. This means, if you use them for the purposes I listed above, you have to append data stored in them to your HTTP requests by hand. If your site depends on many async HTTP calls, it is not wrong to use storages like cookies. Otherwise they are useful for caching things like template data and site resources.</p>
+
+<hr>
+
+<p>If you use cookies for storing user related data that is needed for your server, those kind of cookies can be encrypted on server side before sent to the client. You can still access such cookies with <code>ngCookies</code> but the only harm that can be done is that some injected code may invalidate them. If somehow your encryption scheme is revealed and they become readable to an attacker, you can invalidate modifications to them by appending a signature (created with a secure hash algorithm) on every store and check your signature on every retrieval. Let's illustrate that process.</p>
+
+<pre><code>$userState = json_encode($yourStateObjectOrAnAssociativeArray);
+$sign = my_hash($userState);
+$encryptedState = encrypt($userState);
+setcookie("user" , $encryptedState);
+setcookie("sign" , $sign);
+</code></pre>
+
+<p>Here we have encoded our state as JSON, then first generated a hash. You can use some SHA1, SHA256 and such with a stored key you choose to come up with a <code>my_hash()</code> function. Below is an example that is correct but you shouldn't use it since even I shouldn't know your algorithm.</p>
+
+<pre><code>// hash() is reserved so use something else
+function my_hash($object) {
+    return sha1(md5($object) . "some giberish key that is stored as config data or in a db" . sha1($object))
+}
+</code></pre>
+
+<p>Note that <code>my_hash()</code> is not extremely secure since it uses a static string as key and a generation structure that is not complex. In the end, it is <code>sha1()</code> of some randomly structured string. It is sufficient for a cookie sign though.</p>
+
+<p>You can write your own <code>encrypt()</code> / <code>decrypt()</code> pair by using AES encryption or some equally secure algorithm of your choice. <a href="http://stackoverflow.com/questions/3422759/php-aes-encrypt-decrypt/30166085#30166085">Here is an example from this site.</a></p>
+
+<p>Now our cookie is stored and ready to be sent on the next request. Below is how you decrypt and validate your cookie from the example above.</p>
+
+<pre><code>$sign = $_COOKIE["sign"];
+$encryptedState = $_COOKIE["user"];
+
+$userState = decrypt($encryptedState); //If this fails, it indicates someone tried to replace your cookie by hand, it is a failed attack
+
+$assoc = true; //If true, json_decode returns array, otherwise it returns an object
+$yourStateObjectOrAnAssociativeArray = json_decode($userState, $assoc); //If this fails, it indicates someone tried to replace your cookie by hand, it is a failed attack
+
+if($sign == my_hash($yourStateObjectOrAnAssociativeArray)) {
+    //Noone modified your cookie, you are safe
+    //Do something with it
+}
+else {
+    // Someone tried to replace your sign cookie to imitate your server but he failed
+    // or
+    // Someone managed to decrypt your cookie and modified it but failed to generate a valid sign (very unlikely)
+    // You are still safe
+    // Log this line and check every once in a while to detect unsuccessful hackers
+}
+</code></pre>
+
+<hr>
+
+<p>The good part of using a state object is that it can be used to implement many kinds of restrictions and tracking mechanisms. For example storing system time during creation of your cookie gives you the chance to expire it later. Embedding client IP is a way to restrict sharing cookies across networks.</p>

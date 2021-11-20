@@ -1,0 +1,78 @@
+<p>So, it seems you do have a strange <code>#include</code>, leading to code getting compiled by the wrong compiler. Make a distinction between gpu headers and cpu headers by using .cu.h for cuda headers. Make sure <em>only</em> NVCC compiles <code>.cu</code> and <code>.cu.h</code> files. Cuda files should never be included in cpp files. The kernel and kernel call should be in a <code>.cu</code> or <code>.cu.h</code> files, and those files shouldn't be included anywhere in cpps. </p>
+
+<p>Because your <code>.cu</code> is being included in a header which is being compiled by the host compiler, the host compiler ends up hitting the token <code>&lt;&lt;&lt;</code> - which it doesn't recognise. It probably does understand the token <code>&lt;&lt;</code> so it consumes that, leaving an unexpected <code>&lt;</code>.</p>
+
+<p>Here's an alternative way of doing things that should work (not tried it but it's similar to code we use)</p>
+
+<p><em>(note, this might work but it also might not be the right way to solve the problem. My boss doesn't like it as a solution and would prefer to add an implementation per variation)</em> </p>
+
+<p>The underlying problem seems to be lack of distinction between host and device code. I'm leaving the detail out in my solution - things like copying results to and from the device, sum implementation, etc.</p>
+
+<p>The problem I'm trying to solve is, given a construct, how can you template it for use both on the host and the device?</p>
+
+<p>I'll template <code>Matrix.h</code> on both the type and the implementation detail.</p>
+
+<pre><code> template &lt;typename T, typename Implementation&lt;T&gt; &gt; class Matrix {
+     void sum(Matrix&lt;T&gt;&amp; m1, Matrix&lt;T&gt;&amp; m2, Matrix&lt;T&gt;&amp; sum)
+     {
+         Implementation.sumImp(m1, m2, sum);
+     }
+ }
+</code></pre>
+
+<p>The host implementation, <code>HostMatrixSum.h</code> will do things the on the cpu:</p>
+
+<pre><code> #include "Matrix.h"
+
+ template &lt;typename T&gt; struct HostMatrixSum
+ {
+     void sumImp(Matrix&lt;T&gt;&amp; m1, Matrix&lt;T&gt;&amp; m2, Matrix&lt;T&gt;&amp; sum)
+     {
+         ...
+     }
+ }
+</code></pre>
+
+<p>While <code>GpuMatrixSum.cu.h</code> will upload the matrix, do the sum and recover the results:</p>
+
+<pre><code> #include "Matrix.h"
+
+ template &lt;typename T&gt; struct GpuMatrixSum
+ {   
+     template&lt;typename T&gt; __global__ void sumKernel(const Matrix&lt;T&gt; m1, const Matrix&lt;T&gt; m2, Matrix&lt;T&gt; sum)
+     {
+         ...
+     }
+
+     void sumImp(Matrix&lt;T&gt;&amp; m1, Matrix&lt;T&gt;&amp; m2, Matrix&lt;T&gt;&amp; sum)
+     {
+         ...
+         sumKernel&lt;T&gt; &lt;&lt;&lt; dimGrid, dimBlock &gt;&gt;&gt; (m1,m2);
+         ...
+     }
+ }
+</code></pre>
+
+<p>Then when we come to use Matrix from host code we template on the host sum implementation and never need to see any cuda specifics:</p>
+
+<pre><code> #include "Matrix.h"
+ #include "HostMatrixSum.h"
+
+ Matrix&lt;int, HostMatrixSum&gt; m1 = Matrix&lt;int&gt;(...);
+ Matrix&lt;int, HostMatrixSum&gt; m2 = Matrix&lt;int&gt;(...);
+ Matrix&lt;int, HostMatrixSum&gt; result;
+ Matrix.sum(m1,m2,result);
+</code></pre>
+
+<p>And if we're working on the gpu we can use the accelerated gpu implementation of sum:</p>
+
+<pre><code> #include "Matrix.h"
+ #include "GpuMatrixSum.cu.h"
+
+ Matrix&lt;int, GpuMatrixSum&gt; m1 = Matrix&lt;int&gt;(...);
+ Matrix&lt;int, GpuMatrixSum&gt; m2 = Matrix&lt;int&gt;(...);
+ Matrix&lt;int, GpuMatrixSum&gt; result;
+ Matrix.sum(m1,m2,result);
+</code></pre>
+
+<p>Hope that works for you!</p>

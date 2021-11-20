@@ -1,0 +1,102 @@
+<p>In python, <code>some_string[5] = 'a'</code> would be an error, but the closest equivalent operation, <code>some_string = some_string[5:] + 'a' + some_string[6:]</code> would indeed be O(n). But that's not just true of immutable objects. The same is true for concatenating lists: <code>[1,2,3] + [4,5,6]</code> generates a new list and is O(n). </p>
+
+<p>Adding numbers creates a new value, but generally the resulting value is always the same size in memory, so it's O(1). Of course that only holds with small ints. Once you hit some threshold (20 digits on my machine), suddenly ints take up a variable amount of space. I don't know how that effects asymptotic performance.</p>
+
+<p>However, I found that it doesn't seem to have even a significant effect even near <code>log10(n) == 1000</code>:</p>
+
+<pre><code>&gt;&gt;&gt; times = [timeit.timeit(stmt=stmt.format(10 ** i, 10 ** i), number=100) for i in range(1000)]
+&gt;&gt;&gt; sum(times) * 1.0 / len(times)
+3.0851364135742186e-06
+&gt;&gt;&gt; times[-1]
+3.0994415283203125e-06
+</code></pre>
+
+<p>For strings, the asymptotic performance hit is more immediately apparent:</p>
+
+<pre><code>&gt;&gt;&gt; stmt = 's[:5] + "a" + s[6:]'
+&gt;&gt;&gt; setup = 's = "b" * {0}'
+&gt;&gt;&gt; times = [timeit.timeit(stmt=stmt, setup=setup.format(i), number=10) for i in range(100000)]
+&gt;&gt;&gt; sum(times) * 1.0 / len(times)
+6.2434492111206052e-05
+&gt;&gt;&gt; times[-1]
+0.0001220703125
+</code></pre>
+
+<p>The execution time for the last operation is well below the average. And the trend is pretty steady:</p>
+
+<pre><code>&gt;&gt;&gt; for t in times[0:100000:10000]:
+...     print t
+... 
+5.00679016113e-06
+1.31130218506e-05
+2.90870666504e-05
+3.88622283936e-05
+5.10215759277e-05
+6.19888305664e-05
+7.41481781006e-05
+8.48770141602e-05
+9.60826873779e-05
+0.000108957290649
+</code></pre>
+
+<p>Still, operations like these on small strings are pretty cheap. </p>
+
+<hr>
+
+<p>To expand on your other questions, indexed access is O(1) on both lists and strings. </p>
+
+<pre><code>&gt;&gt;&gt; stmt = 'x = s[{0}] + s[{1}] + s[{2}]'
+&gt;&gt;&gt; setup = 's = "a" * {0}'
+&gt;&gt;&gt; times = [timeit.timeit(stmt=stmt.format(i / 2, i / 3, i / 4), setup=setup.format(i + 1), number=10) for i in range(1000000)]
+&gt;&gt;&gt; sum(times) * 1.0 / len(times)
+3.6441037654876707e-06
+&gt;&gt;&gt; times[-1]
+3.0994415283203125e-06
+</code></pre>
+
+<p>Likewise with lists:</p>
+
+<pre><code>&gt;&gt;&gt; stmt = 'x = s[{0}] + s[{1}] + s[{2}]'
+&gt;&gt;&gt; setup = 's = ["a"] * {0}'
+&gt;&gt;&gt; times = [timeit.timeit(stmt=stmt.format(i / 2, i / 3, i / 4), setup=setup.format(i + 1), number=10) for i in range(100000)]
+&gt;&gt;&gt; sum(times) * 1.0 / len(times)
+2.8617620468139648e-06
+&gt;&gt;&gt; times[-1]
+1.9073486328125e-06
+</code></pre>
+
+<p>Slicing copies both strings <em>and</em> lists, and is therefore O(n) with <code>n == len(slice)</code>. There is no "good" way to replace one letter of a string, although I want to emphasize that the "bad" way is good enough most of the time. If you want a "good" way, use a different data type; manipulate a list and join it when a string is required; or use a StringIO object. <a href="http://skymind.com/~ocrow/python_string/">This page</a> has some useful information on concatenating different built-in Python datatypes.</p>
+
+<p>Finally, since you're really interested in the internals, I dug up the <code>struct</code> declaration of <code>PyStringObject</code> in <a href="http://svn.python.org/view/python/branches/release27-maint/Include/stringobject.h?view=markup"><code>stringobject.h</code></a> (from version 2.7; 3+ probably looks different). It's about what you'd expect -- a c string with some extra bells and whistles: </p>
+
+<pre><code>typedef struct {
+    PyObject_VAR_HEAD
+</code></pre>
+
+<p>(<code>PyObject_VAR_HEAD</code> is a c preprocessor macro that expands to something like the below depending on rules explained <a href="http://docs.python.org/py3k/c-api/structures.html#PyObject_HEAD">here</a>.)</p>
+
+<pre><code>    Py_ssize_t ob_refcnt;
+    PyTypeObject *ob_type;
+    Py_ssize_t ob_size;
+</code></pre>
+
+<p>Continuing...</p>
+
+<pre><code>    long ob_shash;
+    int ob_sstate;
+    char ob_sval[1];
+
+    /* Invariants:
+     *     ob_sval contains space for 'ob_size+1' elements.
+     *     ob_sval[ob_size] == 0.
+     *     ob_shash is the hash of the string or -1 if not computed yet.
+     *     ob_sstate != 0 iff the string object is in stringobject.c's
+     *       'interned' dictionary; in this case the two references
+     *       from 'interned' to this object are *not counted* in ob_refcnt.
+     */
+} PyStringObject;
+</code></pre>
+
+<p>Lists have a <a href="http://svn.python.org/view/python/branches/release27-maint/Include/listobject.h?view=markup">similar structure</a> -- c arrays with extra bells and whistles -- but aren't null terminated and generally have extra preallocated storage space.</p>
+
+<p>Needless to say... much of this this applies <em>only</em> to cPython -- <a href="http://pypy.org/">PyPy</a>, <a href="http://ironpython.codeplex.com/">IronPython</a>, and <a href="http://www.jython.org/">Jython</a> probably all look totally different!</p>

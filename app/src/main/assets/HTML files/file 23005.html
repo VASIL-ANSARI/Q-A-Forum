@@ -1,0 +1,51 @@
+<p>Have you tried using <a href="https://github.com/numba/numba" rel="nofollow">Numba</a>? It's a package that allows you to wrap Python code that is usually slow with a JIT compiler. I took a quick stab at your problem using Numba and got a significant speed up. Using IPython's magic <code>timeit</code> magic function, the <code>custom_convolution</code> function took ~18 s, while Numba's optimized function took 10.4 ms. That's a <strong>speed up of more than 1700</strong>.</p>
+
+<p>Here's how Numba is implemented. </p>
+
+<pre><code>import numpy as np
+from numba import jit, double
+
+s = 15
+array_a = np.random.rand(s ** 3).reshape(s, s, s)
+array_b = np.random.rand(s ** 3).reshape(s, s, s)
+
+# Original code
+def custom_convolution(A, B):
+
+    dimA = A.shape[0]
+    dimB = B.shape[0]
+    dimC = dimA + dimB
+
+    C = np.zeros((dimC, dimC, dimC))
+    for x1 in range(dimA):
+        for x2 in range(dimB):
+            for y1 in range(dimA):
+                for y2 in range(dimB):
+                    for z1 in range(dimA):
+                        for z2 in range(dimB):
+                            x = x1 + x2
+                            y = y1 + y2
+                            z = z1 + z2
+                            C[x, y, z] += A[x1, y1, z1] * B[x2, y2, z2]
+    return C
+
+# Numba'ing the function with the JIT compiler
+fast_convolution = jit(double[:, :, :](double[:, :, :],
+                        double[:, :, :]))(custom_convolution)
+</code></pre>
+
+<p>If you compute the residual between the results of both functions you will get zeros. This means that the JIT implementation is working without any problems.  </p>
+
+<pre><code>slow_result = custom_convolution(array_a, array_b) 
+fast_result = fast_convolution(array_a, array_b)
+
+print np.max(np.abs(slow_result - fast_result))
+</code></pre>
+
+<p>The output I get for this is <code>0.0</code>. </p>
+
+<p>You can either install Numba into your current Python setup or try it quickly with the <a href="http://continuum.io/downloads.html" rel="nofollow">AnacondaCE</a> package from continuum.io. </p>
+
+<p>Last but not least, Numba's function is faster than the <code>scipy.signal.fftconvolve</code> function by a factor of a few. </p>
+
+<p>Note: I'm using Anaconda and not AnacondaCE. There are some differences between the two packages for Numba's performance, but I don't think it will differ too much. </p>

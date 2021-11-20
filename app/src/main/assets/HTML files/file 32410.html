@@ -1,0 +1,86 @@
+<p>In this case the answer is pretty simple. Do not use many-to-many. Use pairing object. Exactly for the reasons you've mentioned: Extend the pairing object with more properties:</p>
+
+<p>Check here <a href="http://nhforge.org/doc/nh/en/index.html#best-practices" rel="nofollow">24. Best Practices</a>, a cite:</p>
+
+<blockquote>
+  <h3>Don't use exotic association mappings.</h3>
+  
+  <p>Good usecases for a real many-to-many associations are rare. Most of the time you need additional information stored in the "link table". In this case, it is much better to use two one-to-many associations to an intermediate link class. In fact, we think that most associations are one-to-many and many-to-one, you should be careful when using any other association style and ask yourself if it is really neccessary. </p>
+</blockquote>
+
+<p>Other words, create the <code>one-to-many</code> relations refering the pairing objects from boht ends, and <code>many-to-one</code> from the pairing object.</p>
+
+<p>Also check these:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/q/19687006/1679310">Hibernate: many-to-many relationship table as entity</a></li>
+<li><a href="http://stackoverflow.com/q/15560856/1679310">NHibernate Bidirectional Many-to-Many Mapping List / Bag</a></li>
+<li><a href="http://stackoverflow.com/q/15510748/1679310">Nhibernate: How to represent Many-To-Many relationships with One-to-Many relationships?</a></li>
+</ul>
+
+<p>An example of the Address and Company. First Pairing object</p>
+
+<pre><code>public class AddressCompany
+{
+    // the relation to both sides
+    public virtual Address Address { get; set; }
+    public virtual Company Company { get; set; }
+
+    // many other settings we need
+    public virtual string   Description  { get; set; }
+    public virtual DateTime CreationDate { get; set; }
+    ...
+}
+</code></pre>
+
+<p>the Address and Company in a nut-shell:</p>
+
+<pre><code>public class Address
+{
+    public virtual IList&lt;AddressCompany&gt; Companies { get; set; }
+    ...
+}
+
+public class Company
+{
+    public virtual IList&lt;AddressCompany&gt; Addresses { get; set; }
+    ...
+}
+</code></pre>
+
+<p>The mapping is as expected:</p>
+
+<pre><code>public AddressMap()
+{
+    HasMany(x =&gt; x.Companies)
+     ...
+}
+public CompanyMap()
+{
+    HasMany(x =&gt; x.Addresses)
+     ...
+}
+public AddressCompanyMap()
+{
+    References(x =&gt; x.Address)..
+    References(x =&gt; x.Company)..
+     ...
+}
+</code></pre>
+
+<p>So, this is representing the Pairing object</p>
+
+<p>Well, but now we can find some Companies Created after a date:</p>
+
+<pre><code>var subquery = QueryOver.Of&lt;AddressCompany&gt;()
+    .Where(c =&gt; c.CreationDate &gt; new DateTime(2000, 1, 1))
+    .Select(c =&gt; c.Company.ID);
+
+var query = session.QueryOver&lt;Company&gt;()
+    .WithSubquery
+    .WhereProperty(c =&gt; c.ID)
+    .In(subquery)
+    ...;
+</code></pre>
+
+<p>This way we can also filter Company over the Address...</p>

@@ -1,0 +1,62 @@
+<p>Based on your screenshots, I'm assuming that you're using Nintex Forms.</p>
+
+<p><strong>For Plain Text Multi-Line Fields</strong></p>
+
+<p>The following will work for plain text multiline fields, but not for rich text or enhanced rich text fields (neither of which are represented by an ordinary textarea element).</p>
+
+<p>In your form settings, in the Custom JavaScript section, you can add the following code:</p>
+
+<pre><code>ExecuteOrDelayUntilScriptLoaded(function(){setTimeout(checkFieldExists,1000);},"sp.js");
+
+function checkFieldExists(){
+    // Nintex forms load slowly; we'll hold off on running the code
+    // until we're able to access the element through the DOM.
+    var field = document.getElementById(DescriptionID);
+    if(field){
+        // The field exists, time to attach an event listener.
+        addExpansionToggleEvent(field);
+    }else{
+        // Wait a second, then check again.
+        setTimeout(checkFieldExists,1000);
+    }
+}
+
+function addExpansionToggleEvent(field){
+    field.style.height = ""; // remove the default height=100%
+    field.ondblclick = function(){
+        var rows = field.getAttribute("rows"); 
+        field.setAttribute("rows",+rows &lt; 10 ? 10 : 1);
+    };
+}
+</code></pre>
+
+<p>This is assuming you added a client ID of <code>DescriptionID</code> to the plain text multiline field that you want to toggle, as shown in your screenshot.</p>
+
+<p><strong>For Rich Text Multi-Line Fields</strong></p>
+
+<p>Rich text fields are (bizarrely) represented by iframes instead of <code>textarea</code> elements.</p>
+
+<p>The following code can be added to your Custom JavaScript section to provide expand/shrink behavior upon double-clicking a rich text field, but note that this does not readjust the way other controls are laid out on the form to account for the field's new size... so it's not especially useful.</p>
+
+<pre><code>ExecuteOrDelayUntilScriptLoaded(function(){setTimeout(checkFieldExists,1000);},"sp.js");
+function checkFieldExists(){
+    var iframes = document.querySelectorAll("iframe[title=\"Rich Text Editor\"]");
+    if(iframes.length &gt; 0){
+        addExpansionToggleEvent(iframes);
+    }else{
+        setTimeout(checkFieldExists,1000);
+    }
+}
+function addExpansionToggleEvent(iframes){
+    for(var i = 0, len = iframes.length; i &lt; len; i++){
+        var body = iframes[i].contentDocument.querySelector("body");
+        (function(container){
+            body.ondblclick = function(){
+                container.height = +(container.height) &lt; 140 ? 140 : 30; 
+            };
+        })(iframes[i]);
+    }
+}
+</code></pre>
+
+<p>Again, this code is specifically targeted toward rich text field, and will not work for plain text or enhanced rich text fields.</p>

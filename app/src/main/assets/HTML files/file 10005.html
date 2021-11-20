@@ -1,0 +1,78 @@
+<p>I ended up just doing the math by hand. Here's the function I used for posterity:</p>
+
+<pre><code>getRadiusAngle: function(referenceX, referenceY, centerX, centerY) {                
+    var width = centerX - referenceX;
+    var height = centerY - referenceY;
+    var angle, radius;
+
+    if(centerY &gt; referenceY) {
+        if(centerX &gt; referenceX) {
+            angle = Math.PI - Math.atan(Math.abs(height/width));
+            radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
+        } else if (centerX &lt; referenceX) {
+            angle = Math.atan(Math.abs(height/width));
+            radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
+        } else if (centerX == referenceX) {
+            angle = Math.PI / 2;
+            radius = height;
+        }
+    } else if(centerY &lt; referenceY) {
+        if(centerX &gt; referenceX) {
+            angle = Math.PI + Math.atan(Math.abs(height/width));
+            radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
+        } else if (centerX &lt; referenceX) {
+            angle = (2 * Math.PI) - Math.atan(Math.abs(height/width));
+            radius = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
+        } else if (centerX == referenceX) {
+            angle = Math.PI * 1.5;
+            radius = Math.abs(height);
+        }
+    } else if(centerY == referenceY) {
+        if(centerX &gt; referenceX) {
+            angle = Math.PI;
+            radius = width;
+        } else if (centerX &lt; referenceX) {
+            angle = 0;
+            radius = Math.abs(width);
+        } else if(centerX == referenceX) {
+            angle = 0;
+            radius = 0;
+        }
+    }
+
+    return({
+        "radius": radius, 
+        "angle": angle
+    })
+},
+</code></pre>
+
+<p>For rotate operations I then used:</p>
+
+<pre><code>var calcwidth = annotations[i].getAttribute("calcwidth");
+var matrix = annotations[i].getCTM();
+
+var referenceX = (matrix.e + (calcwidth/2));
+var referenceY = (matrix.f + 32);
+
+var ra = this.getRadiusAngle(referenceX, referenceY, pointerX, pointerY);
+
+var current_angle = ra.angle;
+var radius = ra.radius
+
+var newX, newY;
+if(radius == 0) {
+    newX = matrix.e;
+    newY = matrix.f;
+} else {      
+    var new_angle = current_angle + -radians;  
+
+    newX = (pointerX + (radius * Math.cos(new_angle))) - (calcwidth/2);
+    newY = (pointerY + -(radius * Math.sin(new_angle))) - 32;
+}
+
+annotations[i].setAttribute("transform", "translate(" 
+    + newX + " " + newY + ")");
+</code></pre>
+
+<p>For scaling, I used a similar strategy.</p>

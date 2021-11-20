@@ -1,0 +1,47 @@
+<p>According to <a href="http://en.cppreference.com/w/cpp/language/overload_resolution" rel="nofollow">overload resolution rules (section <strong>Ranking of implicit conversion sequences</strong>)</a>, as the argument can be converted to either function's parameter type, the best viable function in this case would be the one whose implicit conversion is better.</p>
+
+<p>For:</p>
+
+<pre><code>class Foo {
+  public:
+    void bar(void*);
+    void bar(int*);
+};
+
+// ...
+
+Foo foo;
+int* p2;
+foo.bar(p2);
+</code></pre>
+
+<p>The first is rank 3 (<strong>Conversion</strong>), while the second is rank 1 (<strong>Exact Match</strong>).  As an exact match, which requires no conversion, is better than a conversion, it will call <code>void bar(int*)</code>.</p>
+
+<p>It gets more complex in your second case, however:</p>
+
+<pre><code>class Foo {
+  public:
+    virtual void bar(void*);
+    virtual void bar(Foo*);
+    virtual ~Foo() = default;
+};
+
+class FooTwo : public Foo {};
+
+// ...
+
+Foo foo;
+FooTwo footwo;
+
+foo.bar(&amp;footwo);
+</code></pre>
+
+<p>As both are rank 3 (<strong>Conversion</strong>), this then follows conversion ranking rules.  And as both conversions have the same conversion rank, this then goes to extended conversion ranking rules.  Extended rule 2 states:</p>
+
+<blockquote>
+  <p>Conversion that converts pointer-to-derived to pointer-to-base is better than the conversion of pointer-to-derived to pointer-to-void, and conversion of pointer-to-base to void is better than pointer-to-derived to void.</p>
+</blockquote>
+
+<p>Considering this, <code>void bar(Foo*)</code> is considered a better match than <code>void bar(void*)</code>, meaning that it will be selected by <code>foo.bar(&amp;footwo);</code>.</p>
+
+<p>See <a href="http://ideone.com/PtTSAR" rel="nofollow">here</a> for an example of the latter.</p>

@@ -1,0 +1,55 @@
+<p>Sounds like you need an <a href="http://www.mssqltips.com/sqlservertip/1160/execute-dynamic-sql-commands-in-sql-server/" rel="nofollow"><strong>dynamic SQL commands</strong></a>, but you cannot use dynamic SQL from a function. For that you have to create stored procedure. </p>
+
+<pre><code>CREATE PROCEDURE [dbo].[GetStockDeatils]
+AS
+BEGIN
+DECLARE @tableName varchar(25),
+        @PKKey numeric(18,0),
+        @dsql nvarchar(max) = N''
+
+IF OBJECT_ID('tempdb.dbo.#Results') IS NOT NULL DROP TABLE dbo.#Results
+CREATE TABLE dbo.#Results(PurchaseData nvarchar(50) NOT NULL)
+
+DECLARE StockCursor CURSOR LOCAL FAST_FORWARD FOR 
+SELECT tableName ,PKKey 
+FROM INVM 
+OPEN StockCursor
+FETCH NEXT FROM StockCursor INTO @tableName, @PKKey
+WHILE @@FETCH_STATUS = 0
+BEGIN 
+  SET @dsql = 'Insert dbo.#Results Select PurchaseData from ' + @tableName + ' WHERE PKKey = ' + CAST(@PKKey AS varchar(10))
+  EXEC sp_executesql @dsql  
+  FETCH NEXT FROM StockCursor INTO @tableName, @PKKey 
+END
+CLOSE StockCursor
+DEALLOCATE StockCursor
+
+SELECT *
+FROM dbo.#Results
+END
+
+EXEC [dbo].[GetStockDeatils]
+</code></pre>
+
+<p>Demo on <a href="http://sqlfiddle.com/#!3/3271c/1" rel="nofollow"><strong>SQLFiddle</strong></a></p>
+
+<p>Procedure creating view</p>
+
+<pre><code>CREATE PROCEDURE [dbo].[GetStockDeatils]
+AS
+BEGIN
+DECLARE @dsql nvarchar(max) = N''
+IF OBJECT_ID('dbo.v_Results') IS NOT NULL DROP VIEW dbo.v_Results
+SELECT @dsql += 
+  'UNION ALL SELECT PurchaseData FROM ' + tableName + 
+  ' WHERE PKKey = ' + CAST(PKKey AS varchar(10))                
+FROM dbo.INVM
+SET @dsql = N'CREATE VIEW dbo.v_Results AS ' + STUFF(@dsql, 1, 10, '')
+EXEC sp_executesql @dsql
+END
+
+EXEC [dbo].[GetStockDeatils]
+
+SELECT *
+FROM dbo.v_Results
+</code></pre>

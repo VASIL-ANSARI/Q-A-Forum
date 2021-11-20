@@ -1,0 +1,26 @@
+<p>Before I suggest my answer, allow me a word of caution: temporarily removing a durable subscription sounds a little bit like you don't really need a durable subscription. Durable subscriptions are for <code>Consumers</code> which need to receive messages that were sent while they are offline. If you need the messages only sometimes (say, when your consumer is connected), a non-durable topic is the item of choice.</p>
+
+<p>Note that this only makes sense for <code>Topics</code> (1:n communication, pub/sub). <code>Queues</code> work slightly different as they are used for 1:1 communication (advanced techniques like load balancing set aside for now).</p>
+
+<p>Durable topics incur a notable resource overhead on the message broker and removing and recreating subscriptions might lead to expensive initialization over and over again.</p>
+
+<p>Now if you really want to (temporarily) unsubscribe from your durable topic (also works for "normal" topics), you'll have to extend <code>DefaultMessageListenerContainer</code>:</p>
+
+<pre><code>public class MyContainer extends DefaultMessageListenerContainer {
+    public Session retrieveSession() {
+        return getSession(); // this is protected, so we wrap it (could also make getSession public)
+    }
+}
+</code></pre>
+
+<p>When you instantiate <code>MyContainer</code> (instead of <code>DefaultMessageListenerContainer</code>) in the <code>container</code> method, make sure to store the reference:</p>
+
+<pre><code>protected MyContainer listenerContainer;
+...
+listenerContainer = new MyContainer(...);
+return listenerContainer;
+</code></pre>
+
+<p>You can then just call <code>listenerContainer.retrieveSession().unsubscribe(...)</code> to unsubscribe.</p>
+
+<p>Please also note that you may only call this after all the session's consumers to that topic are closed and there are no messages in transit (direct quote from the <a href="http://docs.oracle.com/javaee/7/api/javax/jms/Session.html#unsubscribe%28java.lang.String%29" rel="nofollow">documentation</a>: "It is erroneous for a client to delete a durable subscription while there is an active (not closed) consumer for the subscription, or while a consumed message is part of a pending transaction or has not been acknowledged in the session."</p>

@@ -1,0 +1,62 @@
+<p>Comments get a bit cramped, so I'll expand a bit on the problems mentioned.</p>
+
+<p><strong>Problem 0: Syntax errors (added by me)</strong></p>
+
+<p>There are still syntax errors. You seem to have inserted a <code>console.log</code> statement in the parameter list for <code>.then()</code>. Remove that, so you'll have something like this:</p>
+
+<pre><code>).then(
+    // Q1:console.log print 3 'undefined'
+    // ------------&gt; You can't have a console.log statement here,
+    // ------------&gt; this is the parameter list for then()!
+    // console.log( this.url + this.urlType + this.layout); 
+    function(response){
+       ....
+    }, 
+    function(error){
+       ....            
+    });
+</code></pre>
+
+<p><strong>Problem 2: Class properties not working</strong></p>
+
+<p>This is a very common Javascript mistake, I advice you to take a look at these:</p>
+
+<ul>
+<li><a href="http://ryanmorr.com/understanding-scope-and-context-in-javascript/" rel="nofollow">http://ryanmorr.com/understanding-scope-and-context-in-javascript/</a></li>
+<li><a href="http://stackoverflow.com/questions/3127429/javascript-this-keyword">JavaScript &quot;this&quot; keyword</a></li>
+<li><a href="http://dojotoolkit.org/reference-guide/1.9/dojo/_base/lang.html#hitch" rel="nofollow">http://dojotoolkit.org/reference-guide/1.9/dojo/_base/lang.html#hitch</a> </li>
+</ul>
+
+<p>Essentially, one way to solve it is by making local variables, e.g. <code>var layout = this.layout;</code> like you've done (you'll often see people doing <code>var self = this;</code> also). This is because function scope and the <code>this</code> keyword work a little differently from what you're used to (see the aforementioned links).</p>
+
+<p>Alternatively, you can use the <code>hitch()</code> function in <code>dojo/_base/lang</code> to "bind" the function to the <code>this</code> object. That would look something like the following:</p>
+
+<pre><code>define([
+    "dojo/_base/lang", // &lt;--------- remember to add this
+    /* your other dependencies here... */
+], function (
+    lang, // &lt;!--------- this too!
+    /* your other dependencies here as well, of course.. */
+) {
+// your other code as before ......
+
+    request.post( this.url, {
+            handleAs: this.urlType 
+        }).then(
+            lang.hitch(this, function(response) {
+                // &lt;--------- Now using this.layout etc works here
+            }),
+            function(error) { /* .... */ }
+        );
+</code></pre>
+
+<p><strong>Problem 3: Grid not showing until you resize the pane</strong></p>
+
+<p>This usually occurrs when the Grid tries to render itself in a DOM node that is detached from the DOM (or the node has <code>display: none</code> or similar). You can try to fix this by calling <code>grid._resize()</code> after you've inserted it in the DOM. </p>
+
+<p>As a quick test, you can do something silly like (do <strong>not</strong> leave this in there though, it's just for determining the root cause):</p>
+
+<pre><code>setTimeout(function() { grid._resize(); }, 2000);
+</code></pre>
+
+<p>Edit: Ok, I see you've tried something similar, so this may not be the issue.</p>

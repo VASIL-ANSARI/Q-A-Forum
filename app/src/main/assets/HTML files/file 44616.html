@@ -1,0 +1,38 @@
+<p>This is a question which doesnât have anything to do with lambda expressions. Itâs about software design. In your code, a piece of code implementing program logic (which happens to be a lambda expression) has a hardwired creation of <code>new Scanner(System.in)</code> in it.</p>
+
+<p>The problems with that are not connected to the fact that the code is a lambda expression and neither does the solution depend on it. You have to provide the <code>Scanner</code> from the surrounding context. Generally, you would have to abstract user interfaces to make testing possible. If you have an <code>interface</code> which can be implemented by either, actually asking the user or providing a predefined value from the testcase, you can test any code which works on an instance of that <code>interface</code>.</p>
+
+<p>In case of a <code>Scanner</code> it is a bit easier as it already is an abstraction. You may simply create a <code>Scanner</code> instance operating on predefined input, e.g. via <code>StringReader</code> to enable testing of code working with a <code>Scanner</code>. The only requirement is that the code using the <code>Scanner</code> doesnât create its own <code>Scanner</code> instance in a hardwired way but uses an instance provided from the surrounding context instead.</p>
+
+<p>At this point you may consider putting the code into a named method as itâs pretty big for a lambda expression anyway. Maybe thatâs what you already attempted with the invalid code fragment of your question:</p>
+
+<pre><code>public void cardOne(Scanner scanner, PlayerType player, GameType game) {
+    TextUserInterface UI = TextUserInterface.getUI();
+    Set&lt;GreenPlayerCard&gt; playerCards = player.getPlayerCards();
+    discardCard = UI.getCardChoice(playerCards,"Choose a card to discard: ");
+
+    String optionChoice = null;
+    System.out.println("\t1- to Confirm Discard Card, enter 1");
+    System.out.println("\t2- Do nothing, enter 2");
+    System.out.print("Choice: ");
+    input: for(;;) {
+        optionChoice = scanner.nextLine();
+        switch (optionChoice) {
+        case "1":
+            game.discardCard(discardCard, player);
+            break input;
+        case "2": break input;
+        default: System.out.println("\tPlease enter your choice:");
+        }
+    }
+}
+</code></pre>
+
+<p>If you have that method, you can test it easily by passing a prepared <code>Scanner</code> instance. Within the actual application you can use it with a lambda expression which may look like</p>
+
+<pre><code>(player, game) -&gt; handleCardOne(new Scanner(System.in), player, game)
+</code></pre>
+
+<p>but you may consider calling <code>new Scanner(System.in)</code> at the beginning of the application and keeping that one instance.</p>
+
+<p>The actual lambda expression follows the rule of thump that lambda expression should be short enough to be âtoo simple to failâ thus not require its own test case. Every time a lambda expression becomes so complex that you have doubts about it, you should consider moving the code into a named, testable method.</p>

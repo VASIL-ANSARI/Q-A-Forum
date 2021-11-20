@@ -1,0 +1,45 @@
+<p>None; no copies are done.  </p>
+
+<p>The address of the caller's Data return value is actually passed as a hidden argument to the function, and the createData function simply writes into the caller's stack frame.</p>
+
+<p>This is known as the <a href="http://en.wikipedia.org/wiki/Return_value_optimization">named return value optimisation</a>.  Also see the <a href="http://www.parashift.com/c++-faq-lite/ctors.html#faq-10.9">c++ faq on this topic</a>.</p>
+
+<blockquote>
+  <p>commercial-grade C++ compilers implement return-by-value in a way that lets them eliminate the overhead, at least in simple cases</p>
+  
+  <p>...</p>
+  
+  <p>When yourCode() calls rbv(), the compiler secretly passes a pointer to the location where rbv() is supposed to construct the "returned" object.</p>
+</blockquote>
+
+<p>You can demonstrate that this has been done by adding a destructor with a printf to your struct.  The destructor should only be called once if this return-by-value optimisation is in operation, otherwise twice.</p>
+
+<p>Also you can check the assembly to see that this happens:</p>
+
+<pre><code>Data createData() 
+{
+    Data data;
+    // initialize data values...
+    data.values[5] = 6;
+    return data;
+}
+</code></pre>
+
+<p>here's the assembly:</p>
+
+<pre><code>__Z10createDatav:
+LFB2:
+        pushl   %ebp
+LCFI0:
+        movl    %esp, %ebp
+LCFI1:
+        subl    $1032, %esp
+LCFI2:
+        movl    8(%ebp), %eax
+        movl    $6, 20(%eax)
+        leave
+        ret     $4
+LFE2:
+</code></pre>
+
+<p>Curiously, it allocated enough space on the stack for the data item <code>subl    $1032, %esp</code>, but note that it takes the first argument on the stack <code>8(%ebp)</code> as the base address of the object, and then initialises element 6 of that item.  Since we didn't specify any arguments to createData, this is curious until you realise this is the secret hidden pointer to the parent's version of Data.</p>

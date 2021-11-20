@@ -1,0 +1,104 @@
+<p>Some assumptions/definitions:</p>
+
+<ul>
+<li><code>objects</code> a member variable, something like <code>vector&lt;Object*&gt; objects;</code></li>
+<li><code>p</code> is also a member variable, something like <code>vector&lt;Object*&gt;::iterator p;</code></li>
+</ul>
+
+<p>So <code>p</code> is an iterator, <code>*p</code> is an Object pointer, and <code>**p</code> is an Object.</p>
+
+<p>The problem is that this method:</p>
+
+<pre><code>void Engine::killUpdate(std::string command) {
+  if ((*p)-&gt;getIsDead() == true) {
+    delete *p;
+  }
+}
+</code></pre>
+
+<p>deallocates the Object pointed to by <code>*p</code>, the pointer in the vector at the position referenced by the <code>p</code> iterator. However the pointer <code>*p</code> itself is still in the vector, now it just points to memory that is no longer allocated. Next time you try to use this pointer, you will cause undefined behavior and very likely crash.</p>
+
+<p>So you need to remove this pointer from your vector once you have deleted the object that it points to. This <em>could</em> be as simple as:</p>
+
+<pre><code>void Engine::killUpdate(std::string command) {
+  if ((*p)-&gt;getIsDead() == true) {
+    delete *p;
+    objects.erase(p);
+  }
+}
+</code></pre>
+
+<p><strong>However</strong>, you are calling <code>killUpdate</code> from <code>update</code> in a loop that iterates over the <code>objects</code> vector. If you use the code above, you will have another problem: once you erase <code>p</code> from the <code>objects</code> vector, it is no longer safe to execute <code>p++</code> in your for-loop statement, because <code>p</code> is no longer a valid iterator.</p>
+
+<p>Fortunately, STL provides a very nice way around this. <code>vector::erase</code> returns the next valid iterator after the one you erased! So you can have the <code>killUpdate</code> method update <code>p</code> instead of your for-loop statement, e.g.</p>
+
+<pre><code>void Engine::update(string command) {
+  if (getGameOver() == false) {
+    for (p = objects.begin(); p != objects.end(); /* NOTHING HERE */) {
+      // ...
+      killUpdate(command);
+    }
+  }
+}
+
+void Engine::killUpdate(std::string command) {
+  if ((*p)-&gt;getIsDead() == true) {
+    delete *p;
+    p = objects.erase(p);
+  } else {
+    p++;
+  }
+}
+</code></pre>
+
+<p>This is of course assuming that you <em>always</em> call <code>killUpdate</code> in the loop, but I'm sure you can see the way around this if you don't -- just execute <code>p++</code> at the end of the for-loop body in the case that you haven't called <code>killUpdate</code>.</p>
+
+<p>Also note that <strong>this is not particularly efficient</strong>, since every time you erase an element of the vector, the elements that follow it have to be shifted back to fill in the empty space. So this will be slow if your <code>objects</code> vector is large. If you used a <code>std::list</code> instead (or if you are already using that), then this is not a problem, but lists have other drawbacks.</p>
+
+<p><strong>A secondary approach</strong> is to overwrite each pointer to a deleted object with <code>nullptr</code> and then use <code>std::remove_if</code> to remove them all in one go at the end of the loop. E.g.:</p>
+
+<pre><code>void Engine::update(string command) {
+  if (getGameOver() == false) {
+    for (p = objects.begin(); p != objects.end(); p++) {
+      // ...
+      killUpdate(command);
+    }
+  }
+  std::erase(std::remove_if(objects.begin(), objects.end(), 
+                            [](const Object* o) { return o == nullptr; }), 
+             objects.end());
+}
+
+void Engine::killUpdate(std::string command) {
+  if ((*p)-&gt;getIsDead() == true) {
+    delete *p;
+    *p = nullptr;
+  } 
+}
+</code></pre>
+
+<p>The assumption this time is that you will never have a <code>nullptr</code> element of <code>objects</code> that you want to keep for some reason.</p>
+
+<p>Since you seem to be a beginner, I should note that this:</p>
+
+<pre><code>  std::erase(std::remove_if(objects.begin(), objects.end(), 
+                            [](const Object* o) { return o == nullptr; }),
+             objects.end());
+</code></pre>
+
+<p>is <a href="http://en.wikipedia.org/wiki/Erase-remove_idiom" rel="nofollow">the erase-remove idiom, which is explained well on Wikipedia</a>. It erases elements from the vector if they return true when a given function object is called on them. In this case, the function object is:</p>
+
+<pre><code>[](const Object* o) { return o == nullptr; }
+</code></pre>
+
+<p>Which is a <a href="http://stackoverflow.com/questions/7627098/what-is-a-lambda-expression-in-c11">lambda expression</a> and is essentially shorthand for an instance of an object with this type:</p>
+
+<pre><code>class IsNull {
+ public:
+   bool operator() (const Object* o) const {
+     return o == nullptr;
+   }
+};
+</code></pre>
+
+<p>One last caveat to the second approach, I just noticed that you have <em>another</em> loop over <code>objects</code> in <code>scrollUpdate</code>. If you choose the second approach, be sure to update this loop to check for <code>nullptr</code>s in <code>objects</code> and skip them.</p>

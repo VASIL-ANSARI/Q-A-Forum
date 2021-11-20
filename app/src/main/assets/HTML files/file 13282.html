@@ -1,0 +1,29 @@
+<p>Almost all the functions operating on Mat's check the size and type of the destination Mat's. If they are the same, they use them. So, if you threshold a Mat with </p>
+
+<pre><code>threshold(src, src, ...);
+</code></pre>
+
+<p>It will be processed <strong>in-place</strong></p>
+
+<p>But, if the destination mat is of different size, type, number of channels, etc, it will alloc a new one. In your example:</p>
+
+<pre><code>tmp.convertTo(tmp, CV_OTHER_TYPE);
+</code></pre>
+
+<p>now you suppose that the dst, which is actually the source for tpm, will be changed:</p>
+
+<pre><code>dst(tmp_region_ofInterest).convertTo(dst(region));
+</code></pre>
+
+<p>But it actually expands to</p>
+
+<pre><code>Mat  tmp2(tmp.size, CV_OTHER_SIZE);
+tmp.convertTo(tmp2,...);
+tmp = tmp2;
+</code></pre>
+
+<p>And after the function exits, your tmp is not anymore a region of dst.</p>
+
+<p>Reason is simple: first, you cannot change type in place, and you cannot change type of a partial matrix. What do you want to happen? Have matrix (continuous space in the memory), filled with a mix of <code>unsigned char</code> and <code>float</code>? Because this will happen, at least at some moment when processing. </p>
+
+<p>So, always check in the doc if a given function operates in place, and if it operates on regions of interest, and if it can operate in place on regions of interest. And also use the common sense to fill the missing gaps in the official doc.</p>

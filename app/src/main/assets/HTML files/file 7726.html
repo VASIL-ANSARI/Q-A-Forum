@@ -1,0 +1,63 @@
+<p>As to your concrete problem: in Java, strings are objects, not primitives. You need to compare objects by the <a href="http://download.oracle.com/javase/6/docs/api/java/lang/Object.html#equals%28java.lang.Object%29" rel="nofollow"><code>Object#equals()</code></a> method, not by equality operator <code>==</code> (or even more incorrectly, the assignment operator <code>=</code>). This is not different when writing raw Java code straight in a JSP file instead of a Java class.</p>
+
+
+
+<pre class="lang-xml prettyprint-override"><code>&lt;% if (request.getMethod().equals("POST")) { %&gt;
+</code></pre>
+
+<hr>
+
+<p>As to the better way, just use a servlet.</p>
+
+<p>Put JSP in <code>/WEB-INF/query.jsp</code> to prevent direct access and remove all old fashioned <em>scriptlets</em> so that it becomes a fullworthy view.</p>
+
+
+
+<pre class="lang-xml prettyprint-override"><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+    &lt;head&gt;
+        &lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8"&gt;
+        &lt;title&gt;XML Query&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;form action="query" method="post"&gt;
+            &lt;table cellpadding="2"&gt;
+                &lt;tr&gt;&lt;td&gt;Query:&lt;/td&gt;&lt;/tr&gt;
+                &lt;tr&gt;&lt;td&gt;&lt;textarea name="query" cols="60" rows="10" &gt;&lt;/textarea&gt;
+                &lt;tr&gt;&lt;td&gt;&lt;input type="submit" value="Go"&gt;&lt;/td&gt;&lt;/tr&gt;
+            &lt;/table&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>Create a servlet which does the controlling job:</p>
+
+
+
+<pre class="lang-java prettyprint-override"><code>@WebServlet(urlPatterns={"/query"})
+public class QueryServlet extends HttpServlet {
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        if (request.getParameterMap().isEmpty()) {
+            showJsp(request, response);
+        } else {
+            showXml(request, response);
+        }
+    }
+
+    private void showJsp(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.getRequestDispatcher("/WEB-INF/query.jsp").forward(request, response);
+    }
+
+    private void showXml(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // ...
+    }
+
+}
+</code></pre>
+
+<p>Open the page by <a href="http://localhost:8080/contextname/query" rel="nofollow">http://localhost:8080/contextname/query</a>.</p>
+
+<p>I however wonder how it's useful to mix POST/GET here since you want to intercept on the query string as well. Just remove <code>method="post"</code> from the <code>&lt;form&gt;</code> and replace <code>service()</code> method name in above example by <code>doGet()</code>. This way the form submit URL becomes bookmarkable as well (which is what among others Google also does).</p>

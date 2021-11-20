@@ -1,0 +1,66 @@
+<p>Several problems:</p>
+
+<ol>
+<li>Don't manipulate DOM when using KO. Manipulate the view model instead, let KO handle updating the DOM for you.</li>
+<li>You have a radio button input (without a <code>value</code> attribute!) but seem to want to bind a <em>boolean</em>, which would <a href="http://stackoverflow.com/questions/10127001/binding-true-false-to-radio-buttons-in-knockout-js">require extra work</a>.</li>
+<li>You use <code>onclick</code> attributes where there's also a <code>click</code> binding handler.</li>
+</ol>
+
+<p>If you insist on ignoring 1 and manipulate the DOM yourself, do so in a way where KO will get notified of the change. Since you use jQuery anyways I recommend using its API for triggering events on the inputs. Here's a demo fixing/working around problem 2 and 3:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var ViewModel = function() {
+  this.enableMe = ko.observable(false);
+};
+ 
+var myVM = new ViewModel();
+ 
+ko.applyBindings(myVM); 
+
+function clickme() {
+  // This is NOT recommended! Check the second example.
+  $("#mycheck1").trigger("click");
+}</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>pre { font: 11px consolas; padding: 5px; background: #fafafa; border: 1px solid #ddd; }</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.2.0/knockout-min.js"&gt;&lt;/script&gt;
+&lt;script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"&gt;&lt;/script&gt;
+
+EnableMe: &lt;input value="true" id="mycheck1" type="checkbox" data-bind='checked: enableMe'/&gt;&lt;br/&gt;
+Enable status: &lt;span data-bind='text: enableMe'&gt;&lt;/span&gt;
+&lt;br/&gt;
+&lt;button id="button1" data-bind="click: clickme"&gt;Click To Toggle&lt;/button&gt;
+&lt;hr&gt;
+&lt;pre data-bind="text: ko.toJSON($root, null, 2)"&gt;&lt;/pre&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<p>However, you should use an approach like this:</p>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>var ViewModel = function() {
+  var self = this;
+  
+  self.enableMe = ko.observable(false);
+  
+  self.clickme = function() {
+    self.enableMe(true);
+  }
+};
+ 
+var myVM = new ViewModel(); 
+ko.applyBindings(myVM);</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>pre { font: 11px consolas; padding: 5px; background: #fafafa; border: 1px solid #ddd; }</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"&gt;&lt;/script&gt;
+
+EnableMe: &lt;input value="true" id="mycheck1" type="checkbox" data-bind='checked: enableMe'/&gt;&lt;br/&gt;
+Enable status: &lt;span data-bind='text: enableMe'&gt;&lt;/span&gt;
+&lt;br/&gt;
+&lt;button id="button1" data-bind="click: clickme"&gt;Click To Toggle&lt;/button&gt;
+&lt;hr&gt;
+&lt;pre data-bind="text: ko.toJSON($root, null, 2)"&gt;&lt;/pre&gt;</code></pre>
+</div>
+</div>
+</p>

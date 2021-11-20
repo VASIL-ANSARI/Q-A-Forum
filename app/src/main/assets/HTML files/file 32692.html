@@ -1,0 +1,65 @@
+<p>There is no way to do this using namespaces, but you could implement a class that acts as an accessor or factory for the types in the namespace.</p>
+
+<pre><code>interface IFactory
+{
+    Type GetType1();
+}
+
+namespace X
+{
+    public class Type1 { }
+
+    public class Factory : IFactory
+    {
+        public Type GetType1() { return typeof(Type1); }
+    }
+}
+
+namespace Y
+{
+    public class Type1 { }
+
+    public class Factory : IFactory
+    {
+        public Type GetType1() { return typeof(Type1); }
+    }
+}
+
+public void MyFunction&lt;T&gt;(T factory)
+    where T : IFactory
+{
+    var type = factory.GetType1();
+    ...
+}
+
+void Main()
+{
+    MyFunction(new X.Factory());
+    MyFunction(new Y.Factory());
+}
+</code></pre>
+
+<p>Or you would implement a non-generic reflection solution:</p>
+
+<pre><code>public void MyFunction(string ns)
+{
+    var typesReader = from asm in AppDomain.CurrentDomain.GetAssemblies()
+                      from type in asm.GetExportedTypes()
+                      where type.Namespace == ns
+                      select type;
+
+    var typeMap = typesReader.ToDictionary(t =&gt; t.Name);
+
+    var type1 = typeMap["Type1"];
+
+    ...
+}
+
+void Main()
+{
+    MyFunction("X");
+    MyFunction("Y");
+}
+</code></pre>
+
+<p>Note that this reflection solution won't work if the assembly(-ies) containing the namespace(s) aren't loaded in the appdomain yet.</p>

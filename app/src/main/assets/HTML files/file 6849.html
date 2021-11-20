@@ -1,0 +1,55 @@
+<p>I took a quick look at the source code. I didn't see any obvious way to do that. But I whipped up a quick and dirty awk script to insert the column names.</p>
+
+<p>Starting with this dump:</p>
+
+<pre><code>PRAGMA foreign_keys=OFF;
+BEGIN TRANSACTION;
+CREATE TABLE test (test_id int primary key, test_name varchar(35));
+INSERT INTO "test" VALUES(1,'Wibble');
+INSERT INTO "test" VALUES(2,'Wobble');
+INSERT INTO "test" VALUES(3,'Pernicious');
+COMMIT;
+</code></pre>
+
+<p>I ran this awk script</p>
+
+<pre><code>/CREATE TABLE/ {
+  # Extract the part between parens. This part contains the 
+  # column definitions.
+  first_col = match($0, /\(.*\)/ );
+  if (first_col) {
+     num_columns = split(substr($0, RSTART + 1, RLENGTH), a, ",");
+     for (i = 1; i &lt;= num_columns; i++) {
+       sub(/^ /, "", a[i]);
+       split(a[i], names, " ");
+       column_names[i] = names[1];
+     }
+  }
+}
+/INSERT INTO \"[A-Za-z].*\"/ {
+  insert_part = match($0, /INSERT INTO \"[A-Za-z].*\"/);
+  printf("%s ", substr($0, RSTART, RLENGTH));
+
+  printf("(");
+  for (j = 1; j &lt;= num_columns; j++) {
+    if (j == 1) {
+        printf("%s", column_names[j]);
+    }
+    else {
+        printf(", %s", column_names[j]);
+    }
+  }
+  printf(") ");
+
+  values_part = substr($0, RLENGTH+1, length($0) - RSTART);
+  printf("%s\n", values_part);
+
+}
+</code></pre>
+
+<p>which gave me this output.</p>
+
+<pre><code>INSERT INTO "test" (test_id, test_name)  VALUES(1,'Wibble');
+INSERT INTO "test" (test_id, test_name)  VALUES(2,'Wobble');
+INSERT INTO "test" (test_id, test_name)  VALUES(3,'Pernicious');
+</code></pre>

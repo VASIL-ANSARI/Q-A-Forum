@@ -1,0 +1,72 @@
+<p>According to <a href="http://msdn.microsoft.com/en-us/library/bb522469.aspx" rel="nofollow">MSDN</a> you need to include the FILENAME clause</p>
+
+<pre><code>MODIFY FILE ( NAME = logical_file_name, FILENAME = ' new_path/os_file_name ' )
+</code></pre>
+
+<p>I believe the flow would be:</p>
+
+<ol>
+<li>Rename the database and datafile names</li>
+<li>Take the database offline</li>
+<li>Rename the physical files</li>
+<li>update the database filenames to point at the new physical files</li>
+<li>Bring the database back online</li>
+</ol>
+
+<p>I have had a go at updating your script to how I think it should read, I don't have anywhere to test this, so make sure you are testing this in a 'safe' place.</p>
+
+<pre><code>$sqlServer = "MySqlServer"
+$currentDbName = "MyDB"
+$sqlConnectionString = "Server='$sqlserver';Database='$currentDbName';Integrated Security=True"
+
+$PhysicalLocal = "C:\Data\"
+$PhysicalUNC = "\\$sqlserver\C$\Data\"
+
+$sqlQueries = `
+    "ALTER DATABASE [$currentDbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE",`
+    "EXEC sp_renamedb '$currentDbName', '$NewName'",`
+    "ALTER DATABASE [$NewName] SET MULTI_USER", `
+    "ALTER DATABASE [$NewName] MODIFY FILE (NAME = $currentDbName, NEWNAME = $NewName)", `
+    "ALTER DATABASE [$NewName] MODIFY FILE (NAME = $($currentDbName)_Log, NEWNAME = $($NewName)_Log)", `
+    "ALTER DATABASE [$currentDbName] SET offline"
+
+$sqlQueriesRename = `
+    "ALTER DATABASE [$NewName] MODIFY FILE (NAME = $NewName, FILENAME = $($PhysicalLocal\$NewName).mdf", `
+    "ALTER DATABASE [$NewName] MODIFY FILE (NAME = $($NewName)_Log, FILENAME = $($PhysicalLocal\$NewName)_Log.ldf)", `
+    "ALTER DATABASE [$currentDbName] SET online"
+
+$conn=new-object System.Data.SqlClient.SQLConnection($sqlConnectionString)
+try {
+    $conn.Open()
+
+    # Rename the database, leave in offline state
+    $sqlQueries | % {
+        $cmd = $conn.CreateCommand()
+        $cmd.CommandText = $_
+        $cmd.ExecuteScalar()
+        Write-Host "    Executed: $_" -ForegroundColor Gray
+    }
+
+    # Rename the physical files
+    Rename-Item $(Join-Path -Path $PhysicalUNC -ChildPath $($currentDbName).mdf) $($NewName).mdf
+    Rename-Item $(Join-Path -Path $PhysicalUNC -ChildPath $($currentDbName)_Log.ldf) $($NewName)_Log.ldf
+
+    # Rename the database files to match the physical ones
+    $sqlQueriesRename | % {
+        $cmd = $conn.CreateCommand()
+        $cmd.CommandText = $_
+        $cmd.ExecuteScalar()
+        Write-Host "    Executed: $_" -ForegroundColor Gray
+    }
+}
+catch{
+    $actualError = $error[0]
+    throw $actualError
+}
+finally{
+    if($conn) {
+        $conn.Close()
+        $conn.Dispose()
+    }
+}
+</code></pre>

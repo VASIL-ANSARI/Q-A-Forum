@@ -1,0 +1,52 @@
+<p>As you want the complete path to a category, you can't start your non-recursive part with <code>c.id = 5</code> you have to start at the root using <code>where parent_id is null</code> (you should <strong>not</strong> identify the root nodes with a non-existing category ID, that prevents creating a proper foreign key for the parent_id column).</p>
+
+<p>In the recursive part you can then aggregate the full path to the root category:</p>
+
+<pre><code>with recursive tree as 
+(
+  select *, id as root_category, concat('/', name) as category_path
+  from category
+  where parent_id is null
+  union all
+  select c.*, p.root_category, concat(p.category_path, '/', c.name)
+  from category c
+    join tree p on c.parent_id = p.id
+)
+select p.id as product_id,
+       p.name as product_name,
+       t.root_category,
+       t.category_path
+from tree t
+  join product p on p.category = t.id
+</code></pre>
+
+<p>Using the following sample data:</p>
+
+<pre><code>create table category (id integer, name text, parent_id integer);
+create table product (id integer, name text, category integer, description text);
+
+insert into category
+values
+(1, 'Category A', null),
+(2, 'Category B', null),
+(3, 'Category C', null),
+(4, 'Category D', null),
+(5, 'Subcategory Of 1', 1),
+(6, 'Subcategory Of 5', 5),
+(7, 'Subcategory Of 5', 5),
+(8, 'Subcategory of D', 4)
+;
+
+insert into product
+values
+(1, 'Product One', 5, 'Our first product'),
+(2, 'Product Two', 8, 'The even better one');
+</code></pre>
+
+<p>This returns:</p>
+
+<pre><code>product_id | product_name | root_category | category_path               
+-----------+--------------+---------------+-----------------------------
+         1 | Product One  |             1 | /Category A/Subcategory Of 1
+         2 | Product Two  |             4 | /Category D/Subcategory of D
+</code></pre>

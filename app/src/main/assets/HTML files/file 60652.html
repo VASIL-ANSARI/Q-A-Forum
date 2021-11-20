@@ -1,0 +1,24 @@
+<p><code>await</code> is not compatible with <code>Mutex</code>. You can use an async-compatible mutex like <code>SemaphoreSlim</code> or the <a href="https://github.com/StephenCleary/AsyncEx.Coordination" rel="nofollow"><code>AsyncLock</code> that I have as part of my AsyncEx library</a>.</p>
+
+<p>However, if you need a <em>named</em> mutex, then you'll have to do something quite different. What that is depends on what exactly you're trying to do.</p>
+
+<p><strong>Update due to comments:</strong></p>
+
+<p>Since you're on the UI thread, there's no need to call into the dispatcher. You just need a <code>SemaphoreSlim</code> to keep them one-at-a-time:</p>
+
+<pre><code>private readonly SemaphoreSlim _mutex = new SemaphoreSlim(1);
+
+//Function that is attached to each pages "LayoutUpdated" call.
+private async void AnyPageLayoutUpdated(object sender, object e)
+{
+  await _mutex.WaitAsync();
+  try
+  {
+    LCDDriver.ILI9488.PaintScreen(sender);
+  }
+  finally
+  {
+    _mutex.Release();
+  }
+}
+</code></pre>

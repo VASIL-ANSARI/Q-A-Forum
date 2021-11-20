@@ -1,0 +1,32 @@
+<p>the <code>IntsToEntities</code> is there, you can see it being used in the <code>DefaultMapper</code> in <code>MapperConfig</code> class</p>
+
+<pre><code>// go from int[] to ICollection&lt;Entity&gt; 
+public class IntsToEntities : LoopInjection
+{
+    protected override bool MatchTypes(Type src, Type trg)
+    {
+        return src == typeof(int[]) 
+            &amp;&amp; trg.IsGenericType
+            &amp;&amp; trg.GetGenericTypeDefinition() == typeof(ICollection&lt;&gt;)
+            &amp;&amp; trg.GetGenericArguments()[0].IsSubclassOf(typeof(Entity));
+    }
+
+        protected override void SetValue(object source, object target, PropertyInfo sp, PropertyInfo tp)
+        {
+            var sourceVal = sp.GetValue(source);
+            if (sourceVal != null)
+            {
+                var tval = tp.GetValue(target);// make EF load the collection before modifying it; without it we get errors when saving an existing object
+
+                dynamic repo = IoC.Resolve(typeof(IRepo&lt;&gt;).MakeGenericType(tp.PropertyType.GetGenericArguments()[0]));
+                dynamic resList = Activator.CreateInstance(typeof(List&lt;&gt;).MakeGenericType(tp.PropertyType.GetGenericArguments()[0]));
+
+                var sourceAsArr = (int[])sourceVal;
+                foreach (var i in sourceAsArr)
+                    resList.Add(repo.Get(i));
+
+                tp.SetValue(target, resList);
+            }
+        }
+    }
+</code></pre>

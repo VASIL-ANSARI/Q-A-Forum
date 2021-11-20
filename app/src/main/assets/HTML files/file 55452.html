@@ -1,0 +1,43 @@
+<p>So you are asking for the query to check if the user is a paid member?</p>
+
+<pre><code>$paidMember = false;
+$checkPaidMember = mysql_query("select * from register where matri_id='$from_id' AND status = 'Paid'");
+if(mysql_num_rows($checkPaidMember) &gt; 0){
+    $paidMember = true;
+}
+</code></pre>
+
+<p>Just send the select with the userId and the status needed to the database. If the database returns a dataset there is a user with the id and the status you were asking for.</p>
+
+<p>Trincot is right, you should not use the mysql_* functions and take care of your security vulnerabilities.</p>
+
+<p>Is this what you are looking for?</p>
+
+<pre><code>&lt;?php
+require("../connect/report.php");
+$mid = $_SESSION['mid'];
+$from_id = isset($_REQUEST['toid']) ? $_REQUEST['toid'] : 0;
+$exp_sel = mysql_query("select * from register where matri_id='$from_id'");
+$fet = mysql_fetch_array($exp_sel);
+$today = date('Y-m-d');
+$exp_sel = mysql_query("select * from expressinterest where ei_sender='$mid' and ei_receiver='$from_id' and receiver_response ='Accept'");
+$num = mysql_num_rows($exp_sel);
+
+$paidMember = false;
+$checkPaidMember = mysql_query("select * from register where matri_id='$from_id' AND status = 'Paid'");
+if(mysql_num_rows($checkPaidMember) &gt; 0){
+    $paidMember = true;
+}
+
+if ($num &gt; 0 || $paidMember === true) { // added OR in this place for to bypass the first condition if it is a paid member
+    $cnt = "SELECT * FROM payments WHERE (pemail = '$mid' or pmatri_id='$mid')";
+    $cn = mysql_query($cnt);
+    $ncha = mysql_fetch_array($cn);
+    if ($ncha['p_no_contacts'] - $ncha['r_cnt'] &gt; 0) {
+        $ch_viewd = mysql_query("select count(id) as row from today_contact where who='$mid' and on_date='$today'");
+        $ch_fet = mysql_fetch_array($ch_viewd);
+        if ($ch_fet['row'] &lt; 3 || $paidMember === true) { // added OR in this place to bypass the second condition if it is a paid member
+            ?&gt;                      
+            &lt;div class="modal-dialog yoyo-large"&gt;
+                &lt;div class="modal-content"&gt;
+</code></pre>

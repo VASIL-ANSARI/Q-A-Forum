@@ -1,0 +1,35 @@
+<p>For one single request you could make none RESTful endpoint. This would be not right if you have decided for some reason that your whole service is going to be 100% RESTful. </p>
+
+<p>But, if you are looking for something less heavily try standard Django view:</p>
+
+<pre><code>import json
+
+from django.http import (HttpResponse,
+                     HttpResponseNotAllowed, HttpResponseForbidden)
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
+def connect_and_retrieve_data(request):
+    """
+    Docstrings..
+    """
+    if not request.user.is_authenticated():
+        return HttpResponseForbidden(json.dumps({'message': 'User must be authenticated'}),
+                                     content_type='application/json')
+    if request.method != 'GET':
+        return HttpResponseNotAllowed(permitted_methods=('GET',))
+
+    if request.GET.get('q'):
+        mycase = connect_and_retrieve_data(request, request.GET.get('q'))
+        mycase = json.loads(mycase)
+        return HttpResponse(
+            json.dumps({'mycase': mycase, 'success': True}),
+            content_type='application/json')
+    else:
+        return HttpResponse(
+            json.dumps({'message': 'Missing q param', 'success': False}),
+            content_type='application/json')
+</code></pre>
+
+<p>Be aware of that your project might be falling out of control soon if you will get too many undocumented and untested endpoints like this in RESTful API. At some point you might consider something else then RESTful. But if it is not more then 10% of all endpoints and nicely described you will be fine.</p>

@@ -1,0 +1,63 @@
+<p>So to avoid having a store with </p>
+
+<blockquote>
+  <p>remoteSort: true</p>
+</blockquote>
+
+<p>and </p>
+
+<blockquote>
+  <p>groupField</p>
+</blockquote>
+
+<p>to be auto loaded, I overrode <code>group</code> method on <code>'Ext.data.AbstractStore'</code></p>
+
+<pre><code>/**
+ * Groups data inside the store.
+ * @param {String/Object} grouper Either a string name of one of the fields in this Store's
+ * configured {@link Ext.data.Model Model}, or an object, or a {@link Ext.util.Grouper grouper} configuration object.
+ * @param {String} [direction] The overall direction to group the data by. Defaults to the value of {@link #groupDir}.
+ */
+group: function(grouper, direction) {
+    var me = this,
+        sorters = me.getSorters(false),
+        change = grouper || (sorters &amp;&amp; sorters.length)
+
+    if (grouper &amp;&amp; typeof grouper === 'string') {
+        grouper = {
+            property: grouper,
+            direction: direction || me.getGroupDir()
+        };
+    }
+
+    me.settingGroups = true;
+    me.getData().setGrouper(grouper);
+    delete me.settingGroups;
+
+    if (change) {
+        if (me.getRemoteSort()) {
+            /**
+             * when grouping a store only if the store is loaded trigger a load otherwise
+             * the store would be autoloading.
+             */
+            if(me.isLoaded()) {
+                me.load({
+                  scope: me,
+                  callback: me.fireGroupChange
+                });
+            }
+        } else {
+            me.fireEvent('datachanged', me);
+            me.fireEvent('refresh', me);
+            me.fireGroupChange();
+        }
+    }
+    // groupchange event must fire when group is cleared. 
+    // The Grouping feature forces a view refresh when changed to a null grouper 
+    else {
+        me.fireGroupChange();
+    }
+},
+</code></pre>
+
+<p>});</p>

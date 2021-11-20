@@ -1,0 +1,97 @@
+<p><strong>From "<a href="http://stackoverflow.com/questions/1334613/zip-a-directory-in-php/1334949#1334949">Zip a directory in PHP</a>".</strong></p>
+
+<hr>
+
+<p>Here is a simple function that can compress any file or directory recursively, only needs the zip extension to be loaded.</p>
+
+<pre><code>function Zip($source, $destination)
+{
+    if (extension_loaded('zip') === true)
+    {
+        if (file_exists($source) === true)
+        {
+            $zip = new ZipArchive();
+
+            if ($zip-&gt;open($destination, ZIPARCHIVE::CREATE) === true)
+            {
+                $source = realpath($source);
+
+                if (is_dir($source) === true)
+                {
+                    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
+
+                    foreach ($files as $file)
+                    {
+                        $file = realpath($file);
+
+                        if (is_dir($file) === true)
+                        {
+                            $zip-&gt;addEmptyDir(str_replace($source . '/', '', $file . '/'));
+                        }
+
+                        else if (is_file($file) === true)
+                        {
+                            $zip-&gt;addFromString(str_replace($source . '/', '', $file), file_get_contents($file));
+                        }
+                    }
+                }
+
+                else if (is_file($source) === true)
+                {
+                    $zip-&gt;addFromString(basename($source), file_get_contents($source));
+                }
+            }
+
+            return $zip-&gt;close();
+        }
+    }
+
+    return false;
+}
+</code></pre>
+
+<p>Call it like this:</p>
+
+<pre><code>Zip('/folder/to/compress/', './compressed.zip');
+</code></pre>
+
+<hr>
+
+<p><strong>EDIT - This one won't keep the folder structure (check my comment):</strong></p>
+
+<pre><code>function Zip($source, $destination)
+{
+    if (extension_loaded('zip') === true)
+    {
+        if (file_exists($source) === true)
+        {
+            $zip = new ZipArchive();
+
+            if ($zip-&gt;open($destination, ZIPARCHIVE::CREATE) === true)
+            {
+                if (is_dir($source) === true)
+                {
+                    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source), RecursiveIteratorIterator::SELF_FIRST);
+
+                    foreach ($files as $file)
+                    {
+                        if (is_file($file) === true)
+                        {
+                            $zip-&gt;addFromString(basename($file), file_get_contents($file));
+                        }
+                    }
+                }
+
+                else if (is_file($source) === true)
+                {
+                    $zip-&gt;addFromString(basename($source), file_get_contents($source));
+                }
+            }
+
+            return $zip-&gt;close();
+        }
+    }
+
+    return false;
+}
+</code></pre>

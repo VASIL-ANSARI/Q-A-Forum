@@ -1,0 +1,24 @@
+<p>I've always done this via a <a href="http://dev.mysql.com/doc/refman/5.0/en/exists-and-not-exists-subqueries.html" rel="nofollow"><code>NOT EXISTS</code> clause</a>...extremely fast, even more so if <code>StockMatrixDetail.Sku</code> is indexed...it doesn't even hit the table.</p>
+
+<pre><code>SELECT
+    Stock.*,
+    REPLACE (Description, '&amp;', '&amp;amp;') as Description,
+    PRD1.RuleValue AS Price, 
+    PRD2.RuleValue AS WasPrice,
+    PRD2.RuleValue-PRD1.RuleValue AS Save
+FROM 
+    Stock INNER JOIN
+    StockCategoryMemberList ON StockCategoryMemberList.Sku = Stock.Sku LEFT JOIN 
+    PriceRuleDetail PRD1 ON PRD1.Sku = Stock.Sku
+        AND PRD1.PriceRule = 'RG'
+        AND PRD1.Quantity = 1 LEFT JOIN
+    PriceRuleDetail PRD2 ON PRD2.Sku = Stock.Sku
+        AND PRD2.PriceRule = 'RRP'
+        AND PRD2.Quantity = 1
+WHERE StockCategoryMemberList.CategoryCode = 'FIRE'
+AND NOT EXISTS (SELECT 1
+                  FROM StockMatrixDetail smd
+                  WHERE smd.Sku = Stock.Sku)
+AND Stock.GeneralStkStatus &lt; 3
+ORDER BY StockCategoryMemberList.Order ASC
+</code></pre>

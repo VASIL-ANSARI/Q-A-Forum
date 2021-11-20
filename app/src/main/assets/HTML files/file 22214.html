@@ -1,0 +1,57 @@
+<p>Here's a somewhat more extensible approach:</p>
+
+<pre><code>&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:output method="xml" omit-xml-declaration="yes" indent="yes"/&gt;
+
+  &lt;xsl:key name="k" match="page" use="@section"/&gt;
+
+  &lt;xsl:variable name="rename"&gt;
+    &lt;item from="Arsenal_Finances" to="Financeâs Today" /&gt;
+  &lt;/xsl:variable&gt;
+
+  &lt;xsl:template match="/root"&gt;
+    &lt;xsl:variable name="uniqueSections"
+                  select="page[generate-id() = generate-id(key('k', @section))]" /&gt;
+    &lt;table&gt;
+      &lt;tr&gt;
+        &lt;xsl:apply-templates select="$uniqueSections"/&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;xsl:apply-templates select="$uniqueSections" mode="page"/&gt;
+      &lt;/tr&gt;
+    &lt;/table&gt;
+  &lt;/xsl:template&gt;
+
+
+  &lt;xsl:template match="page"&gt;
+    &lt;xsl:variable name="sectionTrimmed"
+                  select="substring-after(@section, '_')" /&gt;
+    &lt;td class="{$sectionTrimmed}"&gt;
+      &lt;xsl:variable name="renameItem"
+                    select="document('')//xsl:variable[@name = 'rename']
+                            /item[@from = current()/@section]" /&gt;
+      &lt;xsl:choose&gt;
+        &lt;xsl:when test="$renameItem"&gt;
+          &lt;xsl:value-of select="$renameItem/@to"/&gt;
+        &lt;/xsl:when&gt;
+        &lt;xsl:otherwise&gt;
+          &lt;xsl:value-of select="$sectionTrimmed"/&gt;
+        &lt;/xsl:otherwise&gt;
+      &lt;/xsl:choose&gt;
+    &lt;/td&gt;
+    &lt;td&gt;&lt;/td&gt;
+  &lt;/xsl:template&gt;
+
+  &lt;xsl:template match="page" mode="page"&gt;
+    &lt;td&gt;
+      &lt;xsl:value-of select="@number"/&gt;
+    &lt;/td&gt;
+    &lt;td&gt;
+      &lt;xsl:value-of select="key('k', @section)[last()]/@number"/&gt;
+    &lt;/td&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;
+</code></pre>
+
+<p>Here I have an <code>xsl:variable</code> where you can list 1 or more item names that should be renamed to other names.  If a match is found, then the <code>@to</code> value is used.  If not, then <code>substring-after(@section, '_')</code> is used. I've also used variables to capture the values of two formulas that were being used more than once in a single template.</p>

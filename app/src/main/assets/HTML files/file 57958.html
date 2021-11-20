@@ -1,0 +1,114 @@
+<p>Please try this, hope this would help a lot.</p>
+
+<p>Html</p>
+
+<pre><code>&lt;form action="/complete" id="paymentForm" method="post"&gt;
+
+    &lt;span id="paymentErrors"&gt;&lt;/span&gt;
+
+    &lt;div class="form-row"&gt;
+        &lt;label&gt;Name on Card&lt;/label&gt;
+        &lt;input data-worldpay="name" name="name" type="text" /&gt;
+    &lt;/div&gt;
+    &lt;div class="form-row"&gt;
+        &lt;label&gt;Card Number&lt;/label&gt;
+        &lt;input data-worldpay="number" size="20" type="text" /&gt;
+    &lt;/div&gt;
+    &lt;div class="form-row"&gt;
+        &lt;label&gt;CVC&lt;/label&gt;
+        &lt;input data-worldpay="cvc" size="4" type="text" /&gt;
+    &lt;/div&gt;
+    &lt;div class="form-row"&gt;
+        &lt;label&gt;Expiration (MM/YYYY)&lt;/label&gt;
+        &lt;input data-worldpay="exp-month" size="2" type="text" /&gt;
+        &lt;label&gt; / &lt;/label&gt;
+        &lt;input data-worldpay="exp-year" size="4" type="text" /&gt;
+    &lt;/div&gt;
+
+    &lt;input type="submit" value="Place Order" /&gt;
+
+&lt;/form&gt;
+</code></pre>
+
+<p>SCRIPT</p>
+
+<pre><code>&lt;script src="https://cdn.worldpay.com/v1/worldpay.js"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript"&gt;
+        var form = document.getElementById('paymentForm');
+
+        Worldpay.useOwnForm({
+            'clientKey': 'Your_Client_Key',
+            'form': form,
+            'reusable': false,
+            'callback': function (status, response) {
+                document.getElementById('paymentErrors').innerHTML = '';
+                if (response.error) {
+                    Worldpay.handleError(form, document.getElementById('paymentErrors'), response.error);
+                } else {
+                    var token = response.token;
+                    Worldpay.formBuilder(form, 'input', 'hidden', 'token', token);
+                    console.log(token);
+
+                    $.ajax({
+                        url: "/Home/payment/",
+                        data: { token: token },
+                        success: function (data) {
+
+                        },
+                        dataType: "html",
+                        type: "POST",
+                        cache: false,
+                        error: function () {
+                            //Error Message
+                        }
+                    });
+
+                    form.submit();
+                }
+            }
+        });
+&lt;/script&gt;
+</code></pre>
+
+<p>Serve Side Code C#</p>
+
+<pre><code>public ActionResult payment(string token)
+{
+    var restClient = new WorldpayRestClient("https://api.worldpay.com/v1", "Your_Service_Key");
+
+    var orderRequest = new OrderRequest()
+    {
+        token = token,
+        amount = 500,
+        currencyCode = CurrencyCode.GBP.ToString(),
+        name = "test name",
+        orderDescription = "Order description",
+        customerOrderCode = "Order code"
+
+    };
+
+    var address = new Address()
+    {
+        address1 = "123 House Road",
+        address2 = "A village",
+        city = "London",
+        countryCode = CountryCode.GB,
+        postalCode = "EC1 1AA"
+    };
+
+    orderRequest.billingAddress = address;
+
+    try
+    {
+        OrderResponse orderResponse = restClient.GetOrderService().Create(orderRequest);
+        Console.WriteLine("Order code: " + orderResponse.orderCode);
+    }
+    catch (WorldpayException e)
+    {
+        Console.WriteLine("Error code:" + e.apiError.customCode);
+        Console.WriteLine("Error description: " + e.apiError.description);
+        Console.WriteLine("Error message: " + e.apiError.message);
+    }
+    return Json(null, JsonRequestBehavior.AllowGet);
+}
+</code></pre>

@@ -1,0 +1,110 @@
+<p>A usual way to resolve this kind of problem is to define an <code>optionsResolver</code> which is passed to each one of your class in order to be initialized.</p>
+
+<pre><code>$optionsResolver-&gt;setRequiredOptions(array('products', 'multi', 'variations'));
+</code></pre>
+
+<p>Then you pass your arguments as an array of options instead (this way you can keep your interface):</p>
+
+<pre><code>public function createProduct($options)
+</code></pre>
+
+<p>You can validate your options using something like:</p>
+
+<pre><code>$optionsResolver-&gt;resolve($options);
+</code></pre>
+
+<p>To see a full example of implementation, take a look at <a href="http://symfony.com/doc/current/components/options_resolver.html" rel="nofollow">Symfony2</a>.</p>
+
+<hr>
+
+<p><strong>Example:</strong></p>
+
+<pre><code>class Ebay implements MarketPlaceInterface
+{
+    // ...
+
+    public function createProduct(array $options = array())
+    {
+        $resolver = new OptionsResolver();
+        $resolver
+            -&gt;setRequired(array('product', 'multi'))
+            -&gt;setAllowedTypes('product', 'string')
+            -&gt;setAllowedTypes('multi', 'boolean')
+            -&gt;setDefaults(array('multi' =&gt; true))
+        ;
+
+        // Add default values.
+        // Check for required fields.
+        // Check allowed types.
+        // Throw an exception if the options have a wrong format.
+        $options = $resolver-&gt;resolve($options);
+
+        // Do the creation here.
+    }
+}
+
+class Amazon implements MarketPlaceInterface
+{
+    // ...
+
+    public function createProduct(array $options = array())
+    {
+        $resolver = new OptionsResolver();
+        $resolver
+            -&gt;setRequired(array('products', 'multi', 'variations'))
+            -&gt;setAllowedTypes('products', 'array')
+            -&gt;setAllowedTypes('multi', 'boolean')
+            -&gt;setAllowedTypes('variations', 'array')
+            -&gt;setDefaults(array(
+                'products' =&gt; array(),
+                'multi' =&gt; true
+            ))
+        ;
+
+        $options = $resolver-&gt;resolve($options);
+
+        // Do the creation here.
+    }
+}
+</code></pre>
+
+<p>You can also set the behaviour in an abstract class or in a class manipulating the market place objects. Here is the case of an abstract class with a GOF's design pattern <a href="http://www.dofactory.com/net/template-method-design-pattern" rel="nofollow">template method</a>:</p>
+
+<pre><code>abstract class AbstractMarketPlace implements MarketPlaceInterface
+{
+    // ...
+
+    public function createProduct(array $options = array())
+    {
+        $resolver = new OptionsResolver();
+        $this-&gt;setResolver($resolver);
+        $options = $resolver-&gt;resolve($options);
+
+        $this-&gt;doCreateProduct($options)
+    }
+
+    abstract protected function setResolver(OptionsResolver $resolver);
+
+    abstract protected function doCreateProduct(array $options);
+}
+
+class Ebay extends AbstractMarketPlace
+{
+    // ...
+
+    protected function setResolver(OptionsResolver $resolver)
+    {
+        $resolver
+            -&gt;setRequired(array('product', 'multi'))
+            -&gt;setAllowedTypes('product', 'string')
+            -&gt;setAllowedTypes('multi', 'boolean')
+            -&gt;setDefaults(array('multi' =&gt; true))
+        ;
+    }
+
+    protected function doCreateProduct(array $options)
+    {
+        // Do the creation here.
+    }
+}
+</code></pre>

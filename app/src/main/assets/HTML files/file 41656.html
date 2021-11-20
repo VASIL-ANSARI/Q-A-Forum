@@ -1,0 +1,43 @@
+<p>Not really sure where to put this, because it's not exactly an answer, but maybe it'll put you in the right direction.  Here's some code that shim/hooks <code>fork()</code>, written in C.  In this case, it was written to detect if a sandboxed program was forking more than twice, but you could obviously modify the behavior as necessary. </p>
+
+<pre><code>#define MAKE_CALLTHROUGH(fx, libfx)                                            \
+    do{                                                                        \
+        void *handle = NULL;                                                   \
+        if(!libfx){                                                            \
+            handle = dlopen("/lib64/libc.so.6", RTLD_LAZY);                    \
+            if(!handle){                                                       \
+                fputs(dlerror(), stderr);                                      \
+                exit(1);                                                       \
+                return 0;                                                      \
+            }                                                                  \
+            libfx = dlsym(handle, fx);                                         \
+            if(dlerror() != NULL){                                             \
+                fprintf(stderr, "Could not make handle for function %s\n", fx);\
+                exit(1);                                                       \
+            }                                                                  \
+        }                                                                      \
+    }while(0);
+
+const int MAX_FORKS = 2;
+int forks = 0;
+
+int fork(){
+    static int (*libfork) (void) = NULL;
+    MAKE_CALLTHROUGH("fork", libfork);
+    if(forks++ &gt; 2){
+        fprintf(stderr, "Illegally exceeded 2 forks.\n");
+        killpg(0, 9);
+    }
+    return libfork();
+}
+</code></pre>
+
+<p>In case anyone was curious, I compiled it like this:</p>
+
+<pre><code>gcc -g -Wall -Wextra -fPIC -c watchshim.c -o watchshim.o
+gcc -g -Wall -Wextra -fPIC -shared -ldl watchshim.o -o watchshim.so 
+
+gcc -g -Wall -Wextra -pthread -o watch watch.c 
+</code></pre>
+
+<p>Where <code>watchshim.c</code> is the file containing the shim/hook code, and <code>watch.c</code> is the process in which <code>fork()</code> is shimmed (it is also shimmed in all child processes of <code>watch</code>.  <code>"/lib64/libc.so.6"</code> is the <code>so</code> containing the original <code>fork()</code>.  I have <code>MAKE_CALLTHROUGH</code> written as a macro, because I was shimming multiple functions in the project I used this in.</p>

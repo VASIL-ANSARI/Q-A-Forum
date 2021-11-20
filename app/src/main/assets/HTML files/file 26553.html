@@ -1,0 +1,74 @@
+<p>From <a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/printf.html">http://pubs.opengroup.org/onlinepubs/009695399/functions/printf.html</a>:</p>
+
+<ul>
+<li><strong>z</strong><br>
+Specifies that a following [...] conversion specifier applies to a <code>size_t</code> or the corresponding signed integer type argument; </li>
+<li><strong>t</strong><br>
+Specifies that a following [...] conversion specifier applies to a <code>ptrdiff_t</code> or the corresponding unsigned type argument;</li>
+</ul>
+
+<p>And from <a href="http://en.wikipedia.org/wiki/Size_t#Size_and_pointer_difference_types">http://en.wikipedia.org/wiki/Size_t#Size_and_pointer_difference_types</a>:</p>
+
+<ul>
+<li><code>size_t</code> is used to represent the size of any object (including arrays) in the particular implementation. It is used as the return type of the <code>sizeof</code> operator.</li>
+<li><code>ptrdiff_t</code> is used to represent the difference between pointers.</li>
+</ul>
+
+<p>On the current OS X and iOS platforms we have</p>
+
+<pre><code>typedef __SIZE_TYPE__ size_t;
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+</code></pre>
+
+<p>where <code>__SIZE_TYPE__</code> and <code>__PTRDIFF_TYPE__</code> are predefined by the
+compiler. For 32-bit the compiler defines</p>
+
+<pre><code>#define __SIZE_TYPE__ long unsigned int
+#define __PTRDIFF_TYPE__ int
+</code></pre>
+
+<p>and for 64-bit the compiler defines</p>
+
+<pre><code>#define __SIZE_TYPE__ long unsigned int
+#define __PTRDIFF_TYPE__ long int
+</code></pre>
+
+<p>(This may have changed between Xcode versions. Motivated by @user102008's 
+comment, I have checked this with Xcode 6.2 and updated the answer.)</p>
+
+<p>So <code>ptrdiff_t</code> and <code>NSInteger</code> are both typedef'd to the <em>same type</em>:
+<code>int</code> on 32-bit and <code>long</code> on 64-bit. Therefore</p>
+
+<pre><code>NSLog(@"%td", i);
+NSLog(@"%tu", u);
+</code></pre>
+
+<p>work correctly and compile without warnings on all current
+iOS and OS X platforms.</p>
+
+<p><code>size_t</code> and <code>NSUInteger</code> have the same size on all platforms, but
+they are not the same type, so </p>
+
+<pre><code>NSLog(@"%zu", u);
+</code></pre>
+
+<p>actually gives a warning when compiling for 32-bit.</p>
+
+<p>But this relation is not fixed in any standard (as far as I know), therefore I would
+<strong><em>not</em></strong> consider it safe (in the same sense as assuming that <code>long</code> has the same size
+as a pointer is not considered safe). It might break in the future.</p>
+
+<p>The only alternative to type casting that I know of is from the answer to "<a href="http://stackoverflow.com/questions/18848716/foundation-types-when-compiling-for-arm64-and-32-bit-architecture">Foundation types when compiling for arm64 and 32-bit architecture</a>", using preprocessor macros:</p>
+
+<pre><code>// In your prefix header or something
+#if __LP64__
+#define NSI "ld"
+#define NSU "lu"
+#else
+#define NSI "d"
+#define NSU "u"
+#endif
+
+NSLog(@"i=%"NSI, i);
+NSLog(@"u=%"NSU, u);
+</code></pre>

@@ -1,0 +1,23 @@
+<p>Looks like it is doing a particularly poor job of producing "disassembly pseudocode" (whatever that is -- is it a disassembler or a decompliler?  Can't decide)</p>
+
+<p>In this case it looks like it has has <a href="http://www.merriam-webster.com/dictionary/elide" rel="nofollow">elided</a> the stack frame setup (the function prolog), but not the cleanup (function epilog).  So you'll get a much better idea of what is going on by using an actual disassembler to look at the actual disassembly code:</p>
+
+<pre><code>$ gcc -c simple.c
+$ objdump -d simple.o
+
+simple.o:     file format elf64-x86-64
+
+Disassembly of section .text:
+
+0000000000000000 &lt;main&gt;:
+   0:   55                      push   %rbp
+   1:   48 89 e5                mov    %rsp,%rbp
+   4:   c7 45 fc 05 00 00 00    movl   $0x5,-0x4(%rbp)
+   b:   b8 00 00 00 00          mov    $0x0,%eax
+  10:   5d                      pop    %rbp
+  11:   c3                      retq   
+</code></pre>
+
+<p>So what we have here is code to set up a stack frame (address 0-1), the assignment you have (4), setting up the return value (b), tearing down the frame (10) and then returning (11).  You might see something different due to using a different version of gcc or a different target.</p>
+
+<p>In the case of your disassembly, the first part has been elided (left out as being an uninteresting housekeeping task) by the disassembler, but the second to last part (which undoes the first part) has not.</p>

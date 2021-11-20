@@ -1,0 +1,12 @@
+<p>Fixed point can be viewed as storing the top half of a fraction, and the bottom half in your case is 4096.  So 1.0f is equal to 4096/4096, and it's stored in memory as 4096.  I won't go into the details of fractional multiplication because I don't remember them, but the important part is when multiplying <code>A/D * B/D</code> to get a result <code>C/D</code>, then <code>C</code> is <code>A*B/D</code>.</p>
+
+<p>So: where you have <code>1.0f * 400.0f</code>, the computer sees this as <code>4096 * 1638400 / 4096</code>.  A little algebra shows this should result in 1638400 (400.0f), but if the fractional point library isn't smart enough for that, it ends up with a temporary value of 6710886400 before it does the division, which is too big for an <code>int</code>.  </p>
+
+<p>Since your floating points have a denominator of 4096, your "floats" are accurate to the closest 0.00024, and have a range of -524288.999f to 524287.999f (ish).  Is there a way in your compiler to decrease the accuracy of the "floats" to get more range?  Otherwise you're hosed.</p>
+
+<h1>EDIT</h1>
+
+<p>Max confirms that the 4096 is part of Marmalade and cannot be changed.  In that case, I see few options:<br>
+(1) Don't use fixed point.<br>
+(2) Try to keep all floating point numbers between -128 and 128.<br>
+(3) Use a special function for multiplying a scalar and a <code>CIwVec2</code> that uses <code>IW_FIXED_MUL</code> underneath.  Preferably, wrap the <code>float</code> in a special class and overload the <code>operator*</code> to call <code>IW_FIXED_MUL</code>.  Don't provide an implicit conversion to <code>float</code>, otherwise you'll never find all the errors.</p>

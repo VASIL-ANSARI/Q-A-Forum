@@ -1,0 +1,82 @@
+<p>You can greatly speed up your calculation by doing two things:</p>
+
+<ul>
+<li><p>don't compute the normalization within each loop! As currently written, for an NxN image with M components, you're computing each relevant calculation <code>N * N * M</code> times, leading to an <code>O[N^4 M^2]</code> algorithm! Instead you should compute all the elements once, and then divide by the sum, which will be <code>O[N^2 M]</code>.</p></li>
+<li><p>use numpy vectorization rather than explicit loops. This can be done very straightforwardly the way you've set up the code.</p></li>
+</ul>
+
+<p>Essentially, your <code>expectation</code> function should look something like this:</p>
+
+<pre><code>def expectation(self):
+    responsibilities = (self.mixing_coefficients[:, None, None] *
+                        gaussian_probability(self.image_matrix,
+                                             self.means[:, None, None],
+                                             self.variances[:, None, None] ** 0.5))
+    return responsibilities / responsibilities.sum(0)
+</code></pre>
+
+<p>You didn't provide a complete example, so I had to improvise a bit to check and benchmark this, but here's a quick take:</p>
+
+<pre><code>import numpy as np
+
+def gaussian_probability(x,mean,standard_dev):
+    termA = 1.0 / (standard_dev*np.sqrt(2.0*np.pi))
+    termB = np.exp(-((x - mean)**2.0)/(2.0*(standard_dev**2.0)))
+    return termA * termB
+
+class EM(object):
+    def __init__(self, N=5):
+        self.image_matrix = np.random.rand(20, 20)
+        self.num_components = N
+        self.mixing_coefficients = 1 + np.random.rand(N)
+        self.means = 10 * np.random.rand(N)
+        self.variances = np.ones(N)
+
+    def sum_of_gaussians(self, x):
+        return sum([self.mixing_coefficients[i] * 
+                    gaussian_probability(x, self.means[i], self.variances[i]**0.5) 
+                    for i in range(self.num_components)])
+
+    def expectation(self):
+        dim = self.image_matrix.shape
+        rows, cols = dim[0], dim[1]
+        responsibilities = []
+        for i in range(self.num_components):
+            gamma_k = np.zeros([rows, cols])
+            for j in range(rows):
+                for k in range(cols):
+                    p = (self.mixing_coefficients[i] *      
+                         gaussian_probability(self.image_matrix[j,k],
+                                              self.means[i], 
+                                              self.variances[i]**0.5))
+                    gamma_k[j,k] = p / self.sum_of_gaussians(self.image_matrix[j,k])
+            responsibilities.append(gamma_k)
+        return responsibilities
+
+    def expectation_fast(self):
+        responsibilities = (self.mixing_coefficients[:, None, None] *
+                            gaussian_probability(self.image_matrix,
+                                                 self.means[:, None, None],
+                                                 self.variances[:, None, None] ** 0.5))
+        return responsibilities / responsibilities.sum(0)
+</code></pre>
+
+<p>Now we can instantiate the object and compare the two implementations of the expectation step:</p>
+
+<pre><code>em = EM(5)
+np.allclose(em.expectation(),
+            em.expectation_fast())
+# True
+</code></pre>
+
+<p>Looking at the timings, we're about a factor of 1000 faster for a 20x20 image with 5 components:</p>
+
+<pre><code>%timeit em.expectation()
+10 loops, best of 3: 65.9 ms per loop
+
+%timeit em.expectation_fast()
+10000 loops, best of 3: 74.5 Âµs per loop
+</code></pre>
+
+<p>This improvement will grow as the image size and number of components increase.
+Best of luck!</p>

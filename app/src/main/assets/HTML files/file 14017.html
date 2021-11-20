@@ -1,0 +1,132 @@
+<p>You can decorate every member function with a pie decorator, something like</p>
+
+<pre><code>@transaction
+def insertData(self):
+    # code
+</code></pre>
+
+<p>and transaction is a decorator you define to wrap the function with a pre and post.
+Yes, you have to do it for every function. Here is an example</p>
+
+<pre><code>def transaction(f):
+    def pre():
+        print "pre transaction"
+    def post():
+        print "post transaction"
+
+    def wrapped(*args):
+        pre()
+        f(*args)
+        post()
+
+    return wrapped
+
+
+class Foo(object):
+    def __init__(self):
+        print "instantiating"
+
+    def doFoo(self):
+        print "doing foo"
+
+    @transaction
+    def doBar(self, value):
+        print "doing bar "+str(value)
+
+@transaction
+def foofunc():
+    print "hello"
+
+foofunc()
+
+f=Foo()
+f.doFoo()
+f.doBar(5)
+</code></pre>
+
+<p>.</p>
+
+<pre><code>stefanos-imac:python borini$ python decorator.py 
+pre transaction
+hello
+post transaction
+instantiating
+doing foo
+pre transaction
+doing bar 5
+post transaction
+</code></pre>
+
+<p>The alternative is that you use a metaclass, like this:</p>
+
+<pre><code>import types
+
+
+class DecoratedMetaClass(type):
+    def __new__(meta, classname, bases, classDict):
+        def pre():
+            print "pre transaction"
+        def post():
+            print "post transaction"
+        newClassDict={}
+        for attributeName, attribute in classDict.items():
+            if type(attribute) == types.FunctionType:
+                def wrapFunc(f):
+                    def wrapper(*args):
+                        pre()
+                        f(*args)
+                        post()
+                    return wrapper
+                newAttribute = wrapFunc(attribute)
+            else:
+                newAttribute = attribute
+            newClassDict[attributeName] = newAttribute
+        return type.__new__(meta, classname, bases, newClassDict)
+
+
+
+class MyClass(object):
+
+    __metaclass__ = DecoratedMetaClass
+
+    def __init__(self):
+        print "init"
+    def doBar(self, value):
+        print "doing bar "+str(value)
+    def doFoo(self):
+        print "doing foo"
+
+
+
+c = MyClass()
+c.doFoo()
+c.doBar(4)
+</code></pre>
+
+<p>This is pure black magic, but it works</p>
+
+<pre><code>stefanos-imac:python borini$ python metaclass.py
+pre transaction
+init
+post transaction
+pre transaction
+doing foo
+post transaction
+pre transaction
+doing bar 4
+post transaction
+</code></pre>
+
+<p>You normally don't want to decorate the <code>__init__</code>, and you may want to decorate only those methods with a special name, so you may want to replace</p>
+
+<pre><code>        for attributeName, attribute in classDict.items():
+            if type(attribute) == types.FunctionType:
+</code></pre>
+
+<p>with something like </p>
+
+<pre><code>        for attributeName, attribute in classDict.items():
+            if type(attribute) == types.FunctionType and "trans_" in attributeName[0:6]:
+</code></pre>
+
+<p>This way, only methods called trans_whatever will be transactioned.</p>

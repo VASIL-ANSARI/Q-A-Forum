@@ -1,0 +1,25 @@
+<p>The problem lines are those inside of your <code>try</code> block:</p>
+
+<pre><code>list[counter].SetDesktopLocation(i*list[counter].MdiParent.Width/a, j*list[counter].MdiParent.Height/b);
+list[counter].Size = new Size(list[counter].MdiParent.Width/a, list[counter].MdiParent.Height/b);
+counter++;
+</code></pre>
+
+<p>You're checking <code>Form.Width</code> and <code>Form.Height</code>, which return the <em>total</em> size of the form on the screen, including all of the borders. You can only place child windows inside the <em>client area</em> of the parent form, so you need to query the <a href="http://msdn.microsoft.com/en-us/library/9278sfx2.aspx" rel="nofollow"><code>ClientSize</code> property</a> instead. That is defined as the size of the form, minus the borders and title bar; in other words, the area of the form in which children can be placed.</p>
+
+<p>Re-write your <code>try</code> block to this, instead:</p>
+
+<pre><code>list[counter].SetDesktopLocation(i*list[counter].MdiParent.ClientSize.Width/a, j*list[counter].MdiParent.ClientSize.Height/b);
+list[counter].Size = new Size(list[counter].MdiParent.ClientSize.Width/a, list[counter].MdiParent.ClientSize.Height/b);
+counter++;
+</code></pre>
+
+<p>And then get rid of that silly empty <code>catch</code> block. If all you're <em>doing</em> when an exception is thrown is <code>break</code>ing, then there's no point in catching the exception. It will bubble up to the next exception handler, all the way to the global one if necessary. Only catch exceptions that you know specifically how to handle. You shouldn't be getting an <code>IndexOutOfRangeException</code>, and if you do, that's a bug in your codeâyou want to know about it so that you can fix it. That means not swallowing the exception.</p>
+
+<hr>
+
+<p><img src="http://i.stack.imgur.com/8o1Z6.png" alt="Clippy, the Office Assistant, now on Stack Overflow!"> But, if I may channel Clippy here, it looks like you're trying to <strong>tile your MDI children</strong>.</p>
+
+<p>In that case, there's an easier method than writing a bunch of <code>for</code> loops and manually setting the size and position of your children. Instead, just call the <a href="http://msdn.microsoft.com/en-us/library/system.windows.forms.form.layoutmdi.aspx" rel="nofollow"><code>Form.LayoutMdi</code> method</a> on your parent MDI form, and specify one of the <a href="http://msdn.microsoft.com/en-us/library/system.windows.forms.mdilayout.aspx" rel="nofollow"><code>MdiLayout</code> enumeration values</a>. In this case, you probably want either <code>MdiLayout.TileHorizontal</code> or <code>MdiLayout.TileVertical</code>.</p>
+
+<p>WinForms will take care of arranging your child windows precisely how you want them automatically.</p>

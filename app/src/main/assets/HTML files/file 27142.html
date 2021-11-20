@@ -1,0 +1,30 @@
+<p>Please try:</p>
+
+<pre><code>SELECT
+    Name,
+    SUM(MEM) MEM,
+    SUM(NUM_VCPU) NUM_VCPU,
+    SUM(CAPACITY) CAPACITY
+FROM(
+    SELECT       
+        vapp.NAME, 
+        memcpu.[MEM_SIZE_MB]/1000 MEM, 
+        memcpu.[NUM_VCPU] NUM_VCPU, 
+        SUM(CONVERT(BIGINT, hdd.CAPACITY)) OVER(PARTITION BY
+            memcpu.[ID], 
+            memcpu.[DNS_NAME],
+            memcpu.[MEM_SIZE_MB], 
+            memcpu.[NUM_VCPU], 
+            hdd.PATH, 
+            hdd.CAPACITY, 
+            vapp.RESOURCEPOOLID, 
+            vapp.NAME) CAPACITY 
+
+      FROM [VCenterServer].[dbo].[VPX_VM] AS memcpu
+          INNER JOIN [VCenterServer].[dbo].[VPX_GUEST_DISK] AS hdd
+          ON memcpu.ID = hdd.VM_ID
+          INNER JOIN [VCenterServer].[dbo].[VPXV_RESOURCE_POOL] AS vapp
+          ON memcpu.RESOURCE_GROUP_ID = vapp.RESOURCEPOOLID
+    )x
+    GROUP BY NAME
+</code></pre>

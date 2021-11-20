@@ -1,0 +1,58 @@
+<p>Your application is not responding because you are blocking the event handler. It is processed by <code>app.exec_()</code>. This call is only checking for events and handling these in a infinite loop.</p>
+
+<p>Use QTimer with <strong>signal</strong> and <strong>slot</strong>.</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Signals_and_slots" rel="nofollow">Signals and Slots (wikipedia)</a></p>
+
+<p>For using signals and slots in pyqt see <a href="http://pyqt.sourceforge.net/Docs/PyQt4/new_style_signals_slots.html" rel="nofollow">this</a>.</p>
+
+<p>The timer is initialized with a duration and a signal-slot connection. After <code>app.exec_()</code> is called, it will wait for the <code>input_timer</code> signal <code>timeout</code>. If this is raised, the event loop will call lambda function, that disables the textbox, because it is connected to the signal.</p>
+
+<pre><code>def main():
+    app = QtGui.QApplication(sys.argv)
+    main = Main()
+    main.show()  
+
+    input_timer = QTimer(self)
+    input_timer.timeout.connect(lambda : main.text.setReadOnly(True))
+    input_timer.setSingleShot(True)
+    input_timer.start(2000)
+
+    sys.exit(app.exec_())
+</code></pre>
+
+<p>This will disable the textbox after 2000 milliseconds. Adjust as you need. I would move the timer and behaviour to <code>Main</code> class.</p>
+
+<pre><code>import sys
+from PyQt4 import QtCore, QtGui
+
+class Main(QtGui.QMainWindow):
+    def __init__(self,parent = None):
+        QtGui.QMainWindow.__init__(self,parent)
+        self.init_ui()
+
+        self.disable_edit_text_timer = QtCore.QTimer(self)
+        self.disable_edit_text_timer.timeout.connect(self.disable_edit_text)
+        self.disable_edit_text_timer.setSingleShot(True)
+        self.disable_edit_text_timer.start(2000)
+
+    def init_ui(self):
+        self.text = QtGui.QTextEdit(self)
+        self.setCentralWidget(self.text)
+        self.statusbar = self.statusBar()        
+        self.setGeometry(100,100,1080,720)
+        self.setWindowTitle("Text Editor")
+
+    def disable_edit_text(self):
+        self.text.setReadOnly(True)
+
+def main():
+    app = QtGui.QApplication(sys.argv)
+    main = Main()
+    main.show()  
+
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
+</code></pre>

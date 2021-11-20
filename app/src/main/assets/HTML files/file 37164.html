@@ -1,0 +1,95 @@
+<blockquote>
+  <p>Any function contains a yield statement will return a generator object</p>
+</blockquote>
+
+<p>This is correct. The return value of a function containing a <code>yield</code> is a generator object. The generator object is an iterator, where each iteration returns a value that was <code>yield</code>ed from the code backing the generator.</p>
+
+<blockquote>
+  <blockquote>
+    <p>A generator object is a stack contains state</p>
+  </blockquote>
+</blockquote>
+
+<p>A generator object contains a pointer to a the current execution frame, along with a whole bunch of other stuff used to maintain the state of the generator. The execution frame is what contains the call stack for the code in the generator.</p>
+
+<blockquote>
+  <p>Each time I call .next method Python extracts the function's state and
+  when it finds another yield statement it'll bind the state again and
+  deletes the prior state</p>
+</blockquote>
+
+<p>Sort of. When you call <code>next(gen_object)</code>, Python <a href="http://hg.python.org/cpython/file/2929cc408fbb/Objects/genobject.c#l107" rel="nofollow">evaluates the current execution frame</a>:</p>
+
+<pre class="lang-c prettyprint-override"><code>gen_send_ex(PyGenObject *gen, PyObject *arg, int exc) {  // This is called when you call next(gen_object)
+    PyFrameObject *f = gen-&gt;gi_frame;
+    ...
+    gen-&gt;gi_running = 1;
+    result = PyEval_EvalFrameEx(f, exc);  // This evaluates the current frame
+    gen-&gt;gi_running = 0; 
+</code></pre>
+
+<p><code>PyEval_EvalFrame</code> is highest-level function <a href="https://docs.python.org/2/c-api/veryhigh.html?highlight=frame#PyEval_EvalFrameEx" rel="nofollow">used to interpret Python bytecode</a>:</p>
+
+<blockquote>
+  <p><strong>PyObject* PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)</strong></p>
+  
+  <p>This is the main, unvarnished function of Python interpretation. It is
+  literally 2000 lines long. The code object associated with the
+  execution frame f is executed, interpreting bytecode and executing
+  calls as needed. The additional throwflag parameter can mostly be
+  ignored - if true, then it causes an exception to immediately be
+  thrown; this is used for the throw() methods of generator objects.</p>
+</blockquote>
+
+<p>It knows that when it hits a <code>yield</code> while evaluating the bytecode, it should <a href="http://hg.python.org/cpython/file/2929cc408fbb/Python/ceval.c#l1959" rel="nofollow">return the value being yielded to the caller</a>:</p>
+
+<pre class="lang-c prettyprint-override"><code>    TARGET(YIELD_VALUE) {
+        retval = POP();
+        f-&gt;f_stacktop = stack_pointer;
+        why = WHY_YIELD;
+        goto fast_yield;
+    }
+</code></pre>
+
+<p>When you yield, the current value of the frame's value stack is maintained (via <code>f-&gt;f_stacktop = stack_pointer</code>), so that we can resume where we left off when <code>next</code> is called again. All non-generator functions set <code>f_stacktop</code> to <code>NULL</code> after they're done evaluating. So when you call <code>next</code> again on the generator object, <code>PyEval_ExvalFrameEx</code> is called again, using the same frame pointer as before. The pointer's state will be exactly the same as it was when it yielded during the previous, so execution will continue on from that point. Essentially the current state of the frame is "frozen". This is described in the <a href="http://legacy.python.org/dev/peps/pep-0255/" rel="nofollow">PEP that introduced generators</a>:</p>
+
+<blockquote>
+  <p>If a yield statement is encountered, the state of the function is 
+  frozen, and the value [yielded] is returned to .next()'s 
+  caller.  By "frozen" we mean that all local state is retained, 
+  including the current bindings of local variables, the instruction 
+  pointer, and the internal evaluation stack:  enough information is 
+  saved so that the next time .next() is invoked, the function can 
+  proceed exactly as if the yield statement were just another external 
+  call.</p>
+</blockquote>
+
+<p>Here is most of the state a generator object maintains (taken directly from its header file):</p>
+
+<pre class="lang-c prettyprint-override"><code>typedef struct {
+    PyObject_HEAD
+    /* The gi_ prefix is intended to remind of generator-iterator. */
+
+    /* Note: gi_frame can be NULL if the generator is "finished" */
+    struct _frame *gi_frame;
+
+    /* True if generator is being executed. */
+    char gi_running;
+
+    /* The code object backing the generator */
+    PyObject *gi_code;
+
+    /* List of weak reference. */
+    PyObject *gi_weakreflist;
+
+    /* Name of the generator. */
+    PyObject *gi_name;
+
+    /* Qualified name of the generator. */
+    PyObject *gi_qualname;
+} PyGenObject;
+</code></pre>
+
+<p><code>gi_frame</code> is the pointer to the current execution frame.</p>
+
+<p>Note that all of this is CPython implementation-specific. PyPy/Jython/etc. could very well be implementing generators in a completely different way. I encourage you to <a href="http://hg.python.org/cpython/file/2929cc408fbb/Objects/genobject.c" rel="nofollow">read through the source for generator objects</a> to learn more about CPython's implementation.</p>

@@ -1,0 +1,54 @@
+<p>In your controller: add the list of select items to your view model instead of viewBag or view data since they are not strongly typed.It's a good practice to do so. do not convert in the HtmlHelper.</p>
+
+<p>By the way, here is a generic method I created to populate dropdown lists in one of my projects.You can even append static values like All or Nothing.</p>
+
+<pre><code>    public IEnumerable&lt;SelectListItem&gt; GetSelection&lt;T&gt;(IEnumerable&lt;T&gt; data,
+       Func&lt;T, string&gt; name = null,
+       Func&lt;T, string&gt; key = null,
+       string defaultValue = "0",
+       bool showAllValue = true,
+       bool showNothing = false)
+    {
+        var selectItemList = new List&lt;SelectListItem&gt;();
+        if (showAllValue)
+        {
+            selectItemList.Add(new SelectListItem { Text = "Choose All", Value = 0 });
+        }
+        if (showNothing)
+        {
+            selectItemList.Add(new SelectListItem { Text = "Nothing Selected", Value = -1 });
+        }
+
+        selectItemList.AddRange(data.Select(item =&gt; key != null ? (name != null ? new SelectListItem
+        {
+            Text = name(item),
+            Value = key(item)
+        } : null) : null));
+
+        //default selection
+        var defaultItem = selectItemList.FirstOrDefault(x =&gt; x.Value == defaultValue);
+        if (defaultItem != null)
+        {
+            defaultItem.Selected = true;
+        }
+        else
+        {
+            var firstItem = selectItemList.FirstOrDefault();
+            if (firstItem != null) firstItem.Selected = true;
+        }
+        return selectItemList;
+    }
+</code></pre>
+
+<p>You can call it like this:</p>
+
+<pre><code>public IEnumerable&lt;SelectListItem&gt; GetClientSelectionList(string defaultClient = "0", bool showAllValue = false)
+    {
+        return this.GetSelection(data: _clientsManager.GetClients(),
+                                        name: s =&gt; s.Client_Name,
+                                        key: s =&gt; s.Client_ID.ToString(CultureInfo.InvariantCulture),
+                                        defaultValue: defaultClient,
+                                        showAllValue: showAllValue
+            );
+    }
+</code></pre>

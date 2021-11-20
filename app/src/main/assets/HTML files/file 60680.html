@@ -1,0 +1,87 @@
+<p>The problem doesn't come up when serializing but rather when unserializing.
+You see, your Event uses the <code>SerializesModels</code> trait. This trait has the following method:</p>
+
+<pre><code>protected function getRestoredPropertyValue($value)
+{
+    if (! $value instanceof ModelIdentifier) {
+        return $value;
+    }
+
+    return is_array($value-&gt;id)
+            ? $this-&gt;restoreCollection($value)
+            : (new $value-&gt;class)-&gt;newQuery()-&gt;useWritePdo()-&gt;findOrFail($value-&gt;id);
+}
+</code></pre>
+
+<p>This trait serializes models as a <code>ModelIdentifier</code>, which just holds the class name and the id. When unserializing, the model is fetched fresh from the database using that information. In your delete case, the <code>findOrFail</code> makes it, well, fail.</p>
+
+<p>I guess you can think of a solution that suits your needs now. This one, for instance, I guess should work for different models; if you know you just want this for Car models you can make a more straightforward one.</p>
+
+<pre><code>protected function getRestoredPropertyValue($value)
+{
+    if ($this-&gt;type == 'delete' &amp;&amp; $value instanceof ModelIdentifier) {
+        $model = (new $value-&gt;class);
+        $pk = $model-&gt;getQueueableId();
+        $model-&gt;$pk = $value-&gt;id;
+
+        return $model;
+    }
+
+
+    return parent::getRestoredPropertyValue($value);
+}
+</code></pre>
+
+<hr>
+
+<p><strong>Update</strong>
+Probably it's cleaner to have separate Events as you suggest. All constructors should receive a Car model, and for the delete case you create a simple object with the attributes you need. </p>
+
+<pre><code>abstract class CarEvent extends Event implements ShouldBroadcast
+{
+
+    use SerializesModels;
+
+    public $car;
+    protected $type;
+
+    public function __construct(Car $car)
+    {
+        $this-&gt;car = $car;
+    }
+
+    public function broadcastOn()
+    {
+        return ['car'];
+    }
+
+    public function broadcastAs()
+    {
+        return $this-&gt;type;
+    }
+}
+</code></pre>
+
+<hr>
+
+<pre><code>class AddCarEvent extends CarEvent
+{
+
+    protected $type = 'add';
+
+}
+</code></pre>
+
+<hr>
+
+<pre><code>class DeleteCarEvent extends CarEvent
+{
+
+    protected $type = 'delete';
+
+    public function __construct(Car $car)
+    {
+        $this-&gt;car = (object) ['id' =&gt; $car-&gt;id];
+    }
+}
+</code></pre>

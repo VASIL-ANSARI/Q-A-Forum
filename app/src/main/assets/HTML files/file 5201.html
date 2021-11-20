@@ -1,0 +1,140 @@
+<p>The way I currently deal with this is through <a href="http://numpy.scipy.org/" rel="nofollow">numpy</a>:</p>
+
+<ol>
+<li>Read image into a 2D <code>numpy</code> array.  You don't <em>need</em> to use <code>numpy</code>, but I've found it easier to use than the regular Python 2D arrays</li>
+<li>Convert 2D numpy array into <code>PIL.Image</code> object using <code>PIL.Image.fromarray</code></li>
+</ol>
+
+<p>If you insist on using <code>PIL.Image.open</code>, you could write a wrapper that attempts to load a PGM file first (by looking at the header).  If it's a PGM, load the image using the steps above, otherwise just hands off responsibility to <code>PIL.Image.open</code>.</p>
+
+<p>Here's some code that I use to get a <strong>PBM</strong> image into a <a href="http://numpy.scipy.org/" rel="nofollow">numpy</a> array.</p>
+
+<pre><code>import re
+import numpy
+
+def pbm2numpy(filename):
+    """
+    Read a PBM into a numpy array.  Only supports ASCII PBM for now.
+    """
+    fin = None
+    debug = True
+
+    try:
+        fin = open(filename, 'r')
+
+        while True:
+            header = fin.readline().strip()
+            if header.startswith('#'):
+                continue
+            elif header == 'P1':
+                break
+            elif header == 'P4':
+                assert False, 'Raw PBM reading not implemented yet'
+            else:
+                #
+                # Unexpected header.
+                #
+                if debug:
+                    print 'Bad mode:', header
+                return None
+
+        rows, cols = 0, 0
+        while True:
+            header = fin.readline().strip()
+            if header.startswith('#'):
+                continue
+
+            match = re.match('^(\d+) (\d+)$', header)
+            if match == None:
+                if debug:
+                    print 'Bad size:', repr(header)
+                return None
+
+            cols, rows = match.groups()
+            break
+
+        rows = int(rows)
+        cols = int(cols)
+
+        assert (rows, cols) != (0, 0)
+
+        if debug:
+            print 'Rows: %d, cols: %d' % (rows, cols)
+
+        #
+        # Initialise a 2D numpy array 
+        #
+        result = numpy.zeros((rows, cols), numpy.int8)
+
+        pxs = []
+
+        # 
+        # Read to EOF.
+        # 
+        while True:
+            line = fin.readline().strip()
+            if line == '':
+                break
+
+            for c in line:
+                if c == ' ':
+                    continue
+
+                pxs.append(int(c))
+
+        if len(pxs) != rows*cols:
+            if debug:
+                print 'Insufficient image data:', len(pxs)
+            return None
+
+        for r in range(rows):
+            for c in range(cols):
+                #
+                # Index into the numpy array and set the pixel value.
+                #
+                result[r, c] = pxs[r*cols + c]
+
+        return result
+
+    finally:
+        if fin != None:
+            fin.close()
+        fin = None
+
+    return None
+</code></pre>
+
+<p>You will have to modify it slightly to fit your purposes, namely:</p>
+
+<ul>
+<li>Deal with P2 (ASCII, greyscale) instead of P1 (ASCII, bilevel).</li>
+<li>Use a different container if you're not using numpy.  Normal Python 2D arrays will work just fine.</li>
+</ul>
+
+<p><strong>EDIT</strong></p>
+
+<p>Here is how I would handle a wrapper:</p>
+
+<pre><code>def pgm2pil(fname):
+    #
+    # This method returns a PIL.Image.  Use pbm2numpy function above as a
+    # guide.  If it can't load the image, it returns None.
+    #
+    pass
+
+def wrapper(fname):
+    pgm = pgm2pil(fname)
+
+    if pgm is not None:
+        return pgm
+    return PIL.Image.open(fname)
+
+#
+# This is the line that "adds" the wrapper
+#
+PIL.Image.open = wrapper
+</code></pre>
+
+<p>I didn't write <code>pgm2pil</code> because it's going to be very similar to <code>pgm2numpy</code>.  The only difference will be that it's storing the result in a <code>PIL.Image</code> as opposed to a <code>numpy</code> array.  I also didn't test the wrapper code (sorry, a bit short on time at the moment) but it's a fairly common approach so I expect it to work.</p>
+
+<p>Now, it sounds like you want <strong>other</strong> applications that use PIL for image loading to be able to handle PGMs.  It's possible using the above approach, but you need to be sure that the above wrapper code gets added <strong>before</strong> the first call to <code>PIL.Image.open</code>.  You can make sure that happens by adding the wrapper source code to the PIL source code (if you have access).</p>

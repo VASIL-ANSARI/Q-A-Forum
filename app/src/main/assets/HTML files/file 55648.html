@@ -1,0 +1,52 @@
+<p>Stubbing out <code>ActiveRecord::Base.connection</code> should do the trick.</p>
+
+<p>One thing to watch out for is  to stub out after all preparations (<code>Arrange</code> part of test) are done. For example <code>before(:each)</code> could be cleaning database before the tests are run => ActiveRecord.connection is triggered, you may be creating some record that will be indexed by ElasticSearch => ActiveRecord.connection is called.</p>
+
+<p>so something like this:</p>
+
+<pre><code>class WorksSearchSerializer
+  attr_reader :collection
+
+  def initialize(collection)
+    @collection
+  end
+
+  def as_json
+    [
+      {
+        id: work.id
+        comment_ids: work.comments.map(&amp;:id)
+        # ... other stuff that may trigger ActiveRecord call
+      }
+    ]
+  end
+end
+
+require 'rails_helper'
+
+RSpec.describe WorksSearchSerializer do
+  ShouldNotDoAnyDBConnection = Class.new(StandardError)
+
+  subject { described_class.new(es_works)  }
+  let!(:work) { Work.create!  } #this triggers ActiveRecord::Base.connection call
+  let(:es_works) { Work.__elasticsearch__.search({query: { match_all: {} }}.to_json) }
+  let(:result) { subject.as_json }
+
+  before do
+    sleep 0.2 # wait for ES reindex
+  end
+
+  it 'should not pull any relational DB records' do  
+    allow(ActiveRecord::Base)
+      .to receive(:connection)
+      .and_raise(ShouldNotDoAnyDBConnection)
+
+    expect(result).to be_kind_of Array
+
+    allow(ActiveRecord::Base)
+      .to receive(:connection)
+      .and_call_original
+  end
+
+end
+</code></pre>

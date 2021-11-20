@@ -1,0 +1,39 @@
+<p>I don't know of any patterns to deal with this specific issue.  It's a tricky design question, and one somewhat unique to languages like C++.  Another issue is that the answer to this question is closely tied to your individual (or corporate) coding style.</p>
+
+<p>I would use pointers for these members, and when they need to be constructed, allocate them at the same time.  You can use auto_ptr for these, and check against NULL to see if they are initialized.  (I think of pointers are a built-in "optional" type in C/C++/Java, there are other languages where NULL is not a valid pointer).</p>
+
+<p>One issue as a matter of style is that you may be relying on your constructors to do too much work.  When I'm coding OO, I have the constructors do just enough work to get the object in a consistent state.  For example, if I have an <code>Image</code> class and I want to read from a file, I could do this:</p>
+
+<pre><code>image = new Image("unicorn.jpeg"); /* I'm not fond of this style */
+</code></pre>
+
+<p>or, I could do this:</p>
+
+<pre><code>image = new Image(); /* I like this better */
+image-&gt;read("unicorn.jpeg");
+</code></pre>
+
+<p>It can get difficult to reason about how a C++ program works if the constructors have a lot of code in them, especially if you ask the question, "what happens if a constructor fails?"  This is the main benefit of moving code out of the constructors.</p>
+
+<p>I would have more to say, but I don't know what you're trying to do with delayed construction.</p>
+
+<p>Edit: I remembered that there is a (somewhat perverse) way to call a constructor on an object at any arbitrary time.  Here is an example:</p>
+
+<pre><code>class Counter {
+public:
+    Counter(int &amp;cref) : c(cref) { }
+    void incr(int x) { c += x; }
+private:
+    int &amp;c;
+};
+
+void dontTryThisAtHome() {
+    int i = 0, j = 0;
+    Counter c(i);       // Call constructor first time on c
+    c.incr(5);          // now i = 5
+    new(&amp;c) Counter(j); // Call the constructor AGAIN on c
+    c.incr(3);          // now j = 3
+}
+</code></pre>
+
+<p>Note that doing something as reckless as this might earn you the scorn of your fellow programmers, unless you've got solid reasons for using this technique.  This also doesn't delay the constructor, just lets you call it again later.</p>

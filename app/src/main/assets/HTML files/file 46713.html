@@ -1,0 +1,50 @@
+<p>The problem is, you try to attach the image to an <code>ImageView</code>, that is not there yet. Since you want to show the image in your list, you need to move the attachment into the adapter, since this is where you create the new <code>ImageView</code>. You will need to create a new <code>ArrayAdapter</code> for this purpose:</p>
+
+<pre><code>public class PicassoAdapter extends ArrayAdapter&lt;String&gt; {
+    public PicassoAdapter(List&lt;String&gt; urls, Context context){
+        super(context, 0, urls);
+    }
+
+    @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        PlaceViewHolder holder;
+        //ListView tries to reuse invisible Row-Views to save memory, thats why this method can be called with null OR actually a ready View
+        if(convertView == null){
+            //in this case we need to create a new View
+            //create a holder Object that we will attach to the view
+            holder = new PlaceViewHolder();
+            //in this line we actually create a new row from the xml-file
+            convertView = View.inflate(getContext(), R.layout.places_layout, parent, false);
+            //we attach the Image- and Text-View to our holder, so we can access them in the next step
+            holder.placeIcon = (ImageView)convertView.findViewById(R.id.placeicon);
+            holder.placeInfo = (TextView)convertView.findViewById(R.id.placeinfo);
+            convertView.setTag(holder)
+        } else {
+            //if the view is already created, simply get the holder-object
+            holder = (PlaceViewHolder)convertView.getTag();
+        }
+        //I assume the URL is a String, if you need another Type, simply change it here and in class declaration
+        String url = getItem(position);
+        Picasso.with(getContext())
+                        .load(url)
+                        //now we have an ImageView, that we can use as target
+                        .into(holder.placeIcon);
+         //you can set the info here
+         holder.placeInfo.setText("test");
+         }
+    }
+
+    //we need this class as holder object
+    public static class PlaceViewHolder {
+        private ImageView placeIcon;
+        private TextView palceInfo;
+    }
+}
+</code></pre>
+
+<p>now you can use this adapter in your List:</p>
+
+<pre><code>placesList.setAdapter(new PicassoAdapter(urls, DisplayPlacesActivity.this));
+</code></pre>
+
+<p>beware, that the performance of this code may be very bad, since we try to load the image on the UI-Thread, but I think it's ok as an example</p>

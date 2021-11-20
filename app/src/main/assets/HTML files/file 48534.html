@@ -1,0 +1,46 @@
+<p>Your scenario with <code>SDWebImage</code> is correct.<br>
+For editing purpose you need set delegate to <code>SDWebImageManager</code> object and implement necessary method:  </p>
+
+<pre><code>// Set delegate
+[SDWebImageManager sharedManager].delegate = self;
+
+// Implement delegate method
+- (UIImage *)imageManager:(SDWebImageManager *)imageManager 
+ transformDownloadedImage:(UIImage *)image 
+                 withURL:(NSURL *)imageURL {
+
+    UIImage scaledImage = ... // Make scale based on 'image' object
+    return scaledImage;
+}
+</code></pre>
+
+<p>Note that this method called immediately after image was downloaded but before storing it to memory cache and before completion block is called.<br>
+Documentation for this method:  </p>
+
+<blockquote>
+  <p>Allows to transform the image immediately after it has been downloaded
+  and just before to cache it on disk and memory. NOTE: This method is
+  called from a global queue in order to not to block the main thread.</p>
+</blockquote>
+
+<p>After that you will be able to use <code>SDWebImageDownloader</code> and <code>SDImageCache</code> as in your question:  </p>
+
+<pre><code>[SDWebImageDownloader.sharedDownloader downloadImageWithURL:imageURL
+                                                options:0
+                                               progress:^(NSInteger receivedSize, NSInteger expectedSize) {
+                                                   // progression tracking code
+                                               }
+                                               completed:^(UIImage *image, NSData *data, NSError *error, BOOL finished) {
+                                                   if (image &amp;&amp; finished) {
+                                                        [[SDImageCache sharedImageCache] storeImage:image forKey:myCacheKey];
+                                                   }
+                                               }];
+</code></pre>
+
+<p>Then you can manage cache by using methods of <code>SDImageCache</code> class:  </p>
+
+<pre><code>- (NSOperation *)queryDiskCacheForKey:(NSString *)key done:(SDWebImageQueryCompletedBlock)doneBlock;
+- (void)removeImageForKey:(NSString *)key fromDisk:(BOOL)fromDisk withCompletion:(SDWebImageNoParamsBlock)completion;
+</code></pre>
+
+<p>If you need algorithm for image scaling by max data size take a look on <a href="http://stackoverflow.com/questions/20403805/how-to-downscale-a-uiimage-in-ios-by-the-data-size">this</a> answer.</p>

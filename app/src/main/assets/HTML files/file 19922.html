@@ -1,0 +1,35 @@
+<p>There is a bug (or feature) in .net 4.5 and IIS. </p>
+
+<p>The MemoryFailPoint class depends on an internal GC related variable, but under x64 this variable can be 0 and dividing by zero can generate positive infinity (double) and some operations (even multiply with zero) with this extreme value can generate a large double value (depends on the actual FPU settings).</p>
+
+<p>You can check this bug very easy.
+Create a simple web application and add an page then paste this code:</p>
+
+<pre><code>&lt;%
+    var memoryFailPointType = typeof(System.Runtime.MemoryFailPoint);
+    var staticPrivateFieldFlags = 
+        System.Reflection.BindingFlags.NonPublic |
+        System.Reflection.BindingFlags.Static;
+    var gCSegmentSizeField = memoryFailPointType
+        .GetField("GCSegmentSize", staticPrivateFieldFlags);
+    var gCSegmentSize = (uint)gCSegmentSizeField.GetValue(null);
+    string allocationResult;
+    try
+    {
+        using (var mfp = new System.Runtime.MemoryFailPoint(1))
+        {
+            allocationResult = "Ok";
+        }
+    }
+    catch (Exception exception)
+    {
+        allocationResult = exception.Message;
+    }
+%&gt;
+&lt;%= gCSegmentSize %&gt;&lt;br /&gt; &lt;!-- it can be 0 --&gt;
+&lt;%= allocationResult %&gt;&lt;br /&gt; &lt;!-- Insufficient memory to meet the expected demands of an operation, and this system is likely to never satisfy this request. If this is a 32 bit system, consider booting in 3 GB mode. --&gt;
+</code></pre>
+
+<p>So if gCSegmentSize is zero and (ulong)(double.PositiveInfinite * (uint)0) doesn't equal 0, you shouldn't use MemoryFailPoint class.</p>
+
+<p>In a console application the FPU control word is 0x09001F, but under IIS the FPU control word is 0x08001F.</p>

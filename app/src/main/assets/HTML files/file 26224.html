@@ -1,0 +1,35 @@
+<p>I suspect that the problem is that the mediaBox is only a magic accessor for a variable is shared across p and all copies t.  Therefore, assignments to <code>t.mediaBox</code> will result in the mediaBox having the same coordinates in all four copies.</p>
+
+<p>The variable behind the mediaBox field is lazily created on the first access to mediaBox, so if you comment out the line <code>(w, h) = p.mediaBox.upperRight</code>, the mediaBox variables will be created separately for each t .</p>
+
+<p>Two possible solutions for automatically determining the page dimensions:</p>
+
+<ol>
+<li><p>Get the dimensions after making the copy:</p>
+
+<pre><code>for p in [input.getPage(i) for i in range(0,input.getNumPages())]:
+
+    for j in range(0,4):
+        t = copy.copy(p)       
+        (w, h) = t.mediaBox.upperRight
+        t.mediaBox.lowerLeft  = (ifel(j%2==1, w/2, 0),   ifel(j&lt;2, h/2, 0))
+        t.mediaBox.upperRight = (ifel(j%2==0, w/2, w), ifel(j&gt;1, h/2, h))
+        output.addPage(t)  
+</code></pre></li>
+<li><p>Instantiate fresh RectangleObjects to use for mediaBox variables</p>
+
+<pre><code>for p in [input.getPage(i) for i in range(0,input.getNumPages())]:
+    (w, h) = p.mediaBox.upperRight
+
+    for j in range(0,4):
+        t = copy.copy(p)        
+        t.mediaBox.lowerLeft  = pyPdf.generic.RectangleObject(
+                                    ifel(j%2==1, w/2, 0),   
+                                    ifel(j&lt;2, h/2, 0),
+                                    ifel(j%2==0, w/2, w), 
+                                    ifel(j&gt;1, h/2, h))
+        output.addPage(t)
+</code></pre></li>
+</ol>
+
+<p>Using <code>copy.deepcopy()</code> will cause memory issues for large, complex PDFs, </p>

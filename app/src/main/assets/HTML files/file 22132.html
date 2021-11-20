@@ -1,0 +1,39 @@
+<p>It could be an operating system issue because the NSFileHandle is never being closed for each chunk. I would recommend closing it. </p>
+
+<p>Also, it looks like you have your variables declared outside the scope of the for loop. Unless you need those variables outside the loop, it's generally good to keep the scope of your variables as small as possible, especially if you are using ARC and are trying to think about when memory will be released.</p>
+
+<p>If you think that the NSFileHandle is holding onto data in memory, try to use the <code>-synchronizeFile</code> method after writing each chunk to make sure in memory changes are reflected to disk.</p>
+
+<p>Also, I moved the creation of the file you are writing to outside the loop, because it's easier to follow for me.</p>
+
+<p>Try this adjustment:</p>
+
+<pre><code>// List of chunk files        
+NSArray *filelist= [[NSFileManager defaultManager] contentsOfDirectoryAtPath:fileDir error:err];
+
+if([[NSFileManager defaultManager] createFileAtPath:tempFile contents:[NSData data] attributes:nil]){
+    NSLog(@"File was created!");
+} else {
+    NSLog(@"File was not created.");
+}
+
+NSFileHandle *fileWriteHandle = [NSFileHandle fileHandleForWritingAtPath:tempFile];
+
+for(int i = 0; i &lt; [filelist count]; i++) {
+    // Read the chunk of file
+    NSString *fileName = [NSString stringWithFormat:@"data-%d", i];
+    NSString *filePath = [fileDir stringByAppendingPathComponent:fileName];
+
+    NSFileHandle *fileReadHandle = [NSFileHandle fileHandleForReadingAtPath:filePath];
+    NSData *data = [fileReadHandle readDataToEndOfFile];
+
+    // No longer using the file
+    [fileReadHandle closeFile];
+
+    // Write in tempFile
+    [fileWriteHandle writeData:data];
+    [fileWriteHandle synchronizeFile];// Flush any data in memory to disk
+}
+
+[fileWriteHandle closeFile];
+</code></pre>

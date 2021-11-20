@@ -1,0 +1,28 @@
+<p>You cannot do that without rewriting both complete expression trees into a complete new one.</p>
+
+<p>Reason: the parameter-expression objects must be the same for the whole expression tree. If you combine the two, you have two parameter-expression objects for the same parameter, which will not work.</p>
+
+<p>It shows with the following code:</p>
+
+<pre><code>Expression&lt;Func&lt;Tab, bool&gt;&gt; leftexp = tag =&gt; ((tag.id == 2) || (tag.id == 3));
+Expression&lt;Func&lt;Tab, bool&gt;&gt; rightexp = tag =&gt; ((tag.uid == "MU") || (tag.uid == "ST"));
+
+Expression binaryexp = Expression.AndAlso(leftexp.Body, rightexp.Body);
+ParameterExpression[] parameters = new ParameterExpression[1] {
+    Expression.Parameter(typeof(Tab), leftexp.Parameters.First().Name)
+};
+Expression&lt;Func&lt;Tab, bool&gt;&gt; lambdaExp = Expression.Lambda&lt;Func&lt;Tab, bool&gt;&gt;(binaryexp, parameters);
+
+var lambda = lambdaExp.Compile();
+</code></pre>
+
+<p>This fails on the lambdaExp.Compile() call, which gives the following exception:</p>
+
+<pre><code>Lambda Parameter not in scope
+</code></pre>
+
+<p>This is caused by the fact that basically I'm re-using the leftexp and rightexp expression, but they have different parameter-expressions, both which are not given by me to the <code>Expression.Lambda&lt;Func&lt;Tab&gt;&gt;(...)</code> call. Deep down into the leftexp and rightexp there are parameter-expression objects which must match the one given to the <code>Expression.Lambda&lt;Func&lt;Tab&gt;&gt;(...)</code> call.</p>
+
+<p>To solve this you have recreate the complete expression using a new (single) parameter-expression for parameter tag.</p>
+
+<p>See <a href="http://stackoverflow.com/questions/1574427/lambda-parameter-not-in-scope-while-building-binary-lambda-expression">here</a> for more information about the problem.</p>

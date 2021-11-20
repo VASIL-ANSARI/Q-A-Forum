@@ -1,0 +1,72 @@
+<p>From iOS 6 onwards you can set your audio session active, play your file and then deactivate your session with options using the <strong>AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation</strong> <em>flag</em>. Make sure you set a non-mixable category when you need to play audio so background audio stops.</p>
+
+<p>In simple steps -</p>
+
+<pre><code>    // Configure audio session category and activate ready to output some audio
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    // Play some audio, then when completed deactivate the session and notify other sessions
+    [[AVAudioSession sharedInstance] setActive:NO withOptions: AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
+</code></pre>
+
+<p>From Apple's documentation-</p>
+
+<blockquote>
+  <p>When passed in the flags parameter of the setActive:withOptions:error: instance method, indicates that when your audio session deactivates, other audio sessions that had been interrupted by your session can return to their active state.
+  This flag is used only when deactivating your audio session; that is, when you pass a value of NO in the beActive parameter of the setActive:withOptions:error: instance method</p>
+</blockquote>
+
+<p>and also-</p>
+
+<blockquote>
+  <p>Deactivating your session will fail if any associated audio objects (such as queues, converters, players or recorders) are currently running.</p>
+</blockquote>
+
+<p>EDIT: A more detailed example -</p>
+
+<p>Configure a mixable audio session at the start of your applications lifecycle</p>
+
+<pre><code>    // deactivate session
+    BOOL success = [[AVAudioSession sharedInstance] setActive:NO error: nil];
+    if (!success) { NSLog(@"deactivationError"); }
+    // set audio session category AVAudioSessionCategoryPlayAndRecord
+    success = [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord withOptions:AVAudioSessionCategoryOptionMixWithOthers error:nil];
+    if (!success) { NSLog(@"setCategoryError"); }
+    // set audio session mode to default
+    success = [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeDefault error:nil];
+    if (!success) { NSLog(@"setModeError"); }
+    // activate audio session
+    success = [[AVAudioSession sharedInstance] setActive:YES error: nil];
+    if (!success) { NSLog(@"activationError"); }
+</code></pre>
+
+<p>When your application wants to output audio without any background audio playing, change the audio session category first like this</p>
+
+<pre><code>    // activate a non-mixable session
+    // set audio session category AVAudioSessionCategoryPlayAndRecord
+    BOOL success;
+    AVAudioSessionCategoryOptions AVAudioSessionCategoryOptionsNone = 0;
+    success = [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord withOptions:AVAudioSessionCategoryOptionsNone error:nil];
+    if (!success) { NSLog(@"setCategoryError"); }
+
+    // set audio session mode default
+    success = [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeDefault error:nil];
+    if (!success) { NSLog(@"setModeError"); }
+
+    // activate audio session
+    success = [[AVAudioSession sharedInstance] setActive:YES error: nil];
+    if (!success) { NSLog(@"activationError"); }
+
+    // commence playing audio here...
+</code></pre>
+
+<p>And when your application has completed playing audio you can deactivate your audio session</p>
+
+<pre><code>    // deactivate session and notify other sessions
+    // check and make sure all playing of audio is stopped before deactivating session...
+    BOOL success = [[AVAudioSession sharedInstance] setActive:NO withOptions: AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error: nil];
+    if (!success) { NSLog(@"deactivationError"); }
+</code></pre>
+
+<p>I can confirm that the above code works, tested with the <strong>Music App</strong> playing on an <strong>iPhone 5</strong> running <strong>iOS 7.0.4</strong>, however this is not guaranteed because there are other considerations such as user actions. For example if I plug in a headset the background audio from the music app routes to the headset and continues to play, but if I remove the headset the background audio produced by the music app pauses.</p>
+
+<p>For more info read AVAudioSession Class Reference </p>

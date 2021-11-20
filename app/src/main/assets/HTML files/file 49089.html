@@ -1,0 +1,16 @@
+<p>Use <code>popen</code> to start your <code>clang</code> session. Create a new command line as <code>clang -v</code> (including the space) and concatenate the arguments that you usually feed to <code>clang</code> itself. After the final argument, add <code>2&gt;&amp;1</code> to convert Clang's <code>stderr</code> output to regular <code>stdout</code> so <code>popen</code> can pick it up. Then loop over <code>popen</code>'s input and parse each separate line, adding extra information where you see fit.</p>
+
+<p>As an example, I grabbed the entire set of flags for my local Clang using</p>
+
+<pre><code>clang -cc1 --help
+</code></pre>
+
+<p>and incorporated this as a single long string in my C program. Then I looped over the return results from <code>popen</code>, scanning for flags starting with <code>-</code>, and when one was found, I scanned the long flags string for this. If it found something, I write it out on a separate line in green (using ANSI escape sequences). Then I test the flags string if an argument should follow â these usually have a leading <code>&lt;...&gt;</code> indicator. If so, I write it out in blue. Finally, I write out the entire flag explanation line until I encounter an end-of-line.</p>
+
+<p>With my very rough program called <code>colorclang</code> â 123 lines of actual code â I get output like this:</p>
+
+<p><a href="http://i.stack.imgur.com/grIDN.png" rel="nofollow"><img src="http://i.stack.imgur.com/grIDN.png" alt="colorclang output"></a></p>
+
+<p>As it is, it tests <em>every</em> input line for possible flags so there is some mis-coloring. More exact parsing is possible; I'd have to add separate routines for the single line starting with <code>"/usr/bin/clang"</code> (for the common Clang flags), the single line starting with <code>"/usr/bin/ld"</code> (and parse the <em>loader</em> flags), and possibly the lines after each <code>#include ..</code> statement.</p>
+
+<p>Pieced together with the help of <a href="http://stackoverflow.com/questions/7880812/complete-list-of-clang-flags">Complete list of clang flags?</a>, Steve Kemp's <a href="http://stackoverflow.com/a/646254/2564301">answer</a> to <a href="http://stackoverflow.com/q/646241/2564301">C: Run a System Command and Get Output?</a>, and after deducing <code>clang -v</code> writes to <code>stderr</code>, <a href="http://stackoverflow.com/a/6900631/2564301">larsman's answer</a> to <a href="http://stackoverflow.com/q/6900577/2564301">c popen won&#39;t catch stderr</a>.</p>

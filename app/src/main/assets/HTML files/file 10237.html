@@ -1,0 +1,22 @@
+<p>Unfortunately there isn't an elegant way to do what you want. The Autofac container, and its builder, are "black boxes" that don't let you take a good look at what you already have.</p>
+
+<p>There is no harm in registering a component twice, UNLESS your registrations are order-dependent (BAD, BAD, BAD). Registering a second time will simply overwrite the old registration with the new.</p>
+
+<p>I seriously question this code, as it depends totally on how allTypesInAllAvailableAssemblies is initialized. If it really is every type in your system, then it's a crap shoot as to what will resolve as, say, an IDisposable. If you have several different implementations of, say, IConfigurator, you will have limited control over which one ends up registered, regardless of whether you're checking for what's already registered or just letting the registration be overwritten; it depends totally on what class ends up first (or last) in the list.</p>
+
+<p>The only thing I could think to do is use a little Linq to make sure that the list of types you are registering is unique:</p>
+
+<pre><code>protected override void Load(ContainerBuilder builder)
+{
+    foreach (var componentType in allTypesInAllAvailableAssemblies.OfType&lt;Type&gt;().Distinct()) // Set elsewhere
+    {
+        var handlerInterfaces = componentType.GetInterfaces().Where(i =&gt; i.IsClosedTypeOf(typeof(IMessageHandler&lt;&gt;)));
+        if (handlerInterfaces.Any())
+            builder.RegisterType(componentType).As(handlerInterfaces);
+    }
+}
+</code></pre>
+
+<p>This will guarantee that each instance of componentType has never been seen by the builder before, within the scope of this foreach loop. That means that, given that this is the only module used to build Containers, and each Container is only built once and never updated, each component in the system will have been registered in any given Container exactly once. Common interfaces, like IDisposable, IEnumerable, IComparable, IComparer, etc are going to be worthless to try to resolve; they'll resolve to an instance of the last class that had that interface.</p>
+
+<p>If you have to verify that an interface has never been registered, or that this code also works when using a ContainerBuilder to Update() an existing Container, just stop what you're doing because you are about to create a hopeless mess you will never be able to maintain properly.</p>

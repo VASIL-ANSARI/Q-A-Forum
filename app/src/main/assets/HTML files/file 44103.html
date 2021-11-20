@@ -1,0 +1,112 @@
+<p>Since making a short comment on your question, I've had chance to fully play around with the options.  It appears that at present (even trying .NET 4.6 and SQL 2014) you cannot set <code>SqlGeography</code> OR <code>SqlGeometry</code> as the <code>typeof()</code> parameter when defining a column for a <code>DataTable</code>.  For absolute clarity, you can do it in .NET and even populate it, but you then cannot then pass that table as a TVP to a Stored Procedure.</p>
+
+<p>There are two options.</p>
+
+<p><strong>Option 1. Pass the value in WKT format.</strong></p>
+
+<p>Define your table-type as follows.</p>
+
+<pre><code>CREATE TYPE [dbo].[WKT_Example] AS TABLE
+(
+    [geom] [varchar](max) NOT NULL
+)
+</code></pre>
+
+<p>Then define your Stored Procedure as follows.</p>
+
+<pre><code>CREATE PROCEDURE [dbo].[BulkInsertFromWKT]
+
+    @rows [dbo].[WKT_Example] READONLY
+
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    INSERT INTO [dbo].[Table1]
+        ([SpatialData])
+    SELECT
+        geometry::STGeomFromText(R.[SpatialData], 4326)
+    FROM
+        @rows R;
+
+END
+</code></pre>
+
+<p>Define your .NET DataTable as follows:</p>
+
+<pre><code>DataTable wktTable = new DataTable();
+wktTable.Columns.Add("SpatialData", typeof(string));
+</code></pre>
+
+<p>Populate it as follows:</p>
+
+<pre><code>for (int j = 0; j &lt; geometryCollection.Count; j++)
+{
+    System.Data.SqlTypes.SqlString wkt = geometryCollection[j].STAsText().ToSqlString();
+
+    wktTable.Rows.Add(wkt.ToString());
+}
+</code></pre>
+
+<p><strong>Option 2. Pass the value in WKB format.</strong></p>
+
+<p>Define your table-type as follows.</p>
+
+<pre><code>CREATE TYPE [dbo].[WKB_Example] AS TABLE
+(
+    [geom] [varbinary](max) NOT NULL
+)
+</code></pre>
+
+<p>Then define your Stored Procedure as follows.</p>
+
+<pre><code>CREATE PROCEDURE [dbo].[BulkInsertFromWKB]
+
+    @rows [dbo].[WKB_Example] READONLY
+
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    INSERT INTO [dbo].[Table1]
+        ([SpatialData])
+    SELECT
+        geometry::STGeomFromWKB(R.[SpatialData], 4326)
+    FROM
+        @rows R;
+
+END
+</code></pre>
+
+<p>Define your .NET DataTable as follows:</p>
+
+<pre><code>DataTable wkbTable = new DataTable();
+wkbTable.Columns.Add("SpatialData", typeof(System.Data.SqlTypes.SqlBytes));
+</code></pre>
+
+<p>Populate it as follows:</p>
+
+<pre><code>for (int j = 0; j &lt; geometryCollection.Count; j++)
+{
+    wkbTable.Rows.Add(geographyCollection[j].STAsBinary());
+}
+</code></pre>
+
+<p><strong>Notes:</strong></p>
+
+<p>Define your SqlParameter as follows:</p>
+
+<pre><code>SqlParameter p = new SqlParameter("@rows", SqlDbType.Structured);
+p.TypeName = "WKB_Example"; // The name of your table type
+p.Value = wkbTable;
+</code></pre>
+
+<p>I've left an SRID of 4326 in from my geography work.  You can change this to whatever you wish - and indeed if you're using <code>Geography</code> I would suggest making it a second parameter to give you flexibility.</p>
+
+<p>Additionally, if performance is critical, you'll find using WKB better.  My tests found that WKB completed in 45% to 65% of the time WKT took.  This will vary by the complexity of your data and by your setup.</p>
+
+<p>The information you found on specifying the parameter's <code>UdtTypeName</code> as "Geometry" / "Geography" is correct when your Stored Procedure has a parameter of type [Geometry] or [Geography].  It doesn't apply to TVPs.</p>

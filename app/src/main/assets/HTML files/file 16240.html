@@ -1,0 +1,66 @@
+<p>The docs for <a href="http://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/" rel="nofollow">Boost Math Toolkit</a> has a long list of <a href="http://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/math_toolkit/backgrounders/refs.html" rel="nofollow">references</a>, among which Abramowitz and Stegun. The <a href="http://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/math_toolkit/special/sf_erf/error_function.html" rel="nofollow">erf-function</a> interface contains a <a href="http://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/math_toolkit/policy.html" rel="nofollow">policy</a> template parameter that can be used to control the numerical precision (and hence its run-time complexity).</p>
+
+<pre><code>#include &lt;boost/math/special_functions/erf.hpp&gt;
+namespace boost{ namespace math{
+
+template &lt;class T&gt;
+calculated-result-type erf(T z);
+
+template &lt;class T, class Policy&gt;
+calculated-result-type erf(T z, const Policy&amp;);
+
+template &lt;class T&gt;
+calculated-result-type erfc(T z);
+
+template &lt;class T, class Policy&gt;
+calculated-result-type erfc(T z, const Policy&amp;);
+
+}} // namespaces
+</code></pre>
+
+<p><strong>UPDATE</strong>:</p>
+
+<p>Below a verbatim copy of the section "Implementation" of the earlier provided reference to the erf-function:</p>
+
+<p><strong>Implementation</strong></p>
+
+<p>All versions of these functions first use the usual reflection formulas to make their arguments positive:</p>
+
+<pre><code>erf(-z) = 1 - erf(z);
+
+erfc(-z) = 2 - erfc(z);  // preferred when -z &lt; -0.5
+
+erfc(-z) = 1 + erf(z);   // preferred when -0.5 &lt;= -z &lt; 0
+</code></pre>
+
+<p>The generic versions of these functions are implemented in terms of the incomplete gamma function.</p>
+
+<p>When the significand (mantissa) size is recognised (currently for 53, 64 and 113-bit reals, plus single-precision 24-bit handled via promotion to double) then a series of rational approximations devised by JM are used.</p>
+
+<p>For z &lt;= 0.5 then a rational approximation to erf is used, based on the observation that erf is an odd function and therefore erf is calculated using:</p>
+
+<pre><code>erf(z) = z * (C + R(z*z));
+</code></pre>
+
+<p>where the rational approximation R(z*z) is optimised for absolute error: as long as its absolute error is small enough compared to the constant C, then any round-off error incurred during the computation of R(z*z) will effectively disappear from the result. As a result the error for erf and erfc in this region is very low: the last bit is incorrect in only a very small number of cases.</p>
+
+<p>For z > 0.5 we observe that over a small interval [a, b) then:</p>
+
+<pre><code>erfc(z) * exp(z*z) * z ~ c
+</code></pre>
+
+<p>for some constant c.</p>
+
+<p>Therefore for z > 0.5 we calculate erfc using:</p>
+
+<pre><code>erfc(z) = exp(-z*z) * (C + R(z - B)) / z;
+</code></pre>
+
+<p>Again R(z - B) is optimised for absolute error, and the constant C is the average of erfc(z) * exp(z*z) * z taken at the endpoints of the range. Once again, as long as the absolute error in R(z - B) is small compared to c then c + R(z - B) will be correctly rounded, and the error in the result will depend only on the accuracy of the exp function. In practice, in all but a very small number of cases, the error is confined to the last bit of the result. The constant B is chosen so that the left hand end of the range of the rational approximation is 0.</p>
+
+<p>For large z over a range [a, +â] the above approximation is modified to:</p>
+
+<pre><code>erfc(z) = exp(-z*z) * (C + R(1 / z)) / z;
+</code></pre>
+
+<p>The rational approximations are explained in <a href="http://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/math_toolkit/backgrounders/remez.html" rel="nofollow"><strong>excruciating detail</strong></a>. Tf you need more details, you can always look at the <a href="http://www.boost.org/doc/libs/1_49_0/boost/math/special_functions/erf.hpp" rel="nofollow">source code</a>.</p>

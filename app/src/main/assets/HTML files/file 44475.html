@@ -1,0 +1,48 @@
+<p>Assuming that there always will be a match:</p>
+
+<pre><code>import re
+
+def cleanup(str): 
+    return ''.join(re.match('(\"[^\"]+\").*?(\^\^xsd\:date\.)', str).groups())
+
+&gt;&gt;&gt; s = """"C def geh.#- ijk "&lt;&gt; ""^^xsd:date."""
+&gt;&gt;&gt; cleanup(s)
+'"C def geh.#- ijk "^^xsd:date.'
+</code></pre>
+
+<p>UPDATE If the dot at the end of the string might or might not appear, use this (and I forgot the dollar sign to mark the end):</p>
+
+<pre><code>def cleanup(str): 
+    return ''.join(re.match('(\"[^\"]+\").*?(\^\^xsd\:date\.?)$', str).groups())
+
+&gt;&gt;&gt; s = '"1980-"05"-26"^^xsd:date'
+&gt;&gt;&gt; cleanup(s)
+'"1980-"^^xsd:date'
+</code></pre>
+
+<p>If you want to handle the situation when there is no match (e.g. return empty string), then it could be done like this:</p>
+
+<pre><code>def cleanup(str):
+    try:
+        return ''.join(re.match('(\"[^\"]+\").*?(\^\^xsd\:date\.?)$', str).groups())
+    except AttributeError:
+        return ''
+
+&gt;&gt;&gt; cleanup("asdfadf")
+''
+</code></pre>
+
+<p>UPDATE after getting more explanations from OP (need to cleanup the contents between the first and last quotes and return the rest unchanged):</p>
+
+<pre><code>def cleanup(str):
+    left_index = s.find('\"')
+    right_index = s.rfind('\"')
+    if left_index==right_index: 
+        return str
+    else:
+        cleaned = re.sub('[^0-9a-zA-Z\#\-\.\_\(\)]','',s[left_index+1:right_index])
+        return str[:left_index+1]+cleaned+str[right_index:]
+
+&gt;&gt;&gt; cleanup(s)
+'"1980-05-26"^^xsd:date'
+</code></pre>

@@ -1,0 +1,50 @@
+<p>Please, check <a href="http://stackoverflow.com/questions/1310694/output-rtf-special-characters-to-unicode/1315997#1315997">the answer</a> to <a href="http://stackoverflow.com/questions/1310694/output-rtf-special-characters-to-unicode">this question</a>.</p>
+
+<hr>
+
+<p><strong>Edited to Add</strong></p>
+
+<p>As you say that the above answer applies to the conversion of RTF to PlainText, according to <a href="http://msdn.microsoft.com/en-us/library/aa278903%28office.10%29.aspx" rel="nofollow">RTF Specification 1.6</a> you use <code>\u261a</code> to display <code>Ä</code>, <code>\u281e</code> for <code>Ä</code>...</p>
+
+<p>The syntax is <strong>\u<i>Nd</i></strong> where <strong><em>N</em></strong> is the decimal Unicode value for the character, and <strong><em>d</em></strong> is the ASCII approximation. </p>
+
+<hr>
+
+<p><strong>Edited to Clarify</strong></p>
+
+<p>For what you say, you have some placeholders in the RTF, right?</p>
+
+<p>What you need to do is to have a function that, when replacing the placeholders, add the proper RTF encoded characters.</p>
+
+<p>After a little bit of research, I think you may use something like this:</p>
+
+<pre><code>Public Function GetRtfString(ByVal text As String) As String
+
+  Dim sb As New Text.StringBuilder()
+  For Each c As Char In text
+    Dim code = Convert.ToInt32(c)
+    If (Char.IsLetter(c) AndAlso code &lt; &amp;H80) Then
+      sb.Append(c)
+    Else
+      sb.AppendFormat(CultureInfo.InvariantCulture, "\u{0}{1}", code, RemoveDiacritics(c))
+    End If
+  Next
+  Return sb.ToString()
+
+End Function
+
+Public Function RemoveDiacritics(ByVal text As String) As String
+
+  Dim formD = text.Normalize(System.Text.NormalizationForm.FormD)
+  Dim sb As New Text.StringBuilder()
+
+  For Each c As Char In formD
+    If (CharUnicodeInfo.GetUnicodeCategory(c) &lt;&gt; UnicodeCategory.NonSpacingMark) Then
+      sb.Append(c)
+    End If
+  Next
+
+  Return sb.ToString().Normalize(System.Text.NormalizationForm.FormC)
+
+End Function
+</code></pre>

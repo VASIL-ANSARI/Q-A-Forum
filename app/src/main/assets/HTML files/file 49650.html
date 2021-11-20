@@ -1,0 +1,104 @@
+<p>If you want the columns to generate dynamically for you in WPF you need to dynamically add column definitions with appropriate bindings each time you repopulate the list view.</p>
+
+<p>Try this:</p>
+
+<p><strong>MainWindow.xaml.cs</strong></p>
+
+<pre><code>using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+
+namespace ListViewTest
+{
+    public class Column
+    {
+        public string Title { get; set; }
+        public string SourceField { get; set; }
+    }
+
+    /// &lt;summary&gt;
+    /// Interaction logic for MainWindow.xaml
+    /// &lt;/summary&gt;
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+
+            GridView gridView = new GridView();
+            this.myListView.View = gridView;
+
+            List&lt;dynamic&gt; myItems = new List&lt;dynamic&gt;();
+            dynamic myItem;
+            IDictionary&lt;string, object&gt; myItemValues;
+
+            // Populate the objects with dynamic columns
+            for (var i = 0; i &lt; 100; i++)
+            {
+                myItem = new System.Dynamic.ExpandoObject();
+
+                foreach (string column in new string[] { "Id", "Name", "Something" })
+                {
+                    myItemValues = (IDictionary&lt;string, object&gt;)myItem;
+                    myItemValues[column] = "My value for " + column + " - " + i;
+                }
+
+                myItems.Add(myItem);
+            }
+
+            // Assuming that all objects have same columns - using first item to determine the columns
+            List&lt;Column&gt; columns = new List&lt;Column&gt;();
+
+            myItemValues = (IDictionary&lt;string, object&gt;)myItems[0];
+
+            // Key is the column, value is the value
+            foreach (var pair in myItemValues)
+            {
+                Column column = new Column();
+
+                column.Title = pair.Key;
+                column.SourceField = pair.Key;
+
+                columns.Add(column);
+            }
+
+            // Add the column definitions to the list view
+            gridView.Columns.Clear();
+
+            foreach (var column in columns)
+            {
+                var binding = new Binding(column.SourceField);
+
+                gridView.Columns.Add(new GridViewColumn { Header = column.Title, DisplayMemberBinding = binding });
+            }
+
+            // Add all items to the list
+            foreach (dynamic item in myItems)
+            {
+                this.myListView.Items.Add(item);
+            }
+        }
+    }
+}
+</code></pre>
+
+<p><strong>XAML:</strong></p>
+
+<pre><code>&lt;Window x:Class="ListViewTest.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ListViewTest"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="350" Width="525"&gt;
+    &lt;Grid&gt;
+        &lt;ListView x:Name="myListView"&gt;&lt;/ListView&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+
+<p>Only thing you need to change is adding columns from the reader by using the column name from sql query. And populating the <code>ExpandoObject</code> from <code>fields</code> returned by the <code>reader</code> from your query.</p>
+
+<p>This is a quick demo I written up and didn't have access to a local database to test it so I mimicked it by the for loops and the string array.</p>

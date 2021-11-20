@@ -1,0 +1,27 @@
+<p>Make an inline table with the hours and left join it to your log_events table:</p>
+
+<pre><code>select
+  dummy_hours.hour,
+  log_aggregate.METRIC,
+  log_aggregate.MINIMUM,
+  log_aggregate.MAXIMUM
+from (
+  select to_char(trunc(to_date('08-NOV-10', 'DD-MON-YY'))+(level-1)/24, 'DD-MON-YY "-" HH24":00"') HOUR
+  from dual connect by level &lt;= 48
+) dummy_hours, (
+  select to_char(day,'DD-MON-YY "-" HH24":00"') AS HOUR,
+  round(avg(duration), 2) AS METRIC,
+  round(min(duration), 2) AS MINIMUM,
+  round(max(duration), 2) AS MAXIMUM
+  from log_events
+  where day between to_date('08-NOV-10', 'DD-MON-YY') and to_date('08-NOV-10', 'DD-MON-YY') + 2
+  and day &gt; to_date('08-NOV-10', 'DD-MON-YY')
+  and day &lt; to_date('08-NOV-10', 'DD-MON-YY') + 2
+  and company = 'company A'
+  and component = 'api layer'
+  and event_label = 'execution request'
+  group by to_char(day,'DD-MON-YY "-" HH24":00"')
+) log_aggregate
+where dummy_hours.hour = log_aggregate.hour(+)
+order by dummy_hours.hour;
+</code></pre>

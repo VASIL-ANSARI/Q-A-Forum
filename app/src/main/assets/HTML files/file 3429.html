@@ -1,0 +1,15 @@
+<p>You really shouldn't have to worry about handling the user's count of songs on which they have commented inside a transaction because it seems unlikely that a User would be able to comment on more than one song at a time, right?</p>
+
+<p>Now, it is definitely the case that many users could be commenting on the same song at one time, so that is where you have to worry about making sure that the data isn't made invalid by a race condition.</p>
+
+<p>However, if you keep the count of the number of users who have commented on a song inside the Song entity, and lock the entity with a transaction, you are going to get very high contention for that entity and datastore timeouts will make you application have lots of problems.</p>
+
+<p>This answer for this problem is <a href="http://code.google.com/appengine/articles/sharding_counters.html" rel="nofollow">Sharded Counters</a>.</p>
+
+<p>In order to make sure that you can create a new SongUser entity and update the related Song's sharded counter, you should consider having the SongUser entity have the related Song as a parent. That will put them in the same entity group and you can both create the SongUser and updated the sharded counter in the same transaction. The SongUser's relationship to the User who created it can be held in a ReferenceProperty.</p>
+
+<p>Regarding your concern about the two updates (the transactional one and the User update) not both succeeding, that is always a possibility, but given that either update can fail, you will need to have proper exception-handling to ensure that both succeed. That's an important point: the in-transaction-updates are not guaranteed to succeed. You may get a TransactionfailedError exception if the transaction can not complete for any reason.</p>
+
+<p>So, if your transaction completes without raising an exception, run the update to User in a transaction. That will get you automatic retries of the update to User, should some error occur. Unless there's something about possible contention on the User entity that I don't understand, the possiblity that it will not eventually succeed is <em>surpassingly small</em>. If that is an unacceptable risk, then I don't think that that AppEngine has a perfect solution to this problem for you.</p>
+
+<p>First ask yourself: <em>is it really that bad if the count of songs that someone has commented on is off by one? Is this as critical as updating a bank account balance or completing a stock sale?</em> </p>

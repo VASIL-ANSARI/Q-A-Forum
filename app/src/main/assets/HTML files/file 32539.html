@@ -1,0 +1,23 @@
+<p>I figured out what's causing this. First, we need more information about the configuration.</p>
+
+<p>I have 3 hosts, a.my.com, b.my.com, and c.my.com. The static files are all served from c.my.com, and the html and php are served from a.my.com and b.my.com.</p>
+
+<p>I added the crossorigin attribute to my script tags so I could get useful error information from my scripts. See the SO question describing this issue here: <a href="http://stackoverflow.com/questions/5913978/cryptic-script-error-reported-in-javascript-in-chrome-and-firefox">Cryptic &quot;Script Error.&quot; reported in Javascript in Chrome and Firefox</a></p>
+
+<p>I am using the requesting host as the allowed origin instead of *, as a precursor to whitelisting allowed origins. See this question for more: <a href="http://stackoverflow.com/questions/14499320/how-to-properly-setup-nginx-access-control-allow-origin-into-response-header-bas">How to properly setup nginx Access-Control-Allow-Origin into response header based on the Origin header from the request?</a></p>
+
+<p>My nginx configuration has a long expiration for static content so stuff is cached and not loading down my server with repeated requests. I append a version number to the url for static content so it can be re-requested when something changes. The version number comes from my version in svn, so when I update the server files to the newest version, browsers will all start loading a new url for each static file.</p>
+
+<p>So here's what's happening:</p>
+
+<p>A new user visits a.my.com and loads the page. Javascript files 1 through 5 are loaded from c.my.com for use on a.my.com. Nginx sends them with an origin header allowing "a.my.com" and a far future expiration date. This page works fine, and the javascript loads successfully.</p>
+
+<p>The user then goes on to the other part of the site at b.my.com and loads the page. Javascript files 1 through 10 are requested from c.my.com. Files 1 through 5 are the same files as were loaded for a.my.com. The browser knows it has those files in its cache, so it asks nginx for their status. Nginx replies with a 304 (not modified) and the browser goes on to request the next file.</p>
+
+<p>So now the browser has loaded files 6 through 10 from c.my.com, and has looked in the cache for files 1 through 5. The cached files have their allow origin header attached, and this says "a.my.com" is the allowed origin. The page requesting the files is on b.my.com, so it doesn't match and isn't allowed to use them. So it silently discards them and shows the user a page with missing javascript.</p>
+
+<p>Solutions:</p>
+
+<p>One solution is to send the Access-Control-Allow-Origin with a value of * to allow any origin. This would mean that the cached file is allowed for the current origin even if they didn't initiate the first download. There are security implications for this, as discussed in this SO question: <a href="http://stackoverflow.com/questions/9713644/when-is-it-safe-to-enable-cors/9725695#9725695">When is it safe to enable CORS?</a></p>
+
+<p>A second solution is to make each origin use a different url for the same static file. This forces the browser to cache them separately. That allows the Access-Control-Allow-Origin header to be specific to a single origin. The cost is more resource requests coming to the server, and the user's browser uses more memory and storage for cached resources.</p>

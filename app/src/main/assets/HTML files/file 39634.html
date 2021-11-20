@@ -1,0 +1,72 @@
+<p>Using <code>std::enable_if</code>, <code>std::is_base_of</code> and logical operators between results, it is possible to construct a function whose return type is T (and valid) only if your conditions are met:</p>
+
+<pre><code>template&lt;typename T, typename U&gt;
+typename std::enable_if&lt;
+    std::is_base_of&lt;Object, T&gt;::value &amp;&amp; !std::is_base_of&lt;Object, U&gt;::value, T
+    &gt;::type
+operator + (const T&amp; i1, const U&amp; i2) {
+    return i1 + T(i2);
+}
+</code></pre>
+
+<p>A complete example code then:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;type_traits&gt;
+
+using std::cout;
+using std::endl;
+
+struct Object {
+    virtual ~Object() {}
+};
+
+struct Float : public Object {
+    constexpr explicit Float(float v) : val(v) {};
+    float val;
+
+    Float operator + (const Float&amp; f) const {
+        cout &lt;&lt; "Float(" &lt;&lt; val &lt;&lt; ") + Float(" &lt;&lt; f.val &lt;&lt; ") = ";
+        return Float(val + f.val);
+    }
+};
+
+struct Long : public Object {
+    constexpr explicit Long(long v) : val(v) {};
+    long val;
+
+    Long operator + (const Long&amp; l) const {
+        cout &lt;&lt; "Long(" &lt;&lt; val &lt;&lt; ") + Long(" &lt;&lt; l.val &lt;&lt; ") = ";
+        return Long(val + l.val);
+    }
+};
+
+template&lt;typename T, typename U&gt;
+typename std::enable_if&lt;
+    std::is_base_of&lt;Object, T&gt;::value &amp;&amp; !std::is_base_of&lt;Object, U&gt;::value, T
+    &gt;::type
+operator + (const T&amp; i1, const U&amp; i2) {
+    cout &lt;&lt; "templated ";
+    return i1 + T(i2);
+}
+
+int main(int argc, char*argv[]) {
+    Long L(100);
+    cout &lt;&lt; (L+1).val &lt;&lt; endl;
+    cout &lt;&lt; (L+L).val &lt;&lt; endl;
+
+    Float F(20.0f);
+    cout &lt;&lt; (F+1).val &lt;&lt; endl;
+    cout &lt;&lt; (F+F).val &lt;&lt; endl;
+
+    return 0;
+}
+</code></pre>
+
+<p>With output:</p>
+
+<pre><code>templated Long(100) + Long(1) = 101
+Long(100) + Long(100) = 200
+templated Float(20) + Float(1) = 21
+Float(20) + Float(20) = 40
+</code></pre>

@@ -1,0 +1,38 @@
+<p>Only select the <code>SUM(sale.quantity * item.price)</code> in your subquery and remove the <code>select total</code> one.</p>
+
+<pre><code>update Transaction
+    set total = (
+        select SUM(sale.quantity * Item.price)
+            from Sale
+                inner join Item on Sale.I_ID = Item.I_ID
+            where Sale.T_ID = Transaction.T_ID
+    )
+</code></pre>
+
+<p>That is what I would try out in SQL Server.</p>
+
+<p>I would have prefered to have some sample data so that I can test it against my local SQL Server database in order to verify whether this statement does what is expected, though you're not using SQL Server, the idea is still the same.</p>
+
+<p><strong>EDIT #1</strong></p>
+
+<blockquote>
+  <p>Though I do not fully understand why it does not overwrite values in the transaction.total column when a transaction is composed of several different items, your suggested query works.</p>
+</blockquote>
+
+<p>The behaviour of the <code>SUM</code> function is to sum all targeted records resulting in only one scalar value for each <code>Sale</code> and <code>Item</code> rows. There can be only one sum, can it not?</p>
+
+<p>That said, it multipies each resulting rows from the constraint, that is, for a particular transaction.</p>
+
+<ol>
+<li>It selects both <code>Sale</code> and <code>Item</code> rows for this very transaction;</li>
+<li>It then iterates through each of the resulting rows and multiply <code>Sale.Quantity</code> and <code>Item.Price</code> together, which is worth a value for each row;</li>
+<li>Once a row is multiplied, its total is then added to a total which is stored somewhere in memory;</li>
+<li>Once it has processed all the rows for that transaction, it comes out with a scalar value, which is the sum of all the rows in <code>Sale</code> and <code>Item</code> for that given transaction;</li>
+<li>This SUM ends up to be this transaction's total.</li>
+</ol>
+
+<p>In other words, the subquery "knows" for which transaction to sum which is filtered in the subquery itself. The <code>Transaction</code> table is accessible in the subquery as part of the main SQL statement. So, putting it in the <code>where</code> clause filters the rows from <code>Sale</code> and <code>Item</code> that will be later multiplied and additioned for the total.</p>
+
+<p>Does this help you better understand this update statement?</p>
+
+<p>Please feel free to ask your questions. =)</p>

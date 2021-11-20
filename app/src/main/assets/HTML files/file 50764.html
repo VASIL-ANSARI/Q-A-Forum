@@ -1,0 +1,49 @@
+<p>You can use a device-tree overlay to activate the pull-ups and port direction at boot up. </p>
+
+<p>You will have to modify and compile the dts (source), place it in /boot/overlays, and enable it in config.txt.  The instructions are in the source header. (Thanks to PhillE for his help!)</p>
+
+<pre><code>/*
+* Overlay for enabling gpio's to pull at boot time
+* this overlay uses pincctrl to initialize the pull-up register for the the listed gpios
+* the compatible="gpio-leds" forces a module probe so the pinctrl does something
+*
+* To use this dts:
+* copy this to a file named gpio_pull-overlay.dts
+* modify the brcm,pins, brcm,function, and brcm,pull values
+* apt-get install device-tree-compiler
+* dtc -@ -I dts -O dtb -o gpio_pull-overlay.dtb gpio_pull-overlay.dts
+* sudo cp gpio_pull-overlay.dtb /boot/overlays
+* add this line to the end config.txt: dtoverlay=gpio_pull
+* reboot
+*/
+
+/dts-v1/;
+/plugin/;
+/ {
+  compatible = "brcm,bcm2835", "brcm,bcm2708";
+  fragment@0 {
+    target = &lt;&amp;gpio&gt;;
+    __overlay__ {
+       gpio_pins: gpio_pins {
+          brcm,pins = &lt;30 31 32 33&gt;; /* list of gpio(n) pins to pull */
+          brcm,function = &lt;0 1 0 1&gt;; /* boot up direction:in=0 out=1 */
+          brcm,pull = &lt;2 0 1 0&gt;; /* pull direction: none=0, 1 = down, 2 = up */
+       };
+    };
+  };
+  fragment@1 {
+    target-path = "/soc";
+    __overlay__ {
+       gpiopull:gpiopull {
+          compatible = "gpio-leds";
+          pinctrl-names = "default";
+          pinctrl-0 = &lt;&amp;gpio_pins&gt;;
+          status = "okay";
+       };
+    };
+  };
+  __overrides__ {
+     gpio_pull = &lt;&amp;gpiopull&gt;,"status";
+  };
+};
+</code></pre>

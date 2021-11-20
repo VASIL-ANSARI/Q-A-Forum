@@ -1,0 +1,47 @@
+<p>It's a little hard to tell what's going on without the whole test. The typical test pattern would be:</p>
+
+<ol>
+<li>create the fake</li>
+<li>configure the fake to set up the capturing of the argument</li>
+<li>execute the production code, which should use the fake, and</li>
+<li>then verify that a call was made.</li>
+</ol>
+
+<p>I can't see where you call the
+production code, but your <code>A.CallTo</code> seems to be trying both to
+configure the method and to verify that a call was made. Since you
+said the <code>MustHaveHappened</code> passes, I'm guessing that this code
+lives after the call to the production code. Something like:</p>
+
+<pre><code>var repository = A.Fake&lt;IRepository&gt;();
+
+repository.SaveSetup(â¦);
+
+EmailEventArgs argsInEvent = null;
+
+A.CallTo(repository).Where(w =&gt; w.Method.Name == "OnSaveRequest")
+    .Invokes(i =&gt; argsInEvent = i.GetArgument&lt;EmailEventArgs&gt;(0))
+    .MustHaveHappened(Repeated.Exactly.Once);
+</code></pre>
+
+<p>This will not work (of course you know that, or you wouldn't be asking a question) because you're configuring the <code>Invokes</code> <em>after</em> the production code has been run (and the <code>OnSaveRequest</code> call was already made on the fake).</p>
+
+<p>You should have something like:</p>
+
+<pre><code>// Arrange
+EmailEventArgs argsInEvent = null;
+
+var repository = A.Fake&lt;IRepository&gt;();
+
+A.CallTo(repository).Where(w =&gt; w.Method.Name == "OnSaveRequest")
+    .Invokes(i =&gt; argsInEvent = i.GetArgument&lt;EmailEventArgs&gt;(0));
+
+// Act
+repository.SaveSetup(â¦);
+
+// Assert
+A.CallTo(repository).Where(w =&gt; w.Method.Name == "OnSaveRequest")
+    .MustHaveHappened(Repeated.Exactly.Once);
+
+// and maybe do something with argsInEvent
+</code></pre>

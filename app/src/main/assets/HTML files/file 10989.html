@@ -1,0 +1,46 @@
+<p>You can automate IE to let it print documents to any printer, including PDFCreator.<br>
+You may also want to check <a href="http://gallery.technet.microsoft.com/scriptcenter/1f08824a-c9db-415e-83b1-2c49ebda195c" rel="nofollow">this blog</a>, it shows how to let PDFCreator skip the "save" dialog.  I'm not an expert on PowerShell, so I won't try to convert this to VBA</p>
+
+<pre><code>'A function that uses IE to print the contents of Google.com to a PDF document
+Sub printgoogle()
+    Dim Explorer As Object
+    Dim eQuery As Long 'return value type for QueryStatusWB
+    Dim i As Integer
+    Dim fTime As Single
+
+    'See function below, to set the default printer to PDFCreator.  Note:  The user would probably be grateful if you checked to see what is the current default printer and set it back when finished printing
+    SetDefaultPrinter "PDFCreator"
+
+    'Connect to Internet Explorer
+    Set Explorer = CreateObject("InternetExplorer.Application")
+    'Open some document.  This is usually a file on your computer, but I use Google here for test purposes
+    Explorer.Navigate "www.google.com"
+
+TryAgain:
+        'Wait for 2 seconds to let IE load the document
+        fTime = Timer
+        Do While fTime &gt; Timer - 2
+            DoEvents
+        Loop
+        eQuery = Explorer.QueryStatusWB(6)  'get print command status
+        If eQuery And 2 Then
+            Explorer.ExecWB 6, 2, "", ""   'Ok to Print? Then execute the Print (6) command, without displaying the print dialog (2)
+            'Wait for 2 seconds while IE prints
+            fTime = Timer
+            Do While fTime &gt; Timer - 2
+                DoEvents
+            Loop
+        Else
+            GoTo TryAgain
+        End If
+
+End Sub
+
+'This function sets the Windows default printer to whatever printer you insert as parameter
+Public Sub SetDefaultPrinter(ByVal printerName As String)
+    Dim oSH As WshNetwork
+    Set oSH = New WshNetwork
+    oSH.SetDefaultPrinter printerName
+    Set oSH = Nothing
+End Sub
+</code></pre>

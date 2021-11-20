@@ -1,0 +1,213 @@
+<p>You need to register your own clipboard format, then you can store the <code>struct</code> data as-is.</p>
+
+<pre><code>static UINT CF_MYSTRUCTDATA = RegisterClipboardFormat(TEXT("MyStructData"));
+
+#pragma pack(push, 1)
+struct sData
+{
+    DWORD Number;
+    int CurrentNumber;
+    bool GameOver;
+};
+#pragma pack(pop)
+
+bool SetData(const sData &amp;data)
+{
+    if (CF_MYSTRUCTDATA == 0)
+        return false;
+
+    bool bOK = false;
+    if (OpenClipboard(NULL))
+    {
+        if (EmptyClipboard())
+        {
+            HGLOBAL clipbuffer = GlobalAlloc(GMEM_MOVEABLE, sizeof(sData));
+            if (clipbuffer)
+            {
+                sData *buffer = (sData*) GlobalLock(clipbuffer);
+                if (buffer)
+                {
+                    *buffer = data;
+                    GlobalUnlock(clipbuffer);
+                    bOK = SetClipboardData(CF_MYSTRUCTDATA, clipbuffer);
+                }
+                if (!bOK)
+                    GlobalFree(clipbuffer);
+            }
+        }
+        CloseClipboard();
+    }
+
+    return bOK;
+}
+
+bool GetData(sData &amp;data) const
+{
+    if (CF_MYSTRUCTDATA == 0)
+        return false;
+
+    bool bOk = false;
+    if (OpenClipboard(NULL))
+    {
+        HANDLE clipbuffer = GetClipboardData(CF_MYSTRUCTDATA);
+        if (clipbuffer)
+        {
+            sData *buffer = (sData*) GlobalLock(clipbuffer);
+            if (buffer)
+            {
+                data = *buffer;
+                GlobalUnlock(clipbuffer);
+                bOK = true;
+            }
+        }
+        CloseClipboard();
+    }
+    return bOK;
+}
+</code></pre>
+
+<p>Alternatively, using some C++ RAII wrappers:</p>
+
+<pre><code>struct Clipboard
+{
+    Clipboard(HWND hWnd = NULL)
+    {
+        if (!OpenClipboard(hWnd))
+            throw std::runtime_error("Error opening clipboard");
+    }
+
+    ~Clipboard()
+    {
+        CloseClipboard();
+    }
+
+    void Empty()
+    {
+        if (!EmptyClipboard())
+            throw std::runtime_error("Error emptying clipboard");
+    }
+
+    template&lt;typename T&gt;
+    struct DataBuffer
+    {
+        HGLOBAL _hmem;
+        bool _free;
+
+        struct Lock
+        {
+            DataBuffer&amp; _buffer;
+            T* _data;
+
+            Lock(DataBuffer &amp;buffer)
+                : _buffer(buffer), _locked(false)
+            {
+                _data = (T*) GlobalLock(_buffer.Get());
+                if (!_data)
+                    throw std::runtime_error("Error locking memory");
+            }
+
+            ~Lock()
+            {
+                GlobalUnlock(_buffer.Get());
+            }
+
+            T&amp; Data() { return *_data; }
+        };
+
+        DataBuffer(const T &amp;data)
+            : _hmem(NULL), _free(true)
+        {
+            _hmem = GlobalAlloc(GMEM_MOVEABLE, sizeof(T));
+            if (!_hmem)
+                throw std::runtime_error("Error allocating memory");
+            Lock(*this).Data() = data;
+        }
+
+        DataBuffer(HGLOBAL hmem)
+            : _hmem(mem), _free(false)
+        {
+            if (GlobalSize(_hmem)) &lt; sizeof(T))
+                throw std::runtime_error("Bad memory size");
+        }
+
+        ~DataBuffer()
+        {
+            if ((_hmem) &amp;&amp; (_free))
+                GlobalFree(_hmem);
+        }
+
+        HGLOBAL Release()
+        {
+            HGLOBAL tmp = _hmem;
+            _hmem = NULL;
+            return tmp;
+        }
+
+        HGLOBAL Get()
+        {
+            return _hmem;
+        }
+
+        void Copy(T &amp;data)
+        {
+            data = Lock(*this).Data();
+        }
+    };
+
+    template&lt;typename T&gt;
+    void SetData(UINT format, const T &amp;data)
+    {
+        DataBuffer&lt;T&gt; buffer(data);
+        if (!SetClipboardData(format, buffer.Get()))
+            throw std::runtime_error("Error setting clipboard data");
+        buffer.Release();
+    }
+
+    template&lt;typename T&gt;
+    void GetData(UINT format, T &amp;data)
+    {
+        DataBuffer&lt;T&gt; buffer(GetClipboardData(format));
+        if (!buffer.Get())
+            throw std::runtime_error("Error getting clipboard data");
+        buffer.Copy(data);
+    }
+};
+</code></pre>
+
+<p></p>
+
+<pre><code>bool SetData(const sData &amp;data)
+{
+    if (CF_MYSTRUCTDATA != 0)
+    {
+        try
+        {
+            Clipboard clipbrd;
+            clipbrd.Empty();
+            clipbrd.SetData(CF_MYSTRUCTDATA, data);
+            return true;
+        }
+        catch (const std::runtime_error&amp;)    
+        {
+        }
+    }
+    return false;
+}
+
+bool GetData(sData &amp;data) const
+{
+    if (CF_MYSTRUCTDATA != 0)
+    {
+        try
+        {
+            Clipboard clipbrd;
+            clipbrd.GetData(CF_MYSTRUCTDATA, data);
+            return true;
+        }
+        catch (const std::runtime_error&amp;)
+        {
+        }
+    }
+    return false;
+}
+</code></pre>

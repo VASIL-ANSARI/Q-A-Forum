@@ -1,0 +1,58 @@
+<p>If anyone needs something similar, this was my implementation:</p>
+
+<pre><code># config/initializers/sql_returner.rb
+module ActiveRecord
+  class Base
+
+    def sql_insert
+      if attributes_with_quotes.empty?
+        connection.empty_insert_statement(self.class.table_name)
+      else
+        "INSERT INTO #{self.class.quoted_table_name} " +
+        "(#{quoted_column_names.join(', ')}) " +
+        "VALUES(#{attributes_with_quotes.values.join(', ')});"
+      end
+    end
+
+    def self.sql_create
+      "CREATE TABLE #{table_name} (" +
+      " #{ self.columns.collect{ |column|
+        column_sql = " #{ column.name }  #{ sql_type column } "
+        column_sql &lt;&lt; " PRIMARY KEY " if column.primary
+        column_sql &lt;&lt; " NOT NULL " unless column.null
+        column_sql
+      }.join(', ') } );"
+    end
+
+    private
+
+    def self.sql_type column
+      case column.type
+      when 'datetime', 'string'
+        'TEXT'
+      else
+        column.type.to_s
+      end
+    end
+
+  end
+end
+</code></pre>
+
+<p>Then, if I need to create tables and insert records, taking the same code of the question as example, I must to run:</p>
+
+<pre><code>def download_link
+  temp_file = Tempfile.new 'temp_file'
+  temp_sqlite_db = SQLite3::Database.new temp_file.path
+
+  temp_sqlite_db.execute(Inspection.sql_create)
+  inspections = Inspection.a_heavy_query_that_doesnt_worths_to_wait_so_much_for_a_reply
+  insert = ""
+  inspections.each{ |insp|
+    insert &lt;&lt; insp.return_insert_sql
+  }
+  #.....
+end
+</code></pre>
+
+<p>For the first method <code>sql_insert</code> I took as example the <a href="https://github.com/rails/rails/blob/2-3-stable/activerecord/lib/active_record/base.rb#L2946" rel="nofollow">create method</a> code of ActiveRecord. I know that maybe some kittens died coding this implementation, but at least for me it works.</p>

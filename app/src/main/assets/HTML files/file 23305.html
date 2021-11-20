@@ -1,0 +1,82 @@
+<blockquote>
+  <p>Does anyone have an alternative solution to this problem?</p>
+</blockquote>
+
+<p>Hash code of the object must not be changed during the object life-time. You shouldn't use mutable data for hash code calculation.</p>
+
+<p><strong>Update</strong>.</p>
+
+<p>I didn't expect, that my answer will cause such discussion. Here's some detail explanation, may be it will help OP.</p>
+
+<p>Let's look at some mutable entity type defined in your code, which overrides <code>GetHashCode</code> and, of course, <code>Equals</code>. The equality is based on <code>Id</code> equality:</p>
+
+<pre><code>class Mutable : IEquatable&lt;Mutable&gt;
+{
+    public int Id { get; set; }
+
+    public override int GetHashCode()
+    {
+        return Id.GetHashCode();
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (obj == null)
+        {
+            return false;
+        }
+
+        var mutable = obj as Mutable;
+        if (mutable == null)
+        {
+            return false;
+        }
+
+        return this.Equals(mutable);
+    }
+
+    public bool Equals(Mutable other)
+    {
+        return Id.Equals(other.Id);
+    }
+}
+</code></pre>
+
+<p>Somewhere in your code you've created several instances of this type:</p>
+
+<pre><code>        // here's some mutable entities with hash-code, calculated using mutable data:
+        var key1 = new Mutable { Id = 1 };
+        var key2 = new Mutable { Id = 2 };
+        var key3 = new Mutable { Id = 3 };
+</code></pre>
+
+<p>And this is some external code, which uses <code>Dictionary&lt;Mutable, string&gt;</code> for its internal purposes:</p>
+
+<pre><code>        // let's use them as a key for the dictionary:
+        var dictionary = new Dictionary&lt;Mutable, string&gt;
+        {
+            { key1, "John" },
+            { key2, "Mary" },
+            { key3, "Peter" }
+        };
+
+        // everything is ok, all of the keys being located properly:
+        Console.WriteLine(dictionary[key1]);
+        Console.WriteLine(dictionary[key2]);
+        Console.WriteLine(dictionary[key3]);
+</code></pre>
+
+<p>Again, your code. Suppose, you've changed <code>Id</code> of <code>key1</code>. The hash-code was changed too:</p>
+
+<pre><code>        // let's change the hashcode of key1:
+        key1.Id = 4;
+</code></pre>
+
+<p>And again, external code. Here it tries to locate some data by <code>key1</code>:</p>
+
+<pre><code>Console.WriteLine(dictionary[key1]); // ooops! key1 was not found in dictionary
+</code></pre>
+
+<p>Of course, you <em>can</em> design mutable types, which overrides <code>GetHashCode</code> and <code>Equals</code>, and calculate hash-code on mutable data. But you shouldn't do that, really (except the cases, when you definitely know, what are you doing). </p>
+
+<p>You <em>can't</em> guarantee, that any external code won't use <code>Dictionary&lt;TKey, TValue&gt;</code> or <code>HashSet&lt;T&gt;</code> internally.</p>

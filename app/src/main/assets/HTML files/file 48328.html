@@ -1,0 +1,62 @@
+<p>So, looking at the disassembly of the <code>pthread_rwlock_rdlock</code> and <code>pthread_rwlock_wrlock</code>, it's reasonably light-weight in the "fast case" (that is, there is no contention, we're able to take the lock with no difficulty) - about 20 instructions - one of which is a <code>cmpxchg</code> (so will ask any other processor to "release this cache-line"), but the rest are pretty simple/lightweight instructions. </p>
+
+<p>Of course, if you have to wait, then you're in for a bit of a ride, but that's what you'd expect.</p>
+
+<p>[And no, don't ask me EXACTLY how it works]</p>
+
+<p>Below is the code for <code>rdlock</code>, but <code>wrlock</code> is pretty similar in complexity.</p>
+
+<p>Code here:</p>
+
+<pre><code>  406760:   48 89 fa                mov    %rdi,%rdx
+  406763:   90                      nop
+  406764:   0f b6 47 20             movzbl 0x20(%rdi),%eax
+  406768:   84 c0                   test   %al,%al
+  40676a:   0f 8e 90 00 00 00       jle    406800 &lt;__pthread_rwlock_rdlock+0xa0&gt;   // May need to do stuff here
+
+  406770:   83 e8 01                sub    $0x1,%eax
+  406773:   88 47 20                mov    %al,0x20(%rdi)
+  406776:   bf 01 00 00 00          mov    $0x1,%edi
+  40677b:   31 c0                   xor    %eax,%eax
+  40677d:   8b 72 1c                mov    0x1c(%rdx),%esi
+  406780:   f0 0f b1 3a             lock cmpxchg %edi,(%rdx)
+  406784:   74 16                   je     40679c &lt;__pthread_rwlock_rdlock+0x3c&gt;
+&lt;---- Lock maybe taken!
+Else wait... 
+  406786:   48 8d 3a                lea    (%rdx),%rdi
+  406789:   48 81 ec 80 00 00 00    sub    $0x80,%rsp
+  406790:   e8 bb 34 00 00          callq  409c50 &lt;__lll_lock_wait&gt;
+  406795:   48 81 c4 80 00 00 00    add    $0x80,%rsp
+
+---&gt; Maybe taken?
+  40679c:   8b 72 18                mov    0x18(%rdx),%esi
+  40679f:   85 f6                   test   %esi,%esi
+  4067a1:   75 4c                   jne    4067ef &lt;__pthread_rwlock_rdlock+0x8f&gt;
+&lt;---- Take slow path.
+ Else may still have taken the lock.
+  4067a3:   8b 4a 14                mov    0x14(%rdx),%ecx
+  4067a6:   85 c9                   test   %ecx,%ecx
+  4067a8:   75 3e                   jne    4067e8 &lt;__pthread_rwlock_rdlock+0x88&gt;
+&lt;--- Nope, slow path
+  4067aa:   8b 4a 04                mov    0x4(%rdx),%ecx
+  4067ad:   8d 41 01                lea    0x1(%rcx),%eax
+  4067b0:   85 c0                   test   %eax,%eax
+  4067b2:   89 42 04                mov    %eax,0x4(%rdx)
+  4067b5:   0f 84 d5 00 00 00       je     406890 &lt;__pthread_rwlock_rdlock+0x130&gt;
+ &lt;--- Slow path, lock not taken.
+  Else: Success, we have the lock, update number of times it's locked.
+  4067bb:   90                      nop
+  4067bc:   45 31 c0                xor    %r8d,%r8d
+  4067bf:   8b 72 1c                mov    0x1c(%rdx),%esi
+  4067c2:   f0 ff 0a                lock decl (%rdx)
+  4067c5:   74 16                   je     4067dd &lt;__pthread_rwlock_rdlock+0x7d&gt;
+ &lt;---- Lock been taken, return!
+ELSE if necessary, call the wake function too. 
+  4067c7:   48 8d 3a                lea    (%rdx),%rdi
+  4067ca:   48 81 ec 80 00 00 00    sub    $0x80,%rsp
+  4067d1:   e8 1a 35 00 00          callq  409cf0 &lt;__lll_unlock_wake&gt;
+  4067d6:   48 81 c4 80 00 00 00    add    $0x80,%rsp
+--&gt; We have the lock... 
+  4067dd:   44 89 c0                mov    %r8d,%eax
+  4067e0:   c3                      retq  
+</code></pre>

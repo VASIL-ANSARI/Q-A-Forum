@@ -1,0 +1,19 @@
+<p>First, I'd add a couple of echo commands, either side of the fsockopen call:</p>
+
+<pre><code>echo date("Y-m-d H:i:s")."Before open\n";
+$socket = fsockopen($host, $port, $errno, $errstr, 10);
+echo date("Y-m-d H:i:s")."After open (socket=".($socket===false?"Bad":"OK")."\n";
+</code></pre>
+
+<p>This is to confirm the 10 second timeout is working. If you never see the second message then the timeout is not working, and the problem is more obscure.</p>
+
+<p>Anyway, if you are getting a valid $socket, but the lock-up happens later, then try:</p>
+
+<pre><code>if ($socket !== false) {
+    stream_set_timeout($socket,2);  //2 second timeout
+    stream_set_blocking($socket,false);  //no blocking
+    fwrite($socket, "\xFE");
+    ...
+</code></pre>
+
+<p>P.S. If adding those two commands solves the problem, then experiment to see if just one of them solves it. That would give a big clue what the real problem is.</p>

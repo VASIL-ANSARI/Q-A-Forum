@@ -1,0 +1,40 @@
+<p>The problem isn't that it's not picklable in this case - if you're using a Unix-like platform, the queue can be passed to the child without pickling. (On Windows, I think you would get a pickling error here, though). The root problem is that you're not using a process-safe queue. The only queues that can be used between processes are <a href="https://docs.python.org/2/library/multiprocessing.html#pipes-and-queues">the <code>Queue</code> objects</a> that live inside the <code>multiprocessing</code> module. Unfortunately, there is no <code>PriorityQueue</code> implementation available. However, you can easily create one by registering a <code>PriorityQueue</code> with a <a href="https://docs.python.org/2/library/multiprocessing.html#managers"><code>multiprocessing.Manager</code></a> class, like this:</p>
+
+<pre><code>import time
+from multiprocessing import Process
+from multiprocessing.managers import SyncManager
+from Queue import PriorityQueue
+
+
+class MyManager(SyncManager):
+    pass
+MyManager.register("PriorityQueue", PriorityQueue)  # Register a shared PriorityQueue
+
+def Manager():
+    m = MyManager()
+    m.start()
+    return m
+
+def worker(queue):
+    print(queue)
+    for i in range(100):
+        queue.put(i)
+    print "worker", queue.qsize()
+
+
+m = Manager()
+pr_queue = m.PriorityQueue()  # This is process-safe
+worker_process = Process(target = worker, args = (pr_queue,))
+worker_process.start()
+
+time.sleep(5)    # nope, race condition, you shall not pass (probably)
+print "main", pr_queue.qsize()
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>worker 100
+main 100
+</code></pre>
+
+<p>Note that this probably won't perform quite as well as it would if it was standard <code>multiprocessing.Queue</code> subclass. The <code>Manager</code>-based <code>PriorityQueue</code> is implemented by creating a <code>Manager</code> server process which actually contains a regular <code>PriorityQueue</code>, and then providing your main and worker processes with <a href="https://docs.python.org/2/library/multiprocessing.html#proxy-objects"><code>Proxy</code></a> objects that use IPC to read/write to the queue in the server process. Regular <code>multiprocessing.Queue</code>s just write/read data to/from a <code>Pipe</code>. If that's a concern, you could try implementing your own <code>multiprocessing.PriorityQueue</code> by subclassing or delegating from <code>multiprocessing.Queue</code>. It may not be worth the effort, though.</p>

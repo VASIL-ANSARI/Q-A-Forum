@@ -1,0 +1,82 @@
+<p>Rather than sending and receiving a whole lot of unused data across the wire and opening yourself to over posting attack, create a view model that represents what you want to display and edit. See <a href="http://stackoverflow.com/questions/11064316/what-is-viewmodel-in-mvc">What is a view model in MVC?</a></p>
+
+<p>View model</p>
+
+<pre><code>public class EatenMealVM
+{
+  public int MealID { get; set; }
+  [Display(Name="Nazwa posiÅku")]
+  public string MealName { get; set; }
+  [Display(Name = "Typ posiÅku")]
+  [Required(ErrorMessage = "Please select a meal")]
+  public int? MealTypeID { get; set; }
+  [Display(Name = "Porcja (g)")]
+  public double Serving { get; set; } // is this really double?
+  [Display(Name = "Data spoÅ¼ycia")]
+  [DataType(DataType.Date)]
+  public DateTime Date { get; set; }
+  public SelectList MealTypeList { get; set; }
+}
+</code></pre>
+
+<p>Controller</p>
+
+<pre><code>public ActionResult AddEatenMeal(int id)
+{
+  var meal = mealRepository.GetMeal(id);
+  var mealTypes = // get the list of meal types from the database
+  EatenMealVM model = new EatenMealVM()
+  {
+    MealID = meal.Id,
+    MealName = meal.Name,
+    MealTypeList = new SelectList(mealTypes, "ID", "Name")
+  };
+  return View(model);
+}
+</code></pre>
+
+<p>View</p>
+
+<pre><code>@model EatenMealVM
+....
+@using (Html.BeginForm())
+{
+  @Html.HiddenFor(m =&gt; m.MealID)
+
+  @Html.DisplayNameFor(m =&gt; m.MealName)
+  @Html.DisplayFor(m =&gt; m.MealName)
+
+  @Html.LabelFor(m =&gt; m.MealTypeID)
+  @Html.DropDownListFor(m =&gt; m.MealTypeID, Model.MealTypeList, "--Please select--")
+  @Html.ValidationMessageFor(m =&gt; m.MealTypeID)
+
+  @Html.LabelFor(m =&gt; m.Serving)
+  @Html.TextBoxFor(m =&gt; m.Serving, new { @class = "form-control")
+  @Html.ValidationMessageFor(m =&gt; m.Serving)
+
+  @Html.LabelFor(m =&gt; m.Date)
+  @Html.TextBoxFor(m =&gt; m.Date)
+  @Html.ValidationMessageFor(m =&gt; m.Date, new { @class = "form-control" })
+
+  &lt;input type="submit" class="btn btn-info" value="Dodaj" /&gt;
+}
+</code></pre>
+
+<p>Post method</p>
+
+<pre><code>[HttpPost]
+public ActionResult AddEatenMeal(EatenMealVM model)
+{
+  if (!ModelState.IsValid)
+  {
+    var mealTypes = // get the list of meal types from the database
+    model.MealTypeList = new SelectList(mealTypes, "ID", "Name");
+    return View(model);
+  }
+  // Initialize new EatenMeal class
+  // Map properties from view model (including setting user name) 
+  // Save and redirect
+}
+</code></pre>
+
+<p>Note also the use of <code>[Display]</code> attribute and <code>@Html.LabelFor()</code>. Currently you not creating 'real' labels (they are not associated with the corresponding control)</p>

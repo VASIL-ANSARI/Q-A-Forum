@@ -1,0 +1,19 @@
+<p>Given 3 years have passed, I assume you were using Google In-App Billing v2.</p>
+
+<p>Nevertheless, problems remain in v3 (at least for the sandbox/test accounts) and syncing. You can really only depend on Google In-App Billing v3 API (GIABAPIv3) to provide you with a new <code>purchaseToken</code> and <code>developerPayload</code> upon successful completion of the payment popup flow. <code>purchaseData</code> returned by <code>getPurchases</code> may not be in sync with reality*, as I have often observed. Furthermore, the behaviour of the GIABAPIv3 popup flow may not be in sync with reality*.</p>
+
+<p>It is possible for GIABAPIv3's <code>purchaseData</code> to reflect the wrong <code>isAutoRenewing</code> state and for GIABAPIv3 popup flow too! For example, a subscription may be cancelled (and expired) in reality* but both GIABAPIv3 and it's popup indicate that the User remains subscribed. In such cases, it seems cancelling again (via Google Play app) helps encourage GIABAPIv3 to get in sync.</p>
+
+<blockquote>
+  <p>"The getPurchases() method does not return failed or expired
+  subscriptions."</p>
+</blockquote>
+
+<p>Contrary to that, <code>getPurchases</code> will return data for 'cancelled' purchases. Strangely, the GDAPI <code>expiryTime</code> will be changed from what had been the normal subscription end to the time at which the purchase was cancelled. So in order to achieve the desirable behaviour whereby your app continues to treat the User as subscribed until the subscription end, your server will need to remember the original expiryTime. If <code>expiryTime</code> &lt; subscription end then it indicates that the purchase got cancelled (and you should expect GDAPI's <code>AutoRenewing</code> to also have changed to false).
+<a href="https://developer.android.com/google/play/billing/billing_integrate.html" rel="nofollow">https://developer.android.com/google/play/billing/billing_integrate.html</a>
+"The call returns a Bundle with all the active subscriptions owned by the user. Once a subscription expires without renewal, it will no longer appear in the returned Bundle."
+This leads me to conclude that Google have used the word 'expires' above and the field name <code>expiryTime</code> poorly, they are not entirely related (<code>expiryTime</code> will represent the time of cancellation if that happens, and the true expiry (subscription end) won't be available via GDAPI - one must remember it or infer it via the absence of that purchase in GIABAPIv3^).</p>
+
+<p>*reality here is in accordance with what the human User has done and what the Google Developer API (GDAPI) says.</p>
+
+<p>^I can't say I've seen that happen, which might be a symptom of sandbox/test's daily reset. I've seen a cancelled and expired subscription in reality* continue to show up in GIABAPIv3 for days after (only re-cancelling in Google Play app yielded a sync back to reality*).</p>

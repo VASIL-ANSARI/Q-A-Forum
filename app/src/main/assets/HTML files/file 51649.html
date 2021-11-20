@@ -1,0 +1,31 @@
+<p>I faced this problem once and, in my case, i found it happen because Rails Admin try to show the relationship. This get err along the way.</p>
+
+<p>I solve this problem by overriding the rails_admin show delete view
+just create
+<code>views/rais_admin/main/_delete_notice.html.haml</code>
+and put</p>
+
+<pre><code>- object = delete_notice
+
+%li{style: 'display:block; margin-top:10px'}
+  %span.label.label-default= @abstract_model.pretty_name
+  - wording = object.send(@model_config.object_label_method)
+  - if show_action = action(:show, @abstract_model, object)
+    = link_to(wording, url_for(action: show_action.action_name, model_name: @abstract_model.to_param, id: object.id), class: 'pjax')
+  - else
+    = wording
+  %ul
+    - @abstract_model.each_associated_children(object) do |association, child|
+      -#- unless child.kind_of?(String) || child.kind_of?(ActsAsTaggableOn::Tagging)
+      - if child.kind_of?(ActiveRecord::Base)
+        %li
+          - child_config = RailsAdmin.config(child)
+          = @abstract_model.model.human_attribute_name association.name
+          - wording = child.send(child_config.object_label_method)
+          - if child.id &amp;&amp; (show_action = action(:show, child_config.abstract_model, child))
+            = link_to(wording, url_for(action: show_action.action_name, model_name: child_config.abstract_model.to_param, id: child.id), class: 'pjax')
+          - else
+            = wording
+</code></pre>
+
+<p>the line <code>- if child.kind_of?(ActiveRecord::Base)</code> prevent the further checking on model attributes, which causing <code>undefined method model for nil:NilClass</code> in your error log</p>

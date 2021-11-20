@@ -1,0 +1,73 @@
+<p>There are 2 cases for creating too many requests:</p>
+
+<ol>
+<li><p>Your system really need so many requests to be processed. If that's the case there is no way but to try to get better hardware and tune the performance of your individual tasks.</p></li>
+<li><p>Your tasks can actually be conflated and merged (which I smell is the case for you). If this is the case, you can try a worker I got below where it guarantees only 1 execution is triggered as per many requests to put the task into the <code>ExecutorService</code>. The IDispatcher is essentially an <code>ExecutorService</code> of mine.</p></li>
+</ol>
+
+<p><div class="snippet" data-lang="js" data-hide="false">
+<div class="snippet-code">
+<pre class="snippet-code-css lang-css prettyprint-override"><code>/**
+ * This class ensures the given task is only dispatched once in the dispatcher.
+ * 
+ * @author Alex Suo
+ *
+ */
+public class DispatchOnceWorker implements IDispatchWorker {
+
+    /** Logger of the class. */
+    private static final Logger LOG = LoggerFactory.getLogger(DispatchOnceWorker.class);
+
+    /** The key of task. */
+    private final String key;
+
+    /** The actual task to be dispatched. */
+    private final Runnable taskWrapper;
+
+    /** The dispatcher working on. */
+    private final IDispatcher dispatcher;
+
+    /** The counter for task scheduling count. */
+    private final AtomicInteger counter = new AtomicInteger();
+
+    /**
+     * Constructor.
+     * 
+     * @param key The dispatcher key for the task.
+     * @param task The actual task to be executed/dispatched.
+     * @param dispatcher The dispatcher working on.
+     */
+    public DispatchOnceWorker(final String key, final Runnable task, final IDispatcher dispatcher) {
+        this.key = key;
+        this.dispatcher = dispatcher;
+
+        this.taskWrapper = new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    counter.set(1);
+                    task.run();
+                } catch (Exception e) {
+                    LOG.error("Error executing on dispatch key " + key, e);
+                } finally {
+                    if (counter.decrementAndGet() &gt; 0) {
+                        dispatcher.dispatch(key, this);
+                    }
+                }
+            }
+
+        };
+    }
+
+    @Override
+    public void dispatch() {
+        if (counter.getAndIncrement() == 0) {
+            dispatcher.dispatch(key, taskWrapper);
+        }
+    }
+
+}</code></pre>
+</div>
+</div>
+</p>

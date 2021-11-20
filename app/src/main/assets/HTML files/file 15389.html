@@ -1,0 +1,281 @@
+<p>As you've no doubt discovered, it is easy enough to map inheritance like this: Person -> User, or Person -> Manager, or Person -> Manager -> User (or alternately, Person -> Manager -> User).</p>
+
+<p>NHibernate does not allow you to promote/demote to or from a subclass. You'd have to run native SQL to promote or demote. </p>
+
+<p>However, if you followed my initial "map" of your inheritance, you should have had an epiphany that using subclasses for what you are trying to do is an inappropriate solution for what you are trying to model. And that's only with two subclasses! What happens when you add more roles?</p>
+
+<p>What you have is a Person, who can be a member of any number of roles, where roles are extensible. Consider this solution (Source on github: <a href="https://github.com/HackedByChinese/NHibernateComposition" rel="nofollow">https://github.com/HackedByChinese/NHibernateComposition</a>):</p>
+
+<p>(Assume we have an Entity abstract class which handles equality, where to objects of the same type with the same ID are considered equal)</p>
+
+<p><strong>Project: Models</strong></p>
+
+<pre><code>public class Person : Entity, IPerson
+{
+    public virtual string FirstName { get; set; }
+
+    public virtual string LastName { get; set; }
+
+    public virtual IList&lt;Role&gt; Roles { get; protected set; }
+
+    public Person()
+    {
+        Roles = new List&lt;Role&gt;();
+    }
+
+    public virtual void AddRole(Role role)
+    {
+        if (Roles.Contains(role)) return;
+
+        role.Person = this;
+
+        Roles.Add(role);
+    }
+
+    public virtual void RemoveRole(Role role)
+    {
+        if (!Roles.Contains(role)) return;
+
+        role.Person = null;
+
+        Roles.Remove(role);
+    }
+}
+
+public interface IPerson
+{
+    string FirstName { get; set; }
+
+    string LastName { get; set; }
+
+    Int32 Id { get; }
+}
+
+public abstract class Role : Entity
+{
+    public virtual Person Person { get; set; }
+
+    public virtual string RoleName { get; protected set; }
+}
+
+public class User : Role
+{
+    public virtual string LoginName { get; set; }
+
+    public virtual string Password { get; set; }
+}
+</code></pre>
+
+<p><strong>Project: Models.B</strong></p>
+
+<pre><code>public class Manager : Role
+{
+    public virtual string Division { get; set; }
+
+    public virtual string Status { get; set; }
+}
+</code></pre>
+
+<p><strong>Project: Models.Impl</strong></p>
+
+<p><em>I placed fluent mappings for both projects into one to save time. There could easily be separate mapping assemblies for Models and Models.B</em></p>
+
+<pre><code>public class PersonMap : ClassMap&lt;Person&gt;
+{
+    public PersonMap()
+    {
+        Id(c =&gt; c.Id)
+            .GeneratedBy.HiLo("100");
+
+        Map(c =&gt; c.FirstName);
+        Map(c =&gt; c.LastName);
+
+        HasMany(c =&gt; c.Roles)
+            .Inverse()
+            .Cascade.AllDeleteOrphan();
+    }
+}
+
+public class RoleMap : ClassMap&lt;Role&gt;
+{
+    public RoleMap()
+    {
+        Id(c =&gt; c.Id)
+            .GeneratedBy.HiLo("100");
+
+        DiscriminateSubClassesOnColumn&lt;string&gt;("RoleName");
+
+        References(c =&gt; c.Person);
+    }
+}
+
+public class UserMap : SubclassMap&lt;User&gt;
+{
+    public UserMap()
+    {
+        DiscriminatorValue("User");
+
+        Join("User", joined =&gt;
+                         {
+                             joined.Map(c =&gt; c.LoginName);
+                             joined.Map(c =&gt; c.Password);
+                         });
+    }
+}
+</code></pre>
+
+<p><strong>Project: Models.Impl.Tests</strong></p>
+
+<pre><code>[TestFixture]
+public class MappingTests
+{
+    private ISessionFactory _factory;
+
+    #region Setup/Teardown for fixture
+
+    [TestFixtureSetUp]
+    public void SetUpFixture()
+    {
+        if (File.Exists("test.db")) File.Delete("test.db");
+
+        _factory = Fluently.Configure()
+            .Database(() =&gt; SQLiteConfiguration.Standard
+                                .UsingFile("test.db")
+                                .ShowSql()
+                                .FormatSql())
+            .Mappings(mappings =&gt; mappings.FluentMappings
+                                      .AddFromAssemblyOf&lt;PersonMap&gt;())
+            .ExposeConfiguration(config =&gt;
+                                     {
+                                         var exporter = new SchemaExport(config);
+                                         exporter.Execute(true, true, false);
+                                     })
+            .BuildSessionFactory();
+    }
+
+    [TestFixtureTearDown]
+    public void TearDownFixture()
+    {
+        _factory.Close();
+    }
+
+    #endregion
+
+    #region Setup/Teardown for each test
+
+    [SetUp]
+    public void SetUpTest()
+    {
+    }
+
+    [TearDown]
+    public void TearDownTest()
+    {
+    }
+
+    #endregion
+
+    [Test]
+    public void Should_create_and_retrieve_Person()
+    {
+        var expected = new Person
+        {
+            FirstName = "Mike",
+            LastName = "G"
+        };
+
+        using (var session = _factory.OpenSession())
+        using (var tx = session.BeginTransaction())
+        {
+            session.SaveOrUpdate(expected);
+
+            tx.Commit();
+        }
+
+        expected.Id.Should().BeGreaterThan(0);
+
+        using (var session = _factory.OpenSession())
+        using (var tx = session.BeginTransaction())
+        {
+            var actual = session.Get&lt;Person&gt;(expected.Id);
+
+            actual.Should().NotBeNull();
+            actual.ShouldHave().AllProperties().EqualTo(expected);
+        }
+
+    }
+
+    [Test]
+    public void Should_create_and_retrieve_Roles()
+    {
+        // Arrange
+        var expected = new Person
+                         {
+                             FirstName = "Mike",
+                             LastName = "G"
+                         };
+
+        var expectedManager = new Manager
+                           {
+                               Division = "One",
+                               Status = "Active"
+                           };
+        var expectedUser = new User
+                               {
+                                   LoginName = "mikeg",
+                                   Password = "test123"
+                               };
+
+        Person actual;
+
+        // Act
+        expected.AddRole(expectedManager);
+        expected.AddRole(expectedUser);
+
+        using (var session = _factory.OpenSession())
+        using (var tx = session.BeginTransaction())
+        {
+            session.SaveOrUpdate(expected);
+
+            tx.Commit();
+        }
+
+        using (var session = _factory.OpenSession())
+        using (var tx = session.BeginTransaction())
+        {
+            actual = session.Get&lt;Person&gt;(expected.Id);
+
+            // ignore this; just forcing the Roles collection to be lazy loaded before I kill the session.
+            actual.Roles.Count();
+        }
+
+        // Assert
+        actual.Roles.OfType&lt;Manager&gt;().First().Should().Be(expectedManager);
+        actual.Roles.OfType&lt;Manager&gt;().First().ShouldHave().AllProperties().But(c =&gt; c.Person).EqualTo(expectedManager);
+
+        actual.Roles.OfType&lt;User&gt;().First().Should().Be(expectedUser);
+        actual.Roles.OfType&lt;User&gt;().First().ShouldHave().AllProperties().But(c =&gt; c.Person).EqualTo(expectedUser);
+    }
+}
+</code></pre>
+
+<p>If you want to constrain a Person to one instance of a particular role, just put a unique index and mess with the Equals method to check if <code>Id</code> is the same OR <code>RoleName</code> is the same.</p>
+
+<p>You can easily get or check a user's role of any type:</p>
+
+<pre><code>if (person.Roles.OfType&lt;User&gt;().Any())
+{
+   var user = person.Roles.OfType&lt;User&gt;().FirstOrDefault();
+} 
+</code></pre>
+
+<p>You can also query roles directly to look up their Person:</p>
+
+<pre><code>var peopleWhoAreManagersInDistrictOne = (from role in session.Query&lt;Manager&gt;()
+                                         where role.District == "One"
+                                         select role.Person);
+</code></pre>
+
+<p>You can also see that other assemblies can define additional roles. Manager is in a different assembly than Models.</p>
+
+<p>So, you can see this will do everything you want plus more, despite the fact that it uses a different approach.</p>

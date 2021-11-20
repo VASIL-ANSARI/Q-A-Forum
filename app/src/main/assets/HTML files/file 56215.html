@@ -1,0 +1,54 @@
+<p>It might sound like too broad of an answer, but I would suggest to switch to a <em>template engine</em>, like <a href="http://www.makotemplates.org/" rel="nofollow"><code>mako</code></a> or <a href="http://jinja.pocoo.org/docs/dev/" rel="nofollow"><code>jinja2</code></a>, instead of trying to manually construct HTML using the string concatenation. You would solve this kind of problem just by using the variable placeholders and built-in or custom filters.</p>
+
+<p>As a bonus, you would get a nice separation of logic (your Python code) and presentation - the generated HTML. A much cleaner and more testable code.</p>
+
+<hr>
+
+<p>Here is a working sample using <code>jinja2</code> (created a <a href="http://jinja.pocoo.org/docs/dev/api/#custom-filters" rel="nofollow">custom <code>rstrip</code> filter</a>):</p>
+
+<pre><code>from jinja2 import Environment, FileSystemLoader
+
+jiradb = [
+    {'total': 0, 'Resolution': None, 'key': u'CNSSDEBUG-151394', 'summary': u'[Lenovo][NFA344A][Win10] - [QCA6174_9377.WIN.1.0-10366-QCARMTFX86WZ-2] - Undetermined crash root cause'},
+    {'total': 1, 'Resolution': 'fixed', 'key': u'CNSSDEBUG-151395', 'summary': u'Some other summary'},
+]
+
+env = Environment(loader=FileSystemLoader('.'))
+env.filters['rstrip'] = lambda value, s: value.rstrip(s) if value else ''
+
+template = env.get_template('index.html')
+print(template.render(jiradb=jiradb))
+</code></pre>
+
+<p><code>index.html</code> contents:</p>
+
+<pre><code>&lt;table&gt;
+    {% for item in jiradb %}
+        &lt;tr&gt;
+            &lt;td&gt;{{ loop.index }}&lt;/td&gt;
+            &lt;td&gt;{{ item.key|rstrip("\n!") }}&lt;/td&gt;
+            &lt;td&gt;{{ item.summary|rstrip("\n!") }}&lt;/td&gt;
+            &lt;td&gt;{{ item.Resolution|rstrip("\n!") }}&lt;/td&gt;
+        &lt;/tr&gt;
+    {% endfor %}
+&lt;/table&gt;
+</code></pre>
+
+<p>Prints:</p>
+
+<pre><code>&lt;table&gt;
+    &lt;tr&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;CNSSDEBUG-151394&lt;/td&gt;
+        &lt;td&gt;[Lenovo][NFA344A][Win10] - [QCA6174_9377.WIN.1.0-10366-QCARMTFX86WZ-2] - Undetermined crash root cause&lt;/td&gt;
+        &lt;td&gt;&lt;/td&gt;
+    &lt;/tr&gt;
+
+    &lt;tr&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;CNSSDEBUG-151395&lt;/td&gt;
+        &lt;td&gt;Some other summary&lt;/td&gt;
+        &lt;td&gt;fixed&lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+</code></pre>

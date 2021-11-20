@@ -1,0 +1,85 @@
+<p>You can. Say the route your web app is trying to load is /posts/123, and you need to load Post #123 and its Comments, which reside in two different tables. In your client-side app you can do something like</p>
+
+<pre><code>store.find('post', 123)
+</code></pre>
+
+<p>or even</p>
+
+<pre><code>store.find('post', 123, { params: { with: 'comment' } })
+</code></pre>
+
+<p>which will make a GET request to something like <code>/post/123</code> and <code>/post/123?with=comment</code> respectively.</p>
+
+<p>Your backend can respond with the Post record with its Comments embedded, and as long as you've told JSData about the relationship between posts and comments they each will be cached into the right part of the in-memory store. For example:</p>
+
+<pre><code>store.defineMapper('post', {
+  relations: {
+    hasMany: {
+      comment: {
+        localField: 'comments',
+        foreignKey: 'post_id'
+      }
+    }
+  }
+});
+store.defineMapper('comment', {
+  relations: {
+    belongsTo: {
+      post: {
+        localField: 'post',
+        foreignKey: 'post_id'
+      }
+    }
+  }
+});
+</code></pre>
+
+<p>You do:</p>
+
+<pre><code>store.find('post', 123)
+</code></pre>
+
+<p>Your backend responds with:</p>
+
+<pre><code>{
+  "id": 123,
+  // ...
+}
+</code></pre>
+
+<p>You do:</p>
+
+<pre><code>store.find('post', 123, { params: { with: 'comment' } })
+</code></pre>
+
+<p>Your backend responds with:</p>
+
+<pre><code>{
+  "id": 123,
+  // ...,
+  comments: [
+    {
+      "id": 14323,
+      "post_id": 123,
+      // ...
+    },
+    // ...
+  ]
+}
+</code></pre>
+
+<p>If you're using Node.js + JSData on the backend, than check out <a href="https://github.com/js-data/js-data-express" rel="nofollow">https://github.com/js-data/js-data-express</a> which can parse the querystring correctlly and generate all of the Express routes for all of your Mappers. Using js-data-express your backend will be able to respond to the requests exactly as I indicated in my examples above.</p>
+
+<p>Once you've loaded data into the in-memory store, your View component can pull the data it needs to display out of the in-memory store:</p>
+
+<p>Get Post #123 out of the in-memory store:</p>
+
+<pre><code>store.get('post', 123)
+</code></pre>
+
+<p>Get the Comments for Post #123 out of the in-memory store:</p>
+
+<pre><code>store.getAll('comment', 123, { index: 'post_id' })
+</code></pre>
+
+<p>If you're using the <code>DataStore</code> component, then the Post's Comments should also be available on the Post record itself, e.g. <code>post.comments</code>.</p>

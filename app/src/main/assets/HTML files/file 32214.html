@@ -1,0 +1,101 @@
+<p>During testing, I found that we had a <code>$scope.watch</code> on the model for this form input. As it turns out, the watch function would run thrice - the first time, with the correct object value; the second time, with the string "Object object" as a representation of the object; and the third time, with a null value. I hotfixed this by checking the <code>newValue</code> data type - if it's a string, reset the model to the old value. However, although this works, I'm still not sure why simply changing the library would have caused such a regression.</p>
+
+<p>If I have time, I intend to try to reproduce this with a simplified test case.</p>
+
+<p><strong>UPDATE 2:</strong> I found <a href="http://stackoverflow.com/q/20261424/677526">this question</a>, which explains the underlying reason this doesn't work. As such, it looks like it's possible to set a priority on the directive and have the render function called.</p>
+
+<p>Code would be like so:</p>
+
+<pre><code>angular.module('ui.select2', []).value('uiSelect2Config', {}).directive('uiSelect2', ['uiSelect2Config', '$timeout',
+    function (uiSelect2Config, $timeout) {
+        var options = {};
+        if (uiSelect2Config) {
+            angular.extend(options, uiSelect2Config);
+        }
+        return {
+            require: 'ngModel',
+            priority: 1, // This fixed it.
+            compile: function (tElm, tAttrs) {
+                ......
+</code></pre>
+
+<p>We used this in our solution and although it's not perfect (there are still some hiccups with data-binding in some cases; Select2 loves to return strings instead of objects for some reason) we've been able to make it work.</p>
+
+<p><s><strong>UPDATE:</strong> I think I found the underlying issue in AngularUI's select2.js.</p>
+
+<p>The <a href="https://raw.github.com/angular-ui/ui-select2/master/src/select2.js" rel="nofollow">source code</a> defines the following as part of the directive for select2 under <code>convertToSelect2Model</code>:</p>
+
+<pre><code>if (controller) {
+    // Watch the model for programmatic changes
+    scope.$watch(tAttrs.ngModel, function (current, old) {
+        if (!current) {
+            return;
+        }
+        if (current === old) {
+            return;
+        }
+        controller.$render();
+    }, true);
+    controller.$render = function () {
+        if (isSelect) {
+            elm.select2('val', controller.$viewValue);
+        } else {
+            if (opts.multiple) {
+                var viewValue = controller.$viewValue;
+                if (angular.isString(viewValue)) {
+                    viewValue = viewValue.split(',');
+                }
+                elm.select2(
+                    'data', convertToSelect2Model(viewValue));
+            } else {
+                if (angular.isObject(controller.$viewValue)) {
+                    elm.select2('data', controller.$viewValue);
+                } else if (!controller.$viewValue) {
+                    elm.select2('data', null);
+                } else {
+                    elm.select2('val', controller.$viewValue);
+                }
+            }
+        }
+    };
+</code></pre>
+
+<p>This is all well and good in older versions of Angular. However, with Angular 1.2.5, this doesn't work; the <code>$render</code> function is actually already defined by Angular and as such, the written function is never called. Renaming the <code>controller.$render</code> function to <code>controller.$renderui</code> fixed the underlying issue. This is my fix:</p>
+
+<pre><code>if (controller) {
+    controller.$renderui = function () {
+        if (isSelect) {
+            elm.select2('val', controller.$viewValue);
+        } else {
+            if (opts.multiple) {
+                elm.select2(
+                    'data', convertToSelect2Model(controller.$viewValue));
+            } else {
+                if (angular.isObject(controller.$viewValue)) {
+                    elm.select2('data', controller.$viewValue);
+                } else if (!controller.$viewValue) {
+                    elm.select2('data', null);
+                } else {
+                    elm.select2('val', controller.$viewValue);
+                }
+            }
+        }
+    };
+
+    // Watch the model for programmatic changes
+    scope.$watch(tAttrs.ngModel, function (current, old) {
+        if (!current) {
+            return
+        }
+        if (current == old) {
+            return
+        }
+        controller.$renderui();
+    }, true)
+</code></pre>
+
+<p>This fixed a lot of issues that I ran into with Select2 (used across my project) and binding to an ng-model (as now, Select2 will update correctly when the ng-model changes), including the original issue I had.</p>
+
+<p>TLDR: AngularUI select2 tries to define <code>controller.$render</code>, but that function is already defined internally by Angular 1.2.5 and attempting to redefine it doesn't seem to work. Renaming the function seems to solve the issue. </p>
+
+<p>I hope that this helps someone. </s></p>

@@ -1,0 +1,54 @@
+<p>Android package is not the binary executable, it can't not be executed by <code>exec</code> system call even if you add the execute permission on it.</p>
+
+<p>You can create a callback in Java, then call it from JNI to install the downloaded package. I use an example file <code>/data/local/tmp/test.apk</code>, you can replace with your downloaded file in your implementation.</p>
+
+<p><strong>JNI method</strong></p>
+
+<pre><code>void __attribute__((visibility("default"))) Java_com_example_test_MainActivity_installFromJNI(
+    JNIEnv* env, jobject obj) {
+
+__android_log_print(ANDROID_LOG_DEBUG, "test", "jni call");
+jclass clzMainActivity = env-&gt;GetObjectClass(obj);
+jclass clzFile = env-&gt;FindClass("java/io/File");
+
+if (env-&gt;ExceptionCheck()) {
+    __android_log_print(ANDROID_LOG_DEBUG, "test", "find class error");
+    env-&gt;ExceptionDescribe();
+}
+
+if (env-&gt;ExceptionCheck()) {
+    __android_log_print(ANDROID_LOG_DEBUG, "test", "get method error");
+    env-&gt;ExceptionDescribe();
+}
+
+jobject filePath = env-&gt;NewStringUTF("/data/local/tmp/test.apk");
+jobject file = env-&gt;NewObject(clzFile,
+        env-&gt;GetMethodID(clzFile, "&lt;init&gt;",
+                "(Ljava/lang/String;)V"), filePath);
+if (env-&gt;ExceptionCheck()) {
+    env-&gt;ExceptionDescribe();
+    __android_log_print(ANDROID_LOG_DEBUG, "test",
+            "create file object error");
+}
+
+jmethodID installCallback = env-&gt;GetMethodID(clzMainActivity,
+        "installCallback", "(Ljava/io/File;)V");
+
+env-&gt;CallVoidMethod(obj, installCallback, file);
+
+__android_log_print(ANDROID_LOG_DEBUG, "test", "jni call end");
+}
+</code></pre>
+
+<p><strong>Java method</strong></p>
+
+<pre><code>public void installCallback(File file) {
+    Intent intent = new Intent(Intent.ACTION_VIEW);
+    intent.setDataAndType(Uri.fromFile(file), "application/vnd.android.package-archive");
+    startActivity(intent);
+}
+
+private native void installFromJNI();
+</code></pre>
+
+<p>The function call chain is, <code>installFromJNI</code>(Java) -> <code>Java_com_example_test_MainActivity_installFromJNI</code>(Native) -> <code>InstallCallback</code>(Java).</p>

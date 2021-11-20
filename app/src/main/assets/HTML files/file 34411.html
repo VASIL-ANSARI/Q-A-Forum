@@ -1,0 +1,29 @@
+<p>Psychic intuition tells me that what you mean is how to extract a particular field when the JSON structure is not uniform for each row in the table.</p>
+
+<p>The query you posted is not valid for any of the rows in your sample, because none of them have an array in the attribute 'similarartists'. However this query is valid for row 1 at least:</p>
+
+<pre><code>SELECT json_array_elements(b-&gt;'similarartists'-&gt;'artist')-&gt;name 
+FROM testme where id=1;
+</code></pre>
+
+<p>In your other two rows - the first row contains a single similar artist and the other contains a scalar ("junk string"). So, I am guessing (psychic powers again) that want you want to do is this:</p>
+
+<ol>
+<li>If the row constains an array of artists then retrieve these separately</li>
+<li>If the row contains a single artist then retrieve this</li>
+<li>Otherwise ignore the row</li>
+</ol>
+
+<p>Using the JSON support available in 9.3, this is surprisingly hard to do. There does not seem to be an easy way to deduce the JSON type of an attribute of array element inside a JSON structure. The solution I present here seems to work, but it is far from elegant:</p>
+
+<pre><code>SELECT CASE substring((b-&gt;'similarartists'-&gt;'artist')::text,1,1)
+    WHEN '[' THEN json_array_elements(b-&gt;'similarartists'-&gt;'artist')-&gt;&gt;'name'
+    WHEN '{' THEN b-&gt;'similarartists'-&gt;'artist'-&gt;&gt;'name'
+    ELSE NULL
+  END AS artist
+FROM testme;
+</code></pre>
+
+<p><a href="http://sqlfiddle.com/#!15/1cb7c/2" rel="nofollow">SqlFiddle</a></p>
+
+<p>The query is examining a string version of the extracted artist field, to see if it starts with a '[', '{' or neither. If a '[' it is an array of artists and you can use json_array_elements on it. If it is a '{' then it is a single artist. Otherwise, it is junk and the query substitutes NULL. Of course you could use a WHERE clause to remove the junk rows altogether if desired.</p>

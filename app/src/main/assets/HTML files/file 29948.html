@@ -1,0 +1,57 @@
+<p>EDIT:</p>
+
+<p>After wading through hundreds of obfuscated Microsoft docs before locating the <a href="http://www.openoffice.org/sc/excelfileformat.pdf" rel="nofollow">OpenOffice version of the XLS format spec</a>, I managed to do something.</p>
+
+<p>However, it relies on the BIFF8 format since, as far as I can tell, BIFF5 (the format used by Excel95) has no direct UTF-16 support.</p>
+
+<pre><code>function array_to_excel($input) 
+{
+    $cells = '';
+    foreach (array_values($input) as $lineNumber =&gt; $row) 
+    {
+        foreach (array_values($row) as $colNumber =&gt; $data) 
+        {
+            if (is_numeric($data)) 
+            {
+                $cells .= pack('sssssd', 0x203, 14, $lineNumber, $colNumber, 0x0, $data);
+            } 
+            else 
+            {
+                $data = mb_convert_encoding ($data, "UTF-16LE", "UTF-8");
+                $len = mb_strlen($data, "UTF-16LE");
+                $cells .= pack('ssssssC', 0x204, 9+2*$len, $lineNumber, $colNumber, 0x0, $len, 0x1).$data;
+           }
+        }
+    }
+    return pack('s4', 0x809, 0x0004, 0x0600, // &lt;- this selects BIFF8 format
+                      0x10) . $cells . pack('ss', 0x0A, 0x00); 
+}
+
+$table = Array (
+    Array ("ÐÐ¾Ð±ÑÑÐ¹ Ð´ÐµÐ½Ñ", "Bonne journÃ©e"),
+    Array ("tschÃ¼Ã", "ããã«ã¡ã¯ã"),
+    Array (30, 40));
+
+$xls = array_to_excel($table);
+file_put_contents ("sample.xls", $xls);
+</code></pre>
+
+<p>My (French) PC version of Excel 2007 managed to open the sample file in compatibility mode, Russian and Japanese included. There is no telling how this hack would work on other variants, though.</p>
+
+<p>EDIT (bis) : from the file specs linked above:</p>
+
+<h3>Byte Strings (BIFF2-BIFF5)</h3>
+
+<p>All Excel file formats up to BIFF5 contain simple byte strings. The byte string consists of the length of the string
+followed by the character array. The length is stored <strong>either as 8bit value or as 16bit value</strong>, depending on the current record. The string is not zero-terminated.
+The encoding of the character array is <strong>dependent on the current record</strong>.</p>
+
+<h3>Record LABEL, BIFF3-BIFF5:</h3>
+
+<p>Offset Size Contents<br>
+0      2    Index to row<br>
+2      2    Index to column<br>
+4      2    Index to XF record<br>
+6      var. <strong>Byte string</strong>, 16-bit string length  </p>
+
+<p>Unless you generate a much more complex file, I'm afraid BIFF5 is a no go.</p>

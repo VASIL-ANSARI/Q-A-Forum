@@ -1,0 +1,43 @@
+<p>It really depends on whether the list maintained by <code>Entity3</code> is set to cascade operations such as <code>PERSIST</code>, <code>MERGE</code>, and <code>DELETE</code>.  </p>
+
+<p>If the list is configured to cascade, then all you'd need to do is:</p>
+
+<ul>
+<li>Set the parent of <code>Entity4</code>.</li>
+<li>Add <code>Entity4</code> to its parent's list and merge the modified parent.</li>
+</ul>
+
+<p>If cascade is not configured, then you'd need to do:</p>
+
+<ul>
+<li>Set the parent of <code>Entity4</code>.</li>
+<li>Persist the newly created instance <code>Entity4</code>.</li>
+<li>Add <code>Entity4</code> to its parent's list and merge the modified parent.</li>
+</ul>
+
+<p>Now you may ask why must the parent entity of <code>Entity4</code> have its list updated and subsequently merged in either case?  </p>
+
+<p>That is to make sure that both sides of the association are updated correctly and properly point to one another.  Its very likely given the scenario that the parent side of the association is already loaded into the persistence context, so adding the child to the database won't refresh and be visible to an already loaded entity unless its refreshed.  The easiest solution in this case is to always modify both sides correctly.</p>
+
+<pre><code>public class ParentEntity {
+
+  // add child to the parent entity, maintains association
+  public void addChild(ChildEntity child) {
+    if ( child.getParent() != null ) { 
+      child.getParent().removeChild( child );
+    }
+    child.setParent( this );
+    children.add( child );
+  }
+
+  // remove child from parent, disassociates association
+  public void removeChild(ChildEntity child) {
+    if ( this.equals( child.getParent() ) ) {
+      child.setParent( null );
+      children.remove( child );
+    }
+  }
+}
+</code></pre>
+
+<p>I usually find it helpful to expose helper methods like the above on my domain models so that my code doesn't need to be concerned with the associations  required to be maintained.  I also would likely make the setter for the parent entity's list private so that only Hibernate can use it if needed to force strict use of the <code>addChild</code> / <code>removeChild</code> methods.</p>

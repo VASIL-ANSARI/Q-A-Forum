@@ -1,0 +1,39 @@
+<blockquote>
+  <p>When is it appropriate to override a function in order to declare it as "not supported" if ever it were called?</p>
+</blockquote>
+
+<p>This is appropriate in rare cases when a method that you must override is optional, according to the logic of your design. In situations like this you need to provide a way for the caller to <em>not</em> call your optional method, for example:</p>
+
+<pre><code>[Flags]
+enum SupportedOperations {
+    Read   = 1
+,   Create = 2
+,   Update = 4
+,   Delete = 8
+}
+
+public abstract class GenericRepo&lt;T&gt; where T : class {
+     public virtual SupportedOperations SupportedOps {
+         get {
+             return 0; // Nothing is supported by default
+         }
+     }
+     public virtual Task CreateAsync(T entity) {
+         throw new NotSupportedException();
+     }
+     public virtual Task UpdateAsync(T entity) {
+         throw new NotSupportedException();
+     }
+     public virtual Task DeleteAsync(T entity) {
+         throw new NotSupportedException();
+     }
+}
+</code></pre>
+
+<p>This approach lets the caller ensure that an operation is supported by checking the appropriate flag of <code>SupportedOps</code> prior to making a call that may throw <code>NotSupportedException</code>.</p>
+
+<blockquote>
+  <p>Multiple inheritance comes to mind, but that isn't supported in C#.</p>
+</blockquote>
+
+<p>A combination of interfaces and extension methods let you come pretty close to it. Rather than using an abstract class and inheriting default implementations, create several interfaces, and provide shared implementations as extension methods. This approach lets you build shallow hierarchies that behave in a way similar to multiple inheritance.</p>

@@ -1,0 +1,82 @@
+<p><strong>Disclaimer</strong>: I'm not really a Mockito user, but from what I understand, mocking is used for situations where you have injected class dependencies (fields), and you mock those dependencies. In which case you still need to set the field with the mocked object. For example </p>
+
+<pre><code>public class TestClass {
+    TestService testService;
+    public void doTest() {
+        System.out.println(testService.getString());
+    }
+    public void setTestService(TestService testService) {
+        this.testService = testService;
+    }
+}
+public class TestService {
+    public String getString() {
+        return "Hello world";
+    }
+}
+@Test
+public void toTest() {
+    TestService testService = Mockito.mock(TestService.class);
+    Mockito.when(testService.getString()).thenReturn("Hello Squirrel");
+    TestClass testClass = new TestClass();
+    testClass.setTestService(testService);
+    testClass.doTest();
+}
+</code></pre>
+
+<p>You can see we are setting the the <code>TestService</code> in the <code>TestClass</code> with the mocked object. It's not greatest example, as we could simple instantiate <code>TestService</code>, but it shows, from my understanding, how the mocking should work.</p>
+
+<p>That being said, I don't see how it is possible to do this with the <code>AuthorizationRequestFilter</code>, as it's handled by the test container, and we are not instantiating it for a unit test. Even if we were, it would seem intrusive (and redundant) to add a <code>SecurityContext</code> field.</p>
+
+<p>So without a full integration test, where we are starting the server, and using the server's authentication capabilities, it will be difficult to handle the <code>SecurityContext</code> per this use case, as the <code>SecurityContext</code> is created by the container, taking information from the underlying servlet containers authentication mechanism.</p>
+
+<p>One way you can achieve this though (which IMO doesn't seem very elegant - but works), without a full integration test, is to create a a filter which performs <em>before</em> your <code>AuthorizationRequestFilter</code>, and set the <code>SecurityContext</code> from <em>there</em>. Testing aside, this is actually pretty common in cases where we need to implement outr own custom authentication mechanism.</p>
+
+<p>An example of how you might do this for your unit test, might be something like:</p>
+
+<pre><code>public class UrlerResourceTest extends JerseyTest {
+    ...
+    @Override
+    public Application configure() {
+        return new ResourceConfig(FooResource.class)
+                .register(AuthorizationRequestFilter.class)
+                .register(AuthenticationFilter.class);
+    }
+
+    @Provider
+    @Priority(Priorities.AUTHENTICATION)
+    public static class AuthenticationFilter implements ContainerRequestFilter {
+        @Override
+        public void filter(ContainerRequestContext requestContext) throws IOException {
+            requestContext.setSecurityContext(new SecurityContext() {
+                @Override
+                public Principal getUserPrincipal() {
+                    return new Principal() {
+                        @Override
+                        public String getName() {
+                            return "Stackoverflow";
+                        }
+                    };
+                }
+                @Override
+                public boolean isUserInRole(String string) {
+                    return "privileged".equals(string);
+                }
+                @Override
+                public boolean isSecure() { return true; }
+                @Override
+                public String getAuthenticationScheme() { return "BASIC"; }                
+            });
+        }  
+    }
+    ...   
+}
+</code></pre>
+
+<p>This filter will perform before the <code>AuthorizationRequestFilter</code> because of the <code>@Priority</code> annotation. We've set it to <code>Priorities.AUTHENTICATION</code> which will before before any other filter without such annotation. (See <a href="https://docs.oracle.com/javaee/7/api/javax/ws/rs/Priorities.html" rel="nofollow">Priorities API</a> and <a href="https://jersey.java.net/documentation/latest/filters-and-interceptors.html#d0e8663" rel="nofollow">Priorities with Jersey</a>. Also the <code>SecurityContext</code> will be passed along between filters and also be injected into your resource class.</p>
+
+<p>As I said, I don't think this is very elegant to have to create another filter, but it works for this purpose. Also I am not too familiar with the Jersey Test Framework, as I'm still beginning with it, but there are many configuration options for deployment within a servlet context. I don't know if we can configure the needed authentication mechanism for this case, but it might be something worth looking into.</p>
+
+<hr>
+
+<p><strong>Edit:</strong> In the beginning I explained about setting the field for the test object, but we can also pass the mocked object to a method. For example we could mock the <code>ContainterRequestContext</code> in the <code>filter</code> method, and call <code>filter</code> ourselves, passing the mocked <code>ContainerRequestContext</code>. But this is only useful when we are actually unit testing the filter class and instantiating it ourselves, which is not the case here.</p>

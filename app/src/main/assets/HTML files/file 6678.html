@@ -1,0 +1,89 @@
+<p>There some ways you can set a default button using the form object DefaultButton property or the DefaultButton property of a panel, but I have found them to be unreliable in the past in various browsers so usually I rely on javascript.  </p>
+
+<p>The only downside to this code is you have to turn off event validation with a page directive, but it should fire off click events, and trigger validators and all that.</p>
+
+<p>Here is an example the code that we use. Normally I would put the register function in a utility class, but for this example it is in the page code.
+Try this out.</p>
+
+<pre><code>&lt;%@ Page Language="C#" EnableEventValidation="false" %&gt;
+
+    &lt;script runat="server"&gt;
+
+        protected void cmdSubmit1_Click(object sender, EventArgs e)
+        {
+            litValue.Text = "Value 1 - You entered: " + txtValue1.Text;
+        }
+        protected void cmdSubmit2_Click(object sender, EventArgs e)
+        {
+            litValue.Text = "Value 2 - You entered: " + txtValue2.Text;
+        }
+
+        /// &lt;summary&gt;
+        /// This function registers what button is clicked based on whatever control currently has focus
+        /// so for example if the user password field has focus then you can cause the enter button to click
+        /// if the enter key is pressed This works with ie and firefox as far as I know
+        /// &lt;/summary&gt;
+        /// &lt;param name="ControlWithFocus"&gt;&lt;/param&gt;
+        /// &lt;param name="ControlToClick"&gt;&lt;/param&gt;
+        private void RegisterDefaultButton(System.Web.UI.Control ControlWithFocus, System.Web.UI.Control ControlToClick)
+        {
+
+            PostBackOptions p = new PostBackOptions(ControlToClick);
+            p.PerformValidation = true;
+            if (ControlToClick is Button)
+            {
+                p.ValidationGroup = ((Button)ControlToClick).ValidationGroup;
+            }
+            else if (ControlToClick is ImageButton)
+            {
+                p.ValidationGroup = ((ImageButton)ControlToClick).ValidationGroup;
+            }
+            else if (ControlToClick is LinkButton)
+            {
+                p.ValidationGroup = ((LinkButton)ControlToClick).ValidationGroup;
+            }
+
+            p.RequiresJavaScriptProtocol = false;
+
+            AttributeCollection a = null;
+            if (ControlWithFocus is HtmlControl)
+            {
+                a = ((System.Web.UI.HtmlControls.HtmlControl)ControlWithFocus).Attributes;
+            }
+            else if (ControlWithFocus is WebControl)
+            {
+                a = ((System.Web.UI.WebControls.WebControl)ControlWithFocus).Attributes;
+            }
+
+            if (a != null)
+            {
+                a["onKeyDown"] = string.Format("if (event.keyCode == 13) {{{0}}}"
+                      , ControlToClick.Page.ClientScript.GetPostBackEventReference(p));
+            }
+        }
+
+
+        protected void Page_Load(object sender, EventArgs e)
+        {
+            RegisterDefaultButton(txtValue1, cmdSubmit1);
+            RegisterDefaultButton(txtValue2, cmdSubmit2);
+
+        }
+
+    &lt;/script&gt;
+
+    &lt;html xmlns="http://www.w3.org/1999/xhtml"&gt;
+    &lt;head runat="server"&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;form id="form1" runat="server"&gt;
+            Enter Value 1: &lt;asp:TextBox ID="txtValue1" runat="server"&gt;&lt;/asp:TextBox&gt;
+            &lt;br /&gt;
+            Enter Value 2: &lt;asp:TextBox ID="txtValue2" runat="server"&gt;&lt;/asp:TextBox&gt;
+            &lt;br /&gt;
+            &lt;asp:Literal ID="litValue" runat="server"&gt;&lt;/asp:Literal&gt;
+            &lt;asp:LinkButton ID="cmdSubmit1" runat="server" Visible="false" OnClick="cmdSubmit1_Click"&gt;Hidden Button 1&lt;/asp:LinkButton&gt;
+            &lt;input id="cmdSubmit2" runat="server" visible="false" type="button" value="Hidden Button 2" onserverclick="cmdSubmit2_Click" /&gt;
+        &lt;/form&gt;
+    &lt;/body&gt;
+</code></pre>

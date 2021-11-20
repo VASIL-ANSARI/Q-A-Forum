@@ -1,0 +1,58 @@
+<p>Actually there is not much of a point in returning the image to the method that called it because this method would have to suspend itself and wait for the image to load, which defeats the purpose of letting the image load in parallel. What exactly are you trying to accomplish?</p>
+
+<p>If you really want to do that, I suppose it could be accomplished by modifying your AsyncTask like this:</p>
+
+<pre><code>private class DownloadImageTask extends AsyncTask&lt;String, Void, Void&gt; {
+    private ImageView bmImage;
+
+    private boolean finished = false;
+    private Bitmap resultingBitmap = null;
+
+    protected Void doInBackground(String... urls) {
+        try{
+        URL url = new URL(urls[0]);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setDoInput(true);
+        connection.connect();
+        InputStream input = connection.getInputStream();
+        resultingBitmap = BitmapFactory.decodeStream(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        finished = true;
+    }
+
+    public boolean isFinished() {
+        return finished;
+    }
+
+    public Bitmap getResultingBitmap() {
+        return resultingBitmap;
+    }
+}
+</code></pre>
+
+<p>And in the caller code:</p>
+
+<pre><code>DownloadImageTask task = new DownloadImageTask();
+String path = "http://d3gtl9l2a4fn1j.cloudfront.net/t/p/original" + example.getProfile_path();
+while (!task.isFinished()) { } // this defeats the purpose of parallel execution
+example.setProfile(task.execute(path).getResultingBitmap());
+</code></pre>
+
+<p>You can however accomplish this as suggested in @Brandon 's answer:</p>
+
+<pre><code>private class DownloadImageTask extends AsyncTask&lt;String, Void, Bitmap&gt; {
+    Example example;
+
+    public DownloadImageTask(Example example) {
+        this.example = example;
+    }
+
+    (...)
+
+    protected void onPostExecute(Bitmap result) {
+        example.setProfile(result);
+    }
+}
+</code></pre>

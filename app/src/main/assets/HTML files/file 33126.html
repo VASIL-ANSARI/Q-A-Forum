@@ -1,0 +1,33 @@
+<p>It is important to distinguish between the initialization of a class, and initialization of an object.</p>
+
+<p><strong>Class Initialization</strong></p>
+
+<p>A class or interface is initialized upon <a href="http://docs.oracle.com/javase/specs/jls/se8/html/jls-12.html#jls-12.4.1">first access</a>, by assigning the compile time constant fields, then recursively initializing the superclass (if not already initialized), then processing the static initializers (which include the initializers for for the static fields that are not compile time constants). </p>
+
+<p>As you have noticed, initialization of a class does not, by itself, trigger initialization of the interfaces it implements. <strong>Interfaces are therefore initialized when they are first accessed, typically by reading a field that is not a compile time constant</strong>. This access may occur during evaluation of an initializer, causing a recursive initialization.</p>
+
+<p>It is also worth noting that initialization is not triggered by accessing fields that are compile time constants, as these are evaluated at <a href="http://docs.oracle.com/javase/specs/jls/se8/html/jls-13.html#jls-13.1">compile time</a>:</p>
+
+<blockquote>
+  <p>A reference to a field that is a constant variable (Â§4.12.4) must be resolved at compile time to the value V denoted by the constant variable's initializer.</p>
+  
+  <p>If such a field is static, then no reference to the field should be present in the code in a binary file, including the class or interface which declared the field. Such a field must always appear to have been initialized (Â§12.4.2); the default initial value for the field (if different than V) must never be observed.</p>
+  
+  <p>If such a field is non-static, then no reference to the field should be present in the code in a binary file, except in the class containing the field. (It will be a class rather than an interface, since an interface has only static fields.) The class should have code to set the field's value to V during instance creation (Â§12.5).</p>
+</blockquote>
+
+<p><strong>Object Initialization</strong></p>
+
+<p>An object is initialized <a href="http://docs.oracle.com/javase/specs/jls/se8/html/jls-12.html#jls-12.5">whenever a new object is created</a>, typically by evaluation of a class instance creation expression. This proceeds as follows:</p>
+
+<blockquote>
+  <ol>
+  <li><p>Assign the arguments for the constructor to newly created parameter variables for this constructor invocation.</p></li>
+  <li><p>If this constructor begins with an explicit constructor invocation (Â§8.8.7.1) of another constructor in the same class (using this), then evaluate the arguments and process that constructor invocation recursively using these same five steps. If that constructor invocation completes abruptly, then this procedure completes abruptly for the same reason; otherwise, continue with step 5.</p></li>
+  <li><p>This constructor does not begin with an explicit constructor invocation of another constructor in the same class (using this). If this constructor is for a class other than Object, then this constructor will begin with an explicit or implicit invocation of a superclass constructor (using super). Evaluate the arguments and process that superclass constructor invocation recursively using these same five steps. If that constructor invocation completes abruptly, then this procedure completes abruptly for the same reason. Otherwise, continue with step 4.</p></li>
+  <li><p>Execute the instance initializers and instance variable initializers for this class, assigning the values of instance variable initializers to the corresponding instance variables, in the left-to-right order in which they appear textually in the source code for the class. If execution of any of these initializers results in an exception, then no further initializers are processed and this procedure completes abruptly with that same exception. Otherwise, continue with step 5.</p></li>
+  <li><p>Execute the rest of the body of this constructor. If that execution completes abruptly, then this procedure completes abruptly for the same reason. Otherwise, this procedure completes normally.</p></li>
+  </ol>
+</blockquote>
+
+<p>As we can see in step 3, the presence of an explicit call to the super constructor simply changes which super class constructor is invoked.</p>

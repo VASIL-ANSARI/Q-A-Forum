@@ -1,0 +1,64 @@
+<p>If I have understood the question correctly you want this:</p>
+
+<p>Please note that I have used AdventureWorks2014 as I don't have 2012.</p>
+
+<pre><code>    Use AdventureWorks2014;
+
+IF OBJECT_ID('TempTable1', 'U') IS NOT NULL
+    DROP TABLE TempTable1
+
+
+IF OBJECT_ID('tempdb..#TempRollingSched') IS NOT NULL
+    DROP TABLE #TempRollingSched
+SELECT  SOD.ProductId,
+        RolingSched=MIN(SOH.DueDate)  
+        INTO   #TempRollingSched
+FROM Sales.SalesOrderHeader SOH
+        INNER JOIN Sales.SalesOrderDetail SOD
+            ON SOH.SalesOrderID = SOD.SalesOrderID
+    WHERE SOH.SalesPersonID &lt;= 274 and 
+        SOD.ProductId &lt; 710  
+        GROUP BY SOD.ProductId
+
+SELECT #TempRollingSched.ProductId, #TempRollingSched.RolingSched FROM #TempRollingSched
+
+
+IF OBJECT_ID('tempdb..#TempRollingSchedComplete') IS NOT NULL
+    DROP TABLE #TempRollingSchedComplete
+SELECT SOH.SalesPersonID, SOD.ProductId as ResourceID,
+        SOH.DueDate as DueDate,
+        SOD.OrderQty as DayIncrement,
+        TRS.RolingSched,
+--
+--  What I actually want for SchedStart date is 
+--  DATEADD(Day, SOD.OrderQty, SOH.DueDate)       FOR THE FIRST RECORD of a Resource ID
+--  Then That Date + DayIncrement for subsequent Records
+--  
+-- The first Three Records for 707 should be 
+--      2005-08-14
+--      2005-08-18
+--      2005-08-28
+--
+        Row_Number() over (PARTITION BY SOD.ProductID ORDER By SOH.DueDate) as JResourceNumber 
+    INTO TempTable1
+
+
+    FROM Sales.SalesOrderHeader SOH
+        INNER JOIN Sales.SalesOrderDetail SOD
+            ON SOH.SalesOrderID = SOD.SalesOrderID
+            INNER JOIN #TempRollingSched AS TRS ON TRS.ProductID=SOD.ProductID
+    WHERE SOH.SalesPersonID &lt;= 274 and 
+        SOD.ProductId &lt; 710
+    ORDER by ResourceID, DueDate
+
+Select  A.SalesPersonID, 
+        A.ResourceID, 
+        A.DueDate, 
+        A.DayIncrement, 
+        SchedStartDate=DATEADD(Day, (SUM(DayIncrement ) OVER  (PARTITION BY  ResourceID ORDER By  JResourceNumber)), RolingSched),  
+        A.JResourceNumber   from TempTable1 AS A
+</code></pre>
+
+<p>Results:</p>
+
+<p><a href="http://i.stack.imgur.com/Bw0zQ.png" rel="nofollow"><img src="http://i.stack.imgur.com/Bw0zQ.png" alt="enter image description here"></a></p>

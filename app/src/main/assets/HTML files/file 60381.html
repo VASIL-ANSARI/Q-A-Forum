@@ -1,0 +1,49 @@
+<p><code>GetSystemDirectory</code> is one option. For a 32-bit app, it will return the 32-bit system directory. For an x64 app, it will return the 64-bit native system directory.</p>
+
+<p>You can also use <code>CreateProcess</code> or <code>ShellExecuteEx</code> with <code>cmd.exe</code> and it should find it without the path unless you are specifically concerned about someone manipulating the search path and getting the wrong <code>cmd.exe</code>.</p>
+
+<p>If you are launching a <code>.cmd</code> file, then you can just do it with <code>ShellExecuteEx</code> with the <code>open</code> verb. Generally for a Windows desktop app, use of <code>ShellExecuteEx</code> is recommended for launching other programs. For example, here's some code that will launch the command prompt running the <code>test.cmd</code> script and wait for the result:</p>
+
+<pre><code>#include &lt;windows.h&gt;
+#include &lt;stdio.h&gt;
+#pragma comment(lib,"shell32.lib")
+
+void main()
+{
+    SHELLEXECUTEINFOW info = {};
+    info.cbSize = sizeof( info );
+    info.lpVerb = L"open";
+    info.fMask = SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+    info.lpFile = L"test.cmd";
+    info.lpParameters = nullptr; // Command-line parameters
+    info.lpDirectory = nullptr; // Working directory to set
+    info.nShow = SW_SHOW;
+    if( !ShellExecuteExW( &amp;info ) )
+    {
+        printf("ERROR\n");
+    }
+    else
+    {
+        // Wait for process to finish.
+        WaitForSingleObject( info.hProcess, INFINITE );
+
+        // Return exit code from process
+        DWORD exitcode;
+        GetExitCodeProcess( info.hProcess, &amp;exitcode );
+
+        CloseHandle( info.hProcess );
+
+        printf("Finished with exit code %u\n", exitcode);
+    }
+}
+</code></pre>
+
+<p>You can also use:</p>
+
+<pre><code>info.lpFile = L"cmd.exe";
+info.lpParameters = L"/c test.cmd";
+</code></pre>
+
+<blockquote>
+  <p>The primary reason to use <code>ShellExecuteEx</code> instead of <code>CreateProcess</code> is that <code>ShellExecuteEx</code> can handle admin elevation requests for exes with the proper <a href="https://blogs.msdn.microsoft.com/chuckw/2013/09/10/manifest-madness/" rel="nofollow">manifest elements</a>. <code>CreateProcess</code> would fail if the target EXE requires higher privileges than your current process.</p>
+</blockquote>

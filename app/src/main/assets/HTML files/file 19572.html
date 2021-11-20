@@ -1,0 +1,46 @@
+<p>You could use <code>memory_get_usage</code> (http://php.net/manual/en/function.memory-get-usage.php) when you think the process is at its peak.</p>
+
+<p>Or you could also just call it occasionally and record whatever was the highest value... or as you please.</p>
+
+<p>But this is within a process. Are you talking about a PHP process "A" checking another PHP process' memory usage?</p>
+
+<p>If so:</p>
+
+<pre><code>$myPID = getmypid();
+$stats = explode("\n", shell_exec('pmap $(pgrep php) | grep \'total\\|\\:\''));
+for ($i = 0; $i &lt; count($stats); $i += 2) {
+    if (strpos($stats[$i], "$myPID") === false) {
+        preg_match('/\d+/', $stats[$i+1], $preRes);
+        $res = $preRes[0];
+    }
+}
+//if $res has a value, that value is the kilobytes of memory being used by the other PHP process
+</code></pre>
+
+<p>This solution has a problem: if you have more than 2 php processes running total, you can't guarantee that you will be getting the right process.</p>
+
+<p>To solve this, run first the other process, obtain its PID and then pass it as argument to this process. If you have the process' PID you want to check, you could just do this:</p>
+
+<pre><code>$stats = explode("\n", shell_exec('pmap $(pgrep php) | grep \'total\\|\\:\''));
+for ($i = 0; $i &lt; count($stats); $i += 2) {
+    if (strpos($stats[$i], "$otherPID") === 0) {
+        preg_match('/\d+/', $stats[$i+1], $preRes);
+        $res = $preRes[0];
+    }
+}
+//$res contains the result you want in kilobytes
+</code></pre>
+
+<p>You could check the memory for all processes that are not you, too:</p>
+
+<pre><code>$myPID = getmypid();
+$stats = explode("\n", shell_exec('pmap $(pgrep php) | grep \'total\\|\\:\''));
+for ($i = 0; $i &lt; count($stats) - 1; $i += 2) {
+    if (strpos($stats[$i], "$myPID") === false) {
+        preg_match('/\d+/', $stats[$i+1], $preRes);
+        $res[] = $preRes[0];
+    }
+}
+</code></pre>
+
+<p>So to get the maximum memory usage, just keep a $max variable and keep checking against it.</p>

@@ -1,0 +1,41 @@
+<p>Ok, lets try the following. Here is Beta(alpha,beta) variate sampling which should work for any small numbers.</p>
+
+<pre><code>import math
+import random
+
+def sample_beta(alpha, beta):
+    x = math.log( random.random() )
+    y = math.log( random.random() )
+
+    return x / (x + y*alpha/beta)
+
+# some testing
+import matplotlib.pyplot as plt
+
+bins = [0.01 * i for i in range(102)]
+plt.hist([sample_beta(0.00001, 0.1) for k in range(10000000)], bins)
+plt.show()
+</code></pre>
+
+<p>Using it, you might try to sample Dirichlet via Beta variate as described in the wikipedia</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Dirichlet_distribution#Random_number_generation" rel="nofollow">https://en.wikipedia.org/wiki/Dirichlet_distribution#Random_number_generation</a></p>
+
+<pre><code>params = [a1, a2, ..., ak]
+xs = [sample_beta(params[0], sum(params[1:]))]
+for j in range(1,len(params)-1):
+    phi = sample_beta(params[j], sum(params[j+1:]))
+    xs.append((1-sum(xs)) * phi)
+xs.append(1-sum(xs))
+</code></pre>
+
+<p>If it works, it could be optimized to have all partial sums precomputed.</p>
+
+<p>UPDATE</p>
+
+<p>Sampling above relies on the fact, that Dirichlet could be sampled via beta variate, and that is better (but slower) choice if case of small parameters. In turn, beta variate could be sampled as pair of gamma variates: </p>
+
+<pre><code>beta(a, b) = gamma(1, a) / (gamma(1, a) + gamma(1, b))
+</code></pre>
+
+<p>So small parameters are moved from being first in gamma (if you sample Dirichlet directly via gamma variates) to being second. And 1 (one) being first in gamma-variates means they are just exponential distribution, sampled as -log(U(0,1)). Please check if my math is ok, but that way sampling might work</p>

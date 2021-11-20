@@ -1,0 +1,69 @@
+<p>In <code>btnCancel_Click</code> you must pass the cancellation request to your worker object; otherwise, it will never be notified. The <code>BackgroundWorker.CancelAsync()</code> does not do anything just simply sets the <code>BackgroundWorker.CancellationPending</code> property, notifying <em>the consumer of the BackgroundWorker</em> (the UI, not the executed task) that your task has been cancelled.</p>
+
+<p>So what you need:</p>
+
+<pre><code>MyObject myObject;
+
+// This method is executed on the worker thread. Do not access your controls
+// in the main thread from here directly.
+private void backgroundWorker1_DoWork(object sender, DoWorkEventArgs e)
+{
+    myObject = new MyObject();
+
+    // The following line is a blocking operation in this thread.
+    // The user acts in the UI thread, not here, so you cannot do here
+    // anything but wait.
+    myObject.DoWork();
+
+    // Now DoWork is finished. Next line is needed only to notify
+    // the caller of the event whether a cancel has happened.
+    if (backgroundWorker1.CancellationPending)
+        e.Cancel = true;
+
+    myObject = null;
+}
+
+private void btnCancel_Click(object sender, EventArgs e)
+{
+   if (backgroundWorker1.IsBusy)
+   {
+       backgroundWorker1.CancelAsync();
+
+       // You must notify your worker object as well.
+       // Note: Now you access the worker object from the main thread!
+       // Note2: It would be possible to pass the worker to your object
+       //        and poll the backgroundWorker1.CancellationPending from there,
+       //        but that would be a nasty pattern. BL objects should not
+       //        aware of the UI components.
+       myObject.CancelWork();
+   }
+}
+</code></pre>
+
+<p>And how should you implement the notification:</p>
+
+<pre><code>public class MyObject
+{
+    // normally you should use locks to access fields from different threads
+    // but if you just set a bool from one thread and read it from another,
+    // then it is enough to use a volatile field.
+    private volatile bool isCancelRequested;
+
+    // this will be called from the main thread
+    public void CancelWork()
+    {
+        isCancelRequested = true;
+    }
+
+    // This method is called from the worker thread.
+    public void DoWork()
+    {
+        // Make sure you poll the isCancelRequested field often enough to
+        // react to the cancellation as soon as possible.
+        while (!isCancelRequested &amp;&amp; ...)
+        {
+            // ...
+        }
+    }
+}
+</code></pre>

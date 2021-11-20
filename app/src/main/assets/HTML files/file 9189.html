@@ -1,0 +1,21 @@
+<p>If you're on linux, one easy option is to use <a href="http://linux.die.net/man/3/pthread_mutexattr_setpshared" rel="nofollow">pshared mutexes</a> and condition variables. A recet version of glibc will be necessary. Essentially inside your shared memory segment you will have something like:</p>
+
+<pre><code>struct shmem_head {
+    pthread_mutex_t mutex;
+};
+</code></pre>
+
+<p>To initialize:</p>
+
+<pre><code>void init_shmem_head(struct shmem_head *head)
+{
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&amp;attr);
+    pthread_mutexattr_setpshared(&amp;attr, PTHREAD_PROCESS_SHARED );
+
+    pthread_mutex_init(&amp;head-&gt;mutex, &amp;attr);
+    pthread_mutexattr_destroy(&amp;head-&gt;mutex);
+}
+</code></pre>
+
+<p>You now have a mutex, shared by all processes with the shared memory segment open. You can simply use <code>pthread_mutex_lock</code> to lock and <code>pthread_mutex_unlock</code> to unlock as normal. There's also a similar <a href="http://linux.die.net/man/3/pthread_condattr_setpshared" rel="nofollow"><code>pthread_condattr_setpshared</code></a> if you want condition variables as well.</p>

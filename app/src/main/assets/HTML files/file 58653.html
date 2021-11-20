@@ -1,0 +1,31 @@
+<p>First of all, your code should be triggering a good bunch of warnings like these:</p>
+
+<blockquote>
+  <p>Warning: DOMDocument::loadHTML(): htmlParseEntityRef: expecting ';' in
+  Entity<br> Warning: DOMDocument::loadHTML(): Unexpected end tag :
+  strong in Entity<br> Warning: DOMDocument::loadHTML(): Tag header
+  invalid in Entity</p>
+</blockquote>
+
+<p>This is to expect with on-the-wild HTML (and this page's code is nor particularly bad) but you haven't even mentioned it, what makes me suspect that you might not have error reporting enabled in your development box.</p>
+
+<p>Additionally, the page has huge amounts of JavaScript and <code>DOMDocument</code> is just an HTML parser.</p>
+
+<p>With that, we can get a clear picture of what's happening. Since <code>DOMDocument</code> is not a full-fledged browser it doesn't understand JavaScript code. That means that it detects the <code>&lt;script&gt;</code> tag but it doesn't handle its contents as JavaScriptâit merely looks for a closing tag and the first one he finds is this:</p>
+
+<pre><code>$('#sponsored-category-header').append('&lt;div class="sponsored-category-logo"&gt;&lt;/div&gt;');
+                                                                             ^^^^^^
+</code></pre>
+
+<p>It doesn't know that it's a JavaScript string and should be ignored. Instead, it thinks the wrong tag is being closed so it attempts to fix what's technically invalid HTML and adds the <em>missing</em> <code>&lt;/script&gt;</code> tag.</p>
+
+<p>For this precise reason, the <code>&lt;script&gt;...&lt;/script&gt;</code> tag set has traditionally been written this way:</p>
+
+<pre><code>&lt;script type="text/javascript"&gt;&lt;!--
+var foo = '&lt;p&gt;Escaped end tag&lt;\/p&gt;';
+//--&gt;&lt;/script&gt;
+</code></pre>
+
+<p>... so user agents that are unaware of JavaScript can safely ignore the whole tag (<em>hey, it's nothing but a good old HTML comment</em>). However, nowadays it's almost universally considered bad practice because "all browsers understand JavaScript".</p>
+
+<p><em>Final note: the DOM extension is probably aware of the <code>&lt;script&gt;</code> tag and knows it isn't allowed to have other tags inside. That explains why inner</em> opening <em>tags are not considered.</em></p>

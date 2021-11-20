@@ -1,0 +1,82 @@
+<p>You can use <code>Join</code> or <code>AutoResetEvent</code> to wait until add picture thread finishes, <strong>But you should not use neither "explained later on the answer."</strong></p>
+
+<p>You can achieve the same results by using <code>AutoResetEvent</code> as alternative to <code>Join</code>; it allows you to setup a blocking-notification, so block before calling the <code>execute()</code> method and only proceed when <code>AddPics</code> thread finishes its job:</p>
+
+<pre><code>private AutoResetEvent _finishAddPicsNotifier = new AutoResetEvent(false);
+
+private void OnMyButton_Click(object sender, EventArgs e)
+{
+    //.....
+    new Thread(AddPics)
+    {
+        Priority = ThreadPriority.Highest,
+        IsBackground = true, //will explaine later
+    }.Start();
+
+    _finishAddPicsNotifier.WaitOne();//this will block until receive a signal to proceed
+    execute();//this method will only called if the AddPics method finished
+    /.....
+}
+
+private void AddPics()
+{
+    //.......
+
+    _finishAddPicsNotifier.Set();//when finish the adding the pictures allow the waiting method to proceed
+}
+</code></pre>
+
+<p><strong>Note:</strong>  Set <code>IsBackground = true</code> to indicates that thread is a background thread so it will not Prevent the application from terminating. read more about background thread <a href="http://msdn.microsoft.com/en-us/library/system.threading.thread.isbackground.aspx" rel="nofollow">here</a>.</p>
+
+<p><strong>Problems:</strong></p>
+
+<ul>
+<li>Since you are using a button click to run the thread, you should add some mechanizem to prevent multi-clicks at the same time to run the code multiple time.</li>
+<li>You are also blocking the UI thread when call <code>Join()</code> or <code>_finishAddPicsNotifier.WaitOne()</code>.</li>
+</ul>
+
+<p><strong>To fix all of that</strong>, a good design is to define a method <code>OnFinishAddingPictures</code> and call it whenever finish adding images, inside this new method call <code>execute()</code>, you should also remove the previous <code>execute()</code> call from button click: </p>
+
+<pre><code>private readonly object _oneAddPicturesLocker = new object();
+
+private void OnMyButton_Click(object sender, EventArgs e)
+{
+    //.....
+    new Thread(AddPics)
+    {
+        Priority = ThreadPriority.Highest,
+        IsBackground = true,
+    }.Start();
+}
+
+private void AddPics()
+{
+    if (Monitor.TryEnter(_oneAddPicturesLocker))
+    {
+        //we only can proceed if no other AddPics are running.
+        try
+        {
+            //.....
+
+            OnFinishAddingPictures();
+        }
+        finally
+        {
+            Monitor.Exit(_oneAddPicturesLocker);
+        }
+    }
+}
+
+private void OnFinishAddingPictures()
+{
+    execute();
+}
+</code></pre>
+
+<p><strong>Note:</strong></p>
+
+<ul>
+<li>We get rid of the blocking using this mechanism.</li>
+<li>We are sure One and Only one call to the <code>AddPics</code> are executed at a moment.</li>
+<li>Always remember to check if <code>InvokerRequeird</code> and use <code>control.Invoke(/*..*/)</code> whenever access to form or controls methods and properties in another thread "not in UI thread".</li>
+</ul>

@@ -1,0 +1,89 @@
+<p>First of all, fantastically written question. Thanks.</p>
+
+<p>I would suggest making a DataFrame for each family, and concatenating at the end:
+You'll need to reverse your <code>lookupMap</code>:</p>
+
+<pre><code>In [80]: d = {'mammal': ['dolphin', 'lion', 'seal', 'tiger'], 'insect': ['ladybug', 'locust', 'mosquito'], 'fish': 
+['seabass', 'shark']}
+</code></pre>
+
+<p>So as an example:</p>
+
+<pre><code>In [83]: k, v = 'mammal', d['mammal']
+
+In [86]: pd.DataFrame([habitat_family[k] for _ in v], index=v).T
+Out[86]: 
+    dolphin  lion  seal  tiger
+1       101   101   101    101
+2       123   123   123    123
+3       523   523   523    523
+4       562   562   562    562
+5       546   546   546    546
+6       213   213   213    213
+7       562   562   562    562
+8       234   234   234    234
+9       987   987   987    987
+10      901   901   901    901
+
+[10 rows x 4 columns]
+</code></pre>
+
+<p>Now do that for each family:</p>
+
+<pre><code>In [88]: for k, v in d.iteritems():
+   ....:     results.append(pd.DataFrame([habitat_family[k] for _ in v], index=v).T)
+</code></pre>
+
+<p>And concat:</p>
+
+<pre><code>In [89]: habitat_species = pd.concat(results, axis=1)
+
+In [90]: habi
+habitat_family   habitat_species  
+
+In [90]: habitat_species
+Out[90]: 
+    dolphin  lion  seal  tiger  ladybug  locust  mosquito  seabass  shark
+1       101   101   101    101      345     345       345      625    625
+2       123   123   123    123      928     928       928      254    254
+3       523   523   523    523      183     183       183      929    929
+4       562   562   562    562      645     645       645      827    827
+5       546   546   546    546      113     113       113      102    102
+6       213   213   213    213      942     942       942      295    295
+7       562   562   562    562      689     689       689      174    174
+8       234   234   234    234      539     539       539      777    777
+9       987   987   987    987      789     789       789      123    123
+10      901   901   901    901      814     814       814      763    763
+
+[10 rows x 9 columns]
+</code></pre>
+
+<p>You might consider passing the families as the <code>key</code> parameter to <code>concat</code> if you want a hierarchical index for the columns with (family, species) pairs.</p>
+
+<p>Some profiling, since you said performance matters:</p>
+
+<pre><code># Mine
+In [97]: %%timeit
+   ....: for k, v in d.iteritems():
+   ....:     results.append(pd.DataFrame([habitat_family[k] for _ in v], index=v).T)
+   ....: habitat_species = pd.concat(results, axis=1)
+   ....: 
+1 loops, best of 3: 296 ms per loop
+
+# Your's
+In [98]: %%timeit
+   ....: for id in habitat_family.index: # loop through habitat id's
+   ....:    for spec in species: # loop through species
+   ....:        corresp_family = lookupMap[spec]
+   ....:        habitat_species.loc[id,spec] = habitat_family.loc[id,corresp_family]
+10 loops, best of 3: 21.5 ms per loop
+
+# Dan's
+In [102]: %%timeit
+   .....: habitat_species = habitat_family[Series(species).replace(lookupMap)]
+   .....: habitat_species.columns = species
+   .....: 
+100 loops, best of 3: 2.55 ms per loop
+</code></pre>
+
+<p>Looks like Dan wins by a longshot!</p>

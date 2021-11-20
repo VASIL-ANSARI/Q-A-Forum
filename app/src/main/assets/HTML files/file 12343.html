@@ -1,0 +1,18 @@
+<p>Well, this is a very relational problem, and using a non-relational database for such a problem requires some effort. In general, I think your schema design is good.</p>
+
+<p>What you're describing is called "the N+1 problem", because you'll have to make N+1 queries for N objects (in your case, it's more complicated, but I guess you get the idea).</p>
+
+<p>Some remedies:</p>
+
+<ul>
+<li><p>You can use the <a href="http://www.mongodb.org/display/DOCS/Advanced+Queries#AdvancedQueries-%24in" rel="nofollow"><code>$in</code></a> operator to find e.g. all tracks of a certain artist:</p>
+
+<pre><code>db.tracks.find({"artists" : { $in : [artist_id_1, artist_id_2, ...] } });
+</code></pre>
+
+<p>This doesn't work if the array of artists grows huge, but a few hundred, maybe a thousand should work fine. Make sure <code>artists</code> is indexed.</p></li>
+<li><p>You can denormalize some of the information that is needed very often. For example, you might want to show the track list very often, so it makes sense to copy the artist's names to every track. Denormalization depends mostly on what you're trying to achieve from an end-user perspective. You might not want to store each and every artist's name in full, but only the first 50 characters because the UI doesn't show more in the overview anyway.</p>
+
+<p>In fact, you're already denormalizing some data, such as the artist ids in album (which are redundant, because you could get them via the tracks as well). This makes queries easier, but it will be more write-heavy. Updates are ugly because you'll have to make sure they propagate through the system.</p></li>
+<li><p>In some cases, it might make sense to 'join' on the client(!) rather than the server. This doesn't really fit your problem well, but it's noteworthy: suppose you have a list of friends. Now the sever will have to look up each friend's name whenever it displays them. Instead, it could provide you with a lookup table ids/friends, and the server only serves the ids. Some JavaScript could replace the ids with the real names from the client's cache.</p></li>
+</ul>

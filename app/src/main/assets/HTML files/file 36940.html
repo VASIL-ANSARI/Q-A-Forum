@@ -1,0 +1,25 @@
+<p>I'm not 100% certain, but try to comment out the <code>stopAnimating</code> call and see if it shows up. </p>
+
+<p>If that helps, <code>applyActionOnCells</code> probably blocks your main thread (where all UI stuff also happens) and the indicator never has a chance to show up before you hide it again. </p>
+
+<p>In that case, try do the <code>applyActionOnCells</code> call in the background:</p>
+
+<pre><code>if(buttonIndex == 1) {
+    [self.activityIndicator startAnimating];
+
+    __block typeof(self) bself = self;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        ContactsTableViewController *contactTableView = [bself getContactsTVC];
+        [contactTableView applyActionOnCells];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [bself.activityIndicator stopAnimating];
+
+            // then go to rootViewController
+            [bself.navigationController popToRootViewControllerAnimated:YES];
+        });
+    });
+}
+</code></pre>
+
+<p>Edit: see also <a href="http://stackoverflow.com/questions/1850186/iphone-uiactivityindicatorview-not-starting-or-stopping">an earlier question</a>.</p>

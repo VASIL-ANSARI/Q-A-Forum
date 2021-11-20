@@ -1,0 +1,47 @@
+<p>I can't give you the answer, there is not enough information provided to do that, but maybe I can help you figure it out yourself. You write:</p>
+
+<blockquote>
+  <p>Im aware this is because an array simply retains a memory address, hence when the same object simply with a different type "obType" is added all of those values change.</p>
+</blockquote>
+
+<p>That is not what happens in your code, though there are situations where what is in an array may <em>appear</em> to change - and that is what you are probably seeing. The line:</p>
+
+<pre><code>NSMutableDictionary *itemToAdd = [[NSMutableDictionary alloc]init];
+</code></pre>
+
+<p>generates a new, never before seen, mutable dictionary. You can log the <em>address</em> (effectively the <em>identity</em>(1)) of this object by adding:</p>
+
+<pre><code>NSLog(@"Created itemToAdd: %p", itemToAdd);
+</code></pre>
+
+<p>after the above line. The <code>%p</code> format will produce the address of the newly created object, and every object has a unique address. When you then get to the line:</p>
+
+<pre><code>[items addObject:itemToAdd];
+</code></pre>
+
+<p>The new dictionary is added to <em>whichever</em> array is referenced by <code>items</code> - and that is <strong>very important</strong>. Any variable, such as <code>items</code> and <code>itemToAdd</code>, <em>references</em> an object, it is <em>not</em> the object itself. So the array being referenced by <code>items</code> could change between calls to <code>addItem:</code>. You should check this and you can do that by adding(2):</p>
+
+<pre><code>NSLog(@"addItem called, items = %p containing %ld element", items, items.count);
+for(id someThing in items)
+   NSLog(@"    element: %p", someThing);
+</code></pre>
+
+<p>to the start of your method. This will first tell you the address of the array currently referenced by <code>items</code> and how many items that array contains. The <code>for</code> loop will then output the address of each element of the array (if there are any).</p>
+
+<p>Further note that <code>addObject:</code> will always add an item to the array, it doesn't matter if the same item is already in the array - add it twice and the array appears to have two elements, both of which reference the same item. When the above code displays the count it should be increasing unless you are removing elements from the array somewhere.</p>
+
+<p>Add those statements and look at the results. Among the possibilities that would produce the results you are reporting:</p>
+
+<ul>
+<li>The array referenced by <code>items</code> is changing</li>
+<li>The dictionary you add is being removed</li>
+<li>Etc.</li>
+</ul>
+
+<p>HTH</p>
+
+<hr>
+
+<p>(1) Addresses can be reused, after an object is no longer required and destroyed by ARC its memory may be reused for a new object. So the address does not strictly identify a unique object, you just need to be aware of this</p>
+
+<p>(2) I am assuming 64-bit here, if not you need to change the <code>%ld</code> format or add a cast.</p>

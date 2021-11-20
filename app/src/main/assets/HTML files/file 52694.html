@@ -1,0 +1,44 @@
+<p>It's not the order of parameter pack expansion which is different, it's the order of function argument evaluation.</p>
+
+<pre><code>f_Swallow
+(
+    [&amp;]()
+    {
+
+        result.push_back(arg);
+        return true;
+    }
+    ()...
+) ;
+</code></pre>
+
+<p>For sake of brevity, lets just give that lambda the name <code>funcN</code> where <code>N</code> is the parameter number. Given four arguments, the parameter pack will be expanded <em>by any conforming compiler</em> into this:</p>
+
+<pre><code>f_Swallow(func1(), func2(), func3, func4()) ;
+</code></pre>
+
+<p>The order of evaluation of function arguments is unspecified in C++. The compiler could evaluate them in-order (like your version of Clang), in reverse order (like your version of MSVC), or in any order it likes. You cannot count on the evaluation order.</p>
+
+<p>To get what you want, you could put the expressions into a context in which the order of evaluation is specified. For example:</p>
+
+<pre><code>template &lt;typename... T&gt;
+std::vector&lt;int&gt; f(T ...arg)
+{
+    std::vector&lt;int&gt; result;
+    (void)std::initializer_list&lt;int&gt; { (result.push_back(arg), 0)... };
+    return result;
+}
+</code></pre>
+
+<hr>
+
+<p>In C++17, you'll be able to do the following with <a href="http://en.cppreference.com/w/cpp/language/fold">fold expressions</a>:</p>
+
+<pre><code>template &lt;typename... T&gt;
+std::vector&lt;int&gt; f(T ...arg)
+{
+    std::vector&lt;int&gt; result;
+    (result.push_back(arg), ...);
+    return result;
+}
+</code></pre>

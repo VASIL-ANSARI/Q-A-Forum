@@ -1,0 +1,24 @@
+<p>The reason you're crashing occasionally is that this structure is unsound:</p>
+
+<pre><code>if([coinCollectPlayer isPlaying]){
+    dispatch_async(dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void) { 
+        [coinCollectPlayer play];
+    });
+}
+</code></pre>
+
+<p>You are checking <code>isPlaying</code> on the main thread. So how do you know that between then and when you say <code>play</code> on a background thread, you haven't already said <code>play</code> on a background thread? You don't. Think of it like this:</p>
+
+<pre><code>if([coinCollectPlayer isPlaying]){
+    // GREAT BIG HOLE HERE YOU CAN DRIVE A TRUCK THROUGH
+    dispatch_async(dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void) { 
+        [coinCollectPlayer play];
+    });
+}
+</code></pre>
+
+<p>You need to use a consistent thread for all communication with your audio players, and either you must use locking / synchronize to enforce coherency or you must use a serial queue (which <code>DISPATCH_QUEUE_PRIORITY_DEFAULT</code> is not).</p>
+
+<p>Having said all that, I think what you're doing is just wrong. I don't believe that AVAudioPlayer needs to or should be used on a background thread.</p>
+
+<p>What I suggest you try is to use every AVAudioPlayer <em>once</em>. In other words, to play a sound, make an AVAudioPlayer, play a sound, and throw the whole thing away.</p>

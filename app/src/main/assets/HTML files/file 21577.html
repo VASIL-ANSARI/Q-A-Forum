@@ -1,0 +1,45 @@
+<p>The collection comparator is only executed when new models are added to the collection: it doesn't update the collection order when properties change. In order to achieve this, you need to call <code>collection.sort()</code>:</p>
+
+<pre><code>App.Collections.Tasks = Backbone.Collection.extend({ 
+    model: App.Models.Task,
+    initialize: function() {
+        this.on('change:counter', this.sort);
+    },
+    comparator: function(task) {
+        return task.get('counter');
+    }
+});
+</code></pre>
+
+<p>In the list view you can listen to the collection's <code>sort</code> event, and re-render your view:</p>
+
+<pre><code>App.Views.TasksView = Backbone.View.extend({
+    tagName: 'ul',
+
+    initialize: function() {
+        this.collection.on('add', this.addOne, this);
+        this.collection.on('sort', this.render, this);
+        this.render();
+    },
+
+    render: function() {
+        //if there are existing child views, remove them
+        if(this.taskViews) {
+            _.each(this.taskViews, function(view) {
+                view.remove();
+            });
+        }
+        this.taskViews = []; 
+        this.collection.each(this.addOne, this);
+        return this;
+    },
+
+    addOne: function(task) {
+        var taskView = new App.Views.TaskView({ model: task });
+        this.$el.append(taskView.render().el);
+
+        //keep track of child views
+        this.taskViews.push(taskView);
+    }
+});
+</code></pre>

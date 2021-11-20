@@ -1,0 +1,83 @@
+<p>Here's one way to do it, which could be modified to read strings of digits from two files, instead of from standard input via <code>scanf</code>. This will read strings of digits up to <code>MAX_LEN</code> in length.</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+#define MAX_LEN 10000
+
+int main(int argc, char **argv)
+{
+    /* read in first string */
+    char *fs = NULL;
+    fs = malloc(MAX_LEN);
+    if (!scanf("%s", fs)) {
+        fprintf(stderr, "Error: Could not read first string!\n");
+        return EXIT_FAILURE;
+    }
+    size_t fs_len = strlen(fs);
+
+    /* populate result array with first string digits */
+    short *res = NULL;
+    int res_len = MAX_LEN + 1;
+    res = malloc(sizeof(short) * res_len);
+    for (int res_idx = res_len - 1; res_idx &gt;= 0; res_idx--) {
+        if (res_idx &gt; (fs_len - 1)) {
+            res[res_idx] = 0;
+            continue;
+        }
+        int digit = fs[fs_len - res_idx - 1] - (int)'0';
+        res[res_idx] = digit;
+        /* error checking */
+        if ((res[res_idx] &lt; 0) || (res[res_idx] &gt; 9)) {
+            fprintf(stderr, "Error: Bad digit in fs at index %lu\n", fs_len - res_idx - 1);
+            return EXIT_FAILURE;
+        }
+    }
+    free(fs), fs = NULL;
+
+    /* read in first string */
+    char *ss = NULL;
+    ss = malloc(MAX_LEN);
+    if (!scanf("%s", ss)) {
+        fprintf(stderr, "Error: Could not read second string!\n");
+        return EXIT_FAILURE;
+    }
+    size_t ss_len = strlen(ss);
+
+    /* do the summation */
+    for (int ss_idx = ss_len - 1, res_idx = 0; ss_idx &gt;= 0; ss_idx--, res_idx++) {
+        int digit = ss[ss_idx] - (int)'0';
+        /* error checking */
+        if ((digit &lt; 0) || (digit &gt; 9)) {
+            fprintf(stderr, "Error: Bad digit in ss at index %d\n", ss_idx);
+            return EXIT_FAILURE;
+        }
+        int temp_res = res[res_idx] + digit;
+        /* do we need to carry up? */
+        if (temp_res &gt;= 10) {
+            res[res_idx + 1] += 1;
+            res[res_idx] = temp_res - 10;
+        }
+        else {
+            res[res_idx] = temp_res;
+        }
+    }
+    free(ss), ss = NULL;
+
+    /* print result */
+    for (int res_idx = (fs_len &gt; ss_len ? fs_len : ss_len); res_idx &gt;= 0; res_idx--) {
+        fprintf(stdout, "%d", res[res_idx]);
+    }
+    fprintf(stdout, "\n");
+    free(res), res = NULL;
+
+    return EXIT_SUCCESS;
+}
+</code></pre>
+
+<p>It only keeps two arrays in memory at most, one <code>char</code> array and one <code>short</code> array. A <code>char</code> array would hold <code>MAX_LEN</code> bytes, and the <code>short</code> array would hold <code>(MAX_LEN + 1) * 2</code> bytes, on systems where a <code>short</code> is two bytes.</p>
+
+<p>If you read one character at a time from the two files, with the <code>FILE</code> pointer reading from the end of the file to the start, you could reduce this to just an array of <code>short</code>.</p>
+
+<p>For further optimization, if you can bear the expense of two passes over the files (which might not be too expensive, given file caching), you could do a first pass on both strings to get their lengths. Given the larger of the two lengths, you can then allocate only as many <code>short</code> as you need to perform the summation, which would be the larger of the two lengths, plus one. Another option is to <code>realloc</code> your <code>short</code> array as you go along.</p>

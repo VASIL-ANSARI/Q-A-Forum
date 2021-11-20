@@ -1,0 +1,65 @@
+<p>Here's your optimized query. The idea is to get rid of the <code>OR</code>s and the <code>CAST()</code> function on hit_date so that MySQL can utilize a compound index that covers each of the subsets of data. You'll want a compound index on (<code>location_id</code>, <code>target_id</code>, <code>hit_date</code>) in that order. </p>
+
+<pre><code>SELECT id, gender_male, gender_female, `age_18 - 20`, target_test, location_NY
+FROM
+(
+SELECT target.id,
+   SUM(CASE gender WHEN 'm' THEN 1 END) AS gender_male,
+   SUM(CASE gender WHEN 'f' THEN 1 END) AS gender_female,
+   SUM(CASE age_range_id WHEN 1 THEN 1 END) AS `age_18 - 20`,
+   SUM(CASE target_id WHEN 1 then 1 END) AS target_test,
+   SUM(CASE location_id WHEN 1 then 1 END) AS location_NY
+FROM Hits
+WHERE (location_id =1)
+  AND (target_id = 40)
+  AND hit_date BETWEEN '2012-05-04 00:00:00' AND '2012-05-10 23:59:59'
+GROUP BY target.id
+
+UNION ALL
+
+SELECT target.id,
+   SUM(CASE gender WHEN 'm' THEN 1 END) AS gender_male,
+   SUM(CASE gender WHEN 'f' THEN 1 END) AS gender_female,
+   SUM(CASE age_range_id WHEN 1 THEN 1 END) AS `age_18 - 20`,
+   SUM(CASE target_id WHEN 1 then 1 END) AS target_test,
+   SUM(CASE location_id WHEN 1 then 1 END) AS location_NY
+FROM Hits
+WHERE (location_id = 2)
+  AND (target_id = 22)
+  AND hit_date BETWEEN '2012-05-04 00:00:00' AND '2012-05-10 23:59:59'
+GROUP BY target.id
+
+UNION ALL
+
+SELECT target.id,
+   SUM(CASE gender WHEN 'm' THEN 1 END) AS gender_male,
+   SUM(CASE gender WHEN 'f' THEN 1 END) AS gender_female,
+   SUM(CASE age_range_id WHEN 1 THEN 1 END) AS `age_18 - 20`,
+   SUM(CASE target_id WHEN 1 then 1 END) AS target_test,
+   SUM(CASE location_id WHEN 1 then 1 END) AS location_NY
+FROM Hits
+WHERE (location_id =1)
+  AND (target_id = 22)
+  AND hit_date BETWEEN '2012-05-04 00:00:00' AND '2012-05-10 23:59:59'
+GROUP BY target.id
+
+UNION ALL
+
+SELECT target.id,
+   SUM(CASE gender WHEN 'm' THEN 1 END) AS gender_male,
+   SUM(CASE gender WHEN 'f' THEN 1 END) AS gender_female,
+   SUM(CASE age_range_id WHEN 1 THEN 1 END) AS `age_18 - 20`,
+   SUM(CASE target_id WHEN 1 then 1 END) AS target_test,
+   SUM(CASE location_id WHEN 1 then 1 END) AS location_NY
+FROM Hits
+WHERE (location_id = 2)
+  AND (target_id = 22)
+  AND hit_date BETWEEN '2012-05-04 00:00:00' AND '2012-05-10 23:59:59'
+GROUP BY target.id
+) a
+GROUP BY id
+</code></pre>
+
+<p>If your selection size is so large that this is no improvement, then you may as well keep scanning all rows like you're already doing.</p>
+
+<p>Note, surround aliases with back ticks, not single quotes, which are deprecated. I also fixed your <code>CASE</code> clauses which had <code>count</code> instead of <code>1</code>.</p>

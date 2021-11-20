@@ -1,0 +1,45 @@
+<p>The purpose of the code is to safely get an array size that can be used at compile time, e.g. as the size of new raw (non-dynamic) array.</p>
+
+<p>The simple definition</p>
+
+<pre><code>#define NELEMS(x) (sizeof(x) / sizeof((x)[0]))
+</code></pre>
+
+<p>&hellip; is unsafe because you can pass a pointer to it, and get back a nonsense size.</p>
+
+<p>So the code you have,</p>
+
+<pre><code>template &lt;typename T, int N&gt;
+char (&amp;ArraySizeHelper(T (&amp;array)[N]))[N];
+#define NELEMS(x) (sizeof(ArraySizeHelper(x)))
+</code></pre>
+
+<p>&hellip; uses template argument deduction to <em>find</em> the size, and it uses a reference-to-array return type to report the size as a compile time constant. If not for a <sup>(1)</sup>silly wording in C++11 and onwards about passing references, we could now do the same with <code>constexpr</code>. Alas, we'll probably have to wait until C++17 before macros can be completely avoided for the simple task of obtaining a compile time array size.</p>
+
+<hr>
+
+<p>I'm unable to reproduce the problem; the following code:</p>
+
+<pre><code>template &lt;typename T, int N&gt;
+char (&amp;ArraySizeHelper(T (&amp;array)[N]))[N];
+#define NELEMS(x) (sizeof(ArraySizeHelper(x)))
+
+#include &lt;iostream&gt;
+auto main() -&gt; int
+{
+    using namespace std;
+    int x[42];
+    cout &lt;&lt; NELEMS( x ) &lt;&lt; endl;
+}
+</code></pre>
+
+<p>compiles nicely with both Visual C++ 2015 and MinGW-64 g++ 5.1.0.</p>
+
+<hr>
+
+<p><sup>
+<sup>1)</sup> C++14 Â§5.19/2 &ldquo;A <em>conditional-expression</em> <code>e</code> is a <em>core constant expression</em> unless the evaluation of <code>e</code>, following the rules of the
+abstract machine (1.9), would evaluate one of the following expressions: [&hellip;] â an <em>id-expression</em> that refers to a variable or data member of reference type unless the reference has a preceding initialization and either
+â it is initialized with a constant expression or
+â it is a non-static data member of an object whose lifetime began within the evaluation of <code>e</code>;&rdquo;
+</sup></p>

@@ -1,0 +1,51 @@
+<p>I'm not sure if it can be done using <code>XmlSerializer</code> because your desired XML structure is quite strange when compared with your class. </p>
+
+<p>But it definitely can be done using LINQ to XML:</p>
+
+<pre><code>var serviceInfo = new Serviceinfo { Profiles = new List&lt;string&gt; { "one", "two", "three" }, state = new List&lt;int&gt; { 1, 2, 4 } };
+
+var xml = new XDocument(
+            new XElement("serviceinfo",
+                serviceInfo.Profiles
+                           .Zip(serviceInfo.state, (p, s) =&gt; new { p, s })
+                           .Select(x =&gt;
+                               new XElement("profiles",
+                                   new XElement("profile", x.p),
+                                   new XElement("state", x.s.ToString())))));
+</code></pre>
+
+<p>If you really want to XML Serialization you should change your class structure to</p>
+
+<pre><code>[XmlRoot(ElementName = "serviceInfo")]
+public class Serviceinfo
+{
+    [XmlElement("profiles")]
+    public List&lt;Profile&gt; Profiles { get; set; }
+}
+
+public class Profile
+{
+    [XmlElement(ElementName = "profile")]
+    public string Name { get; set; }
+    [XmlElement(ElementName = "state")]
+    public int State { get; set; }
+}
+</code></pre>
+
+<p>and use <code>XmlSerializer</code>:</p>
+
+<pre><code>var serviceInfo = new Serviceinfo
+{
+    Profiles = new List&lt;Profile&gt;() {
+        new Profile { Name = "one", State = 1 },
+        new Profile { Name = "two", State = 2 }
+    }
+};
+
+var writer = new StringWriter();
+var serializer = new XmlSerializer(typeof(Serviceinfo));
+
+serializer.Serialize(writer, serviceInfo);
+
+var xml = writer.ToString();
+</code></pre>

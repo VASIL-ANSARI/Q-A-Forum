@@ -1,0 +1,68 @@
+<p>Url rule:</p>
+
+<pre><code>array(
+    '&lt;username:\w+&gt;'=&gt;'user/view',
+)
+</code></pre>
+
+<p>Note that in such scheme, you must also create rules for all your controllers and place above rule at the end, so better prefix it with user:</p>
+
+<pre><code>array(
+    'user/&lt;username:\w+&gt;'=&gt;'user/view',
+)
+</code></pre>
+
+<p>Resulting url will be <code>example.com/user/username</code></p>
+
+<p>In action:</p>
+
+<pre><code>public function actionView($username) ...
+</code></pre>
+
+<p><strong>Update:</strong>
+To make rule which reacts on any input variable create custom url rule class, here is some example, modify to your needs:</p>
+
+<pre><code>class PageUrlRule extends CBaseUrlRule
+{
+
+        public function createUrl($manager, $route, $params, $ampersand)
+        {
+                // Ignore this rule for creating urls
+                return false;
+        }
+
+        public function parseUrl($manager, $request, $pathInfo, $rawPathInfo)
+        {
+                // Ignore / url or any controller name - which could conflict with username
+                if($pathInfo == '/')
+                {
+                        return true;
+                }
+                // Search for username or any resource in db
+                // This is for mongo so it should be tuned to your db,
+                // just check if username exists
+                $criteria = new EMongoCriteria();
+                $criteria-&gt;url-&gt;$lang = $url;
+                $criteria-&gt;select(['_id']);
+                $criteria-&gt;limit(1);
+                $model = PageItem::model();
+                $cursor = $model-&gt;findAll($criteria);
+                // Create route, instead of $url id can be used
+                $route = sprintf('content/page/view/url/%s', urlencode($url));
+                // If found return route or false if not found
+                return $cursor-&gt;count() ? $route : false;
+        }
+
+}
+</code></pre>
+
+<p>Then place this rule in beginning of urlmanager config</p>
+
+<pre><code>'rules' =&gt; [
+    [
+        'class' =&gt; 'application.modules.content.components.PageUrlRule'
+    ],
+    // Other rules here
+</code></pre>
+
+<p><strong>Important</strong>: If user has username same as your controller, it will match username and controller will be inaccessible. You must forbid registering users with same names as controllers.</p>

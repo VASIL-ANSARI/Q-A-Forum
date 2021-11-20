@@ -1,0 +1,25 @@
+<p><code>next</code> is a construction of <code>connect</code> which is a middleware library underlying the Express web server. But you're passing your own handler function to the http server. You should make the http server use the express app to handle requests. Then express's middleware makes it simple.</p>
+
+<pre><code>var http = require('http');
+var auth = require('basic-auth');
+var app = require('express')();
+var server = http.Server(app);
+server.listen(3000);
+
+app.get('/', ensureCredentials, function(req, res){
+  res.sendFile(path.resolve(app.get('appPath') + '/index.html'));
+})
+app.all('*', function(req, res){
+  res.redirect('/');
+})
+function ensureCredentials(req, res, next){
+  // do logic
+  if(){
+    res.status(403).send('Unauthorized')
+  } else {
+    next();
+  }
+}
+</code></pre>
+
+<p>Its important to understand that Express doesn't execute any middlewares after a response is sent with <code>res.send(), res.json(), res.end(), res.redirect()</code>. So in one situation (<code>/</code> with bad auth), the <code>ensureCredentials</code> function sends a 403 and the <code>app.get('/')</code> handler won't be run. In another situation, the auth checks out, <code>next()</code> is called, and the <code>app.get('/')</code> handler is run.</p>

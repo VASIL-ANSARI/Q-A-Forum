@@ -1,0 +1,56 @@
+<p>Edit.
+Basically that code is first calculating the number of nanoseconds per 1/60 second,  then using that to convert the delta to a normalized value.  It's a confusing way of doing it though.</p>
+
+<p>This might be easier to think about:</p>
+
+<pre><code>double nano = 1000000000.0;
+double updateIntervalInSec =  1 / 60.0;
+double delta = 0;
+
+delta += (now-lastTime) / nano;//convert nano to seconds here
+
+while(delta &gt;= updateIntervalInSec)
+{
+  delta -= updateIntervalInSec;
+}
+</code></pre>
+
+<p>Earlier answer; might be useful for someone.</p>
+
+<p>This type of game loop is designed to solve a couple problems.</p>
+
+<ol>
+<li>Make the update rate independent of rendering rate</li>
+<li>Make the time increment per update constant.</li>
+</ol>
+
+<p>The first consideration is important for slow or potentially slow computers;  even if you can't SHOW updates fast enough, the game should (usually) still update at normal speed.</p>
+
+<p>The second consideration is important for games with physics;  updating a physics system with variable time intervals/increments makes physics unhappy.</p>
+
+<p>Now for that implementation.</p>
+
+<pre><code>//run this loop as fast as possible
+while (running) { 
+    long now = System.nanoTime();
+
+    //delta is to collect up the amount of time since the last loop and put it
+    //into our bucket of time
+    delta +=(now - lastTime) / clock;
+
+
+    System.out.println(now-lastTime);
+    lastTime = now;
+
+    //if we have accumulated enough time to meet the minimum requirements for an update, then run one update, and remove one increment of time from our bucket of available time.
+    //but what if we have more time left in the delta bucket?   We need to keep doing updates until we've used up all the available time.
+    while (delta &gt;= 1){
+    //update requires 1 time
+        update();
+        delta--;
+    }
+    //now that we've made sure all the updates are up to date, we can render
+    //note that render happens no matter if 10 updates, or 0 updates were just run
+    render();
+}
+</code></pre>

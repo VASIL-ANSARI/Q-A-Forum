@@ -1,0 +1,18 @@
+<p>If you use <code>await task.ConfigureAwait(false)</code>, then the rest of that method (and whatever you call from there) will not execute on the original context. But this won't affect any code higher up in the logical call tree.</p>
+
+<p>And I think this is the only logical way to do it. If the code higher up has to be executed on the original context (which is quite common), then <code>ConfigureAwait()</code> somewhere deep inside library code really shouldn't affect it.</p>
+
+<p>To make this more concrete, the following simple example of using <code>await</code> in Winforms wouldn't work if <code>ConfigureAwait()</code> behaved according to you:</p>
+
+<pre><code>async void ButtonClicked(object sender, EventArgs e)
+{
+    textBlock.Text = "Downloading";
+    await DownloadAsync();
+    textBlock.Text = "Finished";
+}
+
+async Task DownloadAsync()
+{
+    data = await new HttpClient().GetStringAsync(url).ConfigureAwait(false);
+}
+</code></pre>

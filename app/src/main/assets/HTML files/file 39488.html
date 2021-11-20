@@ -1,0 +1,24 @@
+<p>Instead of deleting a bunch of rows, create a temporary table with the data you want, then truncate the original table and insert it back in:</p>
+
+<pre><code>create table temp_table1 as
+    select t.*
+    from (select t1.*,
+                 (@rn := if(@prevd &lt;&gt; date or minute(time) &lt;&gt; @prevm, 1,
+                            if(@prevd := date, if(@prevm := minute(time), 1, 1), 1)
+                           )
+                 ) as seqnum
+          from table1 t1 cross join
+               (select @rn := 0, @prevd := 0, @prevm := 0) vars
+          order by date, time
+         ) t
+     where seqnum = 1;
+
+
+truncate table table1;
+
+insert into table1(col1, . . ., coln)
+    select col1, . . . , coln
+    from temp_table1;
+</code></pre>
+
+<p>The first query has a subquery that enumerates the rows within a minute.  Then, only the first is kept.  This is then inserted into an empty version of the table.  Of course, test the results from the first query before truncating the original table (and I would copy over the data somewhere else, just in case).</p>

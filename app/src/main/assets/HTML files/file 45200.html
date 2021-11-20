@@ -1,0 +1,58 @@
+<p>C++14 feature, reimplemented:</p>
+
+<pre><code>template&lt;class...&gt;struct voider{using type=void;};
+template&lt;class...Ts&gt;using void_t=typename voider&lt;Ts...&gt;::type;
+</code></pre>
+
+<p>A mini metaprogramming library:</p>
+
+<pre><code>template&lt;class...&gt;struct types{using type=types;};
+namespace details {
+  template&lt;template&lt;class...&gt;class Z, class types, class=void&gt;
+  struct can_apply : std::false_type {};
+  template&lt;template&lt;class...&gt;class Z, class...Ts&gt;
+  struct can_apply&lt; Z, types&lt;Ts...&gt;, void_t&lt; Z&lt;Ts...&gt; &gt; &gt;:
+    std::true_type
+  {};
+}
+template&lt;template&lt;class...&gt;class Z, class...Ts&gt;
+using can_apply = details::can_apply&lt;Z,types&lt;Ts...&gt;&gt;;
+</code></pre>
+
+<p><code>can_apply&lt; some_template, args... &gt;</code> inherits from <code>true_type</code> iff <code>some_template&lt;args...&gt;</code> is a valid expression (in the immediate context).</p>
+
+<p>Now for your problem:</p>
+
+<pre><code>template&lt;class T, class I&gt;
+using dot_count_type = decltype( std::declval&lt;T&gt;().count(std::declval&lt;I&gt;()) );
+
+template&lt;class T, class I&gt;
+using has_dot_count = can_apply&lt;dot_count_type, T, I&gt;;
+</code></pre>
+
+<p>and <code>has_dot_count</code> is a traits class that inherits from <code>true_type</code> iff <code>T.count(I)</code> is a valid expression.</p>
+
+<pre><code>namespace details {
+  template&lt;class C, class I&gt;
+  bool contains(std::false_type, C const&amp; c, I const&amp; i) {
+    for(auto&amp;&amp; x:c) {
+      if(x == i) { return true; }
+    }
+    return false;
+  }
+  template&lt;class C, class I&gt;
+  bool contains(std::true_type, C const&amp; c, I const&amp; i) {
+    return c.count(i) != 0;
+  }
+}
+template&lt;class C, class I&gt;
+bool contains( C const&amp; c, I const&amp; i ) {
+  return details::contains( has_dot_count&lt;C const&amp;,I const&amp;&gt;{}, c, i );
+}
+</code></pre>
+
+<p>which uses tag dispatching instead of SFINAE.</p>
+
+<p>Using <code>find</code> seems like a better idea than <code>.count</code> as an aside.  In fact, in one case you should use <code>.find</code> the other <code>find</code>.  In both cases you should use <code>using std::end; auto e = end(c);</code>.</p>
+
+<p>As an aside, MSVC 2013 (I don't know about 2015) doesn't handle this kind of SFINAE used above.  They call it "expression SFINAE".  They have custom extensions to detect the existence of a member function.  But that is because they are far from C++11 standard compliant.</p>

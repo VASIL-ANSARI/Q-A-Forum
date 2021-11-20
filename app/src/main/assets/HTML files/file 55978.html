@@ -1,0 +1,111 @@
+<p>Please if someone have any solution for the issue let me know, ASAP.
+I'll break the code for more understanding:</p>
+
+<ol>
+<li><p>Get proxy by Proxy vole plugin/jar</p>
+
+<pre><code> public static List&lt;Proxy&gt; getSSLCertificateAutoProxy(String urlStr) throws Exception{          
+setCertificate();
+/*ProxySearch proxySearch = ProxySearch.getDefaultProxySearch();*/
+ProxySearch proxySearch = new ProxySearch();
+proxySearch.setPacCacheSettings(32, 1000*60*5);
+if (PlatformUtil.getCurrentPlattform() == Platform.WIN) { 
+    proxySearch.addStrategy(Strategy.IE); 
+    proxySearch.addStrategy(Strategy.FIREFOX); 
+    proxySearch.addStrategy(Strategy.JAVA); 
+} else if (PlatformUtil.getCurrentPlattform() == Platform.LINUX) { 
+    proxySearch.addStrategy(Strategy.GNOME); 
+    proxySearch.addStrategy(Strategy.KDE); 
+    proxySearch.addStrategy(Strategy.FIREFOX); 
+} else { 
+    proxySearch.addStrategy(Strategy.OS_DEFAULT); 
+}       
+
+
+ProxySelector proxySelector = proxySearch.getProxySelector();
+/*BufferedProxySelector cachedSelector = new BufferedProxySelector(32, 1000*60*5, proxySelector);*/
+
+
+ProxySelector.setDefault(proxySelector); 
+//ProxySelector.setDefault(cachedSelector);
+URI home = URI.create(urlStr);  
+//List&lt;Proxy&gt; proxyList = cachedSelector.select(home); 
+List&lt;Proxy&gt; proxyList = proxySelector.select(home);
+return proxyList;
+}
+</code></pre></li>
+<li><p>Get Proxy using java.net.useSystemProxies</p>
+
+<pre><code>public static List&lt;Proxy&gt; getSSLCertificateSysProxy(String urlStr) throws Exception{
+ setCertificate();      
+ System.setProperty("java.net.useSystemProxies","true");
+ List&lt;Proxy&gt; proxyList = ProxySelector.getDefault().select(new URI(urlStr));
+
+ return proxyList;
+
+}
+</code></pre></li>
+<li><p>Get proxy from PAC:</p>
+
+<pre><code>public static List&lt;Proxy&gt; getSSLCertificatePACProxy(String urlStr) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException, KeyManagementException, ProxyConfigException{
+setCertificate();       
+List&lt;Proxy&gt; proxyList = new ArrayList&lt;Proxy&gt;();
+String proxypac = "&lt;http://mydomain/proxy.pac&gt;";        
+BrowserProxyInfo b = new BrowserProxyInfo();
+/*WDefaultBrowserProxyConfig wd = new WDefaultBrowserProxyConfig();
+BrowserProxyInfo b = wd.getBrowserProxyInfo();        */
+b.setType(ProxyType.AUTO);
+b.setAutoConfigURL(proxypac);       
+DummyAutoProxyHandler handler = new DummyAutoProxyHandler();
+handler.init(b);
+
+URL url = new URL(urlStr);
+ProxyInfo[] ps = handler.getProxyInfo(url); 
+for(ProxyInfo p: ps){
+
+    String proxyHost = p.getProxy();
+    int proxyPort = p.getPort(); 
+
+    //Create your proxy and setup authentication for it.
+    Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort));                      
+    //Setup authentication for your proxy.
+    /*Authenticator.setDefault(new Authenticator() {
+
+          @Override
+          protected PasswordAuthentication getPasswordAuthentication() {
+            return new PasswordAuthentication("&lt;user&gt;", "&lt;password&gt;".toCharArray());
+          }
+    });*/
+    proxyList.add(proxy);
+
+}
+return proxyList;
+
+}
+</code></pre></li>
+<li><p>Get proxy by directly passing known proxy hostname and port</p>
+
+<pre><code>private static List&lt;Proxy&gt; getSSLCertificateConstantProxy() throws Exception{
+
+ setCertificate();
+ List&lt;Proxy&gt; proxyList = new ArrayList&lt;Proxy&gt;();
+ String proxyHost = "&lt;myproxy.hostname&gt;";
+ InetAddress hostIp = InetAddress.getByName(proxyHost);
+ int proxyPort = Integer.parseInt("&lt;myProxyPort&gt;"));
+
+ //Create your proxy and setup authentication for it.
+ Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(hostIp.getHostAddress(), proxyPort));                       
+ //Setup authentication for your proxy.
+ /*Authenticator.setDefault(new Authenticator() {
+
+      @Override
+      protected PasswordAuthentication getPasswordAuthentication() {
+        return new PasswordAuthentication("&lt;user&gt;", "&lt;password&gt;".toCharArray());
+      }
+ });*/
+
+ proxyList.add(proxy);
+ return proxyList; 
+}
+</code></pre></li>
+</ol>

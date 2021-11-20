@@ -1,0 +1,73 @@
+<p>No offense meant but .. your code and consequently your question is a mess ;-) Plus you don't explain what exactly you want to achieve. </p>
+
+<p>Trying to detangle, taking the nested layouts/resizing characteristics (as seen in the snippets, might not be complete):</p>
+
+<pre><code>frame // BorderLayout
+   mainPanel // FlowLayout
+       pnlTabel  // FlowLayout, hard-coded prefSize
+           pane // scrollPane 
+               mainTable // auto-resize-off
+</code></pre>
+
+<p>Aside: intentionally kept untelling names to demonstrate how mixing naming schemes tend to contribute to overall confusion :-) Doesn't really matter whether you decide for pre or postFixing some type-related marker, but if you do be consistent.</p>
+
+<p>In that hierarchy, there are two levels of FlowLayout which <em>basically</em> will layout their children at their respective prefs and adjusting their own pref accordingly, <em>lest</em> the pref were hard-coded on the level of the pnlTable: however the table's pref will be changed (by changing the column prefs) it <em>cannot</em> bubble further up because ... hard-coding the pref leads <em>not</em> calculating its size (neither by layoutManager and nor uiDelegate, both never get a chance to do it)</p>
+
+<p>Another issue - the more interesting one :-) - is that the JScrollPane is somewhat special in </p>
+
+<ul>
+<li>calculating its own prefSize from its view's pref/scrollablePrefViewportSize depending on whether or not the view implements Scrollable (JTable does so, though in a crappy way)</li>
+<li>being a validationRoot: invalidating the view (or any children) doesn't bubble further up the hierarchy</li>
+</ul>
+
+<p>Assuming that you want the table's scrollPane to grow if the prefWidts of the columns change, there are two thingies to tweak:</p>
+
+<ul>
+<li>implement table's getPreferredScrollableWidth to return a value calculated based on the prefWidth of the columns</li>
+<li>revalidate a container higher up in the hierarchy</li>
+</ul>
+
+<p>Some code to play with:</p>
+
+<pre><code>final JTable table = new JTable(50, 10) {
+    // properties to base a reasonable prefScrollable size
+    int visibleColumns = 3;
+    int visibleRows = 10;
+    // hard-coded default in super
+    Dimension dummySuper = new Dimension(450, 400);
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+        Dimension dim =  super.getPreferredScrollableViewportSize();
+        if (!dummySuper.equals(dim)) return dim;
+        dim = new Dimension();
+        for (int column = 0; column &lt; Math.min(visibleColumns, getColumnCount()); column++) {
+            dim.width += getColumnModel().getColumn(column).getPreferredWidth();
+        }
+        dim.height = visibleRows * getRowHeight();
+        return dim;
+    }
+
+};
+table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+for (int i = 0; i &lt; table.getRowCount(); i++) {
+    table.setValueAt("row: " + i, i, 0);
+}
+JComponent tablePanel = new JPanel();
+tablePanel.add(new JScrollPane(table));
+
+Action sizeColumns = new AbstractAction("size columns") {
+    int prefWidth = 75;
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        int newWidth = prefWidth + 15;
+        for (int i = 0; i &lt; table.getColumnCount(); i++) {
+            if (table.getColumnModel().getColumn(i).getPreferredWidth() == prefWidth)
+                table.getColumnModel().getColumn(i).setPreferredWidth(newWidth);
+        }
+        prefWidth = newWidth;
+        // revalidate "higher up" than the table itself
+        frame.revalidate();
+    }
+};
+frame.add(new JButton(sizeColumns), BorderLayout.SOUTH);
+</code></pre>

@@ -1,0 +1,26 @@
+<p>Contrary to running your application in production, a Rake task does <em>not</em> eager load your entire code base. You can see it in <a href="https://github.com/rails/rails/blob/master/railties/lib/rails/application/finisher.rb">the source</a>:</p>
+
+<pre><code>module Rails
+  class Application
+    module Finisher
+      # ...
+      initializer :eager_load! do
+        if config.cache_classes &amp;&amp; !$rails_rake_task
+          ActiveSupport.run_load_hooks(:before_eager_load, self)
+          eager_load!
+        end
+      end
+      # ...
+    end
+  end
+end
+</code></pre>
+
+<p>So <em>only</em> if <code>$rails_rake_task</code> is <code>false</code>, will the application be eager-loaded in production. And <code>$rails_rake_task</code> is set to <code>true</code> in the <code>:environment</code> Rake task.</p>
+
+<p>The easiest workaround is to simply <code>require</code> the model that you need. However, if you <em>really</em> need all of your application to be loaded in the Rake task, it is quite simple to load it:</p>
+
+<pre><code>Rails.application.eager_load!
+</code></pre>
+
+<p>The reason all of this work in development is because Rails autoloads your models in development mode. This also works from within a Rake task.</p>

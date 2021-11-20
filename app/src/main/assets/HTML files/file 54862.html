@@ -1,0 +1,145 @@
+<p>You have to set your already initialized custom search bar to be returned in the overriden search bar getter for you custom UISearchController class and setup its properties after the searchcontroller init, this way all the UISearchController functionality are retained:</p>
+
+<pre><code>public class DSearchController: UISearchController {
+
+    private var customSearchBar = DSearchBar()
+    override public var searchBar: UISearchBar {
+        get {
+            return customSearchBar
+        }
+    }
+
+    required public init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+    }
+    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+    }
+    public init(searchResultsController: UIViewController?,
+                searchResultsUpdater: UISearchResultsUpdating?,
+                delegate: UISearchControllerDelegate?,
+                dimsBackgroundDuringPresentation: Bool,
+                hidesNavigationBarDuringPresentation: Bool,
+                searchBarDelegate: UISearchBarDelegate?,
+                searchBarFrame: CGRect?,
+                searchBarStyle: UISearchBarStyle,
+                searchBarPlaceHolder: String,
+                searchBarFont: UIFont?,
+                searchBarTextColor: UIColor?,
+                searchBarBarTintColor: UIColor?, // Bar background
+                searchBarTintColor: UIColor) { // Cursor and bottom line
+
+        super.init(searchResultsController: searchResultsController)
+
+        self.searchResultsUpdater = searchResultsUpdater
+        self.delegate = delegate
+        self.dimsBackgroundDuringPresentation = dimsBackgroundDuringPresentation
+        self.hidesNavigationBarDuringPresentation = hidesNavigationBarDuringPresentation        
+
+        customSearchBar.setUp(searchBarDelegate,
+                              frame: searchBarFrame,
+                              barStyle: searchBarStyle,
+                              placeholder: searchBarPlaceHolder,
+                              font: searchBarFont,
+                              textColor: searchBarTextColor,
+                              barTintColor: searchBarBarTintColor,
+                              tintColor: searchBarTintColor)
+
+    }
+}
+</code></pre>
+
+<p>And this is my custom searchBar:</p>
+
+<pre><code>public class DSearchBar: UISearchBar {
+
+    var preferredFont: UIFont?
+    var preferredTextColor: UIColor?
+
+    init(){
+        super.init(frame: CGRect.zero)
+    }
+
+    func setUp(delegate: UISearchBarDelegate?,
+               frame: CGRect?,
+               barStyle: UISearchBarStyle,
+               placeholder: String,
+               font: UIFont?,
+               textColor: UIColor?,
+               barTintColor: UIColor?,
+               tintColor: UIColor?) {
+
+        self.delegate = delegate
+        self.frame = frame ?? self.frame
+        self.searchBarStyle = searchBarStyle
+        self.placeholder = placeholder
+        self.preferredFont = font
+        self.preferredTextColor = textColor
+        self.barTintColor = barTintColor ?? self.barTintColor
+        self.tintColor = tintColor ?? self.tintColor
+        self.bottomLineColor = tintColor ?? UIColor.clearColor()
+
+        sizeToFit()
+
+        //        translucent = false
+        //        showsBookmarkButton = false
+        //        showsCancelButton = true
+        //        setShowsCancelButton(false, animated: false)
+        //        customSearchBar.backgroundImage = UIImage()
+    }
+
+    required public init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+    }
+
+
+    let bottomLine = CAShapeLayer()
+    var bottomLineColor = UIColor.clearColor()
+
+    override public func layoutSubviews() {
+        super.layoutSubviews()
+
+        for view in subviews {
+            if let searchField = view as? UITextField { setSearchFieldAppearance(searchField); break }
+            else {
+                for sView in view.subviews {
+                    if let searchField = sView as? UITextField { setSearchFieldAppearance(searchField); break }
+                }
+            }
+        }
+
+        bottomLine.path = UIBezierPath(rect: CGRectMake(0.0, frame.size.height - 1, frame.size.width, 1.0)).CGPath
+        bottomLine.fillColor = bottomLineColor.CGColor
+        layer.addSublayer(bottomLine)
+    }
+
+    func setSearchFieldAppearance(searchField: UITextField) {
+        searchField.frame = CGRectMake(5.0, 5.0, frame.size.width - 10.0, frame.size.height - 10.0)
+        searchField.font = preferredFont ?? searchField.font
+        searchField.textColor = preferredTextColor ?? searchField.textColor
+        //searchField.backgroundColor = UIColor.clearColor()
+        //backgroundImage = UIImage()
+    }
+
+}
+</code></pre>
+
+<p>Init example:</p>
+
+<pre><code>searchController = DSearchController(searchResultsController: ls,
+                                     searchResultsUpdater: self,
+                                     delegate: self,
+                                     dimsBackgroundDuringPresentation: true,
+                                     hidesNavigationBarDuringPresentation: true,
+                                     searchBarDelegate: ls,
+                                     searchBarFrame: CGRectMake(0.0, 0.0, SCREEN_WIDTH, 44.0),
+                                     searchBarStyle: .Minimal,
+                                     searchBarPlaceHolder: NSLocalizedString("Search a location...", comment: ""),
+                                     searchBarFont: nil,
+                                     searchBarTextColor: nil,
+                                     searchBarBarTintColor: UIColor.whiteColor(),
+                                     searchBarTintColor: iconsColor)
+searchController.searchBar.keyboardAppearance = .Dark
+definesPresentationContext = true
+tableView.tableHeaderView = searchController.searchBar
+</code></pre>

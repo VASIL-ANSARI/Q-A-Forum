@@ -1,0 +1,116 @@
+<p>Of course it starts at <code>0</code> again, that's what you are setting it to in the <code>Income</code> method. You need <code>mineral</code> to be a static member:</p>
+
+<pre><code>public class AlphaCygni : StarSystem
+{
+    private static int mineral = 0;
+    public static int Income(int a)
+    {
+        // Here with int mineral, you can see it starts at 0 but each addition with a (hydrogenIncome) should increase the number.
+
+        mineral += a
+        Console.WriteLine(mineral);
+        return mineral;
+
+        // The result of the addition returns mineral
+    }
+}
+</code></pre>
+
+<p>Or, you could try and understand object orientated programming and use instances of classes instead of a bunch of static classes with static methods and members. </p>
+
+<p>Without knowing <em>exactly</em> what you are doing. I would refactor this into something like this:</p>
+
+<pre><code>public class StarSystem
+{
+    public int Minerals { get; set; }
+    public string Name { get; private set; }
+
+    public StarSystem(string name) 
+    {
+        Name = name;
+    }
+}
+</code></pre>
+
+<p>And now, instead of creating derived classes for every system (which will quickly become unmanageable), you can just create an instance of <code>StarSystem</code>:</p>
+
+<pre><code>var alphaCygni = new StarSystem("Alpha Cygni");
+</code></pre>
+
+<p>And to increase it's <code>Minerals</code> property:</p>
+
+<pre><code>alphaCygni.Minerals += hydrogenIncome;
+</code></pre>
+
+<p>Note that you will <em>not</em> create a new instance of <code>StarSystem</code> every time you run your <code>Market</code> method, you need to keep the references to the instances you created so you can update them.</p>
+
+<p>If you have a bunch of these (which I assume you probably do), then you could but them in a collection. A dictionary might be a good fit:</p>
+
+<pre><code>var starSystems = new Dictionary&lt;string,StarSystem&gt;();
+
+starSystems["Alpha Cygni"] = new StarSystem("Alpha Cygni");
+starSystems["Sol"] = new StarSystem("Sol");
+//... and so on
+</code></pre>
+
+<p>And when you want to increase their <code>Minerals</code>:</p>
+
+<pre><code>starSystems["Alpha Cygni"].Minerals += hydrogenIncome;
+</code></pre>
+
+<p>You might even use an <code>enum</code> for the key rather than strings to avoid mistyping the system name. Or you might create your own specialized collection derived from <code>Dictionary</code> to avoid having to type the name twice when you create a new <code>StarSystem</code> and add it to the collection.</p>
+
+<p>Or if you don't need to be able to quickly access an instance of <code>StarSystem</code> by name, a simple list would be sufficient.</p>
+
+<p>So your <code>Economy</code> class might become something like this:</p>
+
+<pre><code>public class Economy
+{
+    private Dictionary&lt;string,StarSystem&gt; systems;
+
+    public Economy()
+    {
+        // Create and populate your systems
+        // We'll hardcode a couple here, but you might load them some external resource
+        systems = new  Dictionary&lt;string,StarSystem&gt;();
+        starSystems["Alpha Cygni"] = new StarSystem("Alpha Cygni");
+        starSystems["Sol"] = new StarSystem("Sol");
+    }
+
+    public void Market() 
+    {
+        Console.WriteLine("This.");
+        Thread.Sleep(250);
+
+        int miningRate = 4;     // This is the rate at which the resource is mined.
+                                // If it is increased, Random() will be able to generate from a larger selection,
+                                // increasing the chances of getting a larger integer.
+
+        int hydrogenIncome = RandomNumber.GetRandomClass(1, miningRate);    // RandomNumber.GetRandomClass (omitted) 
+                                                                            // generates a random number between 1 and miningRate
+
+        // this will increase every system by the same amount
+        // that's probably not exactly what you want, but you can adapt as needed
+        foreach (var system in systems.Values)
+        {
+            system.Minerals += hydrogenIncome;
+        }
+
+
+        ContinueLoop();
+    }
+
+    private void ContinueLoop()
+    {
+        Console.WriteLine("End.");
+
+        // ContinueLoop simply keeps the loop going, calling Economy.Market() so the whole process will continue.
+
+        Thread.Sleep(250);
+
+        Market();
+    }
+}
+</code></pre>
+
+<p>Although I suspect that <code>miningRate</code> and/or <code>hydrogenEconomy</code> are supposed to be class members too. It's really not clear from your description.</p>

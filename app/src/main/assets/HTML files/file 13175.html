@@ -1,0 +1,30 @@
+<p>Finally got it to work (I think), the working server looks like this:</p>
+
+<pre><code>require 'socket'
+@host = "0.0.0.0"
+@port = 80
+BasicSocket.do_not_reverse_lookup = true
+# Create socket and bind to address
+@socket = UDPSocket.new
+@socket.setsockopt(Socket::SOL_SOCKET,Socket::SO_BROADCAST, 1)
+@socket.bind(@host, @port)
+@clientPorts = []
+
+def broadcast(data, clients)                   
+  puts clients
+  clients.each do |client|
+    @socket.send(data, 0, @host, client)
+  end
+end
+
+while true
+  data, client = @socket.recvfrom(1024)
+  Thread.new(client) do |clientAddress|
+    puts "New client has joined" 
+    unless @clientPorts.include? clientAddress[1]
+      @clientPorts &lt;&lt; clientAddress[1]
+    end
+    broadcast(data, @clientPorts)
+  end
+end
+</code></pre>

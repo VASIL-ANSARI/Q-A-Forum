@@ -1,0 +1,68 @@
+<p>Assuming you know the number of possible values of the array1_nbr column, then you can PIVOT the results.  </p>
+
+<p>Here's one way with <code>MAX</code> and <code>CASE</code>:</p>
+
+<pre><code>SELECT Key_Code,
+  MAX(CASE WHEN array1_nbr = 11 THEN fDSHhldDetails END) fDSHhldDetails11,
+  MAX(CASE WHEN array1_nbr = 12 THEN fDSHhldDetails END) fDSHhldDetails12
+FROM YourTable
+GROUP BY Key_Code
+</code></pre>
+
+<ul>
+<li><a href="http://sqlfiddle.com/#!3/cebbd/3" rel="nofollow">SQL Fiddle Demo</a></li>
+</ul>
+
+<p>Here's with a <code>PIVOT</code>:</p>
+
+<pre><code>SELECT Key_Code, [11] fDSHhldDetails11, [12] 
+FROM 
+(
+  SELECT Key_Code, array1_nbr
+  FROM YourTable) p
+PIVOT
+(
+  MAX(array1_nbr)
+  FOR array1_nbr IN
+  ( [11], [12] )
+) pvt;
+</code></pre>
+
+<ul>
+<li><a href="http://sqlfiddle.com/#!3/3b4fa/2" rel="nofollow">Another Fiddle Demo</a></li>
+</ul>
+
+<hr>
+
+<p>Alternatively, if you don't know the number of columns, then look into using <code>Dynamic SQL</code>.  </p>
+
+<p>Here's that example:</p>
+
+<pre><code>DECLARE @cols AS NVARCHAR(MAX),
+    @query  AS NVARCHAR(MAX)
+
+SET @cols = STUFF((SELECT distinct ',' + QUOTENAME(array1_nbr) 
+            FROM YourTable c
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)') 
+        ,1,1,'')
+
+SET @query = 'SELECT Key_code, ' + @cols + ' 
+              FROM 
+              (
+                SELECT Key_Code, array1_nbr
+                FROM YourTable
+               ) p
+              PIVOT 
+              (
+                 MAX(array1_nbr)
+                 for array1_nbr in (' + @cols + ')
+              ) p '
+
+
+EXECUTE(@query)
+</code></pre>
+
+<ul>
+<li><a href="http://sqlfiddle.com/#!3/3b4fa/5" rel="nofollow">Last Fiddle</a></li>
+</ul>

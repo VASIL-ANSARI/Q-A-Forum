@@ -1,0 +1,56 @@
+<p>I am not entirely sure what you are trying to achieve with your function but here is an example of how I might go about capturing both the data and the headers from a HTTP request. Perhaps it will help you achieve what you are trying to do:</p>
+
+<pre><code>#include &lt;curl/curl.h&gt;
+
+size_t write_func(void* buf, size_t size, size_t nmemb, void* userp)
+{
+    if(userp)
+    {
+        std::string&amp; s = *static_cast&lt;std::string*&gt;(userp);
+        std::string::size_type len = size * nmemb;
+        s.append(static_cast&lt;char*&gt;(buf), len);
+        return nmemb;
+    }
+
+    return 0;
+}
+
+int main()
+{
+    CURL* curl = curl_easy_init();
+    CURLcode code = CURLE_OK;
+
+    std::string url = "http://google.com/search?q=wibble";
+
+    long timeout = 60; // seconds
+
+    std::string data;
+    std::string headers;
+
+    if(CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &amp;write_func))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_WRITEDATA, &amp;data))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_WRITEHEADER, &amp;headers))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout))
+    || CURLE_OK != (code = curl_easy_setopt(curl, CURLOPT_URL, url.c_str())))
+    {
+        std::cerr &lt;&lt; curl_easy_strerror(code) &lt;&lt; '\n';
+        return 1;
+    }
+
+    if(CURLE_OK != (code = curl_easy_perform(curl)))
+    {
+        std::cerr &lt;&lt; curl_easy_strerror(code) &lt;&lt; '\n';
+        return 1;
+    }
+
+    std::cout &lt;&lt; "Data:" &lt;&lt; '\n';
+    std::cout &lt;&lt; data &lt;&lt; '\n';
+
+    std::cout &lt;&lt; "Headers:" &lt;&lt; '\n';
+    std::cout &lt;&lt; headers &lt;&lt; '\n';
+
+    curl_easy_cleanup(curl);
+}
+</code></pre>

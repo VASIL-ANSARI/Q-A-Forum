@@ -1,0 +1,85 @@
+<p>First of all, a small note on terminology: what you have isnât a function declaration. This is a function declaration:</p>
+
+<pre><code>function fooBar() {
+}
+</code></pre>
+
+<p>It creates a function named <code>fooBar</code> accessible through the variable <code>fooBar</code>. This is an assignment involving a named function expression:</p>
+
+<pre><code>var foo = function fooBar() {
+};
+</code></pre>
+
+<p>The functionâs name is still <code>fooBar</code>, but the function is only bound to a <code>fooBar</code> variable inside the function itself and not outside. The fact that it does make the function accessible inside its scope without needing to refer to a variable in an outer scope, though, means that there are two reasons to name it:</p>
+
+<ul>
+<li><p>For the ability to refer to the function inside itself regardless of code in the outer function!</p>
+
+<p>This can return whatever the outer function wants:</p>
+
+<pre><code>function fooBar() {
+    return fooBar.toString();
+}
+
+var baz = fooBar;
+fooBar = 5;
+baz(); // "5"
+</code></pre>
+
+<p>This is always consistent:</p>
+
+<pre><code>var fooBar = function fooBar() {
+    return fooBar.toString();
+};
+
+var baz = fooBar;
+fooBar = 5;
+baz(); // "function fooBar() { â¦"
+</code></pre></li>
+<li><p>And yes, for a more detailed stack trace:</p>
+
+<pre><code>function trace(func) {
+    try {
+        func();
+    } catch (error) {
+        console.log(error.stack);
+    }
+}
+
+trace(function () {
+    throw new Error("Bad thing");
+});
+/*
+Error: Bad thing
+    at /home/ryan/test.js:10:18
+    at trace (/home/ryan/test.js:3:16)
+    at Object.&lt;anonymous&gt; (/home/ryan/test.js:9:8)
+    at Module._compile (module.js:410:26)
+    at Object.Module._extensions..js (module.js:428:10)
+    at Module.load (module.js:335:32)
+    at Function.Module._load (module.js:290:12)
+    at Function.Module.runMain (module.js:451:10)
+    at startup (node.js:123:18)
+    at node.js:866:3
+*/
+
+trace(function descriptiveName() {
+    throw new Error("Bad thing");
+});
+/*
+Error: Bad thing
+    at descriptiveName (/home/ryan/test.js:14:18)
+    at trace (/home/ryan/test.js:3:16)
+    at Object.&lt;anonymous&gt; (/home/ryan/test.js:13:8)
+    at Module._compile (module.js:410:26)
+    at Object.Module._extensions..js (module.js:428:10)
+    at Module.load (module.js:335:32)
+    at Function.Module._load (module.js:290:12)
+    at Function.Module.runMain (module.js:451:10)
+    at startup (node.js:123:18)
+    at node.js:866:3
+*/
+</code></pre>
+
+<p>(Node.js pictured here.) Note the <code>descriptiveName</code> at the top of the second stack trace. This is especially convenient when you have slightly complicated systems of asynchronous callbacks, events, methods on objects that are passed around, and so on.</p></li>
+</ul>

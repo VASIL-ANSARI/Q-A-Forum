@@ -1,0 +1,73 @@
+<p>Try this? (It only works on C++14 since it uses auto lambda)</p>
+
+<pre><code>auto func = [&amp;](auto&amp; theThing){
+    // blah, blah code
+};
+
+func(arrayRight[cursor]);
+func(arrayLeft [cursor]);
+</code></pre>
+
+<p><code>[&amp;]</code> here means import all variables in the same scope into the lambda function.</p>
+
+<p>For older C++ version, I use the following code as a ugly way (in a school's project of C99).</p>
+
+<pre><code>int* pData[2] = {arrayRight, arrayLeft};
+for (int i=0; i&lt;2; i++)
+{
+    int* theThing = pData[i];
+    // blah, blah
+}
+</code></pre>
+
+<p>Some of my friend told me macro can hold VA_ARGS so here is a macro way. It should work on GCC. But for MSVC 2003, it doesn't work though. (<code>__typeof</code> need to be replaced by <code>boost::typeof</code>, and anonymous struct definition is not supported in older version of MSVC)</p>
+
+<pre><code>#define in(...) __VA_ARGS__
+#define PP_ARG_N( \
+          _1,  _2,  _3,  _4,  _5,  _6,  _7,  _8,  _9, _10, \
+         _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, \
+         _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, \
+         _31, _32, _33, _34, _35, _36, _37, _38, _39, _40, \
+         _41, _42, _43, _44, _45, _46, _47, _48, _49, _50, \
+         _51, _52, _53, _54, _55, _56, _57, _58, _59, _60, \
+         _61, _62, _63, N, ...) N
+#define PP_RSEQ_N()                                        \
+         63, 62, 61, 60,                                   \
+         59, 58, 57, 56, 55, 54, 53, 52, 51, 50,           \
+         49, 48, 47, 46, 45, 44, 43, 42, 41, 40,           \
+         39, 38, 37, 36, 35, 34, 33, 32, 31, 30,           \
+         29, 28, 27, 26, 25, 24, 23, 22, 21, 20,           \
+         19, 18, 17, 16, 15, 14, 13, 12, 11, 10,           \
+          9,  8,  7,  6,  5,  4,  3,  2,  1,  0
+#define PP_NARG_(...)    PP_ARG_N(__VA_ARGS__)
+#define PP_NARG(...)     PP_NARG_(__VA_ARGS__, PP_RSEQ_N())
+
+#define withInternal(dataType, desiredType, x, dataCnt, data...) for(struct {size_t __i; dataType __t[dataCnt];} __s = {0, data}; x = __s.__t[__s.__i], __s.__i &lt; dataCnt; __s.__i++)
+#define with(x, ...) withInternal(__typeof(__VA_ARGS__), __typeof(__VA_ARGS__), x, PP_NARG(__VA_ARGS__), __VA_ARGS__)
+#define withConst(x, ...) withInternal(__typeof(__VA_ARGS__), __typeof((__VA_ARGS__) + 0), x, PP_NARG(__VA_ARGS__), __VA_ARGS__)
+#define withType(tn, x, ...) withInternal(tn, tn, x, PP_NARG(__VA_ARGS__), __VA_ARGS__)
+</code></pre>
+
+<p>and when you use it:</p>
+
+<pre><code>int main()
+{
+    int x;
+    int s1=2, s2=3;
+    with(x, in(s1, s2))
+        cout&lt;&lt;x&lt;&lt;endl;
+    withConst(x, in(45, 55))
+        cout&lt;&lt;x&lt;&lt;endl;
+    withType(int, x, in(45, s1, 55, s2))
+        cout&lt;&lt;x&lt;&lt;endl;
+    return 0;
+}
+</code></pre>
+
+<p>I believe it is more clear.</p>
+
+<ul>
+<li><code>with</code> works with variables (basically) because when passing consts to <code>with</code>, gcc <code>__typeof</code> generate an automated const type for <code>x</code> which could not be assigned.</li>
+<li><code>withConst</code> uses a <code>x+0</code> trick to remove the const type of variables but <code>+</code> operator doesn't work on every datatype so it has limitations.</li>
+<li><code>withType</code> specifies a data type, it is suitable for mixed situation.</li>
+</ul>

@@ -1,0 +1,68 @@
+<p>Short answer: </p>
+
+<ul>
+<li>No, <code>Contains()</code> does not reuse <code>IndexOf()</code></li>
+<li>Yes, they are equivalent comparison-wise </li>
+</ul>
+
+<p>I decompiled (ReSharper) and saw that eventually both use abstract <code>EqualityComparer&lt;T&gt;.Default.Equals(T x, T y)</code> method. The <code>Default</code> instance for <code>EqualityComparer&lt;T&gt;</code> is initialized (and cached) according to type T.</p>
+
+<p><strong>List.Contains</strong></p>
+
+<pre><code>EqualityComparer&lt;T&gt; @default = EqualityComparer&lt;T&gt;.Default;
+// for loop
+if (@default.Equals(this._items[index], item))
+    return true;
+</code></pre>
+
+<p><strong>List.IndexOf</strong></p>
+
+<pre><code>return Array.IndexOf&lt;T&gt;(this._items, item, 0, this._size);
+</code></pre>
+
+<p><strong>Array.IndexOf</strong></p>
+
+<pre><code>public static int IndexOf&lt;T&gt;(T[] array, T value, int startIndex, int count)
+{
+    // Some assertions
+    return EqualityComparer&lt;T&gt;.Default.IndexOf(array, value, startIndex, count);
+}
+</code></pre>
+
+<p><strong>EqualityComparer.IndexOf</strong></p>
+
+<pre><code>internal virtual int IndexOf(T[] array, T value, int startIndex, int count)
+{
+    // for loop
+    if (this.Equals(array[index], value))
+        return index;
+}
+</code></pre>
+
+<p>And this is how <strong>EqualityComparer.Default</strong> is instantiated</p>
+
+<pre><code>public static EqualityComparer&lt;T&gt; Default
+{
+  get
+  {
+    EqualityComparer&lt;T&gt; equalityComparer = EqualityComparer&lt;T&gt;.defaultComparer;
+    if (equalityComparer == null)
+    {
+      equalityComparer = EqualityComparer&lt;T&gt;.CreateComparer();
+      EqualityComparer&lt;T&gt;.defaultComparer = equalityComparer;
+    }
+    return equalityComparer;
+  }
+}
+
+private static EqualityComparer&lt;T&gt; CreateComparer()
+{
+  RuntimeType genericParameter1 = (RuntimeType) typeof (T);
+
+  if ((Type) genericParameter1 == typeof (byte))
+    return (EqualityComparer&lt;T&gt;) new ByteEqualityComparer();
+  // Some ifs go on
+  else
+    return (EqualityComparer&lt;T&gt;) new ObjectEqualityComparer&lt;T&gt;();
+}
+</code></pre>

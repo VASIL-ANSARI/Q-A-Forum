@@ -1,0 +1,113 @@
+<p>Try this solution:</p>
+
+<pre><code>&lt;?php
+class docxhtml
+{
+    /** @var string */
+    private $tag;
+    /** @var string */
+    private $attribute;
+
+    public $connectname;
+    public $connectpass;
+
+    public function __construct($format_res, $flname)
+    {
+        require_once('config.php');
+        // Turn up error reporting
+        error_reporting(E_ALL | E_STRICT);
+
+        // Turn off WSDL caching
+        ini_set('soap.wsdl_cache_enabled', 0);
+
+        // Define credentials for LD
+        define ('USERNAME', $this-&gt;connectname);
+        define ('PASSWORD', $this-&gt;connectpass);
+
+        // SOAP WSDL endpoint
+        define ('ENDPOINT', 'https://api.livedocx.com/2.1/mailmerge.asmx?wsdl');
+
+        // Define timezone
+        date_default_timezone_set('Europe/Berlin');
+
+        // Instantiate SOAP object and log into LiveDocx
+        $this-&gt;soap = new SoapClient(ENDPOINT);
+
+        $this-&gt;soap-&gt;LogIn(
+            array('username' =&gt; USERNAME, 'password' =&gt; PASSWORD)
+        );
+
+        // Upload template
+        $this-&gt;data = file_get_contents('Original/' . $format_res);
+
+        $this-&gt;soap-&gt;SetLocalTemplate(
+            array('template' =&gt; base64_encode($this-&gt;data), 'format' =&gt; 'docx')
+        );
+
+        $this-&gt;result = $this-&gt;soap-&gt;RetrieveDocument(
+            array('format' =&gt; 'html')
+        );
+
+        $this-&gt;data = $this-&gt;result-&gt;RetrieveDocumentResult;
+
+        $exceptions = array(
+            'a'   =&gt; array('href'),
+            'img' =&gt; array('src')
+        );
+
+        $this-&gt;stripAttributes($exceptions);
+
+        file_put_contents('Recode/' . $flname . '.html', base64_decode($this-&gt;data));
+    }
+
+    public function stripAttributes(array $exceptions)
+    {
+        $dom = new DOMDocument();
+        $dom-&gt;strictErrorChecking = false;
+        $dom-&gt;formatOutput = true;
+        $dom-&gt;loadHTML(base64_decode($this-&gt;data));
+
+        $xpath = new DOMXPath($dom);
+        if (false === ($elements = $xpath-&gt;query("//*"))) die('Xpath error!');
+
+        /** @var $element DOMElement */
+        foreach ($elements as $element) {
+            for ($i = $element-&gt;attributes-&gt;length; --$i &gt;= 0;) {
+                $this-&gt;tag       = $element-&gt;nodeName;
+                $this-&gt;attribute = $element-&gt;attributes-&gt;item($i)-&gt;nodeName;
+
+                if ($this-&gt;checkAttrExceptions($exceptions)) continue;
+
+                $element-&gt;removeAttribute($this-&gt;attribute);
+            }
+        }
+
+        $this-&gt;data = base64_encode($dom-&gt;saveHTML());
+    }
+
+    public function checkAttrExceptions(array $exceptions)
+    {
+        foreach ($exceptions as $tag =&gt; $attributes) {
+            if (empty($attributes) || !is_array($attributes)) {
+                die('Attributes not set!');
+            }
+
+            foreach ($attributes as $attribute) {
+                if ($tag === $this-&gt;tag &amp;&amp; $attribute === $this-&gt;attribute) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}
+</code></pre>
+
+<p>If you need to add more attribute exceptions, just edit <code>$exceptions</code> array. For example, if you don't want strip <code>title</code> attribute in all <strong>"a"</strong> tags modify exceptions:</p>
+
+<pre><code>$exceptions = array(
+    'a'   =&gt; array('href', 'title'),
+    'img' =&gt; array('src')
+);
+</code></pre>

@@ -1,0 +1,36 @@
+<p>fh.f_handle is shown as LP_c_char because you defined the struct that way.</p>
+
+<pre><code>buf = create_string_buffer(8)
+print type(buf)
+fh = FILE_HANDLE(c_uint(8), c_int(0), buf)
+print type(fh.f_handle)
+</code></pre>
+
+<p>Will output</p>
+
+<pre><code>&lt;class 'ctypes.c_char_Array_8'&gt;
+&lt;class 'ctypes.LP_c_char'&gt;
+</code></pre>
+
+<p>You have defined your struct to accept a pointer to a c_char. So when you try to access fh.f_handle it will expect the value to be a memory address containing the address to the actual single c_char.</p>
+
+<p>But by trying to input a c_char * 8 from the string buffer it will convert the first part of your buffer to a pointer.</p>
+
+<p>Python tries to dereference your char[0] which means that it will look for a memory address with the value of the character you have defined in char[0]. That memory address is not valid, so your interpreter will signal a SIGSEGV.</p>
+
+<p>Now to create a class which properly handles a variable length buffer is quite difficult. An easier option is to pass the buffer as an opaque handle, to access it afterwards you need to cast it back to a char array.</p>
+
+<p>Example:</p>
+
+<pre><code>class FILE_HANDLE(Structure):
+    _fields_ = [
+            ("handle_bytes", c_uint),
+            ("handle_type", c_int),
+            ("f_handle", c_void_p)
+        ]
+
+buf = create_string_buffer(8)
+buf = cast(buf, c_void_p)
+fh = FILE_HANDLE(c_uint(8), c_int(0), buf)
+f_handle_value = (c_char * fh.handle_bytes).from_address(fh.f_handle) 
+</code></pre>

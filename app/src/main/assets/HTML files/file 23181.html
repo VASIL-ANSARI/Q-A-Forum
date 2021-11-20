@@ -1,0 +1,26 @@
+<p>What you're looking for is <a href="http://dev.mysql.com/doc/refman/5.0/en/group-by-functions.html#function_count-distinct" rel="nofollow">COUNT(DISTINCT)</a>.</p>
+
+<p>EDIT: according to your comments, You should try something like this:</p>
+
+<pre><code>SELECT count(DISTINCT oi.id) as itemCount, 
+       concat(a.firstname, ' ', a.lastname) as name, 
+       oi.status, a.id as adminID, 
+       (SELECT count(oi2.id) as oldItemsCount 
+               FROM bl_orderitems oi2, 
+                    bl_researcher r2
+               WHERE oi2.status='Pending' AND 
+                     r2.id=oi.researcherid AND 
+                     r2.researchermanagerid=a.id AND
+                     DATE(oi2.regdate)=DATE_SUB(CURDATE(), INTERVAL 3 DAY))
+               as oldItemCount
+FROM bl_orderitems oi, 
+       bl_researcher r,
+       tbladmins a 
+WHERE oi.status in ('Pending', 'QA') AND
+       r.id=oi.researcherid AND 
+       r.researchermanagerid=a.id 
+GROUP BY 
+      name, adminID, oi.status;
+</code></pre>
+
+<p>It's simpler and may fit your needs.</p>

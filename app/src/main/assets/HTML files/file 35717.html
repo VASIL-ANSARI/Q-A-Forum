@@ -1,0 +1,46 @@
+<p>I can see the problem in PS v3.0 but not in PS v2.0. Here is the code I use to
+see this (all examples are in PowerShell):</p>
+
+<pre><code>for() {
+    $runspace = [runspacefactory]::CreateRunspace()
+    $runspace.Open()
+    $runspace.Close()
+    $p = Get-Process -Id $PID
+    '{0} {1}' -f $p.Handles, ($p.PrivateMemorySize / 1mb)
+}
+</code></pre>
+
+<p>It looks like handles and memory are leaking in v3.0 in the code above.</p>
+
+<p>As far as v2.0 does not have this problem, one possible workaround may be to
+start the service using PS v2.0, i.e. <code>PowerShell.exe -Version 2.0</code>.</p>
+
+<p>If this is not possible I can think of two more workarounds. One of them is not
+to create runspaces directly but use <code>[powershell]</code> instead. For example, this
+code does not show the leak in v3.0:</p>
+
+<pre><code>for() {
+    $ps = [powershell]::Create()
+    $p = $ps.AddCommand('Get-Process').AddParameter('Id', $PID).Invoke()
+    '{0} {1}' -f $p.Handles, ($p.PrivateMemorySize / 1mb)
+    $ps.Dispose()
+}
+</code></pre>
+
+<p>Another workaround, if it is applicable, may be use of
+<code>[runspacefactory]::CreateRunspacePool()</code>. This way also does not show the
+leak:</p>
+
+<pre><code>$rs = [runspacefactory]::CreateRunspacePool()
+$rs.Open()
+for() {
+    $ps = [powershell]::Create()
+    $ps.RunspacePool = $rs
+    $p = $ps.AddCommand('Get-Process').AddParameter('Id', $PID).Invoke()
+    '{0} {1}' -f $p.Handles, ($p.PrivateMemorySize / 1mb)
+    $ps.Dispose()
+}
+#$rs.Close() # just a reminder, it's not called here due to the infinite loop
+</code></pre>
+
+<p>The last one also works much faster because the runspace is kind of reused.</p>

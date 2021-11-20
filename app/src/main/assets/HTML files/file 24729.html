@@ -1,0 +1,52 @@
+<p><strong>Usually</strong>, provided the object you call the operations on does not implement the <a href="http://docs.python.org/2/reference/datamodel.html#object.__getattr__" rel="nofollow"><code>__getattr__</code></a>, <a href="http://docs.python.org/2/reference/datamodel.html#object.__detattr__" rel="nofollow"><code>__delattr__</code></a> or <a href="http://docs.python.org/2/reference/datamodel.html#object.__setattr__" rel="nofollow"><code>__setattr__</code></a> hooks in python, then yes, <code>hasattr</code>, <code>getattr</code>, <code>delattr</code> and <code>setattr</code> are atomic operations.</p>
+
+<p>Any individual bytecode is an atomic operation as far as Python threads are concerned. The Python evaluation loop grabs the Global Interpreter Lock (GIL) while interpreting opcodes.</p>
+
+<p>You'd need to look at the bytecode to see where the boundaries lie:</p>
+
+<pre><code>&gt;&gt;&gt; def foo():
+...     if not hasattr(Singleton, "_instance"):
+...         with Singleton._instance_lock:
+...             if not hasattr(Singleton, "_instance"):
+...                 Singleton._instance = Singleton()
+...     return Singleton._instance
+... 
+&gt;&gt;&gt; dis.dis(foo)
+  2           0 LOAD_GLOBAL              0 (hasattr)
+              3 LOAD_GLOBAL              1 (Singleton)
+              6 LOAD_CONST               1 ('_instance')
+              9 CALL_FUNCTION            2
+             12 POP_JUMP_IF_TRUE        64
+
+  3          15 LOAD_GLOBAL              1 (Singleton)
+             18 LOAD_ATTR                2 (_instance_lock)
+             21 SETUP_WITH              35 (to 59)
+             24 POP_TOP             
+
+  4          25 LOAD_GLOBAL              0 (hasattr)
+             28 LOAD_GLOBAL              1 (Singleton)
+             31 LOAD_CONST               1 ('_instance')
+             34 CALL_FUNCTION            2
+             37 POP_JUMP_IF_TRUE        55
+
+  5          40 LOAD_GLOBAL              1 (Singleton)
+             43 CALL_FUNCTION            0
+             46 LOAD_GLOBAL              1 (Singleton)
+             49 STORE_ATTR               3 (_instance)
+             52 JUMP_FORWARD             0 (to 55)
+        &gt;&gt;   55 POP_BLOCK           
+             56 LOAD_CONST               0 (None)
+        &gt;&gt;   59 WITH_CLEANUP        
+             60 END_FINALLY         
+             61 JUMP_FORWARD             0 (to 64)
+
+  6     &gt;&gt;   64 LOAD_GLOBAL              1 (Singleton)
+             67 LOAD_ATTR                3 (_instance)
+             70 RETURN_VALUE        
+</code></pre>
+
+<p>The story doesn't end there; <code>hasattr</code> uses <code>getattr()</code> (tests for an exception), which in turn can invoke the Python <code>__getattr__</code> hook. Similarly, the <code>STORE_ATTR</code> opcode could end up calling a python <code>__setattr__</code> hook implementation. In both cases the GIL would be released again.</p>
+
+<p>For default implementations (<code>Singleton</code> does not implement those hooks) the operations are atomic as Python C code handles the whole operation without falling back to Python and thus the evaluation loop (where the GIL might be released and locked again for another thread).</p>
+
+<p>Of course, you could still be dealing with a custom C library that releases the lock during <a href="http://docs.python.org/2/c-api/object.html" rel="nofollow">object protocol operations</a>. That'd be a an unusual thing to do.</p>

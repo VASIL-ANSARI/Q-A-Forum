@@ -1,0 +1,17 @@
+<p>If you wish to distribute the effort of sending a very large number of emails over several processes and/or threads, using a JMS queue would be one potentially effective way of coordinating the work.  It would spread the load evenly and it would also provide fault tolerance if multiple receivers were processing the work.</p>
+
+<p>Some difficulties, however, might include the following:</p>
+
+<ul>
+<li>JMS Message reception is not, in general, guaranteed to be ordered.  Notifications intended for later times might be delivered before earlier ones.</li>
+<li>It might be difficult to maintain coordination between the database table and the queue.  Every insert/update/delete against the table might also require a message to be posted to the queue. </li>
+<li>It may not be desirable to post all future requests to the queue at once.</li>
+<li>A mechanism might be necessary to propagate cancelled requests through
+to the queue.</li>
+</ul>
+
+<p>One possible solution:</p>
+
+<p>Let an efficient, nimble front-end process read the table every so often and determine which notifications are due shortly.  Ideally, the database table would be indexed and/or partitioned to optimize this query.  Only these data are posted to the JMS queue.  The messages in the queue contain a reference to the database row.  The servicing process retrieves the database row before performing the notification, thus detecting changes/cancellations.</p>
+
+<p>The Achilles heel in this approach is the front-end process.  Pains must be taken to ensure that it is always running and is, itself, fault-tolerant.  Also, the front end must have sufficient throughput to handle the entire load at any given moment in time.  If this is not possible, then multiple front-end processes might be required.  These could either take turns (say, odd minutes, even minutes, etc) or be coordinated, themselves, by another queue.</p>

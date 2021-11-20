@@ -1,0 +1,27 @@
+<p>I can't think of a way to do it with the analytic functions from before SQL 2012 - there may be some Laggy goodness but I'm not that comfortable with those functions yet.</p>
+
+<p>So, if the priority is the result set rather than how it's produced, I'd use:</p>
+
+<pre><code>;With Blocks as (
+    select d1.one,d1.two,ROW_NUMBER() OVER (ORDER BY d1.one) as BlockNumber
+    from @data d1
+        left join
+        @data d2
+            on
+                d1.two = d2.two and
+                d1.one = d2.one + 1
+    where d2.one is null
+    union all
+    select d.one,d.two,b.BlockNumber
+    from
+        @data d
+            inner join
+        Blocks b
+            on
+                d.two = b.two and
+                d.one = b.one + 1
+) select * from Blocks
+order by one
+</code></pre>
+
+<p>The CTE first finds every row which differs from the previous row by its <code>two</code> value. We then keep adding any rows which immediately succeed already identified rows and have the same <code>two</code> value and assign them the same Block number.</p>

@@ -1,0 +1,23 @@
+<p>This doesn't answer your question exactly but I think ultimately, it will be what you need.  It would be pretty bad practice to modify Laravel code so it uses PHPMailer instead of its default mail system because then you would never be able to update Laravel as your changes would likely be overwritten.  The better thing to do would be to tell Laravel to use PHPMailer instead of SwiftMailer whenever it needs to mail anything.  This way, all the Laravel code stays the same.</p>
+
+<p>Before diving in though and trying to figure out how to replace SwiftMailer with PHPMailer, I would try and figure out why SwiftMailer isn't working for you because it can potentially be a LOT of work getting PHPMailer working correctly with Laravel.  Additionally, for whatever reasons SwiftMailer isn't working, it may also cause PHPMailer not to work so in that case, it would be a waste of time.</p>
+
+<p>Going quickly through the docs, it looks like PHPMailer uses SMTP and luckily, SwiftMailer has an SMTP driver.  So make sure in <code>config/mail.php</code>, you have all the settings setup correctly.  Use the smtp driver (which I think is the default), make sure you set the host and port correctly, etc...</p>
+
+<p>If you still can't get it working and have determined you need to make the switch to PHPMailer, then you likely have some work ahead of you.  It's too much for a SO answer to write all the code  (and maybe it deserves its own project on github) but I will try and detail the steps which would need to be taken.</p>
+
+<p>First, you should dive into <code>Illuminate\Mail\Mailer</code>.  You will need to create a new class which is similar to this.  It would need to implement <code>MailerContract</code> and <code>MailQueueContract</code>.  I would just use <code>Illuminate\Mail\Mailer</code> as a guide when you do this and this is where you would utilize PHPMailer wherever <code>Illuminate\Mail\Mailer</code> uses SwiftMailer.  I think a lot of those functions, you likely wouldn't have to change at all and just copy over.</p>
+
+<p>Then you will need to create a new service provider which binds your custom <code>Mailer</code> class you just created to the app with the key <code>mailer</code>.  Again use <code>Illuminate\Mail\MailServiceProvider</code> as a guide when you do this.  This is where you will build up your custom <code>Mailer</code> class with any dependencies (`$app['view'], $app['events'], and probably PHPMailer itself) and configuration values (smtp server, port, from email, etc...) and return it in the callback function of....</p>
+
+<pre><code>$this-&gt;app-&gt;singleton('mailer', function ($app) {
+    ...
+});
+</code></pre>
+
+<p>Then the last thing to do would be to test it out.  Go into <code>config/app.php</code> and modify the line with ...</p>
+
+<pre><code>Illuminate\Mail\MailServiceProvider::class,
+</code></pre>
+
+<p>So that it instead outputs the class name of your new service provider class you setup.</p>

@@ -1,0 +1,11 @@
+<p>At work, we developed a small script to manage our database versioning.  Every change to any table or set of data gets it's own SQL file.  </p>
+
+<p>The files are numbered sequentially.  We keep track of which update files have been run by storing that information in the database.  The script inserts a row with the filename when the file is about to be executed, and updates the row with a completion timestamp when the execution finishes.  This is wrapped inside a transaction.  (It's worth remembering that DDL commands in MySQL can not occur within a transaction.  Any attempt to perform DDL in a transaction causes an implicit commit.)</p>
+
+<p>Because the SQL files are part of our source code repository, we can make running the update script part of the normal rollout process.  This makes keeping the database and the code in sync easy as pie.  Honestly, the hardest part is making sure another dev hasn't grabbed the next number in a pending commit.</p>
+
+<p>We combine this update system with an (optional) nightly wipe of our dev database, replacing the contents with last night's live system backup.  After the backup is restored, the update gets run, with any pending update files getting run in the process.</p>
+
+<p>The restoration occurs in such a way that only tables that were in the live database get overwritten.  Any update that adds a table therefore also has to be responsible for only adding it if it doesn't exist.  <code>DROP TABLE IF EXISTS</code> is handy.  Unfortunately not all databases support that, so the update system also allows for execution of scripts written in our language of choice, not just SQL.</p>
+
+<p>All of this in about 150 lines of code.  It's as easy as reading a directory, comparing the contents to a table, and executing anything that hasn't already been executed, in a determined order.</p>

@@ -1,0 +1,80 @@
+<p>This might do what you want:</p>
+
+<pre><code>import Image, ImageDraw
+
+im = Image.open("Two_Dalmatians.jpg")
+
+draw = ImageDraw.Draw(im)
+
+# Locate the "moon" in the upper-left region of the image
+xy=[x/4 for x in im.size+im.size]
+
+# Bounding-box is 40x40, so radius of interior circle is 20
+xy=[xy[0]-20, xy[1]-20, xy[2]+20, xy[3]+20]
+
+# Fill a chord that starts at 45 degrees and ends at 225 degrees.
+draw.chord(xy, 45, 45+180, outline="white", fill="white")
+
+del draw
+
+# save to a different file
+with open("Two_Dalmatians_Plus_Moon.png", "wb") as fp:
+    im.save(fp, "PNG")
+</code></pre>
+
+<p>Ref: <a href="http://effbot.org/imagingbook/imagedraw.htm" rel="nofollow">http://effbot.org/imagingbook/imagedraw.htm</a></p>
+
+<hr>
+
+<p>This program might satisfy the newly-described requirements:</p>
+
+<pre><code>import Image, ImageDraw
+
+def InitializeMoonData():
+    ''''
+    Return a 40x40 half-circle, tilted 45 degrees, as raw data
+    Only call once, at program initialization
+    '''
+    im = Image.new("1", (40,40))
+    draw = ImageDraw.Draw(im)
+
+    # Draw a 40-diameter half-circle, tilted 45 degrees
+    draw.chord((0,0,40,40),
+               45,
+               45+180,
+               outline="white",
+               fill="white")
+    del draw 
+
+    # Fetch the image data:
+    moon = list(im.getdata())
+
+    # Pack it into a 2d matrix
+    moon = [moon[i:i+40] for i in range(0, 1600, 40)]
+
+    return moon
+
+# Store a copy of the moon data somewhere useful
+moon = InitializeMoonData()
+
+
+def ApplyMoonStamp(matrix, x, y):
+    '''
+    Put a moon in the matrix image at location x,y
+    Call whenever you need a moon
+    '''
+    # UNTESTED
+    for i,row in enumerate(moon):
+        for j,pixel in enumerate(row):
+            if pixel != 0:
+                # If moon pixel is not black,
+                # set image pixel to white
+                matrix[x+i][y+j] = 255
+
+
+# In your code:
+
+#  m = Matrix(1024,768)
+#  m = # some kind of math to create the image #
+#  ApplyMoonStamp(m, 128,128)  # Adds the moon to your image
+</code></pre>

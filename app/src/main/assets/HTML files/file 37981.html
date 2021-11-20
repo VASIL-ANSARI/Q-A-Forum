@@ -1,0 +1,23 @@
+<p>It's pretty clear what the other LINQ methods convert to (<code>where, order by, top(20)</code>), but what would <code>Reverse()</code> convert to? I can't think of an SQL statement I've seen that mimics that behavior, and when you're querying the database your LINQ statement must ultimately resolve to valid SQL.</p>
+
+<p>This may not be what you're going for, but one option would be to execute the query first using <code>ToList()</code>, <em>then</em> apply <code>Reverse()</code>:</p>
+
+<pre><code>var q = db.GetTable&lt;T&gt;()
+          .Where(tb =&gt; tb.TeamId == MyTeamId &amp;&amp; tb.Season == MySeasonId)
+          .OrderByDescending(tb =&gt; tb.Id)
+          .Take(20)
+          .ToList()
+          .Reverse();
+</code></pre>
+
+<p>Alternatively, you could get the count and skip that many records first, although this could be inaccurate if the number of records change between calls. Plus it's two queries instead of just one.</p>
+
+<pre><code>var totalRecords = db.GetTable&lt;T&gt;()
+                     .Count(tb =&gt; tb.TeamId == MyTeamId &amp;&amp; tb.Season == MySeasonId);
+
+var q = db.GetTable&lt;T&gt;()
+          .Where(tb =&gt; tb.TeamId == MyTeamId &amp;&amp; tb.Season == MySeasonId)
+          .Order(tb =&gt; tb.Id)
+          .Skip(totalRecords)
+          .Take(20);
+</code></pre>

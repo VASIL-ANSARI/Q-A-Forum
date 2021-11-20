@@ -1,0 +1,71 @@
+<h2>The Problem</h2>
+
+<p>It turns out this happens when you don't include a <code>@Html.ValidationMessageFor</code> placeholder for a given form element.</p>
+
+<p>Here's a deeper dive into where the problem occurs:</p>
+
+<p>When a form submits, <code>jquery.validate.js</code> will call the following methods:</p>
+
+<pre class="lang-js prettyprint-override"><code>validate: function( options ) {
+  form: function() {
+    showErrors: function(errors) {
+      defaultShowErrors: function() {
+        showLabel: function(element, message) {
+          this.settings.errorPlacement(label, $(element) )
+</code></pre>
+
+<p>Where <code>errorPlacement</code> will call this method in <code>jquery.validate.unobtrusive.js</code>:</p>
+
+<pre class="lang-js prettyprint-override"><code>function onError(error, inputElement) { 
+   var container = $(this).find("[data-valmsg-for='" + escapeAttributeValue(inputElement[0].name) + "']"),
+       replace = $.parseJSON(container.attr("data-valmsg-replace")) !== false;
+</code></pre>
+
+<p>When we don't add a placeholder for the validation message, <code>$(this).find(...)</code> won't find anything.</p>
+
+<p>Meaning <code>container.attr("data-valmsg-replace")</code> will return <code>undefined</code></p>
+
+<p>This poses a problem is when we try to call <code>$.parseJSON</code> on an undefined value.  If an error is thrown (and not caught), JavaScript will stop dead in its tracks and never reach the final line of code in the original method (<code>return false</code>) which prevents the form from submitting.</p>
+
+<h2>The Solution</h2>
+
+<h3>Upgrade jQuery Validate Unobtrusive</h3>
+
+<p><a href="https://www.asp.net/ajax/cdn" rel="nofollow">Newer versions of jQuery Validate</a> handle this better and check for nulls before passing them to <code>$.parseJSON</code></p>
+
+<pre class="lang-js prettyprint-override"><code>function onError(error, inputElement) {  // 'this' is the form element
+    var container = $(this).find("[data-valmsg-for='" + escapeAttributeValue(inputElement[0].name) + "']"),
+        replaceAttrValue = container.attr("data-valmsg-replace"),
+        replace = replaceAttrValue ? $.parseJSON(replaceAttrValue) !== false : null;
+</code></pre>
+
+<h3>Add ValidationMessageFor</h3>
+
+<p>To address the core problem, for every input on your form, make sure to include:</p>
+
+<pre class="lang-cs prettyprint-override"><code>@Html.ValidationMessageFor(model =&gt; model.Name)
+</code></pre>
+
+<p>Which will render the following client side markup</p>
+
+<pre class="lang-html prettyprint-override"><code>&lt;span class="field-validation-valid" data-valmsg-for="Name" data-valmsg-replace="true"&gt;&lt;/span&gt;
+</code></pre>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+<div class="snippet-code">
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.15.1/jquery.validate.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="https://ajax.aspnetcdn.com/ajax/mvc/3.0/jquery.validate.unobtrusive.js"&gt;&lt;/script&gt;
+    
+&lt;form action="/Person" method="post"&gt;
+  &lt;div class="validation-summary-valid" data-valmsg-summary="true"&gt;
+    &lt;ul&gt;&lt;li style="display:none"&gt;&lt;/li&gt;&lt;/ul&gt;
+  &lt;/div&gt;
+  &lt;label for="Name"&gt;Name&lt;/label&gt;
+  &lt;input data-val="true" data-val-required="The Name field is required." id="Name" name="Name" type="text" value="" /&gt;
+  &lt;span class="field-validation-valid" data-valmsg-for="Name" data-valmsg-replace="true"&gt;&lt;/span&gt;
+  &lt;input type="submit" value="Save" /&gt;
+&lt;/form&gt;</code></pre>
+</div>
+</div>
+</p>

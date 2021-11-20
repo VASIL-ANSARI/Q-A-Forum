@@ -1,0 +1,34 @@
+<p>The only way in MySQL to do this dynamically is with Prepared statements.  Here is a good article about them:</p>
+
+<p><a href="http://buysql.com/mysql/14-how-to-automate-pivot-tables.html" rel="nofollow">Dynamic pivot tables (transform rows to columns)</a></p>
+
+<p>Your code would look like this:</p>
+
+<pre><code>SET @sql = NULL;
+SELECT
+  GROUP_CONCAT(DISTINCT
+    CONCAT(
+      'MAX(IF(pa.fieldname = ''',
+      fieldname,
+      ''', pa.fieldvalue, NULL)) AS ',
+      fieldname
+    )
+  ) INTO @sql
+FROM product_additional;
+
+SET @sql = CONCAT('SELECT p.id
+                    , p.name
+                    , p.description, ', @sql, ' 
+                   FROM product p
+                   LEFT JOIN product_additional AS pa 
+                    ON p.id = pa.id
+                   GROUP BY p.id');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+</code></pre>
+
+<p>See <a href="http://sqlfiddle.com/#!2/0a068/6" rel="nofollow">SQL Fiddle with Demo</a></p>
+
+<p>NOTE: GROUP_CONCAT function has a limit of 1024 characters. See parameter group_concat_max_len</p>

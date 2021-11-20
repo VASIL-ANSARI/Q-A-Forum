@@ -1,0 +1,86 @@
+<p>There are two inelegant ways to achieve this, that I know of:</p>
+
+<ol>
+<li>Create a helper class with a static recursive method that checks all
+across the inheritance hierarchy whether the field exists, and sets
+it - <strong>very inelegant and potentially buggy</strong></li>
+<li>Use "bean"-conventional getters/setters and use <code>getDeclaredMethod</code>, in order to leverage the runtime polymorphism instead</li>
+</ol>
+
+<p>Here's a quick &amp; dirty elaboration on point <strong>2</strong>:</p>
+
+<pre><code>package test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MyClass {
+    boolean foo;
+    int bar;
+
+    public void setFoo(boolean value) {
+        foo = value;
+    }
+
+    public boolean getFoo() {
+        return foo;
+    }
+
+    public void setBar(int value) {
+        bar = value;
+    }
+
+    public int getBar() {
+        return bar;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Foo is %b and bar is %d", foo, bar);
+    }
+
+    public static String toGetterMethodName(String fieldName) {
+        // TODO no null nor length check here
+        return "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+    }
+
+    public static String toSetterMethodName(String fieldName) {
+        // TODO no null nor length check here
+        return "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+    }
+
+    public static void main(String[] args) {
+        // a bunch of reflection...
+        try {
+            List&lt;MyClass&gt; instances = new ArrayList&lt;MyClass&gt;();
+            instances.add((MyClass) Class.forName("test.MyClass$MyChildClass")
+                    .newInstance());
+            instances.add((MyClass) Class.forName("test.MyClass")
+                    .newInstance());
+            // default values
+            System.out.println(instances);
+            MyClass.class.getMethod(toSetterMethodName("foo"), boolean.class).invoke(instances.get(0), true);
+            MyClass.class.getMethod(toSetterMethodName("foo"), boolean.class).invoke(instances.get(1), true);
+            MyClass.class.getMethod(toSetterMethodName("bar"), int.class).invoke(instances.get(0), 42);
+            MyClass.class.getMethod(toSetterMethodName("bar"), int.class).invoke(instances.get(1), 42);
+            // values are now set
+            System.out.println(instances);
+
+        }
+        // TODO no specific Exception handling
+        catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    static class MyChildClass extends MyClass {
+
+    }
+}
+</code></pre>
+
+<p><strong>Output</strong></p>
+
+<pre><code>[Foo is false and bar is 0, Foo is false and bar is 0]
+[Foo is true and bar is 42, Foo is true and bar is 42]
+</code></pre>

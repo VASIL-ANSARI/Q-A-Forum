@@ -1,0 +1,23 @@
+<p>Finally I was able to fix this issue.</p>
+
+<p>First, I applied to my configuration everything what is described in this <a href="http://msdn.microsoft.com/en-us/library/ms735120.aspx" rel="nofollow">article</a> under paragraphs 'Enabling WMI' and 'Security'.
+It was not enough, and in my investigation I found a possible bug in the aforementioned codeproject source code. In the StartProcess function located in the ProcessMethod class, the connectionScope was not being added to the ManagementClass. Hence, I added a ManagementScope connectionScope parameter to the constructor and then filled the processTask.Scope. Please take a look at my updated StartPtocess function:</p>
+
+<pre><code>public static int StartProcess(string machineName, string processPath, ManagementScope connnectionScope, int timeout)
+{
+    ManagementClass processTask = new ManagementClass(@"\\" + machineName + @"\root\CIMV2",
+                                                                    "Win32_Process", null);
+    processTask.Scope = connnectionScope;
+    ManagementBaseObject methodParams = processTask.GetMethodParameters("Create");
+    methodParams["CommandLine"] = processPath;
+    InvokeMethodOptions options = new InvokeMethodOptions();
+    options.Timeout = TimeSpan.FromSeconds(timeout);
+    ManagementBaseObject exitCode = processTask.InvokeMethod("Create", methodParams, null);
+
+    return Convert.ToInt32(exitCode["ReturnValue"].ToString());
+}
+</code></pre>
+
+<p>ManagementScope is created in ProcessLocal/ProcessRemote constructors.</p>
+
+<p>This fixed my problem. Hope it helps someone.</p>

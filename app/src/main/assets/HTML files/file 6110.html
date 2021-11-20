@@ -1,0 +1,26 @@
+<p>First of all, it's not clear that two threads will necessarily be useful here. A single thread reading one line at a time (which is pretty easy with <code>StreamReader</code>) and processing each line as you go might perform at least as well. File reads are buffered, and the OS can read ahead of your code requesting data, in which case most of your reads will either complete immediately because the next line has already been read off disk in advance by the OS, or both of your threads will have to wait because the data isn't there on disk. (And having 2 threads sat waiting for the disk doesn't make things happen any faster than having 1 thread sat waiting.) The only possible benefit is that you avoid dead time by getting the next read underway before you finish processing the previous one, but the OS will often do that for you in any case. So the benefits of multithreading will be marginal at best here.</p>
+
+<p>However, since you say you're doing this as a learning exercise, that may not be a problem...</p>
+
+<p>I'd use a <code>BlockingCollection&lt;string&gt;</code> as the mechanism for passing data from one thread to another. (As long as you're using .NET 4 or later. And if not...I suggest you move to .NET 4 - it will simplify this task considerably.) You'll read a line from the file and put it into the collection from one thread:</p>
+
+<pre><code>string nextLine = myFileReader.ReadLine();
+myBlockingCollection.Add(nextLine);
+</code></pre>
+
+<p>And then some other thread can retrieve lines from that:</p>
+
+<pre><code>while (true)
+{
+    string lineToProcess = myBlockingCollection.Take();
+    ProcessLine(lineToProcess);
+}
+</code></pre>
+
+<p>That'll let the reading thread run through the file just as fast as the disk will let it, while the processing thread processes data at whatever rate it can. The <code>Take</code> method simply sits and waits if your processing thread gets ahead of the file reading thread.</p>
+
+<p>One problem with this is that your reading thread might get way ahead if the file is large and your processing is slow - your program might attempt to read gigabytes of data from a file while having only processed the first few kilobytes. There's not much point reading data way ahead of processing it - you really only want to read a little in advance. You could use the <code>BlockingCollection&lt;T&gt;</code>'s <code>BoundedCapacity</code> property to throttle things - if you set that to some number, then the call to <code>Add</code> will block if the collection already has that number of lines in it, and your reading thread won't proceed until the processing loop processes its next line.</p>
+
+<p>It would be interesting to compare performance of a program using your two-threaded technique against one that simply reads lines out of a file and processes them in a loop on a single thread. You would be able to see  what, if any, benefit you get from a multithreaded approach here.</p>
+
+<p>Incidentally, if your processing is very CPU intensive, you could use a variation on this theme to have multiple processing threads (and still a single file-reading thread), because <code>BlockingCollection&lt;T&gt;</code> is perfectly happy to have numerous consumers all reading out of the collection. Of course, if the order in which you finish processing the lines of the file matters, that won't be an option, because although you'll start processing in the right order, if you have multiple processing threads, it's possible that one thread might overtake another one, causing out-of-order completion.</p>

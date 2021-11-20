@@ -1,0 +1,90 @@
+<p>It does not insert anything, because (among other things) your query string is not being built correctly.</p>
+
+<pre><code>('@lid','Array[0],'Array[1],'Array[2])
+</code></pre>
+
+<p>The apostrophes are messed up. I'd like to suggest a (in my opinion) cleaner and more structured way to perform your task:</p>
+
+<p><strong>Note: You are obviously working with the mysql_*-stack, so my example is also based on it. But be aware that this is deprecated. Please use mysqli or even better: <a href="http://www.php.net/manual/en/book.pdo.php" rel="nofollow">PDO</a> instead.</strong></p>
+
+<pre><code>&lt;?php
+
+$maininsert = "INSERT INTO `camptest`
+              (`name`, `city`, `phone`, `photo`)
+              VALUES
+              ('{$_POST['name']}', '{$_POST['city']}', '{$_POST['phone']}', '$photoinfo')";
+
+//perform the main insert and fetch the insert id
+mysql_query($maininsert);
+
+$last_id = mysql_insert_id();
+
+// Put the keys and values of the acts in arrays. We can already 
+// populate them with the one key-value-pair we already know
+$act_keys = array('cid');
+$act_values = array($last_id);
+
+foreach($_POST['classact'] as $key =&gt; $value) {
+  //walk through the POSTed acts and add them to the corresponding array
+  $act_keys[] = 'act'.($key+1);
+  $act_values[] = $value;
+}
+
+//Now build the whole string:
+$insert_acts = "INSERT INTO `class_act` 
+               (`" . implode("`, `", $act_keys) . "`) 
+               VALUES 
+               ('" . implode("', '", $act_values) . "')";
+
+//and finally perform the query:
+mysql_query($insert_acts);
+</code></pre>
+
+<p>Please also note that this code is highly vulnerable concerning <a href="http://en.wikipedia.org/wiki/SQL_injection" rel="nofollow">SQL-Injection</a> and should <em>absolutely not be used in production</em>!!! Make sure to either use prepared statements (like with PDO) or/and to sanitize your input properly.</p>
+
+<p>Also, this solution is just my suggestion and one of many ways to do it. But hey, you asked for an opinion :) PHP is <em>very</em> flexible language, so it's easy to get stuff done, but there are many ways to get it done, so there are always chances to pick a hard an ugly one. Other, especially strong typed languages might prevent that by design. But PHP is really easy to learn and I'm sure your code will improve gradually :)</p>
+
+<p>Another thing I've noticed: You don't need to specify the array-keys in your HTML, you just need to make clear that it's an array with <code>[]</code> behind the name. Also, I'm not sure if the <code>id</code>-attributes you using are valid, but you might want use something more simple:</p>
+
+<pre><code>&lt;input type="text" name="classact[]" value="" id="classact1"&gt;
+&lt;input type="text" name="classact[]" value="" id="classact2"&gt;
+&lt;input type="text" name="classact[]" value="" id="classact3"&gt;
+</code></pre>
+
+<p>In the next step, you might want to refactor your code a little to make it even more structured and readable. Since you are performing one task, which is 'inserting something into a table', twice, we could also make a resusable function out of it:</p>
+
+<pre><code>&lt;?php 
+
+function my_insert($table, $data) {
+  // We leverage the flexibility of associative arrays
+  $keys   = "`" . implode("`, `", array_keys($data)) . "`";
+  $values = "'" . implode("', '", $data) . "'";
+
+  mysql_query("INSERT INTO `{$table}` ({$keys}) VALUES ({$values})");
+
+  return mysql_insert_id(); //This might come in handy...
+}
+
+//in order to use this function, we now put our data into associative arrays:
+$class_insert = array(
+  'name'  =&gt; $_POST['name'],
+  'city'  =&gt; $_POST['city'],
+  'phone' =&gt; $_POST['phone'],
+  'photo' =&gt; $photoinfo
+);
+
+$class_insert_id = my_insert('camptest', $class_insert); //and pass it to the function
+
+// You can either build the array while looping through the POSTed values like above, 
+// or you can pass them in directly, if you know that there will always be 3 values:
+$activities_insert = array(
+  'cid'  =&gt; $class_insert_id,
+  'act1' =&gt; $_POST['classact'][0],
+  'act2' =&gt; $_POST['classact'][1],
+  'act3' =&gt; $_POST['classact'][2]
+); 
+
+$activities_insert_id = my_insert('class_act', $activities_insert);
+</code></pre>
+
+<p>There sure is enough room for improvement and optimization - just wanted to show you how awesome PHP can be :-P</p>

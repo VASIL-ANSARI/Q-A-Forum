@@ -1,0 +1,64 @@
+<p>Are you looking for <code>query.Where(t =&gt; true || false)</code>?</p>
+
+<p>Some example code:</p>
+
+<pre><code>        var someInts = new List&lt;int&gt;
+        {
+            1,2,3,4,5,6,6,7
+        };
+
+        someInts.Where(i =&gt; i == 5 || i == 6);
+</code></pre>
+
+<p>Alternately, you could create a a query object that contains all of the functions that parse down your list (here's some self-contained code:</p>
+
+<pre><code>namespace LinqPlayground
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            var someInts = new List&lt;int&gt;
+            {
+                1,2,3,4,5,6,6,7
+            };
+
+            var queryObjectPattern = new QueryObjectPattern&lt;int&gt;();
+            queryObjectPattern.AddOr(i =&gt; i == 5);
+            queryObjectPattern.AddOr(i =&gt; i == 7);
+
+            var intsThatPassed = queryObjectPattern.GetItemsUsingOrClauses(someInts);
+            foreach (var i in intsThatPassed)
+            {
+                Console.WriteLine("{0} passed!", i);    
+            }
+
+        }
+
+        public class QueryObjectPattern&lt;T&gt;
+        {
+            private readonly List&lt;Func&lt;T, bool&gt;&gt; _funcsToApply;
+
+            public QueryObjectPattern()
+            {
+                _funcsToApply =  new List&lt;Func&lt;T, bool&gt;&gt;();
+            }
+
+            public void AddOr(Func&lt;T, bool&gt; orClause)
+            {
+                _funcsToApply.Add(orClause);
+            }
+
+            public IEnumerable&lt;T&gt; GetItemsUsingOrClauses(IEnumerable&lt;T&gt; items)
+            {
+                var itemsThatPassed = new List&lt;T&gt;();
+                foreach (var func in _funcsToApply)
+                {
+                    itemsThatPassed.AddRange(items.Where(func));
+                }
+                return itemsThatPassed;
+            }
+        }
+    }
+}
+</code></pre>

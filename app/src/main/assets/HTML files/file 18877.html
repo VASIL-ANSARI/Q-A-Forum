@@ -1,0 +1,72 @@
+<p>I would suggest that you do the inventory reversal in the loop, something like this:</p>
+
+<pre><code>&lt;%
+    call navigation
+    url = main_area &amp; "?" &amp; "page=" &amp; page_current 
+    return_page = "../backend/" &amp;  url
+    req_status = request("type")
+    if req_status = "restore" then
+        req_status = False
+    else
+        req_status = True
+    end if
+
+    record = request("bill_id")
+    timestamp = now()
+    record = trim(record)
+    if len(record) &gt; 3 then   ' multiple records was selected
+        arrVals = split(record,",")             
+
+
+        strSql = ""
+        strSql = strSql &amp; "DELETE * FROM tbl_bill_total WHERE "     
+        for i = 0 to ubound(arrVals)
+             if i = 0 then           
+              strSql = strSql &amp; "bill_id IN ("&amp; trim(arrVals(i)) &amp; "    "
+             else
+              strSql = strSql &amp; ","&amp; trim(arrVals(i)) &amp; ""
+             end if
+        next
+        strSql = strSql &amp; ") "
+
+        strSql2 = strSql2 &amp; "DELETE * FROM tbl_order WHERE "    
+        for t = 0 to ubound(arrVals)
+
+Set rsOrder = conn.Execute("SELECT * FROM tbl_order WHERE bill_id = " &amp; arrVals(t)) &amp; "" )             
+pd_id = rsOrder.fields.item("pd_id")  
+od_qty = rsOrder.fields.item("od_qty")  
+conn.Execute("UPDATE tbl_inventory SET inv_qty_act = inv_qty_act + " &amp; od_qty &amp; ", inv_date =  " &amp; date() &amp; " WHERE pd_id = '" &amp; pd_id &amp; "'"  ) 
+
+             if t = 0 then
+              strSql2 = strSql2 &amp; " tbl_order.bill_id IN ("&amp; trim(arrVals(t)) &amp; "    "
+             else
+              strSql2 = strSql2 &amp; ","&amp; trim(arrVals(t)) &amp; ""
+             end if
+        next
+        strSql2 = strSql2 &amp; "); "       
+
+    else
+
+Set rsOrder = conn.Execute("SELECT * FROM tbl_order WHERE bill_id = " &amp; record &amp; "" )             
+pd_id = rsOrder.fields.item("pd_id")  
+od_qty = rsOrder.fields.item("od_qty")  
+conn.Execute("UPDATE tbl_inventory SET inv_qty_act = inv_qty_act + " &amp; od_qty &amp; ", inv_date =  " &amp; date() &amp; " WHERE pd_id = '" &amp; pd_id &amp; "'"  ) 
+
+        strSql  = "DELETE * FROM tbl_bill_total WHERE bill_id=" &amp; record &amp; " "  
+        strSql2  = "DELETE * FROM tbl_order WHERE bill_id =" &amp; record &amp; " " 
+    end if
+
+
+
+
+Call DBConnOpen()
+Set Rs = Server.CreateObject("ADODB.Recordset")
+response.write strSql
+
+conn.Execute strSql
+conn.Execute strSql2
+Call DBConnClose()
+
+response.redirect return_page
+%&gt;
+</code></pre>

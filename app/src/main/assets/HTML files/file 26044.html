@@ -1,0 +1,49 @@
+<p>I gave your filter a spin and (after corrections) it produces a nasty COM error. </p>
+
+<p>This is because the async nature of the the operation: <code>OnResultExecuted</code> is your last chance to do something but this happens when the response (with the filename but not the file itself) has been send back to the client. When the client (browser) then starts the download a Not Found error or worse is produced. </p>
+
+<p>In other words, your approach looks nice but it won't work. </p>
+
+<p>Some rough ideas for a solution: </p>
+
+<ul>
+<li>make sure your server side files have unique names and a reliable timestamp</li>
+<li>use a background process to periodically clean them up, or</li>
+<li>clean up old file every time you prepare a new one</li>
+</ul>
+
+<hr>
+
+<p>I changed your filter like this:</p>
+
+<pre><code>    public override void OnResultExecuted(ResultExecutedContext filterContext)
+    {            
+        base.OnResultExecuted(filterContext);
+
+        var r = filterContext.Result as FilePathResult; // not FileContent           
+        string fileName =
+           filterContext.RequestContext.HttpContext.Server.MapPath(r.FileName);            
+        System.IO.File.Delete(fileName);
+    }
+</code></pre>
+
+<hr>
+
+<p>Update :</p>
+
+<p>Thanks to <a href="http://stackoverflow.com/a/11510933/60761">this SO answer</a>, the following should work:</p>
+
+<pre><code>    public override void OnResultExecuted(ResultExecutedContext filterContext)
+    {            
+        base.OnResultExecuted(filterContext);
+
+        var r = filterContext.Result as FilePathResult; // not FileContent           
+        string fileName =
+           filterContext.RequestContext.HttpContext.Server.MapPath(r.FileName);   
+
+        filterContext.HttpContext.Response.Flush();
+        filterContext.HttpContext.Response.End();
+
+        System.IO.File.Delete(fileName);
+    }
+</code></pre>

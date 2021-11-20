@@ -1,0 +1,53 @@
+<p>Your <code>Select</code> method takes a delegate (the type of that delegate is a <code>Predicate&lt;T&gt;</code>, more specifically <code>Predicate&lt;Tag&gt;</code>).  that delegate points to an instance and a method.  What you've passed in for the delegate is a lambda <code>tag =&gt; tag.Code == code</code>.  That lambda causes the compiler to generate a method for this code.  That method is either contained on the instance that calls <code>Select</code>, or in a new class.    If the generated method is <code>static</code>, there will be no instance and <code>Target</code> will be <code>null</code>.  In any case that class that contains that method is not <code>Tag</code> (unless the call to <code>Select</code> is within the <code>Tag</code> class; but you didn't detail that).  So, <code>Target</code> cannot be a <code>Tag</code> object and can never be cast to <code>Tag</code> successfully.</p>
+
+<p>The predicate that select receives should be <em>given</em> a <code>Tag</code> object.  For example:</p>
+
+<pre><code>public Tag Select(Predicate&lt;Tag&gt; predicate)
+{
+    Tag tag = new Tag();
+    bool result = predicate(tag);
+    return tag;
+}
+</code></pre>
+
+<p>it's not clear what you really want to do within <code>Select</code>; but <code>Predicate&lt;Tag&gt;</code> just returns <code>true</code> or <code>false</code> depending on the <code>Tag</code> given to it.</p>
+
+<h3>Update:</h3>
+
+<p>In your example, it's as if you wrote this:</p>
+
+<pre><code>public class DbTests
+{
+    public void Test1()
+    {
+        Db db = new Db();
+        Tag selectedTag = db.Select((Predicate&lt;Tag&gt;) TestTag);
+    }
+
+    private bool TestTag(Tag tag)
+    {
+        return tag.Code == "123";
+    }
+}
+</code></pre>
+
+<p>There is no <code>Tag</code> instance anywhere in the above snippet.</p>
+
+<h3>Update:</h3>
+
+<p>If you used an instance method from the containing class, for example:</p>
+
+<pre><code>public class DbTests
+{
+    public string code = "123";
+    public void Test1()
+    {
+        Db db = new Db();
+        Tag selectedTag = db.Select(tag =&gt; tag.Code == code);
+    }
+}
+</code></pre>
+
+<p>Then the predicate sent to select will have an instance associated with it and thus <code>Target</code> will not be null.  In the above code, <code>Target</code> would be of type <code>DbTest</code>  But, if you put the call to Select within <code>TagData</code> (e.g. <code>DbTests</code> was renamed to <code>TagData</code>) then <code>Target</code> would be of type <code>TagData</code> and show you instance members from <code>TagData</code> and you'd get what you see in your screen capture.</p>
+
+<p><code>Select</code> doesn't seem like the right term for a method that uses a <code>Predicate&lt;T&gt;</code></p>

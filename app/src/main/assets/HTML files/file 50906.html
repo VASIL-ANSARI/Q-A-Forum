@@ -1,0 +1,43 @@
+<p>Based on your comment "what I really need is to be able to find the regular indexes by cumulative indexes so I can do stuff like delete the 2nd level list that contains cumulative item #10", this should do what you want: not only flatten the list, but keep track of the path you used to get there:</p>
+
+<pre><code>def flatten(l, path=()):
+    if not isinstance(l, list):
+        yield path, l
+        return
+
+    for i, x in enumerate(l):
+        for subpath, sub in flatten(x):
+            yield (i,) + subpath, sub
+</code></pre>
+
+<p>This gives you a generator, so you either have to convert it into a list:</p>
+
+<pre><code>&gt;&gt;&gt; f = [ [ ... 
+&gt;&gt;&gt; res = list(flatten(f))
+&gt;&gt;&gt; print res[2]
+((0, 0, 2), 'c')
+&gt;&gt;&gt; print res[10]
+((1, 1, 0), 'k')
+&gt;&gt;&gt; print res[12]
+((1, 2, 0), 'm')
+</code></pre>
+
+<p>Or, perhaps better yet, create a function to take the <code>nth</code> item from the generator. If your list is huge and this is towards the start of the list, it won't even have to generate the rest:</p>
+
+<pre><code>def nth(it, n):
+    for i, val in enumerate(it):
+        if i == n:
+            return val
+</code></pre>
+
+<p>And then:</p>
+
+<pre><code>&gt;&gt;&gt; print nth(flatten(f), 2)
+((0, 0, 2), 'c')
+&gt;&gt;&gt; print nth(flatten(f), 10)
+((1, 1, 0), 'k')
+&gt;&gt;&gt; print nth(flatten(f), 12)
+((1, 2, 0), 'm')
+</code></pre>
+
+<p>Thus: the second element is <code>'c'</code>, which is in <code>f[0][0][2]</code>, the 10th element is <code>'k'</code>, which is in <code>f[1][1][0]</code>, and the 12th element is <code>'m'</code>, which is in <code>f[1][2][0]</code>.</p>

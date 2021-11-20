@@ -1,0 +1,29 @@
+<p>The "configSource" supports only one config file, so you can't have multiple config files by default. This goes alose for the  node in the web.config.</p>
+
+<p>I suggest you try to do it programmatically You can use <a href="https://msdn.microsoft.com/en-us/library/Microsoft.Web.Administration.ServerManager_methods(v=vs.90).aspx" rel="nofollow">ServerManager</a> class to get access to website configuration. You will probably need to add a reference to Microsoft.Web.Administration. Read your config files and add each rule mannually.</p>
+
+<p>Something like this: </p>
+
+<pre><code>using (ServerManager serverManager = new ServerManager())
+{
+   Configuration config = serverManager.GetWebConfiguration("Default Web Site");
+   ConfigurationSection rulesSection = config.GetSection("system.webServer/rewrite/rules");
+   ConfigurationElementCollection rulesCollection = rulesSection.GetCollection();
+
+   ConfigurationElement ruleElement = rulesCollection.CreateElement("rule");
+   ruleElement["name"] = @"rule";
+
+   ConfigurationElement matchElement = ruleElement.GetChildElement("match");
+   matchElement["url"] = @"foo\.htm";
+
+   ConfigurationElement actionElement = ruleElement.GetChildElement("action");
+   actionElement["type"] = @"Rewrite";
+   actionElement["url"] = @"bar.htm";
+   rulesCollection.Add(ruleElement);
+
+   serverManager.CommitChanges();
+</code></pre>
+
+<p>}</p>
+
+<p>There is also another option but I haven't tried it myself. You can write your own custom rewrite provider for url rewrite module. Here is a walkthrough how to do it: <a href="http://www.iis.net/learn/extensions/url-rewrite-module/developing-a-custom-rewrite-provider-for-url-rewrite-module" rel="nofollow">Custom Rewrite Provider Walkthrough</a></p>

@@ -1,0 +1,54 @@
+<p>Let me give you an idea. Create a function that gets the parent_id from a given ID a number of times, let's call it generation. Cat10 generation 1 would be parent who is CAT5 generation 2 would be CAT3 and so on.</p>
+
+<pre><code>DROP FUNCTION IF EXISTS getNameIdGeneration;
+DELIMITER $$
+CREATE FUNCTION getNameIdGeneration(idPar int, generationPar int)
+  RETURNS VARCHAR(1000) READS SQL DATA
+BEGIN
+  DECLARE auxLoopVar INT default 0;
+  DECLARE parentIdVar INT default idPar;  
+  DECLARE nameVar VARCHAR(1000) default NULL;
+
+  count_loop: LOOP    
+    SELECT parent_id INTO parentIdVar FROM Category_parent WHERE Category_id = parentIdVar;
+    SET auxLoopVar = auxLoopVar + 1;        
+    IF auxLoopVar &gt;= generationPar THEN
+      LEAVE count_loop;
+    END IF;    
+  END LOOP;
+  SELECT name INTO nameVar FROM Category WHERE id = parentIdVar;
+
+  RETURN nameVar;
+END;
+$$
+DELIMITER ;
+</code></pre>
+
+<p>assuming that Category_Id for CAT10 = 10 if you test the function given </p>
+
+<pre><code>select getNameIdGeneration(10, 2);
+</code></pre>
+
+<p>CAT3</p>
+
+<p>Now all you need is a table which contains the id of the CAT you want to know its lineage</p>
+
+<pre><code>MariaDB [mydatabase]&gt; select * from test;
++-------------+------------+
+| category_id | generation |
++-------------+------------+
+|          10 |          1 |
+|          10 |          2 |
+|          10 |          3 |
++-------------+------------+
+
+MariaDB [mydatabase]&gt; select generation, getNameIdGeneration(category_id, generation) as Name from test;
++------------+------+
+| generation | Name |
++------------+------+
+|          1 | CAT5 |
+|          2 | CAT3 |
+|          3 | CAT1 |
++------------+------+
+3 rows in set (0.00 sec)
+</code></pre>

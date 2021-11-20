@@ -1,0 +1,42 @@
+<p>Have you seen <a href="http://discuss.emberjs.com/t/dashboard-type-views/5187" rel="nofollow">http://discuss.emberjs.com/t/dashboard-type-views/5187</a> ?</p>
+
+<p>In that post there are multiple suggested ways to solve it. The code below seems like it would work </p>
+
+<pre><code>App.IndexRoute = Ember.Route.extend({
+   model: function() {
+     return Ember.RSVP.hash({
+        contacts: this.store.find('contacts'),
+        records: this.store.find('records'),
+     });
+   },
+
+  setupController: function (controller, context) {
+    this.controllerFor('contacts').set('model', context.contacts);
+    this.controllerFor('records').set('model', context.records);
+  }
+});
+</code></pre>
+
+<p>However you are not using Ember-Data so I rearranged it to use a static array. Here is my solution with only the javascript changed. <a href="http://jsbin.com/vasezutoxege/4/edit" rel="nofollow">http://jsbin.com/vasezutoxege/4/edit</a> (it needs minor updates to meet all you needs, notably more changes in <code>renderTemplate</code>)</p>
+
+<pre><code>App.IndexRoute = Ember.Route.extend({    
+      setupController: function (controller, context) {
+        this.controllerFor('contacts').set('model', CONTACTS);
+        this.controllerFor('records').set('model', RECORDS);
+      },
+    renderTemplate: function() {
+        // Render default outlet   
+        this.render();
+        // render extra outlets
+        this.render("records", {
+            outlet: "rec",
+            into: "index" // important when using at root level
+        });
+    }  
+});
+App.IndexController = Ember.ObjectController.extend({
+    needs: ['contacts', 'records'] 
+});
+App.ContactsController = Ember.ArrayController.extend();
+App.RecordsController = Ember.ArrayController.extend();
+</code></pre>

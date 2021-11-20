@@ -1,0 +1,69 @@
+<p>Yes I've encountered this problem many times when using Selenium. There are 2 ways I worked around this problem. First off you can actually change the implicit wait time. For example given this piece of code:</p>
+
+<pre><code>Actions builder = new Actions( driver );
+builder.click( driver.findElement( By.className("lala") ) ).perform();
+</code></pre>
+
+<p>This code will throw an exception if at the point it's called there are no elements that could be found to match the "lala" class. You can change this implicit wait time with:</p>
+
+<pre><code>driver.manage().timeouts().implicitlyWait( 5, TimeUnit.SECONDS );
+</code></pre>
+
+<p>This makes the driver poll for 5 seconds instead of failing straight away. If the element still can't be located after 5 seconds then the action will fail. Of course you can change that setting. I found that this method works okay the majority of the time. Most of the time you don't care about the whole page loading, just a certain part.</p>
+
+<p>I also wrote another function which is GetElementByClassAndText which will do the same as implicit wait on an element except it also checks the containing text as well to allow finer detailing of what you want:</p>
+
+<pre><code>public static void waitAndClick( WebDriver driver, By by, String text ) {
+    WebDriverWait wait = new WebDriverWait( driver, 10000 );
+    Function&lt;WebDriver, Boolean&gt; waitForElement = new waitForElement( by );
+    wait.until( waitForElement );
+
+    for( WebElement e : driver.findElements( by ) ) {
+        if( e.getText().equals( text ) ) {
+            Actions builder = new Actions( driver );
+            builder.click( e ).perform();
+            return;
+        }
+    }
+}
+</code></pre>
+
+<p>And the corresponding Function it uses:</p>
+
+<pre><code>public class waitForElement implements Function&lt;WebDriver, Boolean&gt; {
+    private final By by;
+    private String text = null;
+
+    public waitForElement( By by ) {
+        this.by = by;
+    }
+
+    public waitForElement( By by, String text ) {
+        this.by   = by;
+        this.text = text;
+    }
+
+    @Override
+    public Boolean apply( WebDriver from ) {
+        if( this.text != null ) {
+            for( WebElement e : from.findElements( this.by ) ) {
+                if( e.getText().equals( this.text ) ) {
+                    return Boolean.TRUE;
+                }
+            }
+
+            return Boolean.FALSE;
+        } else {
+            try {
+                from.findElement( this.by );
+            } catch( Exception e ) {
+                return Boolean.FALSE;
+            }
+
+            return Boolean.TRUE;
+        }
+    }
+}
+</code></pre>
+
+<p>I realise that you're using Selenium in Ruby but hopefully some of my code (at least conceptually) is transferable and helpful to you.</p>

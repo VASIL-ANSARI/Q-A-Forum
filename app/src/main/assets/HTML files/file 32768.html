@@ -1,0 +1,26 @@
+<p>I was able to get it working ( I think, still 100% CPU load but at least the DB file is being updated ). I followed Dan Bracuk's idea and changed all dates to integer, then I combined my first two SQL statements into one. <strong>I tried using sqlite3 but it was always running out of memory</strong>. Then I switched to dblite and that's what I am using right now. This is the working code:</p>
+
+<pre><code>var dblite = require('dblite'),
+db = dblite('asx.db');
+var count = 0;
+var previousClose = 0;
+var previousTicker = '';
+db.query('SELECT ticker,close,date from stocks order by ticker, date asc',function(err, rows) {
+     if(err) console.log(err);
+     rows.forEach(function(row) {
+          if (previousTicker !== row[0]) {
+               count = 0;
+               previousClose = 0;
+               previousTicker = row[0];
+          }
+          if (count&gt;0) {
+               var change = ((((row[1]-previousClose)/previousClose))*100).toFixed(2);
+               db.query('UPDATE stocks set change=? where ticker=? and date=?',[change,row[0],row[2]], function(err) {
+                     if(err) console.log(err);
+               });
+          }
+          previousClose = row[1];
+          count++;
+     });
+});
+</code></pre>

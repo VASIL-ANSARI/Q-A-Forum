@@ -1,0 +1,42 @@
+<pre><code>bool BST::retrieve(const char *key, Data const *&amp; data) const
+</code></pre>
+
+<p>The second argument is a <strong>reference to a pointer to const Data</strong>, so you must set it to a <strong>pointer</strong> to <code>items[rIndex].data</code>, not to its value.</p>
+
+<p>Consider the following</p>
+
+<pre><code>void foo(int &amp; out)
+{
+    out = 42;
+}
+</code></pre>
+
+<p>When it is called like so</p>
+
+<pre><code>// ...
+int x = 0;
+foo(x);
+std::cout &lt;&lt; x;
+</code></pre>
+
+<p>42 will be printed, because a <strong>reference to x</strong> was passed into the function. Your situation is a little different - you are passed a <strong>reference to a pointer</strong>, so that the caller can retrieve a pointer to the data in a similar way to the above, for example:</p>
+
+<pre><code>int x; // global
+// ...
+void foo(int *&amp; out)
+{
+    x = 42;
+    out = &amp;x; // set out to pointer to x
+}
+
+int main()
+{
+    int * ptr = nullptr;
+    foo(ptr); // foo will set ptr to the pointer to x
+    std::cout &lt;&lt; *ptr; // prints 42
+}
+</code></pre>
+
+<p>Again, 42 will be printed. Note the use of the unary ref, <code>&amp;</code>, and deref, <code>*</code>, operators to get a pointer to <code>x</code> and dereference <code>ptr</code> to extract its value.</p>
+
+<p>As an aside, it's not possible to tell how broken your implementation of <code>Data::operator=</code> is without seeing more of the class. As it stands it is broken because it is undefined behaviour to use <code>strcpy</code> on overlapping regions of memory - which will happen if someone tries to assign an object instance to itself (see <a href="http://www.cplusplus.com/reference/cstring/strcpy/" rel="nofollow">strcpy</a>). For cases other than self-assignment, it is only correct if the destination of the assignment always has enough space for the string in the source. Otherwise you will write to unallocated memory. Also, if there are any additional member variables, they will need copying too.</p>

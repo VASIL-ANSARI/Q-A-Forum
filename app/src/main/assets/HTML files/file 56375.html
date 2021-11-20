@@ -1,0 +1,20 @@
+<p>Your problem suggests a self-join to get the users with common interests.  Then, <code>not exists</code> to avoid the contact list.  The following gets the list of users with common interests, ordered by the number of common interests:</p>
+
+<pre><code>select ip2.userid, count(*) as numInCommon
+from interested_People ipme join
+     interested_People ip2
+     on ipme.interested_in = ip2.interested_in and
+        ipme.userid = $UserId and  -- Your user id goes here
+        ip2.userid &lt;&gt; ipme.userid
+where not exists (select 1 
+                  from contactlist cl
+                  where cl.user1 = ipme.userid and cl.user2 = ip2.userid and
+                        cl.accepted = 1
+                 ) and
+      not exists (select 1 
+                  from contactlist cl
+                  where cl.user1 = ip2.userid and cl.user2 = ipme.userid and
+                        cl.accepted = 1
+                 )
+group by ip2.userid;
+</code></pre>

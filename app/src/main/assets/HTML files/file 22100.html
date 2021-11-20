@@ -1,0 +1,47 @@
+<p>If you use Wicket 6 you could use inter component Events.</p>
+
+<p>First create an event which holds the <code>AjaxRequestTarget</code> like this:</p>
+
+<pre><code>public class AjaxUpdateEvent {
+    private final AjaxRequestTarget target;
+
+    public AjaxUpdateEvent(AjaxRequestTarget target) {
+        this.target = target;
+    }
+    public AjaxRequestTarget getAjaxRequestTarget() {
+        return target;
+    }
+}
+</code></pre>
+
+<p>You can send such an event form any <code>Component</code> you want using the <code>send()</code> method. You send events like this: </p>
+
+<p><code>send(getPage(), Broadcast.DEPTH, new AjaxUpdateEvent(target));</code></p>
+
+<p>Then in the <code>AjaxFallbackDefaultDataTable</code> i would try to override newCellItem and listen there for the event when fired from somewhere sometime and add the desired cell item to the AjaxRequestTarget. Something like that:</p>
+
+<pre><code>    AjaxFallbackDefaultDataTable table =
+            new AjaxFallbackDefaultDataTable("table", null, null, FLAG_RESERVED1) {
+        @Override
+        protected Item newCellItem(String id, int index, IModel model) {
+            Item item;
+            if (index == indexOfColumnYouWant){
+                item = new Item(id, index, model) {
+                    @Override
+                    public void onEvent(IEvent&lt;?&gt; event) {
+                        super.onEvent(event); 
+                        if ((event.getPayload() instanceof AjaxUpdateEvent) ){
+                            ((AjaxRequestTarget)event.getPayload()).add(item);
+                        }
+                    }
+                };
+            } else {
+                item = super.newCellItem(id, index, model);
+            } 
+
+            return item;
+        }
+    };
+</code></pre>
+
+<p>Additionally you could also add the item to the target if it <code>isVisible()</code>.</p>

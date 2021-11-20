@@ -1,0 +1,26 @@
+<p>You can use the <a href="https://docs.djangoproject.com/en/dev/ref/signals/#django.db.models.signals.post_save">models.signals.post_save</a> signal to handle such case:</p>
+
+<pre><code>from django.db import models
+
+class Course(models.Model):
+    student_group = models.OneToOneField(Group, related_name="course_taken")
+    teacher_group = models.OneToOneField(Group, related_name="course_taught")
+
+
+def create_course_groups(instance, created, raw, **kwargs):
+    # Ignore fixtures and saves for existing courses.
+    if not created or raw:
+        return
+
+    if not instance.student_group_id:
+        group, _ = Group.objects.get_or_create(name='_course_' + self.id + '_student')
+        instance.student_group = group
+
+    if not instance.teacher_group_id:
+        teacher_group, _ = Group.objects.get_or_create(name='_course_' + self.id + '_teacher')
+        instance.teacher_group = teacher_group
+
+    instance.save()
+
+models.signals.post_save.connect(create_course_groups, sender=Course, dispatch_uid='create_course_groups')
+</code></pre>

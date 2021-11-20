@@ -1,0 +1,44 @@
+<p>I had the same problem last Friday.</p>
+
+<p>I didn't found any documentation to support this claim but, by reading <a href="https://developers.google.com/eclipse/docs/cloudsql-createapp#create" rel="nofollow">current google's documentation and guides on how to connect to cloud sql with java</a>, it appears that rdbms.dev.LocalRdbmsServiceRemoteDriver is deprecated. </p>
+
+<p>I would recommend you to upgrade your code to use com.mysql.jdbc.GoogleDriver in production and MySQL Connector/J in development. </p>
+
+<p>In development, you could use your own mysql database running on localhost or remotely. If you want to use a db from Google Cloud SQL you could configure your instance of cloud SQL to <a href="https://cloud.google.com/sql/docs/external" rel="nofollow">allow external access</a> from your network and then create a connection like any other mysql server.</p>
+
+<p>You could create create a db connection for each runtime environment:</p>
+
+<pre><code>    protected Connection getConnection() throws SQLException{
+
+        Connection c = null;
+        String url = null;
+        if (SystemProperty.environment.value() == SystemProperty.Environment.Value.Production) {    
+            try {
+                Class.forName("com.mysql.jdbc.GoogleDriver");
+            } catch (ClassNotFoundException e) {
+                System.out.println("Driver unavailable.");
+            }
+
+            url = System.getProperty("ae-cloudsql.cloudsql-database-url.prod");
+        }else{
+            try {
+                Class.forName("com.mysql.jdbc.Driver");
+            } catch (Exception e) {
+                System.out.println("Driver unavailable.");
+            }
+
+            url = System.getProperty("ae-cloudsql.cloudsql-database-url.dev");
+        }
+
+        c = DriverManager.getConnection(url);
+        c.setAutoCommit(false);
+
+        return c;
+    }
+</code></pre>
+
+<p>Extracted from the documentation: </p>
+
+<p>-<a href="https://developers.google.com/eclipse/docs/cloudsql-createapp" rel="nofollow">Creating a New Web App with Cloud SQL Support</a></p>
+
+<p>-<a href="https://developers.google.com/eclipse/docs/cloudsql-createapp" rel="nofollow">Using Google Cloud SQL</a></p>

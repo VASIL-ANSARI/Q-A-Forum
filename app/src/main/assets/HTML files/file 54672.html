@@ -1,0 +1,180 @@
+<p>There are two main aspects of your question:</p>
+
+<ul>
+<li><p>What is this &ldquo;capture&rdquo; thing, and why the error?</p></li>
+<li><p>How to specify a custom compare function for a priority queue?</p></li>
+</ul>
+
+<p>These aspects are most cleanly discussed separately.</p>
+
+<p>Unfortunately the presented (incomplete) example code is not well suited for discussing either aspect, so I just disregard it.</p>
+
+<h2>What is a lambda capture.</h2>
+
+<p>Consider the following code:</p>
+
+<pre><code>#include &lt;stdio.h&gt;
+
+struct S
+{
+    int a_;
+
+    void foo() const
+    {
+        // Compiles nicely:
+        [this]() -&gt; void { printf( "%d\n", a_ ); }();
+
+        // Doesn't compile, oh why!:
+        int b = 666;
+        [this]() -&gt; void { printf( "%d\n", b ); }();
+    }
+};
+
+auto main()
+    -&gt; int
+{ S{ 42 }.foo(); }
+</code></pre>
+
+<p>MinGW g++ 5.1.0 provides the following diagnostics (compilation errors):</p>
+
+<pre>
+x1.cpp: In lambda function:
+x1.cpp:14:44: error: 'b' is not captured
+         [this]() -> void { printf( "%d\n", b ); }();
+                                            ^
+x1.cpp:14:14: note: the lambda has no capture-default
+         [this]() -> void { printf( "%d\n", b ); }();
+              ^
+x1.cpp:13:13: note: 'int b' declared here
+         int b = 666;
+             ^
+</pre>
+
+<p>To understand the &ldquo;not captured&rdquo;, let's <em>implement the lambdas manually</em>, just doing a code transformation equivalent to what the compiler does with it:</p>
+
+<pre><code>    void foo() const
+    {
+        // Compiles nicely:
+        //[this]() -&gt; void { printf( "%d\n", a_ ); }();
+        class Functor_a
+        {
+        private:
+            S const* captured_this_;
+
+        public:
+            void operator()()
+            { printf( "%d\n", captured_this_-&gt;a_ ); }
+
+            Functor_a( S const* this_capture )
+                : captured_this_( this_capture )
+            {}
+        };
+        Functor_a f_a{ this };
+        f_a();
+
+        // Doesn't compile, oh why!:
+        int b = 666;
+        // [this]() -&gt; void { printf( "%d\n", b ); }();
+        class Functor_b
+        {
+        private:
+            S const* captured_this_;
+
+        public:
+            void operator()()
+            { printf( "%d\n", b ); }
+
+            Functor_b( S const* this_capture )
+                : captured_this_( this_capture )
+            {}
+        };
+        Functor_b f_b{ this };
+        f_b();
+    }
+};
+</code></pre>
+
+<p>The diagnostic is now more clear. Since <code>Functor_b</code> is a class, and since a class in C++ is completely free-standing entity, its code has no relation to or access to things in a particular invocation of <code>foo()</code>. So the compiler doesn't accept the reference to some unspecified <code>b</code>, but notes that if you really meant the <code>b</code> in the containing scope, then hey, that name <code>b</code> refers to a different variable in each call of <code>foo</code>, and isn't a valid choice:</p>
+
+<pre>
+x2.cpp: In member function 'void S::foo() const::Functor_b::operator()()':
+x2.cpp:37:35: error: use of local variable with automatic storage from containing function
+                 { printf( "%d\n", b ); }
+                                   ^
+x2.cpp:28:17: note: 'int b' declared here
+             int b = 666;
+                 ^
+</pre>
+
+<p>One solution is to <strong>capture</strong> the <em>value</em>, i.e. copy it into the functor class instance, e.g. as follows:</p>
+
+<pre><code>        class Functor_b
+        {
+        private:
+            int const captured_b_;
+
+        public:
+            void operator()()
+            { printf( "%d\n", captured_b_ ); }
+
+            Functor_b( int const b_capture )
+                : captured_b_( b_capture )
+            {}
+        };
+        Functor_b f_b{ b };     // â The capture.
+        f_b();                  // â Using the captured value.
+</code></pre>
+
+<p>Alternatively you could capture a pointer to the variable, <em>capture by reference</em>. In that the case the pointer is only valid for the lifetime of the variable. So you'd better not keep a functor instance around after that.</p>
+
+<p>Expressed in lambda notation the capture of the value can look like this:</p>
+
+<pre><code>[b]() -&gt; void { printf( "%d\n", b ); }();
+</code></pre>
+
+<p>Or like this, with a general capture-whatever's-needed-by-value <code>=</code>:</p>
+
+<pre><code>[=]() -&gt; void { printf( "%d\n", b ); }();
+</code></pre>
+
+<p>Capturing by reference, i.e. a pointer, looks like this:</p>
+
+<pre><code>[&amp;]() -&gt; void { printf( "%d\n", b ); }();
+</code></pre>
+
+<h2>How to specify a compare function for a <code>std::priority_queue</code>.</h2>
+
+<p>E.g. like this:</p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;queue&gt;
+#include &lt;vector&gt;
+using namespace std;
+
+struct S
+{
+    string name;
+    int birth_year;
+};
+
+auto main() -&gt; int
+{
+    struct Age_sort
+    {
+        auto operator()( S const&amp; a, S const&amp; b )
+            -&gt; bool
+        { return (a.birth_year &lt; b.birth_year); }
+    };
+    using Q = priority_queue&lt; S, vector&lt;S&gt;, Age_sort &gt;;
+    Q pq;
+    pq.push( S{ "beta", 1980 } );
+    pq.push( S{ "alfa", 1992 } );
+    pq.push( S{ "charlie", 1971 } );
+    while( not pq.empty() )
+    {
+        cout &lt;&lt; pq.top().name &lt;&lt; ' ' &lt;&lt; pq.top().birth_year &lt;&lt; endl;
+        pq.pop();
+    }
+}
+</code></pre>

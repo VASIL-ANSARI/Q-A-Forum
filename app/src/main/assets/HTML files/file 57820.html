@@ -1,0 +1,179 @@
+<p>When you receive GCM message, android call your BroadcastReceiver, even if your app is in background:</p>
+
+<pre><code>public class GCMBroadcastReceiver extends BroadcastReceiver {   
+
+    @Override
+    public void onReceive(final Context context, Intent intent) {
+
+        String action = intent.getAction();
+        L.m("onReceive GCM called!");
+
+        //Get your data
+        String id = intent.getStringExtra("id");
+        String tickerText = intent.getStringExtra("tickerText");
+        String title = intent.getStringExtra("title");
+        String msg = intent.getStringExtra("message");
+        String dateTime = intent.getStringExtra("datetime");
+
+        //Here, You can save your data in SQLite
+        //For example: I need to save title, msg and dateTime
+        DBGcmMessages dbGcmMessages = new DBGcmMessages(context);
+        dbGcmMessages.insert(title, msg, dateTime);
+
+        //Then, you can show notification or show nothing!!!
+    }
+}
+</code></pre>
+
+<p>and this is <code>DBGcmMessages</code> content:</p>
+
+<pre><code>public class DBGcmMessages extends SQLiteOpenHelper {
+
+    private Context mContext;
+    private SQLiteDatabase mDatabase;
+
+    private static final String DB_NAME = "gcm_message_db";
+    private static final int DB_VERSION = 1;
+
+    private static final String TABLE = "login";
+    private static final String COLUMN_ID = "_id";
+    private static final String COLUMN_TITLE = "_title";
+    private static final String COLUMN_TEXT = "_text";
+    private static final String COLUMN_DATE_TIME = "_date_time";
+
+    private static final String CREATE_TABLE = "CREATE TABLE " + TABLE + " (" +
+            COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+            COLUMN_TITLE + " nvarchar(255)," +
+            COLUMN_TEXT + " text," +
+            COLUMN_DATE_TIME + " nvarchar(255));";
+
+    public DBGcmMessages(Context context) {
+
+        super(context, DB_NAME, null, DB_VERSION);
+        mContext = context;
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+
+        try {
+
+            db.execSQL(CREATE_TABLE);
+            L.m("Create table gcm messages successfully!");
+
+        } catch (SQLiteException exception) {
+
+            L.m(exception.getMessage());
+        }
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+
+        try {
+
+            L.m("upgrade table gcm message executed!");
+
+            db.execSQL("DROP TABLE " + TABLE + " IF EXISTS;");
+
+            onCreate(db);
+        }
+        catch (SQLiteException exception) {
+
+            L.m(exception.getMessage());
+        }
+    }
+
+    public void insert(String title, String text, String dateTime) {
+
+        try {
+
+            if (title == null || text == null) return;
+
+            this.mDatabase = this.getWritableDatabase();
+
+            //Insert
+            String sql = "INSERT INTO " + TABLE + "(" +
+                    COLUMN_TITLE + "," +
+                    COLUMN_TEXT + "," +
+                    COLUMN_DATE_TIME + ") VALUES (?,?,?);";
+
+            SQLiteStatement statement = this.mDatabase.compileStatement(sql);
+
+            statement.bindString(1, title);
+            statement.bindString(2, text);
+            statement.bindString(3, dateTime);
+
+            statement.execute();
+
+            L.m("Insert gcm message successfully!");
+        }
+        finally {
+
+            if(this.mDatabase != null) this.mDatabase.close();
+            this.close();
+        }
+    }
+
+    public void delete(int id) {
+
+        try {
+
+            this.mDatabase = this.getWritableDatabase();
+
+            this.mDatabase.execSQL("Delete from " + TABLE + " where " + COLUMN_ID + "='" + id + "'");
+
+            L.m("Delete gcm message successfully!");
+        }
+        finally {
+
+            if(this.mDatabase != null) this.mDatabase.close();
+            this.close();
+        }
+    }
+
+    public ArrayList&lt;GCMMessage&gt; getAll() {
+
+        this.mDatabase = this.getWritableDatabase();
+
+        Cursor result = null;
+
+        try {
+
+            result = this.mDatabase.rawQuery("select * from " + TABLE + " order by " + COLUMN_ID + " desc", null);
+
+            int rows = result.getCount();
+            if (rows == 0) return null;
+
+            ArrayList&lt;GCMMessage&gt; messages = new ArrayList&lt;&gt;();
+
+            result.moveToFirst();
+            for (int i = 0; i &lt; rows; i++) {
+
+                int id = result.getInt(0);
+                String title = result.getString(1);
+                String text = result.getString(2);
+                String dateTime = result.getString(3);
+
+                messages.add(new GCMMessage(id, title, text, dateTime));
+
+                result.moveToNext();
+            }
+
+            L.m("Get all gcm message : " + rows);
+
+            return messages;
+
+        } catch (Exception ex) {
+
+            return null;
+        }
+        finally {
+
+            if(result != null) result.close();
+            if(this.mDatabase != null) this.mDatabase.close();
+            this.close();
+        }
+    }
+}
+</code></pre>

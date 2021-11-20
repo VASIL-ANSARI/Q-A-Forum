@@ -1,0 +1,65 @@
+<p>You can do this with one line in a <a href="https://www.youtube.com/watch?v=t85uBptTDYY">dictionary comprehension</a>:</p>
+
+<pre><code>{key: function() for key, function in mydictionary.items()}
+</code></pre>
+
+<p>Of course, this will throw errors when a value isn't a function, so if that is a possibility, we can simply add a check with <a href="http://docs.python.org/library/functions.html#callable">the <code>callable()</code> builtin</a>:</p>
+
+<pre><code>{key: (function() if callable(function) else function) for key, function in mydictionary.items()}
+</code></pre>
+
+<p>We then need to deal with the fact that your answer needs to be recursive, this makes it a little more complex, but not too hard to fix:</p>
+
+<pre><code>def call_all_callables_in_dict(mapping):
+    if hasattr(mapping, "items"):
+        return {key: call_all_callables_in_dict(value) for key, value in mapping.items()}
+    elif callable(mapping):
+        return mapping()
+    else:
+        return mapping
+</code></pre>
+
+<p>Note that if you have objects with an <code>items</code> attribute or method you wish to store in a <code>dict</code> this function will be run on, this could cause problems. I would recommend changing the name of that attribute or method, or replacing the check with <code>isinstance(dict)</code>.</p>
+
+<p>I would also like to note that for misleading function names <code>rand_int</code> that returns a string of <code>'yes'</code> or <code>'no'</code> is probably about as bad as it gets. Generally you want <code>True</code>/<code>False</code> in those situations as well.</p>
+
+<p>As noted in the comments, pre-Python 2.7, you may not have dictionary comprehensions. To get around this, <code>dict()</code> will take a generator of tuples, so you can replace a dict comprehension like so:</p>
+
+<pre><code>{x: y for x, y in something.items()}
+</code></pre>
+
+<p>With:</p>
+
+<pre><code>dict((x, y) for x, y in something.items())
+</code></pre>
+
+<hr>
+
+<p>So, in full:</p>
+
+<pre><code>from random import choice
+
+def rand_int():
+        return choice(['yes', 'no'])
+
+spec = {
+    'answer': rand_int,
+    'next': {'answer': rand_int},
+    'the_answer': 42
+}
+
+def call_all_callables_in_dict(mapping):
+    if hasattr(mapping, "items"):
+        return {key: call_all_callables_in_dict(value) for key, value in mapping.items()}
+    elif callable(mapping):
+        return mapping()
+    else:
+        return mapping
+
+print(call_all_callables_in_dict(spec))
+</code></pre>
+
+<p>Gives us:</p>
+
+<pre><code>{'answer': 'no', 'the_answer': 42, 'next': {'answer': 'yes'}}
+</code></pre>

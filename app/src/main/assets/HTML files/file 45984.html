@@ -1,0 +1,69 @@
+<p>You're almost there. Create a Objective-C class to call C++ method.</p>
+
+<p>For example, Cocos2d-x created <code>CCDirectorCaller</code> Objective-C class in Objective-C++ source code (.mm file).</p>
+
+<p><a href="https://github.com/cocos2d/cocos2d-x/blob/v3/cocos/platform/ios/CCDirectorCaller-ios.mm" rel="nofollow">https://github.com/cocos2d/cocos2d-x/blob/v3/cocos/platform/ios/CCDirectorCaller-ios.mm</a></p>
+
+<p><strong>ADDED</strong></p>
+
+<p>You want to use <code>CADisplayLink</code> for the OpenGL ES render loop. And you also want to use your C++ main loop. Right?</p>
+
+<p><code>CADisplayLink</code> needs <code>NSRunLoop</code>. Also it needs an Objective-C object, for <code>target</code> and <code>selector</code>. Thus, you must create at least one Objective-C class for <code>CADisplayLink</code>.</p>
+
+<p>See also <a href="https://www.mikeash.com/pyblog/friday-qa-2010-01-01-nsrunloop-internals.html" rel="nofollow">Friday Q&amp;A 2010-01-01: NSRunLoop Internals</a>.</p>
+
+<p>So, there is the main <code>NSRunLoop</code> with <code>CADisplayLink</code> in the main thread. Infinite loop in the main <code>NSRunLoop</code> is not totally good idea because <code>NSRunLoop</code> can't loop due to the infinite loop. It is obvious. Thus, if you really want to use your C++ main loop, you should create a thread.</p>
+
+<pre><code>      The main thread                  Other thread
+
+       +-----------+                   +-------------+
+       |           |                   |             |
+       V           |                   V             |
+the main NSRunLoop |                C++ main loop    |
+       |           |                   |             |
+       |     CADisplayLink             |             |
+       |       call target's method    |             |
+       |           |                   |             |
+       |           |                   |             |
+       +-----------+                   +-------------|
+</code></pre>
+
+<p>And if you want to use <code>CADisplayLink</code> schedule for rendering, you need to implement some rendezvous thread synchronization pattern between the main <code>NSRunLoop</code> and your C++ main loop.</p>
+
+<p>It's complicated enough. That's why I recommend you to create a Objective-C class to call C++ method, not C++ main loop.</p>
+
+<blockquote>
+  <p>I had to make the draw function of the renderer public and the renderer class itself singleton</p>
+</blockquote>
+
+<p>Not really.</p>
+
+<pre><code>// **pseudo code**
+
+// In Objective-C++ source code
+typedef void (^block_t)(double);
+@interface RendererCaller : NSObject
+@property (nonatomic, copy) block_t updateBlock;
+@end
+
+@implementation RendererCaller
+- (void)start:(block_t)block
+{
+    self.updateBlock = block;
+    CADisplayLink *link = [CADisplayLink displayLinkWithTarget:self selector:@selector(update:)];
+    ...
+}
+- (void)update:(CADisplayLink *)sender
+{
+    updateBlock(elapsed time using sender);
+}
+@end
+
+void Renderer::startMainLoop()
+{
+    RendererCaller *rendererCaller = [[RendererCaller alloc] init];
+    [rendererCaller start:^(double elapsed){
+        this-&gt;draw(elapsed);
+    }];
+}
+</code></pre>

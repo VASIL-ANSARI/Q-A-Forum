@@ -1,0 +1,35 @@
+<p>The reason you can't find it is because it doesn't exist. The whole point of <code>Array</code> is that it handles arrays of simple, homogenous types that can be stored as "unboxed" binary data.</p>
+
+<p>A tuple is a compound type, which can hold any number of values of any kind. So you can't put it in an <code>Array</code>.</p>
+
+<p>In fact, you can't put strings in arrays either, because strings have a variable number of characters; each one is a different size. (And, if this is Python 3, it's even worse than that, because characters can be 1, 2, or 4 bytesâ¦)</p>
+
+<p>On top of that, an array has a fixed length; you can't <code>pop</code> values off it anyway.</p>
+
+<p>So, you will need to find a different way to share this data.</p>
+
+<p>You could use <code>shared_ctypes</code> if you understand C well enough to map your tuple of strings to a <code>struct</code> of <code>char*</code>.</p>
+
+<p>Or you could write a function to encode the tuples into fixed-size values (which you then slice into an Array of characters) on one side and decode them on the other.</p>
+
+<p>But I suspect you'll find life a lot simpler if you do what the docs recommend and find a way to write your code in terms of message passing instead of shared memory.</p>
+
+<p>Since the only shared mutation you need to here is to have each job <code>pop</code> a value off the end so that other jobs won't see the same value, the obvious answer is to use a <code>Queue</code>, because that's exactly what it does.</p>
+
+<p>Or, even simpler, just use one of the higher-level methods like <code>map</code> instead of <code>apply</code>, to take care of managing the queue and making sure each job gets exactly one value, so you don't even have to think about it. For example:</p>
+
+<pre><code>def thread_func(time, value):
+    time.sleep(time)
+    print(value)
+
+def main(cpu_number):
+    values = [("a","b"), ("c","d"), ("e","f")]
+    results = pool.imap_unordered(partial(thread_func, 1000), values[:cpu_number])
+    for result in results:
+        pass
+
+if __name__ == "__main__":
+    main(3)
+</code></pre>
+
+<p>(As a side note, I'm not sure why you're restricting the number of tasks to the number of CPUs. Normally, you create a <code>Pool(cpu_number)</code> and just queue up all of the tasks on that. If you only want to run exactly 3 tasks, you don't even really need a pool for that, just run each one on a <code>Process</code>.)</p>

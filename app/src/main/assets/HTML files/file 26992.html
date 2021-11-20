@@ -1,0 +1,27 @@
+<p><code>await</code> certainly results in cleaner code than <code>ContinueWith</code>.</p>
+
+<p>That said, it's easier to use <code>FromAsync</code> without a specified callback. I also prefer to wrap <code>FromAsync</code> in a simple extension method:</p>
+
+<pre><code>public static Task&lt;DirectoryResponse&gt; SendRequestAsync(this LdapConnection c, DirectoryRequest request, PrtialResultProcessing partialMode)
+{
+    return Task.Factory&lt;DirectoryResponse&gt;.FromAsync(c.BeginSendRequest, c.EndSendRequest, request, partialMode, null);
+}
+</code></pre>
+
+<p>Which you can then use like this:</p>
+
+<pre><code>public async Task&lt;ActionResult&gt; AjaxStuff()
+{
+    var c = new LdapConnection(string.Empty);
+
+    var result1 = await c.SendRequestAsync(new SearchRequest(string.Empty, "(&amp;(objectClass=*))", SearchScope.Base, "defaultNamingContext"), PartialResultProcessing.NoPartialResultSupport);
+    var nc = ((SearchResponse)result1).Entries[0].Attributes["defaultNamingContext"][0].ToString();
+
+    var result2 = (SearchResponse)(await c.SendRequestAsync(new SearchRequest(nc, "(&amp;(givenName=steve))", SearchScope.Subtree), PartialResultProcessing.NoPartialResultSupport)));
+    var dn = result2.Entries.Count &gt; 0 ? result2.Entries[0].DistinguishedName : "no such thing";
+
+    return this.PartialView("AjaxStuff", dn);
+}
+</code></pre>
+
+<p>By keeping your <code>FromAsync</code> code simple, you're moving all the logic into a single method, and <code>await</code> makes it much more readable.</p>

@@ -1,0 +1,73 @@
+<p>The core of the problem is that <code>Function::operator()</code> is not <code>const</code>. There are some other issues, such as <code>constexpr auto optimize(Func function, const std::pair&lt;auto, auto&gt;... range)</code> being invalid syntax, but those basically fall into place once the main issue is fixed.</p>
+
+<p>Working code:</p>
+
+<pre><code>#include &lt;cstddef&gt;
+#include &lt;functional&gt;
+#include &lt;random&gt;
+#include &lt;experimental/tuple&gt;
+#include &lt;type_traits&gt;
+#include &lt;utility&gt;
+
+template&lt;
+    std::size_t population_size, std::size_t generations,
+    typename Func,
+    typename Compare = std::greater&lt;&gt;,
+    typename Generator = std::default_random_engine,
+    typename Distribution = std::uniform_real_distribution&lt;&gt;,
+    typename... RangeElemT
+&gt;
+auto optimize(Func function, std::pair&lt;RangeElemT, RangeElemT&gt; const... range) {
+    static_assert(sizeof...(range) &gt; 2, "Function needs at least two arguments");
+
+    auto generate_number = [&amp;](auto range) {
+        static_assert(
+            std::is_arithmetic&lt;std::tuple_element_t&lt;0, decltype(range)&gt;&gt;{},
+            "First argument of std::pair has to be arithmetic!"
+        );
+        static_assert(
+            std::is_arithmetic&lt;std::tuple_element_t&lt;1, decltype(range)&gt;&gt;{},
+            "Second argument of std::pair has to be arithmetic!"
+        );
+
+        return std::bind(Distribution(range.first, range.second), Generator{});
+    };
+
+    auto genotype = std::make_tuple(generate_number(range)()...);
+    auto key = std::experimental::apply(function, genotype);
+    return std::make_pair(key, genotype);
+}
+
+#include &lt;cmath&gt;
+
+struct Function {
+    double operator ()(double x, double y, double z) const {
+        return std::exp(x + 1.25) * std::pow(y, z) / std::exp(x * y / z);
+    }
+};
+
+#include &lt;iostream&gt;
+#include &lt;boost/type_index.hpp&gt;
+
+int main() {
+    namespace bti = boost::typeindex;
+
+    Function f{};
+    auto x = optimize&lt;100, 200&gt;(
+        f,
+        std::make_pair(-21, 37),
+        std::make_pair(22.5, 88.11),
+        std::make_pair(-13, 37)
+    );
+    std::cout
+        &lt;&lt; bti::type_id_with_cvr&lt;decltype(x)&gt;().pretty_name() &lt;&lt; '\n'
+        &lt;&lt; x.first &lt;&lt; " :: "
+        &lt;&lt; std::get&lt;0&gt;(x.second) &lt;&lt; ", "
+        &lt;&lt; std::get&lt;1&gt;(x.second) &lt;&lt; ", "
+        &lt;&lt; std::get&lt;2&gt;(x.second) &lt;&lt; '\n';
+}
+</code></pre>
+
+<p><kbd><a href="http://coliru.stacked-crooked.com/a/55d877423d00d9f0" rel="nofollow"><strong>Online Demo</strong></a></kbd></p>
+
+<p>Also note that in both places you used <code>decltype(auto)</code>, <code>auto</code> can (and for clarity, should) be used instead.</p>

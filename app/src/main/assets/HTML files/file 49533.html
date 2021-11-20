@@ -1,0 +1,18 @@
+<p>I don't think it's a bug. If you look at the <a href="http://en.cppreference.com/w/cpp/algorithm/upper_bound" rel="nofollow">(possible) implementation of <code>std::upper_bound</code></a>, the comparison is done like</p>
+
+<pre><code>if (!(value &lt; *it)) { ... } // upper_bound, implicit conversion `MyInt`-&gt;`int` doesn't work
+</code></pre>
+
+<p>And because <code>operator&lt;</code> is a member function of <code>MyInt</code> (and not of <code>int</code>, which is not a class type), the code doesn't compile, since there is no conversion from <code>MyInt</code> to <code>int</code>. On the other hand, in <a href="http://en.cppreference.com/w/cpp/algorithm/lower_bound" rel="nofollow"><code>std::lower_bound</code></a>, <code>*it</code> appears on the lhs of the comparison, and <code>value</code> (of type <code>int</code>) can be implicitly converted to <code>MyInt</code> when passed to <code>MyInt::operator&lt;</code>.</p>
+
+<pre><code>if (*it &lt; value) { ... } // lower_bound, implicit conversion `int`-&gt;`MyInt` works
+</code></pre>
+
+<p>This is the reason why it's better to implement comparison operators as non-members, so you don't have this asymmetry. This is also mentioned in Scott Meyers' <em><a href="http://rads.stackoverflow.com/amzn/click/0321334876" rel="nofollow">Effective C++</a></em> book: <em>Item 24: Declare non-member functions when type conversions should apply to all parameters</em>.</p>
+
+<p><del>Quick and dirty fix: define an <code>MyInt::operator int(){return val;}</code> for implicit conversion <code>MyInt</code> to <code>int</code></del>. (<strong>EDIT:</strong> doesn't really work, ambiguity). What works is removing the need for implicit conversion</p>
+
+<pre><code>set&lt;MyInt&gt;::iterator itU = upper_bound(s.begin(), s.end(), MyInt(2));
+</code></pre>
+
+<p>instead.</p>

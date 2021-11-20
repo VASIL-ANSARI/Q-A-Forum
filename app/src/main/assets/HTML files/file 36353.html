@@ -1,0 +1,26 @@
+<p>I think I've figured it out. As bowlturner pointed out, sequences aren't necessary(although I tried that they could be used). Simple selects and updates are enough:</p>
+
+<pre><code>create or replace function getNextNumber(otherid IN VARCHAR2)
+return number
+is 
+  nextval NUMBER;
+  entryexists NUMBER(1);
+begin
+  select case
+    when exists(select * from CURRENT_STATE where OTHER_ID=otherid)
+      then 1
+      else 0
+    end into entryexists
+  from dual;  
+  if entryexists = 0
+    then      
+      insert into CURRENT_STATE (OTHER_ID, SEQUENCE_STATE) values (otherid, 1);
+      nextval := 1;
+    else  
+      update CURRENT_STATE set SEQUENCE_STATE = SEQUENCE_STATE + 1 where     OTHER_ID=otherid
+        RETURNING SEQUENCE_STATE into nextval;
+  end if;
+  return nextval;
+end;
+/
+</code></pre>

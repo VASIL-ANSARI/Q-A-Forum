@@ -1,0 +1,47 @@
+<p>You could use the <a href="http://oozie.apache.org/docs/4.0.0/WorkflowFunctionalSpec.html#a3.1.4_Decision_Control_Node" rel="nofollow">decision node</a> concept here .</p>
+
+<p>Check for the file , a switch case to determine as soon u have the file execute your next java action.</p>
+
+<p>----EDIT------</p>
+
+<p>find below an example , This as is doesnt solve your case :</p>
+
+<pre><code> &lt;workflow-app xmlns="uri:oozie:workflow:0.4" name="shell-wf"&gt;
+&lt;start to="shell-node"/&gt;
+&lt;action name="shell-node"&gt;
+    &lt;shell xmlns="uri:oozie:shell-action:0.2"&gt;
+        &lt;job-tracker&gt;${jobTracker}&lt;/job-tracker&gt;
+        &lt;name-node&gt;${nameNode}&lt;/name-node&gt;
+        &lt;configuration&gt;
+            &lt;property&gt;
+                &lt;name&gt;mapred.job.queue.name&lt;/name&gt;
+                &lt;value&gt;${queueName}&lt;/value&gt;
+            &lt;/property&gt;
+        &lt;/configuration&gt;
+        &lt;exec&gt;echo&lt;/exec&gt;
+        &lt;argument&gt;my_output=Hello Oozie&lt;/argument&gt;
+        &lt;capture-output/&gt;
+    &lt;/shell&gt;
+    &lt;ok to="check-output"/&gt;
+    &lt;error to="fail"/&gt;
+&lt;/action&gt;
+&lt;decision name="check-output"&gt;
+    &lt;switch&gt;
+        &lt;case to="end"&gt;
+            ${wf:actionData('shell-node')['my_output'] eq 'Hello Oozie'}
+        &lt;/case&gt;
+        &lt;default to="fail-output"/&gt;
+    &lt;/switch&gt;
+&lt;/decision&gt;
+&lt;kill name="fail"&gt;
+    &lt;message&gt;Shell action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]&lt;/message&gt;
+&lt;/kill&gt;
+&lt;kill name="fail-output"&gt;
+    &lt;message&gt;Incorrect output, expected [Hello Oozie] but was [${wf:actionData('shell-node')['my_output']}]&lt;/message&gt;
+&lt;/kill&gt;
+&lt;end name="end"/&gt;
+</code></pre>
+
+<p></p>
+
+<p>Like wise you could add your action nodes in the switch case and continue accordingly.</p>

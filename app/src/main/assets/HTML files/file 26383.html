@@ -1,0 +1,14 @@
+<p>This is what <a href="http://msdn.microsoft.com/en-us/library/9sb57dw4.aspx" rel="nofollow">assert()</a> looks like when its <em>expression</em> argument evaluates to false.  This assert exists in the Debug build of the C runtime library, designed to check for allocation problems.  The free() function in your case.  The Debug build add extra checks to make sure you are writing your code correctly.  And tell you when it detects a problem.  Like calling free() on an allocation that was already freed, the simple case.  Or calling free() passing the wrong pointer value, the trickier case.  Or calling free() when the heap was corrupted by earlier code, the much harder case. </p>
+
+<p>This is only as far as they can take it, they don't actually know <em>why</em> your code got it wrong.  There is not any way they can put a Big Red arrow on the code that corrupted the heap for example.  The easy case is covered by the Debug + Windows + Call Stack debugger window, it takes you to the code in your program that called free().  Or <code>std::operator delete</code> for a C++ program.  The harder case is very, very hard indeed, heap corruption is often a Heisenbug.  Getting the assert to be repeatable so you can set a data breakpoint on the reported address is the core strategy.  Crossing fingers for the easy case, good luck with it!</p>
+
+<hr>
+
+<p>After edit: yes, having cross-module problems with a C++ class like std::string is certainly one of the problems it can catch.  Not a Heisenbug, good kind of problem to have.  Two basic issues with that:</p>
+
+<ul>
+<li>The modules might each have their own copy of the CRT, objects allocated by one copy of the CRT cannot be released by another copy of the CRT.  They each have their own heap they allocate from.  A problem that got addressed in VS2012, the CRT now allocates from a process-global heap.</li>
+<li>The modules might not use the same implementation of std::string.  With an object layout that does not match.  Easily induced by having the modules compiled with different C++ library versions, particularly an issue with C++11 changes.  Or different build settings, the _HAS_ITERATOR_DEBUGGING macro is quite notorious.</li>
+</ul>
+
+<p>The only cure for that problem is to make sure that you build <em>all</em> of the modules in your program with the exact same compiler version using the exact same build settings.  Using /MD is mandatory, it ensures that the CRT is shared so there's only one in the program.</p>

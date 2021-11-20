@@ -1,0 +1,46 @@
+<blockquote>
+  <p>Is there a way to delay this through the has_many call?</p>
+</blockquote>
+
+<p>There is not.</p>
+
+<hr>
+
+<blockquote>
+  <p>Is there a way to pass a custom destroy method through dependent:?</p>
+</blockquote>
+
+<p>Also no; there are only a handful of accepted options in <a href="http://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html#method-i-has_many" rel="nofollow">the docs</a>:</p>
+
+<blockquote>
+  <p>:destroy causes all the associated objects to also be destroyed.</p>
+  
+  <p>:delete_all causes all the associated objects to be deleted directly from the database (so callbacks will not be executed).</p>
+  
+  <p>:nullify causes the foreign keys to be set to NULL. Callbacks are not executed.</p>
+  
+  <p>:restrict_with_exception causes an exception to be raised if there are any associated records.</p>
+  
+  <p>:restrict_with_error causes an error to be added to the owner if there are any associated objects.</p>
+</blockquote>
+
+<hr>
+
+<blockquote>
+  <p>Is there a way, in the CalendarEvent.destroy method, to know whether or not it's being called from a dependent: :destroy definition?</p>
+</blockquote>
+
+<p>You could technically sniff the stack trace in <code>caller</code>, but that doesn't sound like a great idea.</p>
+
+<hr>
+
+<p>I'd remove the <code>dependent:</code> option and build a custom <code>after_destroy</code> that cleans up the <code>CalendarEvent</code> objects in a delayed fashion.</p>
+
+<pre><code>after_destroy :destroy_calendar_events
+
+def destroy_calendar_events
+  calendar_events.each {|event| event.delay.destroy }
+end
+</code></pre>
+
+<p>A loooong time ago, a company I worked at solved this problem with <a href="http://async-observer.rubyforge.org/" rel="nofollow">Async Observer</a>, which provided an <code>async_destroy</code> method, but that was based on <a href="https://kr.github.io/beanstalkd/" rel="nofollow">Beanstalk</a> and would need to be adapted. The code might be interesting if you want to bake something in.</p>

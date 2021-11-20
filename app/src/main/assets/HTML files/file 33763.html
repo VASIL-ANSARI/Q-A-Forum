@@ -1,0 +1,66 @@
+<p>I'm guessing that when you say "javascript stops working" you mean that events which have a javscript function tied to them are not firing that function.</p>
+
+<p>I think the root of the problem is:</p>
+
+<pre><code>document.body.innerHTML=xmlhttp.responseText
+</code></pre>
+
+<p>If you bind a function to an event at page load then you are binding it to the event on a specific element.  When you run the above you remove all elements in the page body and replace them with new ones.  The new ones may have the same class/id but they are new elements which do not have any events bound.</p>
+
+<p>There are two solutions: either  encapsulate all your event binding in a function, which you run both on page load and after replaceing the page as above or use only delegated events where all events are techically bound to the body element itself.</p>
+
+<p><strong>Edit:</strong>
+I see the questions is tagged jQuery (I wonder why ypou are not using $.ajax in this case?).  Using jQuery you can do the delegated events as such:  Instead of </p>
+
+<pre><code>$(function(){
+   $('#foo').click(function(){
+      alert('Foo clicked');
+   });
+   $('.bar').change(function(){
+      //do something
+   });
+});
+</code></pre>
+
+<p>You can use</p>
+
+<pre><code>$(function(){
+   $('body')
+   .on('click', '#foo', function(){
+      alert('Foo clicked');
+   })
+   .on('change', '.bar', function(){
+      //do something
+   });
+});
+</code></pre>
+
+<p>For more info see the <a href="http://api.jquery.com/on/" rel="nofollow">jQuery docs on .on()</a></p>
+
+<p><strong>Second Edit</strong></p>
+
+<p>To use the first option (9encapsulate all events in a function) then, based on the same events as the above example, change the document ready to the following:</p>
+
+<pre><code>function set_events(){
+   $('#foo').click(function(){
+      alert('Foo clicked');
+   });
+   $('.bar').change(function(){
+      //do something
+   });
+}
+$(function(){
+   set_events();
+});
+</code></pre>
+
+<p>Then change you ajax response habndler to 
+xmlhttp.onreadystatechange = function(){</p>
+
+<pre><code>  if (xmlhttp.readyState==4 &amp;&amp; xmlhttp.status==200){
+     document.body.innerHTML=xmlhttp.responseText;
+     set_events();
+  }
+</code></pre>
+
+<p>};</p>

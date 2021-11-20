@@ -1,0 +1,67 @@
+<p>Try using the Tidy library which can be used to clean up bad HTML and XML
+<a href="http://php.net/manual/en/book.tidy.php">http://php.net/manual/en/book.tidy.php</a></p>
+
+<p>A pure PHP solution to fix some XML like this:</p>
+
+<pre><code>&lt;?xml version="1.0"?&gt;
+&lt;feed&gt;
+&lt;RECORD&gt;
+&lt;ID&gt;117387&lt;/ID&gt;
+&lt;ADVERTISERNAME&gt;Test &lt; texter&lt;/ADVERTISERNAME&gt;
+&lt;AID&gt;10544740&lt;/AID&gt;
+&lt;NAME&gt;This &amp; This&lt;/NAME&gt;
+&lt;DESCRIPTION&gt;For one day only this is &gt; than this.&lt;/DESCRIPTION&gt;
+&lt;/RECORD&gt;
+&lt;/feed&gt;
+</code></pre>
+
+<p>Would be something like this:</p>
+
+<pre><code>  function cleanupXML($xml) {
+    $xmlOut = '';
+    $inTag = false;
+    $xmlLen = strlen($xml);
+    for($i=0; $i &lt; $xmlLen; ++$i) {
+        $char = $xml[$i];
+        // $nextChar = $xml[$i+1];
+        switch ($char) {
+        case '&lt;':
+          if (!$inTag) {
+              // Seek forward for the next tag boundry
+              for($j = $i+1; $j &lt; $xmlLen; ++$j) {
+                 $nextChar = $xml[$j];
+                 switch($nextChar) {
+                 case '&lt;':  // Means a &lt; in text
+                   $char = htmlentities($char);
+                   break 2;
+                 case '&gt;':  // Means we are in a tag
+                   $inTag = true;
+                   break 2;
+                 }
+              }
+          } else {
+             $char = htmlentities($char);
+          }
+          break;
+        case '&gt;':
+          if (!$inTag) {  // No need to seek ahead here
+             $char = htmlentities($char);
+          } else {
+             $inTag = false;
+          }
+          break;
+        default:
+          if (!$inTag) {
+             $char = htmlentities($char);
+          }
+          break;
+        }
+        $xmlOut .= $char;
+    }
+    return $xmlOut;
+  }
+</code></pre>
+
+<p>Which is a simple state machine noting whether we are in a tag or not and if not then encoding the text using htmlentities.</p>
+
+<p>It's worth noting that this will be memory hungry on large files so you may want to rewrite it as a stream plugin or a pre-processor.</p>

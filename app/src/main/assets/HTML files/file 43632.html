@@ -1,0 +1,93 @@
+<p>It has been my experience that when you use a TCP server/client socket relationship, the TCP server socket side will be in a thread that is controlled by a flag to continue listening until told to stop (Your comments mention a stop button).</p>
+
+<p>The client side runs until all data is done, or the same flag controlling the server side is tripped.</p>
+
+<p>When a client connects, I would store the AcceptSocket into a list.  When I did this, I had a custom class that the takes the AcceptSocket and the custom class had counters for like how many messages, or bytes was sent/received to/from this client.  </p>
+
+<pre><code>// This should be a threaded method if you're using a button to stop
+private void StartTcpListener()
+{
+    List&lt;ClientClass&gt; clientClassList = new List&lt;ClientClass&gt;();
+
+    TcpListener tcpListener = new TcpListener(ipAdd, iPort);
+    tcpListener.Start();
+
+    while (keepListening)
+    {
+        Socket socket = tcpListener.AcceptSocket();
+
+        // Create a client object and store it in a list
+        ClientClass clientClass = new ClientClass(socket);
+        clientClassList.Add(clientClass);
+
+        // This method would start a thread to read data from the accept socket while it was connected.
+        clientClass.Start();
+    }
+
+    foreach (ClientClass client in clientClassList)
+    {
+        // This method would stop the thread that reads data from the accept socket and close the accept socket
+        client.Stop();
+    }
+    tcpListener.Stop();
+}
+</code></pre>
+
+<p>For the client side, when reading from the client accept socket this would be thread controlled and either the thread is aborted or the client closes its end causing the read to return a -1 for number of bytes read.</p>
+
+<pre><code>// Threaded method
+private void Receive()
+{
+    // Don't know how much of a buffer you need
+    byte[] dataIn = byte[1000];
+    while (acceptSocket.Connected)
+    {
+        // Exception handling so you either end the thread or keep processing data
+        try
+        {
+            int bytesRead = acceptSocket.Read(dataIn);
+            if (bytesRead != -1)
+            {
+                // Process your data
+            }
+            else
+            {
+                // -1 Bytes read should indicate the client shutdown on their end
+                break;
+            }
+        }
+        catch(SocketException se)
+        {
+            // You could exit this loop depending on the SocketException
+        }
+        catch(ThreadAbortException tae)
+        {
+            // Exit the loop
+        }
+        catch (Exception e)
+        {
+            // Handle exception, but keep reading for data
+        }
+    }
+
+    // You have to check in case the socket was disposed or was never successfully created
+    if (acceptSocket != null)
+    {
+        acceptSocket.Close();
+    }
+}
+
+// This is the stop method if you press your stop button
+private void Stop()
+{
+    // Aborts your read thread and the socket should be closed in the read thread.  The read thread should have a ThreadState.Stopped if the while loop was gracefully ended and the socket has already been closed
+    if (readThread != null &amp;&amp; readThread.ThreadState != ThreadState.Stopped)
+    {
+        readThread.Abort();
+    }
+}
+</code></pre>
+
+<p>I think this is the basics of what I've done before.  I'm sure there are "cleaner" ways of doing this now.  This was years ago when I use to implement TCP client/server socket objects.</p>
+
+<p>Hope this helps...</p>

@@ -1,0 +1,113 @@
+<p>Without an ability to test it, it looks basically fine.</p>
+
+<p>However I would never rely on d/m/yy for those dates. The safest format for date literals in SQL Server is YYYYMMDD, next best is YYYY-MM-DD</p>
+
+<p>I might have called set @report_date &amp; set @report_date2 (which aren't storing dates)
+@report_duration &amp; @report_duration2</p>
+
+<p>There's a comma missing in the first line above after @end_date date</p>
+
+<p>I reformatted to read the query, it may help others too:</p>
+
+<pre><code>DECLARE @dataset_name varchar(36)
+      , @start_date datetime
+      , @end_date date
+      , @report_date int
+      , @start_date2 datetime
+      , @end_date2 datetime
+      , @report_date2 int
+
+--set @dataset_name = 'Atlanta OPHC' -- This can be used to search individual business  units  --
+SET @start_date  = '20140701' -- ENTER REPORT START DATE-- 
+SET @end_date    = '20140731' --  ENTER REPORT END DATE--- 
+SET @start_date2 = '20140601' -- ENTER REPORT START DATE-- 
+SET @end_date2   = '20140630' --  ENTER REPORT END DATE---
+--- Do Not Change anything below--- 
+SET @report_date = DATEDIFF(DD, @start_date, @end_date + 1)
+SET @report_date2 = DATEDIFF(DD, @start_date2, @end_date2 + 1)
+
+
+SELECT
+      tot.DATASET_NAME
+    , SUM(tot.LENGTH_OF_STAY)                  AS TOTAL_LOS
+    , SUM(tot.LENGTH_OF_STAY) / @report_date   AS Avg_daily_census
+    , @start_date
+    , @end_date
+    , COUNT(length_of_stay)                    AS clients_servered
+    , AVG(tot.LENGTH_OF_STAY)                  AS avg_los
+    , COUNT(admit_count)                       AS Total_admission
+    , COUNT(discharge_date)                    AS Total_discharge
+    , COUNT(active_patients)                   AS Active_patients
+    , SUM(tot.LENGTH_OF_STAY2)                 AS TOTAL_LOS2
+    , SUM(tot.LENGTH_OF_STAY2) / @report_date2 AS Avg_daily_census2
+    , @start_date2
+    , @end_date2
+    , COUNT(length_of_stay2)                   AS clients_servered2
+    , AVG(tot.LENGTH_OF_STAY2)                 AS avg_los2
+    , COUNT(admit_count2)                      AS Total_admission2
+    , COUNT(discharge_date2)                   AS Total_discharge2
+    , COUNT(active_patients2)                  AS Active_patients2
+
+FROM (
+            SELECT
+                  od.DATASET_NAME
+                , DATEDIFF(DD,
+                  CASE
+                        WHEN pa.ADMIT_DATE &lt; @start_date THEN @start_date
+                        ELSE pa.ADMIT_DATE END,
+                  CASE
+                        WHEN ISNULL(pa.TERMINATION_DATE, GETDATE()) &gt; @end_date THEN @end_date
+                        ELSE ISNULL(pa.TERMINATION_DATE, GETDATE()) END)
+                  + 1                                                                           AS LENGTH_OF_STAY
+                , CASE
+                        WHEN pa.ADMIT_DATE BETWEEN @start_date AND @end_date THEN 1 END         AS admit_count
+                , CASE
+                        WHEN pa.TERMINATION_DATE BETWEEN @start_date AND @end_date THEN 1 END   AS discharge_date
+                , CASE
+                        WHEN pa.ADMIT_DATE &lt;= @start_date OR
+                        pa.ADMIT_DATE &lt;= @end_date AND
+                        TERMINATION_DATE IS NULL THEN 1 END                                     AS active_patients
+                , DATEDIFF(DD,
+                  CASE
+                        WHEN pa.ADMIT_DATE &lt; @start_date2 THEN @start_date2
+                        ELSE pa.ADMIT_DATE END,
+                  CASE
+                        WHEN ISNULL(pa.TERMINATION_DATE, GETDATE()) &gt; @end_date2 THEN @end_date2
+                        ELSE ISNULL(pa.TERMINATION_DATE, GETDATE()) END)
+                  + 1                                                                           AS LENGTH_OF_STAY2
+                , CASE
+                        WHEN pa.ADMIT_DATE BETWEEN @start_date2 AND @end_date2 THEN 1 END       AS admit_count2
+                , CASE
+                        WHEN pa.TERMINATION_DATE BETWEEN @start_date2 AND @end_date2 THEN 1 END AS discharge_date2
+                , CASE
+                        WHEN pa.ADMIT_DATE &lt;= @start_date2 OR
+                        pa.ADMIT_DATE &lt;= @end_date2 AND
+                        TERMINATION_DATE IS NULL THEN 1 END                                     AS active_patients2
+            FROM PT_ADMISSION pa
+                  JOIN PT_BASIC pb
+                              ON pa.PATIENT_ID = pb.PATIENT_ID
+                  JOIN O_DATASET od
+                              ON pb.DATASET_ID = od.DATASET_ID
+            WHERE (od.DATASET_NAME = @dataset_name
+                  OR DATASET_NAME NOT IN (  'Atlanta Training'
+                                          , 'Initial Configuration Home Health'
+                                          , 'Initial Configuration Hospice'
+                                          , 'Initial Configuration Private Duty'
+                                          , 'Penetration Testing')
+                  )
+                  AND pa.ADMIT_DATE &lt;= @end_date
+                  AND ISNULL(pa.TERMINATION_DATE, GETDATE()) &gt;= @start_date
+      ) tot
+GROUP BY
+      tot.DATASET_NAME
+</code></pre>
+
+<p>The predicate</p>
+
+<p>AND ISNULL(pa.TERMINATION_DATE, GETDATE()) >= @start_date</p>
+
+<p>might perform better like this:</p>
+
+<p>AND (pa.TERMINATION_DATE >= @start_date OR pa.TERMINATION_DATE IS NULL)</p>
+
+<p>use of functions on columns in the where clause can remove use of an index, so a "sargable" predicate is preferred.</p>

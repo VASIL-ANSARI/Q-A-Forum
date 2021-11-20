@@ -1,0 +1,107 @@
+<p>I've done this in quite a few applications now. Instead of extending SupportMapFragment, you just create your own MapFragment. You can have your own layout, with a MapView view inside of it. The key is to route the lifecycle events of the Fragment to the MapView, and bobs your uncle.</p>
+
+<p>Heres some example code:</p>
+
+<p><strong>MapFragment</strong></p>
+
+<pre><code>package com.example.testapplication;
+
+import java.util.concurrent.TimeUnit;
+
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.MapsInitializer;
+
+
+public class TestMapFragment extends Fragment {
+
+    private MapView mMapView;
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+    }
+
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.home_fragment, container, false);
+
+        mMapView = (MapView) view.findViewById(R.id.mapview);
+
+        // inflat and return the layout
+        mMapView.onCreate(savedInstanceState);
+        mMapView.onResume();// needed to get the map to display immediately
+
+        try {
+            MapsInitializer.initialize(getActivity());
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
+        }
+        GoogleMap googleMap = mMapView.getMap();
+        googleMap.getUiSettings().setMyLocationButtonEnabled(true);
+        return view;
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setRetainInstance(true);
+    }
+
+    /*
+     * Using a mapview in a fragment requires you to 'route'
+     * the lifecycle events of the fragment to the mapview
+     */
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (null != mMapView)
+            mMapView.onResume();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (null != mMapView)
+            mMapView.onPause();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (null != mMapView)
+            mMapView.onDestroy();
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (null != mMapView)
+            mMapView.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (null != mMapView)
+            mMapView.onLowMemory();
+    }
+}
+</code></pre>
+
+<p><strong>And the layout:</strong></p>
+
+<pre><code>&lt;RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:map="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" &gt;
+
+    &lt;com.google.android.gms.maps.MapView
+        android:id="@+id/mapview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        map:uiZoomControls="false" /&gt;
+&lt;/RelativeLayout&gt;
+</code></pre>

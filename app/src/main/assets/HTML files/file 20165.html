@@ -1,0 +1,46 @@
+<p>Okay, so you want to go for each list and determine the items that it has that aren't in at least one other list, and all of the items in at least one other list that it doesn't have.</p>
+
+<p>To do that start out by finding all of the items in all lists; that is the "intersection" of each list.</p>
+
+<p>Once you have that <code>Except</code> does all of the work for you.  All items <code>except</code> a given list gives you the items that are in the intersection but not in that particular list, the items in the intersection <code>Except</code> the list is all of the items missing from the intersection.</p>
+
+<pre><code>public static IEnumerable&lt;SetDifference&lt;T&gt;&gt; ComputeDifferences&lt;T&gt;(IList&lt;List&lt;T&gt;&gt; lists)
+{
+    if (lists.Count == 0)
+        yield break;
+
+    var intersection = new HashSet&lt;T&gt;(lists.First());
+    foreach (var list in lists.Skip(1))
+    {
+        intersection.IntersectWith(list);
+    }
+
+    var output = new List&lt;SetDifference&lt;T&gt;&gt;();
+    foreach (var list in lists)
+    {
+        yield return new SetDifference&lt;T&gt;(
+            list: list,
+            additionalObjects: list.Except(intersection),
+            missingObjects: intersection.Except(list));
+    }
+}
+</code></pre>
+
+<p>Here is the simple data holder used to provide the output.</p>
+
+<pre><code>public class SetDifference&lt;T&gt;
+{
+    public SetDifference(List&lt;T&gt; list, IEnumerable&lt;T&gt; additionalObjects,
+            IEnumerable&lt;T&gt; missingObjects)
+    {
+        List = list;
+        AdditionalObjects = additionalObjects;
+        MissingObjects = missingObjects;
+    }
+    public List&lt;T&gt; List { get; private set; }
+    public IEnumerable&lt;T&gt; AdditionalObjects { get; private set; }
+    public IEnumerable&lt;T&gt; MissingObjects { get; private set; }
+}
+</code></pre>
+
+<p>Note that because I'm using <code>HashSet</code>, as well as other set operations from LINQ, it will rely on the <code>GetHashCode</code> method of each of the items, so it must have an appropriate implementation given the <code>Equals</code> method for that object.</p>

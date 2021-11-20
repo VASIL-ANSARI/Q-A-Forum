@@ -1,0 +1,55 @@
+<p>If <a href="https://github.com/joyent/node/blob/master/lib/util.js" rel="nofollow">this</a> is the implementation of util.inherits it only does the following for you:</p>
+
+<pre><code>  Child.super_ = Parent;
+  //set prototype using Object.create
+  Child.prototype = Object.create(Parent.prototype, {
+    constructor: {//repair the prototype.constructor
+      value: Child,
+      enumerable: false,
+      writable: true,
+      configurable: true
+    }
+</code></pre>
+
+<p>This is not a problem in Nodejs but in browsers that don't support a second argument to Object.create (because the polyfil does not allow it) you can repair the constructor in the following way:</p>
+
+<pre><code>Child.prototype = Object.create(Parent.prototype);//if you polyfilled Object.create
+//Child.prototype.constructor is now Parent so we should repair it
+Child.prototype.constructor = Child;
+</code></pre>
+
+<p>The extra thing it does is setting Child.super_ so in Child you can do:</p>
+
+<pre><code>function Child(){
+  Child.super_.call(this);//re use parent constructor
+  //same as Parent.call(this);
+}
+</code></pre>
+
+<p>For more information on prototype and constructor functions you can read <a href="http://stackoverflow.com/a/16063711/1641941">this answer</a>.</p>
+
+<p>According to the <a href="https://nodejs.org/api/stream.html" rel="nofollow">following</a>, you are sub classing Transform incorrectly:</p>
+
+<blockquote>
+  <p>In classes that extend the Transform class, make sure to call the
+  constructor so that the buffering settings can be properly
+  initialized.</p>
+</blockquote>
+
+<p>So the correct code should call it's constructor (you are not calling Transform with new but maybe the constructor has a way of handling faulty calls).</p>
+
+<pre><code>var Transform = require("stream").Transform;
+function TStream() {
+  Transform.call(this);//you did not do that in your second example
+}
+//your code sets prototype to an INSTANCE of Transform
+//  and forgets to call the constructor with new
+//TStream.prototype = require("stream").Transform()
+TStream.prototype = Object.create(Transform.prototype);
+TStream.prototype.constructor = TStream;
+TStream.prototype._transform = function (chunk, encoding, done) {
+  this.push(/* transform chunk! */)
+  done()
+}
+process.stdin.pipe(new TStream()).pipe(process.stdout)
+</code></pre>

@@ -1,0 +1,16 @@
+<p>That is not the proper way to configure a many to many relationship between <code>Lifeboat</code> and <code>Sighting</code>. If you remove the Fluent Api configurations you already have, by default, EF will create a third joining table, <code>SightingLifeboats</code>, which will consist of the PK of both the tables. That is because you have a collection navigation property in each entity. But you can configure explicitly that relationship using Fluent Api:</p>
+
+<pre><code> modelBuilder.Entity&lt;LifeBoat&gt;()
+             .HasMany&lt;Sighting &gt;(l =&gt; l.Sightings)
+             .WithMany(s =&gt; s.LifeBoats)
+             .Map(cs =&gt;
+                      {
+                         cs.MapLeftKey("LifeBoatRefId");
+                         cs.MapRightKey("SightingId");
+                         cs.ToTable("SightingLifeboats");
+                      });
+</code></pre>
+
+<p>This way you can change the name of the junction table and specify the FK property names, in case you need to change them.</p>
+
+<p>Another thing, I recommend to change your collection properties to <code>virtual</code>.If you make all your properties <code>virtual</code> then EF will generate proxy classes at runtime that derives from your POCO classes, these proxies allow EF to find out about changes in real time rather than having to capture the original values of your object and then scan for changes when you save.</p>

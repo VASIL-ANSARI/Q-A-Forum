@@ -1,0 +1,70 @@
+<p>Interesting problem :-)
+Not trivial to solve. I don't see why it gets downvoted.</p>
+
+<p>The following code will check all subsets, compute the continuous cover, overlap and the list of tuples that generated that cover + overlap.</p>
+
+<p>Finally it gets sorted by overlap. So the first element in the output should be the one with the desired cover and the least overlap.</p>
+
+<pre><code>from itertools import *
+import operator
+
+def allsubsets(l):
+    for s in chain( *map(lambda r: combinations(l,r), xrange(1,len(l))) ):
+        yield s
+
+
+# only count tuples that make consecutive ranges
+def mk_cover(acc, item):
+    ((curlo, curhi), tuplist, ovl) = acc
+    (newlo, newhi)                 = item
+    if newlo&lt;=curhi:
+        # ok, the new item possibly extends the range
+        if newhi&gt;=curhi:
+            overlap = curhi - newlo
+        else:
+            overlap = newhi - newlo
+            newhi   = curhi
+        return ((curlo, newhi), tuplist+[item], ovl+overlap)
+    else:
+        # it doesn't so return the old accumulator
+        return acc
+
+# return a function that will inspect lists-of-tuples
+# to see if they cover the range lo -&gt; hi. If they do,
+# append the covering list and the overlap to an
+# accumulator; a list of solutions found so far
+def mk_finder(lo, hi):
+    def overlapper(acc, tuples):
+        # inspect the subset of tuples, wether they 
+        # cover lo -&gt; hi 
+        # sort by start value
+        tuples                    = list(sorted(tuples, key=operator.itemgetter(0)))
+        ((covlo, covhi), tl, ovl) = reduce(mk_cover, tuples[1:], (tuples[0], [tuples[0]], 0))
+        if covlo&lt;=lo and covhi&gt;=hi:
+            acc.append( ((covlo, covhi), tl, ovl) )
+        return acc
+    return overlapper
+</code></pre>
+
+<p>With the following input:    </p>
+
+<pre><code>inp = [  (10,20) , (20,30) , (22,24) , (26,30) , (10,28) ] 
+
+# find all that cover 10,30
+found = reduce(mk_finder(10, 30), allsubsets(inp), [])
+
+# sort by overlap
+found = [(tl, ovl) for (cov, tl, ovl) in sorted(found, key=operator.itemgetter(2))
+print found
+</code></pre>
+
+<p>Yields this as output (yes, there are many subsets covering the range 10-30) showing that the combination (10,20) + (20,30) covers the range 10-30 with zero overlap:</p>
+
+<pre><code>[([(10, 20), (20, 30)], 0),
+ ([(10, 28), (26, 30)], 2),
+ ([(10, 20), (20, 30), (22, 24)], 2),
+ ([(10, 20), (20, 30), (26, 30)], 4),
+ ([(10, 28), (22, 24), (26, 30)], 4),
+ .... &lt;snip&gt; 
+ ]
+</code></pre>

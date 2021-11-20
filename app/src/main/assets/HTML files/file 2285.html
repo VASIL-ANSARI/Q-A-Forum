@@ -1,0 +1,64 @@
+<p>It appears the problem is not to do with the source of the mouse event. Indeed I think there's two different things being called "source" here, and you're mixing them together. I think the message:</p>
+
+<pre><code>EventDispatchThread.run() line: not available, Source not found
+</code></pre>
+
+<p>Is Eclipse telling you that the library does not have the source <em>code</em> attached to it, so it cannot find line numbers or show you the source code. The problem does not appear to be with <code>me.getSource()</code>. </p>
+
+<p>The problem is that you are trying to reference an index within an array that is outwith the bounds of the array (hence the <code>ArrayIndexOutOfBoundsException</code> in the stack trace).</p>
+
+<p>Since the stack trace is on the AWT Event Queue thread, it is likely the exception is stemming from within the <code>mousePressed()</code> method of your <code>MouseAdapter</code>. Since you're already using Eclipse, I suggest you get to know the Debugger, which is extremely useful. Put a breakpoint at these lines:</p>
+
+<pre><code>Vector validMoves = move.DroneMovesNorth[index].Moves;
+int totalMoves = move.DroneTotalMovesNorth[index];
+</code></pre>
+
+<p>And check that both the array fields of <code>move</code> are large enough to reference an element at the index. If you don't want to use the debugger (I'd <em>really</em> recommend that way), then you could wrap those two lines with an exception catch, like this:</p>
+
+<pre><code>try {
+    Vector validMoves = move.DroneMovesNorth[index].Moves;
+    int totalMoves = move.DroneTotalMovesNorth[index];
+catch(ArrayIndexOutOfBoundsException e) {
+    System.out.println("Exception thrown: index = " + index + 
+        "Array lengths: " + move.DroneMovesNorth.length + ", " +
+        move.DroneTotalMovesNorth.length);
+}
+</code></pre>
+
+<p>When/if the exception is caught, you want to find out <em>why</em> the index is larger than the size of each of these arrays. That's left as an exercise ;-)</p>
+
+<hr>
+
+<p>Edit: there's some other code in there which looks suspicious.</p>
+
+<p>First you declare the array for the chessboard:  </p>
+
+<pre><code>chessBoard = new JPanel[NUMBER_OF_ROWS][NUMBER_OF_COLS];
+</code></pre>
+
+<p>Then you begin to iterate for every square in the board:</p>
+
+<pre><code>for (int i = 0; i &lt; NUMBER_OF_ROWS; i++) {
+   for (int j = 0; j &lt; NUMBER_OF_COLS; j++) {
+</code></pre>
+
+<p>Note that <code>i</code> will run up to the value <code>NUMBER_OF_ROWS</code>, which is the length of the chessboard array. Then for some reason I don't understand, you change the value of <code>index</code> to something that could be 4x as large as the length of the array:</p>
+
+<pre><code>int index = i * 4 + j;
+</code></pre>
+
+<p>And later try to reference that position in the chessboard array:</p>
+
+<pre><code>if (!(boardArray.chessBoard[index].square.isEmpty())) {
+</code></pre>
+
+<p>This means it's possible for <code>index</code> to be a value higher than <code>NUMBER_OF_ROWS</code>, and if you try to access the element at that index of the array, it will throw the <code>ArrayIndexOutOfBoundsException</code>.</p>
+
+<p>So, my second suggestion would be to take another look at the logic involved in:</p>
+
+<pre><code>int index = i * 4 + j;
+</code></pre>
+
+<p>... as that may also be the problem.</p>
+
+<p>P.S. the debugger in Eclipse is awesome, you should use it ;-)</p>

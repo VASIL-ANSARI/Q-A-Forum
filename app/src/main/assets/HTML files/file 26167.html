@@ -1,0 +1,49 @@
+<p>I had a problem with the crop function (only cooliris media), too:</p>
+
+<p>Cooliris media exception:</p>
+
+<pre><code>E/AndroidRuntime(4439): java.lang.RuntimeException: 
+Unable to start activity ComponentInfo{com.cooliris.media/com.cooliris.media.CropImage}: java.lang.NullPointerException
+...
+E/AndroidRuntime(4439): Caused by: java.lang.NullPointerException
+at com.cooliris.media.CropImage.onCreate(CropImage.java:276)
+</code></pre>
+
+<p>I solved the problem by giving the ACTION_IMAGE_CAPTURE intent the correct output file.
+This worked for me:</p>
+
+<pre><code>private static Uri tempFileUri = null;
+...
+String fileName = "myImg.tmp";
+ContentValues values = new ContentValues();
+values.put(MediaStore.Images.Media.TITLE, fileName);
+values.put(MediaStore.Images.Media.DESCRIPTION, "test description");
+tempFileUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+if (tempFileUri != null) {
+    Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempFileUri); 
+    ...
+    startActivityForResult(takePictureIntent, IntentConstants.INTENT_REQUEST_CODE_TAKE_PHOTO);
+}
+</code></pre>
+
+<p>I don't use <code>intent.putExtra("return-data", true);</code> anymore, because some devices don't return data (and some only small images - it seems that every device acts different). Perhaps this is the reason why the NullPointer Exception in cooliris media occurs (data sent to cooliris was null). It is really annoying that cooliris just crashes ...</p>
+
+<p>The code to crop the image (in onActivityResult for this intent):</p>
+
+<pre><code>Uri picUri = null;
+if (intent.getData() != null) {
+    picUri = intent.getData();
+} else {
+    picUri = tempFileUri;
+}
+Intent cropIntent = new Intent("com.android.camera.action.CROP");
+cropIntent.setDataAndType(picUri, "image/*");
+cropIntent.putExtra("crop", "true");
+cropIntent.putExtra("aspectX", 1);
+cropIntent.putExtra("aspectY", 1);
+cropIntent.putExtra("outputX", 56);
+cropIntent.putExtra("outputY", 56);
+cropIntent.putExtra("return-data", true);
+startActivityForResult(cropIntent, INTENT_REQUEST_CODE_CROP_PHOTO);
+</code></pre>

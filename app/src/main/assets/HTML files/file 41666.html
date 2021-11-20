@@ -1,0 +1,39 @@
+<p>Since the information (URL scheme, host server, port, path - base URL) is missing in <code>&lt;a href=""...&gt;</code>, it needs to be added to the relative URL.</p>
+
+<p>Usually it is correct to use <code>urlparse.urljoin()</code> as you are already doing.</p>
+
+<p>HTML does allow specification of a base url for the page using the <code>&lt;base href="..."&gt;</code> tag, which must be defined once in <code>&lt;head&gt;</code>. If this tag is present you should use it's href attribute as your base URL for <code>urljoin()</code>. Your code could be revised to this:</p>
+
+<pre><code>import urlparse
+import requests
+from lxml import html
+from lxml import etree
+
+aFile = requests.get(url)
+tree = html.fromstring(aFile.text)
+
+linkList = tree.xpath('//a')
+
+urls = []
+
+try:
+    base_url = tree.xpath('//base[1]/@href')[0]
+except IndexError:
+    base_url = url
+
+for link in linkList:
+    urls.append(str(urlparse.urljoin(base_url,link.get('href'))))
+</code></pre>
+
+<p>However, if you are getting connection errors, it would appear that some of the links are invalid. Either the base URL derived from the page's URL, or from the <code>&lt;base href="..."&gt;</code> tag, is correct. Any invalid URLs constructed with this value must be due to an invalid relative URL (or invalid <code>&lt;base&gt;</code> tag).</p>
+
+<p>Have you concrete examples of the URL used when connection errors are experienced?</p>
+
+<p>You could also look at <a href="http://wwwsearch.sourceforge.net/mechanize/" rel="nofollow"><code>mechanize</code></a>:</p>
+
+<pre><code>import mechanize
+
+br = mechanize.Browser()
+resp = br.open(url)
+urls = [link.absolute_url for link in br.links()]
+</code></pre>

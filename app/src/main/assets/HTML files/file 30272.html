@@ -1,0 +1,107 @@
+<p>In xml write</p>
+
+<pre><code>&lt;LinearLayout
+       android:layout_height="45dp" 
+       android:orientation="horizontal"
+       android:layout_width="fill_parent"
+        android:id="@+id/signaturearea" 
+        android:layout_marginTop="320dp"
+         android:layout_marginRight="20dp" 
+         android:layout_marginLeft="20dp" 
+         android:background="#FFFFFF" /&gt; 
+</code></pre>
+
+<p>Now Create an Inner Class</p>
+
+<pre><code>public class signature extends View {
+        private static final float STROKE_WIDTH = 5f;
+        private static final float HALF_STROKE_WIDTH = STROKE_WIDTH / 2;
+        private Paint paint = new Paint();
+        private Path path = new Path();
+        private float lastTouchX;
+        private float lastTouchY;
+        private final RectF dirtyRect = new RectF();
+
+
+        public signature(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        paint.setAntiAlias(true);
+        paint.setColor(Color.BLACK);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(STROKE_WIDTH);
+        }
+
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+        canvas.drawPath(path, paint);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+        float eventX = event.getX();
+        float eventY = event.getY();
+        switch (event.getAction()) {
+        case MotionEvent.ACTION_DOWN:
+        path.moveTo(eventX, eventY);
+        lastTouchX = eventX;
+        lastTouchY = eventY;
+        return true;
+        case MotionEvent.ACTION_MOVE:
+        case MotionEvent.ACTION_UP:
+        resetDirtyRect(eventX, eventY);
+        int historySize = event.getHistorySize();
+        for (int i = 0; i &lt; historySize; i++) {
+        float historicalX = event.getHistoricalX(i);
+        float historicalY = event.getHistoricalY(i);
+        expandDirtyRect(historicalX, historicalY);
+        path.lineTo(historicalX, historicalY);
+        }
+        path.lineTo(eventX, eventY);
+        break;
+        default:
+        debug("Ignored touch event: " + event.toString());
+        return false;
+        }
+        invalidate((int) (dirtyRect.left - HALF_STROKE_WIDTH),
+        (int) (dirtyRect.top - HALF_STROKE_WIDTH),
+        (int) (dirtyRect.right + HALF_STROKE_WIDTH),
+        (int) (dirtyRect.bottom + HALF_STROKE_WIDTH));
+        lastTouchX = eventX;
+        lastTouchY = eventY;
+        return true;
+        }
+
+        private void debug(String string) {
+        }
+
+        private void expandDirtyRect(float historicalX, float historicalY) {
+        if (historicalX &lt; dirtyRect.left) {
+        dirtyRect.left = historicalX;
+        } else if (historicalX &gt; dirtyRect.right) {
+        dirtyRect.right = historicalX;
+        }
+        if (historicalY &lt; dirtyRect.top) {
+        dirtyRect.top = historicalY;
+        } else if (historicalY &gt; dirtyRect.bottom) {
+        dirtyRect.bottom = historicalY;
+        }
+        }
+        private void resetDirtyRect(float eventX, float eventY) {
+        dirtyRect.left = Math.min(lastTouchX, eventX);
+        dirtyRect.right = Math.max(lastTouchX, eventX);
+        dirtyRect.top = Math.min(lastTouchY, eventY);
+        dirtyRect.bottom = Math.max(lastTouchY, eventY);
+        }
+    }
+</code></pre>
+
+<p>In the onCreate of the Activity </p>
+
+<pre><code>//create the inner class object
+signature mSignature =new signature(this, null);
+LinearLayout mContent;
+mContent = (LinearLayout) findViewById(R.id.signaturearea);
+mContent.addView(mSignature, LayoutParams.FILL_PARENT,LayoutParams.FILL_PARENT);    
+</code></pre>

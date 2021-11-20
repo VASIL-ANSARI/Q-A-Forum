@@ -1,0 +1,60 @@
+<p>You should force parameters entry to avoid this error, like :</p>
+
+<pre><code>public function ReportQuery($begDate, $endDate, array $zones)
+{
+    $em = $this-&gt;getDoctrine()-&gt;getManager()-&gt;getRepository('TestBundle:Report');
+    $qb = $em-&gt;createQueryBuilder('t');
+
+    $qb-&gt;select('t.extUserId, t.userName, t.extZoneId, t.zoneName, sum(t.nbCnx) as nbCnx')
+        -&gt;where(
+            $qb-&gt;expr()-&gt;between('t.loadDate', ':begDate' , ':endDate'),
+            $qb-&gt;expr()-&gt;andX(
+                $qb-&gt;expr()-&gt;in('t.extZoneId', ':zones')
+            )
+        )
+        -&gt;addGroupBy('t.extUserId')
+        -&gt;addGroupBy('t.userName')
+        -&gt;addGroupBy('t.extZoneId')
+        -&gt;addGroupBy('t.zoneName')
+        -&gt;orderBy('t.userName', 'ASC')
+        -&gt;setParameter('begDate', $begDate)
+        -&gt;setParameter('endDate', $endDate)
+        -&gt;setParameter('zones', $zones);
+}
+</code></pre>
+
+<p>Or if you want something more dynamic :</p>
+
+<pre><code>public function ReportQuery(array $params)
+{
+    $em = $this-&gt;getDoctrine()-&gt;getManager()-&gt;getRepository('TestBundle:Report');
+    $qb = $em-&gt;createQueryBuilder('t');
+
+    $qb-&gt;select('t.extUserId, t.userName, t.extZoneId, t.zoneName, sum(t.nbCnx) as nbCnx');
+    $qb-&gt;where('1 = 1'); // to call andWhere after...
+
+    if (isset($params['begdate']) &amp;&amp; isset($params['enddate'])) {
+        $qb-&gt;andWhere(
+            $qb-&gt;expr()-&gt;between('t.loadDate', ':begDate' , ':endDate')
+        );
+        $qb-&gt;setParameter('begDate', $params['begdate'])
+           -&gt;setParameter('endDate', $params['enddate']);
+    }
+
+    if (isset($params['zones']) &amp;&amp; is_array($params['zones'])) {
+        $qb-&gt;andWhere(
+            $qb-&gt;expr()-&gt;in('t.extZoneId', ':zones')
+        );
+        $qb-&gt;setParameter('begDate', $params['zones']);
+    }
+
+    $qb
+        -&gt;addGroupBy('t.extUserId')
+        -&gt;addGroupBy('t.userName')
+        -&gt;addGroupBy('t.extZoneId')
+        -&gt;addGroupBy('t.zoneName')
+        -&gt;orderBy('t.userName', 'ASC');
+}
+</code></pre>
+
+<p>I personnaly prefere the first method.</p>

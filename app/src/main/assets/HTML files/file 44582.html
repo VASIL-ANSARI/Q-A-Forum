@@ -1,0 +1,45 @@
+<p>You can change the code at $model->save() to this,  so before you redirect you check if old images exist in directory, delete them.</p>
+
+<pre><code>        $oldThumb = Yii::getPathOfAlias('media') . '/album/optimized/' . $model_old_data-&gt;photo;
+        $oldOptimized = Yii::getPathOfAlias('media') . '/album/optimized/' . $model_old_data-&gt;photo;
+
+        if ($model-&gt;save()) {
+            if (file_exists($oldThumb)) {
+                unlink($oldThumb);
+            }
+            if (file_exists($oldOptimized)) {
+                unlink($oldOptimized);
+            }
+            $this-&gt;redirect(array('view', 'id' =&gt; $model-&gt;id));
+        }
+</code></pre>
+
+<p>Action delete must be changed to,</p>
+
+<pre><code>    public function actionDelete($id)
+    {
+        if (Yii::app()-&gt;request-&gt;isPostRequest) {
+// we only allow deletion via POST request
+            $model_old_data = $this-&gt;loadModel($id);
+            $oldThumb = Yii::getPathOfAlias('media') . '/album/optimized/' . $model_old_data-&gt;photo;
+            $oldOptimized = Yii::getPathOfAlias('media') . '/album/optimized/' . $model_old_data-&gt;photo;
+
+            $model = $this-&gt;loadModel($id);
+            if ($model-&gt;delete()) {
+                if (file_exists($oldThumb)) {
+                    unlink($oldThumb);
+                }
+                if (file_exists($oldOptimized)) {
+                    unlink($oldOptimized);
+                }
+            }
+
+// if AJAX request (triggered by deletion via admin grid view), we should not redirect the browser
+            if (!isset($_GET['ajax'])) {
+                $this-&gt;redirect(isset($_POST['returnUrl']) ? $_POST['returnUrl'] : array('admin'));
+            }
+        } else {
+            throw new CHttpException(400, 'Invalid request. Please do not repeat this request again.');
+        }
+    }
+</code></pre>

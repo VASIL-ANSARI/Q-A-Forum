@@ -1,0 +1,46 @@
+<p>Maybe you can do that by creating different Retrofit object factory method like this.</p>
+
+<pre><code>public class RestClient {
+    public static &lt;S&gt; S createService(Class&lt;S&gt; serviceClass) {
+        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+        OkHttpClient client = httpClient.build();
+
+        Retrofit retrofit = new Retrofit.Builder().baseUrl(APIConfig.BASE_URL)
+                .client(client)
+                .build();
+        return retrofit.create(serviceClass);
+    }
+
+    public static &lt;S&gt; S createServiceWithAuth(Class&lt;S&gt; serviceClass) {
+        Interceptor interceptor = new Interceptor() {
+            @Override
+            public Response intercept(Chain chain) throws IOException {
+                final Request request = chain.request().newBuilder()
+                        .addHeader("CUSTOM_HEADER_NAME_1", "CUSTOM_HEADER_VALUE_1")
+                        .addHeader("CUSTOM_HEADER_NAME_2", "CUSTOM_HEADER_VALUE_2")
+                        .build();
+
+                return chain.proceed(request);
+            }
+        };
+        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+        httpClient.addInterceptor(interceptor);
+        OkHttpClient client = httpClient.build();
+
+        Retrofit retrofit = new Retrofit.Builder().baseUrl(APIConfig.BASE_URL)
+                .client(client)
+                .build();
+        return retrofit.create(serviceClass);
+    }
+}
+</code></pre>
+
+<p>if you want to call api without header auth, you can just call createService method:</p>
+
+<pre><code>YourApi api = RestClient.createService(YourApi.class);
+</code></pre>
+
+<p>And use createServiceWithAuth method if you want to call api with authentication:</p>
+
+<pre><code>YourApiWithAuth api = RestClient.createServiceWithAuth(YourApiWithAuth.class);
+</code></pre>

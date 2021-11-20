@@ -1,0 +1,54 @@
+<p>Usually there is a restriction on using <code>GO_BLOCK</code> or <code>GO_ITEM</code> on a <code>WHEN-VALIDATE-ITEM</code>. However there are a couple of ways to overcome this. One way is to use a <code>WHEN-TIMER-EXPIRED</code> trigger. Here is how-</p>
+
+<p><code>WHEN-TIMER-EXPIRED</code></p>
+
+<pre><code>Begin    
+if GET_APPLICATION_PROPERTY(TIMER_NAME) = 'NEW_TIMER' then    
+   CALL_PROG_UNIT(); --This is your Procedure that calls the GO_BLOCK   
+   /*Do rest of validation here*/
+end if;
+END;
+</code></pre>
+
+<p><code>WHEN-VALIDATE-ITEM</code></p>
+
+<pre><code>DECLARE    
+  timer_id TIMER;    
+Begin        
+  timer_id := CREATE_TIMER('NEW_TIMER',1,NO_REPEAT);    --set a short timer so that the WHEN-TIMER-EXPIRED trigger is fired immediately
+End;
+</code></pre>
+
+<p>What happens is - This will create &amp; expire the timer as soon as the <code>CREATE_TIMER</code> function is called and then the form level trigger <code>WHEN-TIMER-EXPIRED</code> will check the expired timer name and call your program unit that has the <code>GO_BLOCK</code>. Hope this helps.</p>
+
+<hr>
+
+<p><strong>UPDATE</strong></p>
+
+<p>Mr <a href="http://stackoverflow.com/users/103295/jeffrey-kemp">Jeffery Kemp</a> wanted to see proof that this solution works. So here it is-</p>
+
+<p>An Oracle form with two Blocks <code>BLOCK1</code> and <code>BLOCK2</code> with text items on it</p>
+
+<p><img src="http://i.stack.imgur.com/UGNu5.png" alt="enter image description here"></p>
+
+<p>W-V-I Trigger</p>
+
+<p><img src="http://i.stack.imgur.com/rJ8Bv.png" alt="enter image description here"></p>
+
+<p>W-T-E Form Trigger. This calls a PROGRAM UNIT <code>P_CALL_PROC</code> with <code>GO_BLOCK</code> function call first and then does some validations on the field <code>Number 2</code>.</p>
+
+<p><img src="http://i.stack.imgur.com/YyHhP.png" alt="enter image description here"></p>
+
+<p>Here is <code>P_CALL_PROC</code></p>
+
+<p><img src="http://i.stack.imgur.com/swVEO.png" alt="enter image description here"></p>
+
+<p>And here is the result-</p>
+
+<p><img src="http://i.stack.imgur.com/dsuli.png" alt="enter image description here"></p>
+
+<p>And</p>
+
+<p><img src="http://i.stack.imgur.com/6bs5F.png" alt="enter image description here"></p>
+
+<p><a href="http://www.youtube.com/watch?v=c8vcLCRp7EA" rel="nofollow">Here</a> is a Youtube link to see the Form in action.</p>

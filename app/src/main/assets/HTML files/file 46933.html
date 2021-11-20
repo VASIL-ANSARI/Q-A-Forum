@@ -1,0 +1,10 @@
+<p>You can try this to catch all warnings during an igraph call:</p>
+
+<pre><code>from warnings import catch_warnings
+with catch_warnings(record=True) as caught_warnings:
+    testgraph = igraph.Graph.Degree_Sequence(degseq, method="vl")
+    if caught_warnings:
+        # caught_warnings is a list of warnings; do something with them here
+</code></pre>
+
+<p>Regarding the <code>MemoryError</code> that you see: it is actually a bug in the Python interface of igraph. Internally, the C core of the igraph library (which does not know anything about the host language it is embedded in) raises a warning for your degree sequence. This is then turned into a Python warning, which is then turned into an exception by your warning handler. However, the C core of the igraph library does not anticipate that igraph core warnings are sometimes turned into exceptions so it happily proceeds with the execution of the code for <code>Graph.Degree_Sequence</code>, notices the warning-that-was-turned-into-an-exception a few internal calls later, and wrongly attributes it to the failure of some other memory allocation (that has nothing to do with your original warning).</p>

@@ -1,0 +1,27 @@
+<p>You can come close with the following:</p>
+
+<pre><code>select coalesce(ta.id, tb.id, tc.id), ta.field1, tb.field2, tc.field3
+from (select ta.*, row_number() over (partition by id order by (select NULL)) as seqnum
+      from ta
+     ) ta full outer join
+     (select tb.*, row_number() over (partition by id order by (select NULL)) as seqnum
+      from tb
+     ) tb
+     on ta.id = tb.id and
+        ta.seqnum = tb.seqnum
+     (select tc.*, row_number() over (partition by id order by (select NULL)) as seqnum
+      from tc
+     ) tc
+     on coalesce(ta.id, tb.id) = tc.id and
+        coalesce(ta.seqnum, tb.seqnum) = tc.seqnum
+group by coalesce(ta.id, tb.id, tc.id),
+         coalesce(ta.seqnum, tb.seqnum, tc.seqnum)
+order by 1, 2
+</code></pre>
+
+<p>As I said, though, in my comment, the ordering of rows in a table is not guaranteed, so these may not come out in the order you expect.  With your sample data, you could use:</p>
+
+<pre><code>over (partition by id order by field&lt;n&gt;)
+</code></pre>
+
+<p>If the fields define the ordering</p>

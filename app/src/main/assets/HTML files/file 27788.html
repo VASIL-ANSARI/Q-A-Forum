@@ -1,0 +1,126 @@
+<p>I have a django app running on app engine. I followed this link to get it up and running. <a href="http://www.allbuttonspressed.com/projects/djangoappengine" rel="nofollow">http://www.allbuttonspressed.com/projects/djangoappengine</a>. There were a lot of little changes in all of the config files compared to regular django. I now do not use django as i love app engine and hate django. Below are some of my file examples. Note in your question you have a webapp2 request handler, you wont use anything like that with django. It will be all of the normal view definitions as functions, not classes like app engine. If you decide to try this approach out, let me know how it goes.</p>
+
+<p>This is what my app.yaml after i follow the link above.</p>
+
+<pre><code>application: app
+version: production
+runtime: python27
+api_version: 1
+threadsafe: yes
+
+libraries:
+- name: django
+  version: latest
+
+
+handlers:
+- url: /_ah/queue/deferred
+  script: djangoappengine.deferred.handler.application
+  login: admin
+
+- url: /_ah/stats/.*
+  script: djangoappengine.appstats.application
+
+- url: /.*
+  script: djangoappengine.main.application
+</code></pre>
+
+<p>my settings.py</p>
+
+<pre><code># Initialize App Engine and import the default settings (DB backend, etc.).
+# If you want to use a different backend you have to remove all occurences
+# of "djangoappengine" from this file.
+from djangoappengine.settings_base import *
+import os
+
+DEBUG = False
+
+TEMPLATE_DEBUG = DEBUG
+
+# Activate django-dbindexer for the default database
+DATABASES['native'] = DATABASES['default']
+DATABASES['default'] = {'ENGINE': 'dbindexer', 'TARGET': 'native'}
+AUTOLOAD_SITECONF = 'indexes'
+
+INSTALLED_APPS = (
+
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
+    'django.contrib.sessions',
+    'djangotoolbox',
+    'autoload',
+    'dbindexer',
+
+    # djangoappengine should come last, so it can override a few manage.py commands
+    'djangoappengine',
+    )
+
+MIDDLEWARE_CLASSES = (
+    # This loads the index definitions, so it has to come first
+    'autoload.middleware.AutoloadMiddleware',
+
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    )
+
+TEMPLATE_CONTEXT_PROCESSORS = (
+    'django.contrib.auth.context_processors.auth',
+    'django.core.context_processors.request',
+    'django.core.context_processors.media',
+    'context_processors.general'
+    )
+
+
+ADMIN_MEDIA_PREFIX = '/media/'
+TEMPLATE_DIRS = (
+    os.path.join(os.path.dirname(__file__), 'templates'),
+    os.path.join(os.path.dirname(__file__), 'media'),
+
+    )
+</code></pre>
+
+<p>main.py </p>
+
+<pre><code>import os,sys
+
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
+from google.appengine.dist import use_library
+use_library('django', '1.2')
+
+# Google App Engine imports.
+from google.appengine.ext.webapp import util
+
+# Force Django to reload its settings.
+from django.conf import settings
+settings._target = None
+
+import django.core.handlers.wsgi
+import django.core.signals
+import django.db
+import django.dispatch
+
+# Log errors.
+#import logging
+#def log_exception(*args, **kwds):
+#    logging.exception('Exception in request:')
+#
+#django.dispatch.Signal.connect(
+#    django.core.signals.got_request_exception, log_exception)
+
+# Unregister the rollback event handler.
+django.dispatch.Signal.disconnect(
+    django.core.signals.got_request_exception,
+    django.db._rollback_on_exception)
+
+def main():
+    # Create a Django application for WSGI.
+    application = django.core.handlers.wsgi.WSGIHandler()
+
+    # Run the WSGI CGI handler with that application.
+    util.run_wsgi_app(application)
+
+if __name__ == '__main__':
+    main()
+</code></pre>

@@ -1,0 +1,46 @@
+<p>I see two reasons why you might be getting too many matching rows:</p>
+
+<ol>
+<li><p>You have selected only <code>sip</code>/<code>dip</code> as matching criterion, while it should be (<code>sip, dip</code>)/(<code>dip, sip</code>). Use <code>by.x=c('sip', 'dip')</code> and the corresponding <code>by.y</code>.</p></li>
+<li><p>The "talking" rows also match the "responding again" rows, and the "talking again" rows also match the "responding" rows. This is slightly more difficult to solve, let me introduce  <code>arrange(dataframe, ...)</code> from the <code>plyr</code> which sorts data frames elegantly. </p></li>
+</ol>
+
+<p>Let's <code>arrange</code> your data so that related communications between the same peers are adjacent and assign IDs in this order.</p>
+
+<pre><code>library(plyr)
+flowtest_arranged &lt;- arrange(flowtest, pmin(sip, dip), pmax(sip, dip), id)
+flowtest_arranged$nid &lt;- seq_along(flowtest_arranged$id)
+flowtest_arranged$nid.lag &lt;- flowtest_arranged$nid - 1
+</code></pre>
+
+<p>Now, if we assume that your data is well behaved so that no unrelated communication appears between request and response, we can use the new <code>nid</code> variables as additional merge criterion: <code>by.x=c('sip', 'dip', 'nid.lag')</code>, <code>by.y=c('dip', 'sip', 'nid')</code>. Here's the result (R 3.0.1):</p>
+
+<pre><code>merge(flowtest_arranged, flowtest_arranged, by.x=c('sip', 'dip', 'nid.lag'),
+      by.y=c('dip', 'sip', 'nid'))
+
+   sip dip nid.lag id.x                      notes.x nid id.y
+1   20  30       2    8    20 is talking to 30 again   3    4
+2   20  31       6   10    20 is talking to 31 again   7    5
+3   20  32      10    7    20 is talking to 32 again  11    6
+4   30  20       1    4       30 is responding to 20   2    1
+5   30  20       3   12 30 is responding to 20 again   4    8
+6   30  21      13   14       30 is responding to 21  14   13
+7   31  20       5    5       31 is responding to 20   6    2
+8   31  20       7   11 31 is responding to 20 again   8   10
+9   32  20      11    9 32 is responding to 20 again  12    7
+10  32  20       9    6       32 is responding to 20  10    3
+                     notes.y nid.lag
+1     30 is responding to 20       1
+2     31 is responding to 20       5
+3     32 is responding to 20       9
+4        20 is talking to 30       0
+5  20 is talking to 30 again       2
+6        21 is talking to 30      12
+7        20 is talking to 31       4
+8  20 is talking to 31 again       6
+9  20 is talking to 32 again      10
+10       20 is talking to 32       8
+Warning message:
+In merge.data.frame(flowtest_arranged, flowtest_arranged, by.x = c("sip",  :
+  column name ânid.lagâ is duplicated in the result
+</code></pre>

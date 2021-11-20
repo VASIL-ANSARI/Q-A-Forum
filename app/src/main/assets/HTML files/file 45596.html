@@ -1,0 +1,41 @@
+<p>Yes, this is spec-compliant behavior. <a href="http://www.ecma-international.org/ecma-262/5.1/#sec-15.1.2.1.1" rel="nofollow">ES5 15.1.2.1.1, <em>Direct Call to Eval</em></a>, says that one requirement for a call to <code>eval</code> to be "direct" is that the reference to <code>eval</code> "<em>has an environment record as its base value</em>." This means it cannot be a reference done by property access (in which case the owning object would the base value); it must be a "bare" function.</p>
+
+<p>This distinction is critical to step 1 of <a href="http://www.ecma-international.org/ecma-262/5.1/#sec-10.4.2" rel="nofollow">10.4.2, <em>Entering Eval Code</em></a>:</p>
+
+<blockquote>
+  <ol>
+  <li>If there is no calling context or if the eval code is not being evaluated by a direct call (15.1.2.1.1) to the eval function then,
+  
+  <ul>
+  <li>a. Initialise the execution context as if it was a global execution context using the eval code as C as described in 10.4.1.1.</li>
+  </ul></li>
+  </ol>
+</blockquote>
+
+<p>Thus, an indirect call to <code>eval</code> is given a global variable environment, not the local variable environment. Only direct calls get access to the local environment.</p>
+
+<p>This is done for practical implementation reasons, because <code>eval</code> can signal to garbage collectors a need to avoid cleaning up any variables. For example, here's a case without <code>eval</code>:</p>
+
+<pre><code>function foo() {
+    var a = 5, b = 6, c = 7;
+    return function() { return a; }
+}
+var func = foo();
+alert(func());
+</code></pre>
+
+<p>The function returned by <code>foo</code> might access <code>a</code> after <code>foo</code> terminates, but we can be sure <code>b</code> and <code>c</code> will never be accessed ever again after <code>foo</code> terminates. <code>b</code> and <code>c</code> can be safely garbage collected, while <code>a</code> remains uncollected.</p>
+
+<p>Now a case with <code>eval</code>:</p>
+
+<pre><code>function foo() {
+    var a = 5, b = 6, c = 7;
+    return function(exp) { return eval(exp); }
+}
+var func = foo();
+alert(func("b"));
+</code></pre>
+
+<p>It's impossible to generally decide if the <code>eval</code> expression <code>exp</code> will refer to a given variable, so the garbage collector must <em>never</em> collect any of the variables so they are still available for use by the returned function.</p>
+
+<p>In order to decide that <code>eval</code> is in use, the parser must be able to reliably recognize a call to <code>eval</code>. If the <code>eval</code> is presented in an indirect way, like <code>global["e"+"va"+"l!"[0]]</code>, the spec says that that <code>eval</code>ed code doesn't get access to <em>any</em> local variables, thereby avoiding the garbage collection problem.</p>

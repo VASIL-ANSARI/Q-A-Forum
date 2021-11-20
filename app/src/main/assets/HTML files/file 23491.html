@@ -1,0 +1,74 @@
+<p>While log4net recommends this pattern, nothing prevents you from instantiating the logger outside the class, and inject it. Most of the IoCs can be configured to inject one and the same instance. That way, for your unit tests you can inject a mock.</p>
+
+<p>I would recommend a wrapper around LogManager.GetLogger, which returns always one and the same logger instance per type:</p>
+
+<pre><code>namespace StackOverflowExample.Moq
+{
+    public interface ILogCreator
+    {
+        ILog GetTypeLogger&lt;T&gt;() where T : class;
+    }
+
+    public class LogCreator : ILogCreator
+    {
+        private static readonly IDictionary&lt;Type, ILog&gt; loggers = new Dictionary&lt;Type, ILog&gt;();
+        private static readonly object lockObject;
+
+        public ILog GetTypeLogger&lt;T&gt;() where T : class
+        {
+            var loggerType = typeof (T);
+            if (loggers.ContainsKey(loggerType))
+            {
+                return loggers[typeof (T)];
+            }
+
+            lock (lockObject)
+            {
+                if (loggers.ContainsKey(loggerType))
+                {
+                    return loggers[typeof(T)];
+                }
+                var logger = LogManager.GetLogger(loggerType);
+                loggers[loggerType] = logger;
+                return logger;
+            }
+        }
+    }
+
+    public class ClassWithLogger
+    {
+        private readonly ILog logger;
+        public ClassWithLogger(ILogCreator logCreator)
+        {
+            logger = logCreator.GetTypeLogger&lt;ClassWithLogger&gt;();
+        }
+
+        public void DoSomething()
+        {
+            logger.Debug("called");
+        }
+    }
+
+    [TestFixture]
+    public class Log4Net
+    {
+        [Test]
+        public void DoSomething_should_write_in_debug_logger()
+        {
+            //arrange
+            var logger = new Mock&lt;ILog&gt;();
+            var loggerCreator = Mock.Of&lt;ILogCreator&gt;(
+                c =&gt;
+                c.GetTypeLogger&lt;ClassWithLogger&gt;() == logger.Object);
+
+            var sut = new ClassWithLogger(loggerCreator);
+
+            //act
+            sut.DoSomething();
+
+            //assert
+            logger.Verify(l=&gt;l.Debug("called"), Times.Once());
+        }
+    }
+} 
+</code></pre>

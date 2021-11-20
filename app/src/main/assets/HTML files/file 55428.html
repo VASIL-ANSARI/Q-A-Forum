@@ -1,0 +1,186 @@
+<p>In order for Foreign Key constraints to succeed, the following must be met, among other things:</p>
+
+<ol>
+<li>The datatype<sup>1</sup> and sign must match</li>
+<li>The referenced table must have a left-most<sup>2</sup> index on the relevant column(s) for speedy constraint verification.</li>
+<li>Collation can play a factor. Please see <a href="http://stackoverflow.com/a/39332173">answer</a> of mine.</li>
+</ol>
+
+<p>In your case, the indexes were fine, but as Solarflare mentioned, it was only your datatypes here that mattered and were mis-matched:</p>
+
+<pre><code>`alert_disable_register`.`id_escalation_plan`-- signed int
+`escalation_plan`.`id_escalation_plan` -- unsigned int
+</code></pre>
+
+<p>Note that the display width (your numbers in parentheses) and nullability do not matter.</p>
+
+<p>From the Mysql Manual Page <a href="https://dev.mysql.com/doc/refman/5.7/en/create-table-foreign-keys.html" rel="nofollow">Using FOREIGN KEY Constraints</a>:</p>
+
+<blockquote>
+  <p>Corresponding columns in the foreign key and the referenced key must
+  have similar data types. The size and sign of integer types must be
+  the same. The length of string types need not be the same. For
+  nonbinary (character) string columns, the character set and collation
+  must be the same.</p>
+  
+  <p>MySQL requires indexes on foreign keys and referenced keys so that
+  foreign key checks can be fast and not require a table scan. In the
+  referencing table, there must be an index where the foreign key
+  columns are listed as the first columns in the same order.</p>
+  
+  <p>Corresponding columns in the foreign key and the referenced key must
+  have similar data types. The size and sign of integer types must be
+  the same. The length of string types need not be the same. For
+  nonbinary (character) string columns, the character set and collation
+  must be the same.</p>
+</blockquote>
+
+<p>Also note that the <em>referenced</em> table key to satisfy the FK relationship does not need to be a Primary Key or even a Unique key. Just <em>first-most</em> (also known  <em>left-most</em><sup>2</sup>) in <em>ordering</em> to satisfy.</p>
+
+<p>Again, the indexes were not your issue, but it often is for others.</p>
+
+<p>For those needing to add Foreign Key constraints after table creation, use the <a href="http://dev.mysql.com/doc/refman/5.7/en/alter-table.html" rel="nofollow">ALTER TABLE</a> statement.</p>
+
+<p>The following test will run fine. You will need to decide how you want to deal with your changes on your own though. You were missing some tables provided which required remming out some FK constraints in the top 2 tables.</p>
+
+<pre><code>create database xyztest123;
+use xyztest123;
+
+
+CREATE TABLE `escalation_plan` (
+  `id_escalation_plan` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `id_indicator` mediumint(8) unsigned NOT NULL,
+  `id_label` mediumint(8) unsigned NOT NULL,
+  `pressure_waiting_hrs` int(11) NOT NULL DEFAULT '6',
+  PRIMARY KEY (`id_escalation_plan`),
+  KEY `fk_escalation_plan_escalation_plan1_idx` (`id_indicator`),
+  KEY `fk_escalation_plan_label1_idx` (`id_label`)
+  -- CONSTRAINT `fk_escalation_plan_escalation_plan1` FOREIGN KEY (`id_indicator`) REFERENCES `indicator` (`id_indicator`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  -- CONSTRAINT `fk_escalation_plan_label1` FOREIGN KEY (`id_label`) REFERENCES `label` (`id_label`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=152 DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `escalation_plan_task_group_has_user` (
+  `id_escalation_plan_task_has_user` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `id_user` mediumint(8) unsigned NOT NULL,
+  `id_escalation_plan_task_group` int(11) NOT NULL,
+  `text_alert` tinyint(1) NOT NULL DEFAULT '1',
+  `email_alert` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id_escalation_plan_task_has_user`),
+  KEY `fk_escalation_plan_task_has_user_user1_idx` (`id_user`),
+  KEY `fk_escalation_plan_task_group_has_user_escalation_plan_task_idx` (`id_escalation_plan_task_group`)
+  -- CONSTRAINT `fk_escalation_plan_task_group_has_user_escalation_plan_task_g1` FOREIGN KEY (`id_escalation_plan_task_group`) REFERENCES `escalation_plan_task_group` (`id_escalation_plan_task_group`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  -- CONSTRAINT `fk_escalation_plan_task_has_user_user1` FOREIGN KEY (`id_user`) REFERENCES `user` (`id_user`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=3605 DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE `alert_disable_rule` (
+  `id_alert_disable_rule` mediumint(9) NOT NULL AUTO_INCREMENT,
+  `disable_in_weekend` tinyint(1) DEFAULT '0',
+  `start_date` datetime DEFAULT NULL,
+  `end_date` datetime DEFAULT NULL,
+  `start_time` decimal(10,0) DEFAULT NULL,
+  `end_time` decimal(10,0) DEFAULT NULL,
+  PRIMARY KEY (`id_alert_disable_rule`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+CREATE TABLE IF NOT EXISTS  `alert_disable_register` (
+  `id_alert_disable_register` MEDIUMINT NOT NULL AUTO_INCREMENT,
+  `id_label` MEDIUMINT UNSIGNED NULL,
+  `id_indicator` MEDIUMINT UNSIGNED NULL,
+  `id_user` MEDIUMINT UNSIGNED NULL,
+  `active` TINYINT(1) NULL DEFAULT 1,
+  `id_alert_disable_rule` MEDIUMINT NULL,
+  `id_escalation_plan` INT unsigned NULL,
+  PRIMARY KEY (`id_alert_disable_register`),
+  INDEX `id_escalation_plan_alert_rule_idx` (`id_alert_disable_rule` ASC),
+  INDEX `id_label_idx` (`id_label` ASC),
+  INDEX `id_indicator_idx` (`id_indicator` ASC),
+  INDEX `id_user_idx` (`id_user` ASC),
+  INDEX `id_escalation_plan_idx` (`id_escalation_plan` ASC),
+  CONSTRAINT `id_label`
+    FOREIGN KEY (`id_label`) -- MEDIUMINT UNSIGNED 
+    REFERENCES  `escalation_plan` (`id_label`) -- mediumint(8) unsigned , -- Index OK?: Yes
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `id_indicator`
+    FOREIGN KEY (`id_indicator`) -- MEDIUMINT UNSIGNED 
+    REFERENCES  `escalation_plan` (`id_indicator`) -- mediumint(8) unsigned, -- Index OK?: Yes
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `id_user`
+    FOREIGN KEY (`id_user`) -- MEDIUMINT UNSIGNED  
+    REFERENCES  `escalation_plan_task_group_has_user` (`id_user`) -- mediumint(8) unsigned, -- Index OK?: Yes
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `id_alert_disable_rule`
+    FOREIGN KEY (`id_alert_disable_rule`) -- MEDIUMINT 
+    REFERENCES  `alert_disable_rule` (`id_alert_disable_rule`) -- mediumint(9),  -- Index OK?: Yes
+    ON DELETE SET NULL
+    ON UPDATE SET NULL,
+  CONSTRAINT `id_escalation_plan`
+    FOREIGN KEY (`id_escalation_plan`) -- INT 
+    REFERENCES  `escalation_plan` (`id_escalation_plan`) -- int(10) unsigned, Index OK?: Yes
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+drop database xyztest123;
+</code></pre>
+
+<h2><sup>1</sup> Similar and allowable column differences, String data</h2>
+
+<pre><code>drop table if exists a2; -- must do in reverse order
+drop table if exists a1;
+create table a1
+(   id int auto_increment primary key,
+    thing varchar(100) not null,
+    key `keyname001` (thing)
+)ENGINE = InnoDB;
+create table a2
+(   id int auto_increment primary key,
+    myThing char(40) not null, -- similar and allowable datatype
+    foreign key `fk_002` (myThing) references a1(thing)
+)ENGINE = InnoDB;
+insert a2(myThing) values ('a'); -- error 1452, FK violation
+insert a1(thing) values ('a'); -- ok
+insert a2(myThing) values ('a'); -- ok, not FK violation
+
+-- now a redo below to show it slightly different
+
+drop table if exists a2; -- must do in reverse order
+drop table if exists a1;
+create table a1
+(   id int auto_increment primary key,
+    thing varchar(100) not null,
+    key `keyname001` (thing)
+)ENGINE = InnoDB;
+create table a2
+(   id int auto_increment primary key,
+    myThing varchar(30) not null, -- similar and allowable datatype
+    key(myThing),
+    foreign key `fk_002` (myThing) references a1(thing)
+)ENGINE = InnoDB;
+insert a2(myThing) values ('a'); -- error 1452, FK violation
+insert a1(thing) values ('a'); -- ok
+insert a2(myThing) values ('a'); -- ok, not FK violation
+</code></pre>
+
+<h2><sup>2</sup> Left-most / First-most index ordering</h2>
+
+<p>An index (a.k.a. a <em>key</em>) on a single column is left-most as it is not a composite index.</p>
+
+<p>A multi-column index (a.k.a. a <em>composite</em> index) in a parent (a  <em>referenced</em>)  table is left-most satisfying if the ordering of its columns are in the same order as the child table key that depends on it for a foreign key (FK) relationship. Even if the count of columns in that parent composite key is greater than the count of the child composite key. See examples below.</p>
+
+<p>Assuming a child (<em>referencing</em>) table has a composite key FK requirement ordering by <code>(col1,col4)</code> then</p>
+
+<ol>
+<li><p>A parent composite key ordered by <code>(col1,col2,col3,col4)</code> does not satisfy the left-most requirement.</p></li>
+<li><p>A parent composite key ordered by <code>(col1,col4,col3, ...)</code> does satisfy the left-most requirement.</p></li>
+</ol>
+
+<p>The take-away here is that if such a parent key is not left-most satisfying, then the statement for the child table <code>CREATE TABLE</code> will fail for the FK relationship. The attempt to create the table will simply fail with an error code 1215.</p>
+
+<p>Likewise, an <code>ALTER TABLE</code> for the child that exists will fail in an attempt to add an FK relationship after-the-fact.</p>

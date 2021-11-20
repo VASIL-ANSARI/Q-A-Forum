@@ -1,0 +1,68 @@
+<p>To determine a collision in one dimension, say X, consider this example</p>
+
+<pre>
+        x X               
+........bbb............   // Bullet b, position 8 (x=8), width 3 (X=8+3)
+          x   X
+..........ttttt........   // Tank t, position 10 (x=10), width 5 (X=10+5)
+</pre>
+
+<p>a collision happens when </p>
+
+<pre><code>b.X &gt;= t.x &amp;&amp; b.x &lt;= t.X
+</code></pre>
+
+<p>in other words</p>
+
+<pre><code>(b.x + b.width) &gt;= t.x &amp;&amp; b.x &lt;= (t.x + t.width)
+</code></pre>
+
+<p>The same applies to the Y dimension. A collision in 2D space happens when there's one on both axes.</p>
+
+<p>To spice things up I add a little prototype inheritance.</p>
+
+<pre><code>function GameObject(w, h) {
+    this.width = w;
+    this.height = h;
+    this.x = 0;
+    this.y = 0;
+    return this;
+}
+GameObject.prototype.collides = function (otherObject) {
+    return (this.x + this.width) &gt;= otherObject.x &amp;&amp; 
+           this.x &lt;= (otherObject.x + otherObject.width) &amp;&amp;
+           (this.y + this.height) &gt;= otherObject.y &amp;&amp;
+           this.y &lt;= (otherObject.y + otherObject.height);
+};
+GameObject.prototype.move = function (x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+};
+function Bullet() {
+    return GameObject.call(this, 5, 5);
+}
+Bullet.prototype = new GameObject();
+function Tank() {
+    return GameObject.call(this, 31, 31);
+}
+Tank.prototype = new GameObject();
+</code></pre>
+
+<p>Test:</p>
+
+<pre><code>var tank = new Tank().move(10, 10); // 10,10 ; 41,41
+var bullet = new Bullet(); // 0,0 ; 5,5
+
+bullet.move(1, 8); // 5,4 ; 10,9
+console.log( bullet.collides(tank) ); // logs false;
+
+bullet.move(5, 5); // 5,5 ; 10,10
+console.log( bullet.collides(tank) ); // logs true (NE edge);
+
+bullet.move(41, 41); // 41,41 ; 46,46
+console.log( bullet.collides(tank) ); // logs true (SE edge);
+
+bullet.move(42, 42); // 42,42 ; 47,47
+console.log( bullet.collides(tank) ); // logs false;
+</code></pre>

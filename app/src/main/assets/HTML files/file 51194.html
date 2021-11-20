@@ -1,0 +1,51 @@
+<p>Coincidentally I just wrote similar code to allow GZip compression of a stream.  You don't need to extend PipedInputStream, just <a href="https://docs.oracle.com/javase/8/docs/api/java/io/FilterInputStream.html" rel="nofollow">FilterInputStream</a> will do and return a wrapped version, e.g.</p>
+
+<pre><code>final PipedInputStream in = new PipedInputStream();
+final InputStreamWithFinalExceptionCheck inWithException = new InputStreamWithFinalExceptionCheck(in);
+final PipedOutputStream out = new PipedOutputStream(in);
+Thread thread = new Thread(() -&gt; {
+    try {
+      // Start producing the data and push it into output stream.
+      // The production my fail and throw an Exception with the reason
+    } catch (final IOException e) {
+        inWithException.fail(e);
+    } finally {
+        inWithException.countDown();
+    }
+});
+thread.start();
+return inWithException;
+</code></pre>
+
+<p>And then InputStreamWithFinalExceptionCheck is just</p>
+
+<pre><code>private static final class InputStreamWithFinalExceptionCheck extends FilterInputStream {
+    private final AtomicReference&lt;IOException&gt; exception = new AtomicReference&lt;&gt;(null);
+    private final CountDownLatch complete = new CountDownLatch(1);
+
+    public InputStreamWithFinalExceptionCheck(final InputStream stream) {
+        super(stream);
+    }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            complete.await();
+            final IOException e = exception.get();
+            if (e != null) {
+                throw e;
+            }
+        } catch (final InterruptedException e) {
+            throw new IOException("Interrupted while waiting for synchronised closure");
+        } finally {
+            stream.close();
+        }
+    }
+
+    public void fail(final IOException e) {
+        exception.set(Preconditions.checkNotNull(e));
+    }
+
+    public void countDown() {complete.countDown();}
+}
+</code></pre>

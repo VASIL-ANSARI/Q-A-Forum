@@ -1,0 +1,33 @@
+<p>I've never tried this with these kinds of arrays, but this first solution may work and I'm lead to believe so by <a href="https://msdn.microsoft.com/en-us/library/z6cfh6e6(v=vs.100).aspx" rel="nofollow">this MSDN article</a>:</p>
+
+<p>(Note this only works if you can change the function definition on the C# side) In your C# function, change your <code>IntPtr</code> parameter to a <code>double[,,]</code> parameter and add this MarshalAs attribute to it, similar to how the above MSDN article does it.</p>
+
+<pre><code>[DllImport("FooBar.dll")]
+extern void Foo([MarshalAs(UnmanagedType.LPArray, SizeConst=**YOUR ARRAY SIZE HERE**)] double[,,] bar);
+</code></pre>
+
+<p>This also assumes that you have a constant-sized array, and I'm not sure how this would exactly work with a 3d array, but if you'd like to investigate this type of solution further, here's the full documentation for <a href="https://msdn.microsoft.com/en-us/library/system.runtime.interopservices.marshalasattribute(v=vs.100).aspx" rel="nofollow">MarshalAsAttribute</a>.</p>
+
+<hr>
+
+<p>The other solution is very similar to the opposite of that other question. You would initialize your <code>double[,,]</code> to whatever size you needed, then start filling in rows with <code>Marshal.Copy</code> (<a href="https://msdn.microsoft.com/en-us/library/ms146633(v=vs.80).aspx" rel="nofollow">this overload</a>). You could also marshal over a single double with the same function. Something like this:</p>
+
+<pre><code>double[,,] arr = new double[25, 25, 200];
+int il = arr.GetLength(0), jl = arr.GetLength(1), kl = arr.GetLength(2);
+
+IntPtr values = DllFoo();
+
+for (int i = 0; i &lt; il; i++)
+{
+    for (int j = 0; j &lt; jl; j++)
+    {
+        for (int k = 0; k &lt; kl; k++)
+        {
+            double[] temp = new double[1];
+            arr[i,j,k] = Marshal.Copy(values, temp, 1, k + j * jl + k * jl * kl);
+        }
+    }    
+}
+</code></pre>
+
+<p>You can definitely squeeze a lot more performance out of that snippet, but it should still work.</p>

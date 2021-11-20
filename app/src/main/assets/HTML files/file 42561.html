@@ -1,0 +1,43 @@
+<p>Well, a solution can be using JQuery and store the offset of the client. For example, let us have a field in user Model of the system:</p>
+
+<pre><code>class CustomUser(models.Model):
+    user = models.OneToOneField(User)
+    time_offset = models.DecimalField(default=Decimal('0.0'),max_digits=3, decimal_places=1)
+</code></pre>
+
+<p>And (reference from this <a href="http://stackoverflow.com/a/18141175/2696165">SO</a> answer) make a ajax request to ur custom view and save this value in the user model.</p>
+
+<pre><code>$(document).ready(function(){
+    var now = new Date()
+    var value = now.getTimezoneOffset()
+
+    $.ajax({
+        url: "your-url",
+        type: "post", // or "get"
+        data: value,
+        success: function(data) {
+
+          console.log(data);
+        }});
+
+});
+
+# Ajax request view
+
+import json
+def post(request):
+  if request.POST():
+      data = {}
+      try:
+         get_value= request.body
+         custom_user = CustomUser.objects.get(user=request.user)
+         custom_user.time_offset = get_value
+         custom_user.save()
+         data['success'] = 'Success'
+         return HttpResponse(json.dumps(data), content_type="application/json")
+      except Exception as e:
+         data['error'] = e
+         return HttpResponse(json.dumps(data), content_type="application/json")
+</code></pre>
+
+<p>And now you have offset, so when you run your cornjob, just add/subtract the time offset.</p>

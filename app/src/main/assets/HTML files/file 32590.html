@@ -1,0 +1,114 @@
+<p>This does not answer the question but provides a workaround (very hacky)!</p>
+
+<p>I managed to write some custom serializers/deserializers for jackson (until jackson officially supports xsi:nil), that allow the following:</p>
+
+<ul>
+<li>serialize Values from a POJO as xsi:nil elements to a XML-String if they are NULL in the POJO</li>
+<li>deserialize a list of hardcoded Types (String,Integer,Float...) as NULL to a POJO if they are defined as xsi:nil elements in the given XML-String</li>
+</ul>
+
+<p>With this code one can provide interoperability to other xml-binding libraries (JAXB..) that can only work with xsi:nil for null-values.</p>
+
+<p><strong>Class Item:</strong></p>
+
+<pre><code>    public class Item {          
+      public String x;
+      public Integer y;        
+      public Integer z;
+    }
+</code></pre>
+
+<p><strong>Class Main:</strong></p>
+
+<pre><code>    public class Main {
+
+      public static void main(String[] args) throws JsonParseException, JsonMappingException, IOException {
+        NumberDeserializers numberDeserializers = new NumberDeserializers();
+
+        XmlMapper xmlMapper = new XmlMapper();    
+        xmlMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // create custom-serialization
+        XmlSerializerProvider provider = new XmlSerializerProvider(new XmlRootNameLookup());
+        provider.setNullValueSerializer(new MyNullSerializer());
+        xmlMapper.setSerializerProvider(provider);
+
+        // create custom deserialization
+        SimpleModule myModule = new SimpleModule("Module", new Version(1, 9, 10, "FINAL"));    
+        myModule.addDeserializer(String.class, new NullableDeserializer(new StringDeserializer()));            
+        myModule.addDeserializer(Number.class, new NullableDeserializer(numberDeserializers.find(Integer.class, Integer.class.getName())));
+        myModule.addDeserializer(Float.class, new NullableDeserializer(numberDeserializers.find(Float.class, Float.class.getName())));
+
+        xmlMapper.registerModule(myModule);  
+
+        // deserialize
+        Item value = xmlMapper.readValue(
+            "&lt;item xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" &gt;&lt;a&gt;&lt;/a&gt;&lt;x xsi:nil=\"true\"&gt;&lt;/x&gt;&lt;y/&gt;&lt;z&gt;13&lt;/z&gt;&lt;/item&gt;", 
+            Item.class);
+
+        // serialize
+        String xml = xmlMapper.writeValueAsString(value); 
+        System.out.println(xml);
+      }
+    }
+</code></pre>
+
+<p>Class MyNullSerializer:</p>
+
+<pre><code>    public class MyNullSerializer extends JsonSerializer&lt;Object&gt; {
+      @Override
+      public void serialize(Object value, JsonGenerator jgen, SerializerProvider provider) throws IOException, JsonProcessingException {
+        ToXmlGenerator xGen = (ToXmlGenerator) jgen;
+
+        xGen.writeStartObject();
+        try {
+          xGen.getStaxWriter().writeAttribute("xsi:nil", "true");
+        } catch (Exception e){
+          e.printStackTrace();
+        }
+        xGen.writeEndObject();    
+      }
+    }
+</code></pre>
+
+<p>Class MyNullDeserializer:</p>
+
+<pre><code>    public class MyNullDeserializer extends JsonDeserializer {
+
+      private JsonDeserializer delegate; 
+
+      public MyNullDeserializer(JsonDeserializer delegate){
+        this.delegate = delegate;
+      }
+
+      @Override
+      public Object deserialize(JsonParser jp, DeserializationContext ctxt)
+          throws IOException, JsonProcessingException {
+
+        FromXmlParser fxp = (FromXmlParser) jp;
+
+        boolean isNil = false;
+
+        XMLStreamReader reader = fxp.getStaxReader();
+        if (reader.isStartElement()){
+          if (reader.getAttributeCount() &gt; 0){
+            String atVal = reader.getAttributeValue("http://www.w3.org/2001/XMLSchema-instance", "nil");
+            if (atVal != null){
+              if (Boolean.parseBoolean(atVal) == true){
+                isNil = true;
+              }
+            }
+          }
+        }
+
+        Object value = null;
+        if (isNil == false){
+          value = delegate.deserialize(jp, ctxt);
+        } else {
+          jp.getValueAsString(); // move forward
+        }
+        return value;
+      }
+
+    }
+</code></pre>

@@ -1,0 +1,46 @@
+<p>So at the end of the day, you need a class that implements <code>INotifyCollectionChanged</code> and <code>IEnumerable</code> (such as <code>ObservableCollection</code>, or <code>ICollectionView</code>). But of course, you could just make one up yourself. The main thing is that you implement both interfaces in your class, and then invoke <code>CollectionChanged</code> when the collection changes.</p>
+
+<p>A simple example:</p>
+
+<pre><code>class MyObservableDictionary&lt;T, U&gt; : INotifyCollectionChanged, IEnumerable
+{
+    Dictionary&lt;T, U&gt; items = new Dictionary&lt;T,U&gt;();
+
+    public void Add(T key, U value)
+    {
+        this.items.Add(key, value);
+
+        // Update any listeners
+        if (CollectionChanged != null)
+            CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+    }
+
+    // This is from implementing INotifyCollectionChanged
+    public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+    // This is from implementing IEnumerable
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+    {
+        // Dump the entire collection into a 'yield return'. C# will automatically
+        // build an enumerator class from it.
+        foreach (KeyValuePair&lt;T, U&gt; item in items)
+            yield return item;
+    }
+}
+</code></pre>
+
+<p>As you can see, when I add an item I make sure that <code>CollectionChanged</code> isn't null (that is, someone is monitoring this class for collection changes) and then I invoke it. That prompts the monitoring object to call <code>GetEnumerator</code>. In the <code>GetEnumerator</code> function I just do a for each and 'yield return' each item (which tells c# to automatically build an enumerator so I don't have to do it myself).</p>
+
+<p>The XAML:</p>
+
+<pre><code>&lt;ListBox ItemsSource="{Binding Items}"&gt;
+    &lt;ListBox.ItemTemplate&gt;
+        &lt;DataTemplate&gt;
+            &lt;StackPanel Orientation="Horizontal"&gt;
+                &lt;Label Content="{Binding Key}" FontWeight="Bold"/&gt;
+                &lt;Label Content="{Binding Value}"/&gt;
+            &lt;/StackPanel&gt;
+        &lt;/DataTemplate&gt;
+    &lt;/ListBox.ItemTemplate&gt;
+&lt;/ListBox&gt;
+</code></pre>

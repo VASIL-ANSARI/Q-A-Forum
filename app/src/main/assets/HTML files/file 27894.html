@@ -1,0 +1,25 @@
+<p>To determine whether your service is still running, take a look at the answers to <a href="http://stackoverflow.com/questions/7440473/android-how-to-check-if-the-intent-service-is-still-running-or-has-stopped-runni">this question</a>. Please note that this is different from the <code>getRunningAppProcesses</code> solution that you linked to.</p>
+
+<p>In the current implementation of your class, <code>isInstanceCreated()</code> doesn't tell you whether the service is running; it only tells you whether an instance of <code>MyIntentService</code> exists. The static member <code>instance</code> will leak the service object if it's not set to null (e.g., in <code>onDestroy()</code>).</p>
+
+<blockquote>
+  <p>Now, what really happens here if:</p>
+  
+  <p>1- I call isInstanceCreated() from a BroadcastReceiver regarding GC (my thoughts are when BroadcastReceiver finish and eligible for GC, the IntentService is also eligible for GC)</p>
+  
+  <p>2- if I call isInstanceCreated() from Application class regarding GC (my thoughts are IntentService is GC when Android kill Application)</p>
+</blockquote>
+
+<p>Calling <code>isInstanceCreated()</code> has no effect on GC eligibility because it doesn't create or destroy any references.</p>
+
+<blockquote>
+  <p>3- The accessor of the static class method will hold the reference something..???</p>
+</blockquote>
+
+<p>I don't know what you mean by "static class method". The reference to <code>MyIntentService</code> is held by the static member <code>instance</code>. If you set <code>instance</code> to null, then <code>MyIntentService</code> will be GC eligible when the service finishes running and Android removes its own reference(s) to it.</p>
+
+<blockquote>
+  <p>4- [...] When i call isInstanceCreated() are the entire class also taking up memory [...]</p>
+</blockquote>
+
+<p>When you reference <code>MyIntentService</code> the first time, the class loader loads the class into memory and allocates memory for its static members. Since you only have two static members in your class, the memory usage will be very low.</p>

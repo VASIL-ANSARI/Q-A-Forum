@@ -1,0 +1,30 @@
+<blockquote>
+  <p>Is it possible with JS?</p>
+</blockquote>
+
+<p>No. HTML can be arbitrarily nested, which means you need recursion in order to consume it using regex - something which JavaScript regex doesn't have.</p>
+
+<p>Assuming you can ditch JS and use a language that supports PCRE, this <strike>monstrous bunch of unintelligible characters written by Cthulhu</strike> regex does the trick (<a href="https://regex101.com/r/52Zm7Z/1" rel="nofollow">mandatory regex101 link</a>) (note that it doesn't deal with CDATA):</p>
+
+<pre><code>&lt;!--[\s\S]*?--&gt;|&lt;([a-z]+)(?:\s\S+?=(["']|)[\s\S]*?\2)*&gt;((?:[\s\S]*?(?R)?)*)&lt;\/\1&gt;
+</code></pre>
+
+<p>Here's how it works:</p>
+
+<ul>
+<li><code>&lt;!--[\s\S]*?--&gt;|</code> is for preventing comments from causing false positives</li>
+<li><code>&lt;([a-z]+)(?:\s\S+?=(["']|)[\s\S]*?\2)*&gt;</code> is the opening tag, where
+
+<ul>
+<li><code>([a-z]+)</code> is the tag name (note the capturing group - we'll need it in the closing tag)</li>
+<li><code>(?:\s\S+?=(["']|)[\s\S]*?\2)*</code> is the attributes, where
+
+<ul>
+<li><code>\s</code> is the whitespace character that separates attributes from tag name and each other</li>
+<li><code>\S+?=</code> is the attribute name followed by an equals sign (note the lazy quantifier - we need it because <code>\S</code> includes <code>=</code>)</li>
+<li><code>(["']|)[\s\S]*?\2</code> is the value, that can be enclosed in double quotes, single quotes, or nothing</li>
+</ul></li>
+</ul></li>
+<li><code>((?:[\s\S]*?(?R)?)*)</code> is the text between tags (note the capturing group - <strong>it's exactly what you need and will appear as group 3</strong>), where <code>(?R)?</code> makes the regex able to deal with nested constructs</li>
+<li><code>&lt;\/\1&gt;</code> is the closing tag, where <code>\1</code> is the tag name (remember the capturing group in the opening tag)</li>
+</ul>

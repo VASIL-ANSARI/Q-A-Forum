@@ -1,0 +1,60 @@
+<p>Scenario 1: no index (read the whole table)</p>
+
+<pre><code>foreach(page in table.pages)
+{
+  foreach(row in page.rows)
+  {
+    Compare and accumulate franchise and worth from row
+  }
+}
+-- Total IO = table.pages
+</code></pre>
+
+<p>Scenario 2: index on franchise only</p>
+
+<pre><code>foreach(page in index.pages)
+{
+  foreach(indexRow in page.rows)
+  {
+    tableRow = table.fetchRow(indexRow); // + 1 page of IO for each row
+    Compare and accumulate franchise from indexRow and worth from tableRow
+  }
+}
+-- Total IO = index.pages + table.rows
+-- this is likely to be greater than Scenario 1...
+--  so optimizer should prefer that plan instead.
+</code></pre>
+
+<p>Scenario 3: covering index (franchise, worth) in that order.</p>
+
+<pre><code>foreach(page in index.pages)
+{
+  foreach(row in page.rows)
+  {
+    Compare and accumulate franchise and worth from row
+  }
+}
+-- Total IO = index.pages
+-- Assuming that index is thinner than table, a win!
+</code></pre>
+
+<p>Scenario 4: different query with known list of franchises with index from Scenario 3</p>
+
+<pre><code>foreach(franchise in franchises)
+{
+  SELECT MAX(worth) FROM figurines WHERE franchise = franchise
+}
+</code></pre>
+
+<p>...</p>
+
+<pre><code>foreach(franchise in franchises)
+{
+  search into the index looking for the last record with this franchise
+  // this is usually less than 10 pages of IO in my experience.
+}
+-- Total IO = count of franchise * 10
+-- super win!
+</code></pre>
+
+<p>Scenario 4 is different because it invoices a seek and not a scan.</p>

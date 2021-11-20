@@ -1,0 +1,32 @@
+<p>I'm not very familiar with the Doctrine ODM (mongo), but I am familiar with the Doctrine ORM, and they have a lot of similarities. I've built loggers like the one you describe for the ORM, so let me share my experience.</p>
+
+<h3>Which events and why</h3>
+
+<p>I favor the OnFlush event to hook into, because it's a single point in time where all write operations can be found, just <em>before</em> they actually happen. So you can get a consistent set of changes that are about to happen.</p>
+
+<p>With the ORM, using PostPersist, PostUpdate and PostDelete you'll be to late, as the changes have already happened, and can't get reliable change-sets.</p>
+
+<p>Using PrePersist, PreUpdate and PreDelete you won't get a single point in time: PreUpdate and PreDelete will happen inside a flush operation, but PrePersist happens as soon as you call <code>persist()</code> on an entity/document.</p>
+
+<p>So in a OnFlush listener, I will gather all entity/document changes, as well as association changes. I'll keep those in memory, until the PostFlush event gets dispatched. The PostFlush event happens right after everything is persisted into the database, so that's a safe point to write the log. In other words: When the flush operation fails for any reason, the log won't be written, because we haven't actually persisted anything.</p>
+
+<h3>What to track</h3>
+
+<p>With the ORM, changes to scalar properties are always detected. But changes to objects are detected by reference. This means that if the property contains <em>a new object</em> the change is detected. But when the property contains <em>the same object</em> (although that object itself has changed) the change won't be detected.</p>
+
+<p>This is why, with the ORM at least, entities with changed collections won't show up in the return-value of <code>$uow-&gt;getScheduledEntityInsertions()</code>, etc. I'm not sure, but I suspect the ODM behaves in the same way.</p>
+
+<p>So when tracking changes in the listener, you'll have to use all these methods:</p>
+
+<ul>
+<li><code>$uow-&gt;getScheduledDocumentInsertions();</code></li>
+<li><code>$uow-&gt;getScheduledDocumentUpserts();</code></li>
+<li><code>$uow-&gt;getScheduledDocumentUpdates();</code></li>
+<li><code>$uow-&gt;getScheduledDocumentDeletions();</code></li>
+<li><code>$uow-&gt;getScheduledCollectionDeletions();</code></li>
+<li><code>$uow-&gt;getScheduledCollectionUpdates();</code></li>
+</ul>
+
+<p>The last 2 of these will return an array of collections that have changed. From the collection you can get the owning entity/document (<code>$col-&gt;getOwner()</code>), and use the diff methods (<code>$col-&gt;getInsertDiff()</code> and <code>$col-&gt;getDeleteDiff()</code>) to find out what changed exactly.</p>
+
+<p>I hope this helps you reach a solution!</p>

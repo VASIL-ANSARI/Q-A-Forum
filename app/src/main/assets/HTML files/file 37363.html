@@ -1,0 +1,28 @@
+<p>I suspect that the 3rd-party library is requiring some kind of STA pumping. This is fairly common with old-style asynchronous code.</p>
+
+<p>I have a type <code>AsyncContextThread</code> that you can try, passing <code>true</code> to the constructor to enable manual STA pumping. <code>AsyncContextThread</code> is just like <code>AsyncContext</code> except it runs the context within a new thread (an STA thread in this case).</p>
+
+<pre><code>static void Main(string[] args)
+{
+  using (var thread = new AsyncContextThread(true))
+  {
+    thread.Factory.Run(() =&gt; MainAsync(args)).Wait();
+  }
+}
+</code></pre>
+
+<p>or</p>
+
+<pre><code>static void Main(string[] args)
+{
+  AsyncContext.Run(() =&gt; async
+  {
+    using (var thread = new AsyncContextThread(true))
+    {
+      await thread.Factory.Run(() =&gt; MainAsync(args));
+    }
+  }
+}
+</code></pre>
+
+<p>Note that <code>AsyncContextThread</code> will not work in <em>all</em> STA scenarios. I have run into issues when doing (some rather twisted) COM interop that required a true UI thread (WPF or WinForms thread); for some reason the STA pumping wasn't sufficient for those COM objects.</p>

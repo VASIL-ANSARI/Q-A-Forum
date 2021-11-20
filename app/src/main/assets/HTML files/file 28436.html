@@ -1,0 +1,85 @@
+<p>First of all remove the redundant try...catch.
+There's no point in catching an exception just to rethrow it.
+As far as the test you asked for here is the snippet:</p>
+
+<pre><code>    [Test]
+    public void ShouldSucessfully_SaveNewDepartment()
+    {
+        // Arrange
+        var mockUnitOfWork = new Mock&lt;IUnitOfWork&gt;();
+        var mockRepository = new Mock&lt;IRepository&lt;Department&gt;&gt;();
+        Department newDept = new Department { CreatedOn = DateTime.Now, Status = true, DepartmentFullName = "DFN", DepartmentCode = "DC" };
+        mockUnitOfWork.Setup(x =&gt; x.GetRepository&lt;Department&gt;()).Returns(mockRepository.Object);
+
+        var sut = new DepartmentService(mockUnitOfWork.Object);
+
+        // Act
+        bool result = sut.SaveDepartment(newDept);
+
+        // Assert 
+        Assert.That(result, Is.True);
+    }
+
+   [Test]
+    public void ShouldThrowExceptionWhenExceptionThrownInternally_SaveNewDepartment()
+    {
+        // Arrange
+        var mockUnitOfWork = new Mock&lt;IUnitOfWork&gt;();
+        var mockRepository = new Mock&lt;IRepository&lt;Department&gt;&gt;();
+        mockUnitOfWork.Setup(x =&gt; x.GetRepository&lt;Department&gt;()).Returns(mockRepository.Object);
+        mockUnitOfWork.Setup(uow =&gt; uow.Save()).Throws&lt;Exception&gt;();
+
+        var sut = new DepartmentService(mockUnitOfWork.Object);
+
+        // Act
+        TestDelegate action = () =&gt; sut.SaveDepartment(new Department());
+
+        // Assert 
+        Assert.Throws&lt;Exception&gt;(action);
+    }
+</code></pre>
+
+<blockquote>
+  <p>I also want to test when DepartmentCode or DepartmentFullName is blank and if Save is attempted, an exception should be thrown.</p>
+</blockquote>
+
+<p>It depend on who you expect to check for those values: if you want to rely on you database or unitofwork to check for those fields this is not the fixture to test for specific failure conditions it you want a unit test. Here you should only test what happens in case uow throws exception.</p>
+
+<p>If you plan to add those check in the department service than you can do the following:</p>
+
+<pre><code>[Test]
+    public void ShouldThrowExceptionWhenDepartmentCodeIsNull_SaveNewDepartment()
+    {
+        // Arrange
+        var mockUnitOfWork = new Mock&lt;IUnitOfWork&gt;();
+        Department newDept = new Department
+                                 {
+                                     CreatedOn = DateTime.Now, 
+                                     Status = true, DepartmentFullName = "DFN", 
+                                     DepartmentCode = null
+                                 };
+
+        var sut = new DepartmentService(mockUnitOfWork.Object);
+
+        // Act
+        TestDelegate action = () =&gt; sut.SaveDepartment(newDept);
+
+        // Assert 
+        Assert.Throws&lt;ArgumentException&gt;(action);
+    }
+</code></pre>
+
+<p>provided that you modified your method as follows:</p>
+
+<pre><code>public bool SaveDepartment(Department newDepartment)
+    {
+        if (string.IsNullOrEmpty(newDepartment.DepartmentCode))
+        {
+            throw new ArgumentException("DepartmentCode must be not null");
+        }
+
+        repository.Add(newDepartment);
+        _UoW.Save();
+        return true;
+    }
+</code></pre>

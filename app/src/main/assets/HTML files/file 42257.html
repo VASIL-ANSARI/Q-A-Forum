@@ -1,0 +1,11 @@
+<p>Unfortunately, this can't be configured at the controller level. The server decides which controller to use based on the contents of an HTTP request (usually the request path). SSL protects the contents of an HTTP message by encrypting it, and the request path is part of the encrypted message. The SSL channel needs to get set up before any HTTP messages are sent, which is why the configuration of the SSL channel (whether the server tries to negotiate a client cert or not, for example) can't rely on the contents of any HTTP messages.</p>
+
+<p>So here are your options:</p>
+
+<ol>
+<li><p>Spin up a second web role that's configured to not negotiate client certs. You'll need a second domain for this, as it's essentially a separate service. So you'd have <a href="https://domain.com" rel="nofollow">https://domain.com</a> pointing to the non-client-cert one and <a href="https://foo.domain.com" rel="nofollow">https://foo.domain.com</a> pointing to the one that does require client certs.</p></li>
+<li><p>Use the same web role, but set up a second port for IIS to listen on, and have that one configured to not negotiate a client cert. Using non-standard ports is a pain, though, since one of your clients is going to have to do <a href="https://domain.com:444" rel="nofollow">https://domain.com:444</a> (or some other port besides 443).</p></li>
+<li><p>Disable client cert negotiation across the board. This might not work depending on how your service accesses the client certificate, but typically when you access the ClientCertificate property on a System.Web.HttpRequest object (or equivalent), it will negotiate for a certificate on demand. This means it transparently tears down the existing SSL session and sets up a new one, this time challenging the client for the cert. This is pretty inefficient, as setting up an SSL connection in the first place takes several round-trips, and doing it twice is painful. But depending on your available options, the performance requirements for the requests that use client certs, and whether you'll get a lot of connection reuse out of keep-alives, this option may make sense.</p></li>
+</ol>
+
+<p>Hope this helps.</p>

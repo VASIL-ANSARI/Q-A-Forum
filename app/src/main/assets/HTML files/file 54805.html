@@ -1,0 +1,78 @@
+<p>You have (at least) two alternatives to achieve what you want.</p>
+
+<p>The best alternative would be to override the <code>__str__</code> method of the <code>inspect.Signature</code> class. However, as it is written in C, it is read only.</p>
+
+<p>So to do that you need to extend the class as following:</p>
+
+<pre><code>class MySignature(inspect.Signature):
+  def __str__(self):
+    return '(...)'
+</code></pre>
+
+<p>then after defining your function you execute:</p>
+
+<pre><code>func_signature = inspect.signature(func)
+func.__signature__ = MySignature(func_signature.parameters.values(), 
+                                 return_annotation=func_signature.return_annotation)
+</code></pre>
+
+<p>which would then return the following for <code>help(func)</code>:</p>
+
+<pre><code>Help on function func in module __main__:
+
+func(...)
+(END)
+</code></pre>
+
+<p>With this approach inspect.signature still works:</p>
+
+<pre><code>In [1]: inspect.signature(func)
+Out[1]: &lt;MySignature (...)&gt;
+</code></pre>
+
+<p>Alternatively if you don't really care about being able to properly introspect your function (and probably some other use cases), then you can  define the value of your function's <code>__signature__</code> to an object which is not a <code>Signature</code> instance:</p>
+
+<pre><code>def func(x, y):
+    pass
+
+func.__signature__ = object()
+
+help(func)
+</code></pre>
+
+<p>generates the result:</p>
+
+<pre><code>Help on function func in module __main__:
+
+func(...)
+(END)
+</code></pre>
+
+<p>But now <code>inspect.signature(func)</code> will raise <code>TypeError: unexpected object &lt;object object at 0x10182e200&gt; in __signature__ attribute</code>.</p>
+
+<p>Note: this last version is quite hacky and I would not recommend it.</p>
+
+<p>For more info on these two techniques and how the signature works see <a href="https://www.python.org/dev/peps/pep-0362/">PEP 0362</a>.</p>
+
+<p><strong>Update:</strong>
+For python 2.7 you can do the following (probably better using a mock framework):</p>
+
+<pre><code>In [1]: import inspect
+
+In [2]: def myformatargspec(*args, **kwargs):
+   ...:     return '(...)'
+   ...:
+
+In [3]: def func(x, y):
+   ...:     pass
+   ...: 
+
+In [6]: inspect.formatargspec = myformatargspec
+
+In [7]: help(func)
+
+Help on function func in module __main__:
+
+func(...)
+(END)
+</code></pre>

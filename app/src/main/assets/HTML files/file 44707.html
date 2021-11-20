@@ -1,0 +1,53 @@
+<p>You are mixing C++ and C forms of file input:  </p>
+
+<p>When you write: </p>
+
+<pre><code>    fscanf( file_read, "%s", &amp;array[ i ] );
+</code></pre>
+
+<p>the C standard library expects that you provide a pointer to a buffer in which the string read in the file will be stored in form of a C string, that is an array of null terminated characters.  </p>
+
+<p>Unfortunately, you provide a pointer to a C++ string.  So this will result in undefined behaviour (most probably memory corruption). </p>
+
+<p><strong>Solution 1</strong></p>
+
+<p>If you want to keep using the <a href="http://www.cplusplus.com/reference/cstdio/fscanf/?kw=fscanf" rel="nofollow">C standard library file i/o</a>, you have to use an interim buffer:  </p>
+
+<pre><code>char mystring[1024];     //for storing the C string
+...
+        fscanf( file_read, "%1023s", mystring );
+        array[ i ] = string(mystring);   // now make it a C++ string
+</code></pre>
+
+<p>Please note that the format is slightly changed, in order to avoid risks of buffer overflow in case the file contains a string that is larger than your buffer.  </p>
+
+<p><strong>Solution 2</strong></p>
+
+<p>If you learn C++ (looking at your C++ tag and the string header), I'd strongly suggest that you have a look at <strong><a href="http://www.cplusplus.com/reference/fstream/" rel="nofollow"><code>fstream</code></a></strong> in the C++ library.  It's designed to work very well with strings. </p>
+
+<p>Here how it could look like:  </p>
+
+<pre><code>#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;fstream&gt;
+using namespace std;
+
+int main()
+{
+    const int size = 11;
+    string array[ size ];
+    ifstream file_read( "alt.txt");
+    for(int i = 0; i &lt; size &amp;&amp; file_read &gt;&gt; array[ i ]; i++ ) //Read
+        ;
+    file_read.close();
+    ofstream file_write("neu.txt");
+    for(int i = 0; i &lt; size; i++ ) //Write
+        file_write &lt;&lt; array[ i ] &lt;&lt;" "; // with space separator 
+    file_write.close();
+    cout &lt;&lt; "test"&lt;&lt;endl;
+
+    return 0;
+} 
+</code></pre>
+
+<p>And of course, the next thing you should consider, would be to replace classic arrays with vectors  (you don't have to define their size in advance).  </p>

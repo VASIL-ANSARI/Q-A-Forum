@@ -1,0 +1,50 @@
+<p>Why do you use a string for the <code>ExportTimeStamp</code> parameter? Use
+<code>DateTime</code> if it's a <code>date</code> or <code>datetime</code> column.</p>
+
+<p>I'd also replace all of your calls to <a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlparametercollection.addwithvalue(v=vs.110).aspx" rel="nofollow"><code>AddWithValue</code></a> with <a href="http://msdn.microsoft.com/en-us/library/40959t6x(v=vs.110).aspx" rel="nofollow"><code>Add</code></a>. When you call <code>AddWithValue</code> it has to guess what the type of your parameter is. If it guesses wrong   the optimizer cannot select the correct index and falls back to a table scan, and that speaks to the core of database performance. </p>
+
+<p><code>AddWithVaue</code> may result in multiple query plans. Since .NET doesn't know what the size of the database column is, it will use the size of the variable. so if you have a parameterized query and pass two strings in, one of length 10, the other of length 20, you will get two plans: <code>@text nvarchar(10)</code>  and <code>@text nvarchar(20)</code>. It will also assume that your field is <code>nvarchar</code> when it may be <code>varchar</code> and you will get an implicit conversion.</p>
+
+<p>So always either pass the correct type to <code>AddWithValue</code> or (better) use <a href="http://msdn.microsoft.com/en-us/library/40959t6x(v=vs.110).aspx" rel="nofollow"><code>SqlParameterCollection.Add</code></a> with the correct type and size. It'll also validate the parameter <em>before</em>  it gets sent to the database.</p>
+
+<p>Related: </p>
+
+<ul>
+<li><a href="http://stackoverflow.com/q/21110001/284240">SqlCommand Parameters Add vs. AddWithValue</a></li>
+<li><a href="http://sqlblog.com/blogs/aaron_bertrand/archive/2009/10/16/bad-habits-to-kick-mishandling-date-range-queries.aspx" rel="nofollow">Bad habits to kick : mis-handling date</a></li>
+<li><a href="https://www.simple-talk.com/sql/performance/the-seven-sins-against-tsql-performance/" rel="nofollow">The Seven Sins against TSQL Performance</a></li>
+</ul>
+
+<p>Also, use the <code>using</code>-statement to ensure that the connection gets closed as soon as you're finished with it - even in case of an error.</p>
+
+<p>Here is an example:</p>
+
+<pre><code>public DataTable GetDataTable(int Year, int month, string datatype)
+{
+    DataTable myDataTable = new DataTable();
+    String ConnString = ConfigurationManager.ConnectionStrings["IHG_MSTConnectionString"].ConnectionString;
+    using(SqlConnection conn = new SqlConnection(ConnString))
+    using (SqlDataAdapter adapter = new SqlDataAdapter())
+    {
+        var cmd = new SqlCommand("[Yield_Planner_With_Strategy]", conn);
+        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+        cmd.Parameters.Add("@Holidex_Code", SqlDbType.Int).Value = int.Parse(RadComboBox_Hotels.SelectedValue);
+        cmd.Parameters.Add("@Event_Year", SqlDbType.Int).Value = Year;
+        cmd.Parameters.Add("@Event_Month", SqlDbType.Int).Value = month;
+        cmd.Parameters.Add("@DataType", SqlDbType.VarChar).Value = datatype;
+        cmd.Parameters.Add("@MktSeg", SqlDbType.NVarChar).Value = Fruitful.Get_Checked_Values_As_CSV(RadComboBox_MktSeg);
+        DateTime exportdate = DateTime.Now;
+        if (RadComboBox_ExportTimeStamp.Text != "" &amp;&amp; RadComboBox_ExportTimeStamp.Text != "Create New Strategy")
+        {
+            exportdate = DateTime.Parse(RadComboBox_ExportTimeStamp.Text);
+        }
+        cmd.Parameters.Add("@ExportTimeStamp", SqlDbType.DateTime).Value = exportdate;
+        adapter.SelectCommand = cmd;
+
+        // you don't need to open it with Fill
+        adapter.Fill(myDataTable);
+    }
+
+    return myDataTable;
+}
+</code></pre>

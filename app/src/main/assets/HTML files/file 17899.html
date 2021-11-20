@@ -1,0 +1,97 @@
+<p>Your first snippet shows this:</p>
+
+<p><code>JTable table =  new JTable(model);</code> </p>
+
+<p>but your <code>gui()</code> constructor shows:</p>
+
+<p><code>JTable table =  new JTable(data, columnNames);</code> </p>
+
+<p>You initiate the table twice. Once using the <code>TableModel</code> (<a href="http://docs.oracle.com/javase/1.5.0/docs/api/javax/swing/JTable.html#JTable%28javax.swing.table.TableModel%29" rel="nofollow"><code>JTable(TableModel tm)</code></a>) the next using <a href="http://docs.oracle.com/javase/1.5.0/docs/api/javax/swing/JTable.html#JTable%28int,%20int%29" rel="nofollow"><code>JTable(int rows,int cols)</code></a> this is not good, initiate the <code>JTable</code> once in the constructor:</p>
+
+<pre><code>gui() {
+DefaultTableModel model = new DefaultTableModel(data,columnNames);
+JTable table =  new JTable(model);
+JScrollPane scrollPane = new JScrollPane(table);
+
+JButton next = new JButton("next");
+JButton prev = new JButton("prev");
+next.addActionListener(this);
+prev.addActionListener(this);
+JPanel panel = new JPanel(new BorderLayout());
+JPanel buttonPanel = new JPanel();
+buttonPanel.add(prev);
+buttonPanel.add(next);
+panel.add(buttonPanel, BorderLayout.SOUTH);
+panel.add(table.getTableHeader(), BorderLayout.PAGE_START);
+panel.add(scrollPane, BorderLayout.CENTER);
+getContentPane().add(panel);
+}
+</code></pre>
+
+<p><strong>UPDATE:</strong></p>
+
+<p>Here is an example that has a thread which will start 2.5 secinds after the UI is visible and change a value of the <code>JTable</code>:</p>
+
+<pre><code>import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+
+public class Test extends JFrame {
+
+    public static void main(String[] args) throws Exception {
+        SwingUtilities.invokeLater(new Runnable() {
+
+            @Override
+            public void run() {
+                new Test().createAndShowUI();
+            }
+        });
+
+    }
+
+    private void createAndShowUI() {
+        JFrame frame = new JFrame();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        initComponents(frame);
+        frame.pack();
+        frame.setVisible(true);
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(2500);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
+                } 
+                SwingUtilities.invokeLater(new Runnable() {
+
+                     @Override
+                     public void run() {
+                       model.setValueAt("hello", 0, 0);
+                     }
+                });
+            }
+        }).start();
+    }
+    static DefaultTableModel model;
+
+    private void initComponents(JFrame frame) {
+
+        String data[][] = {
+            {"1", "2", "3"},
+            {"4", "5", "6"},
+            {"7", "8", "9"},
+            {"10", "11", "12"}
+        };
+
+        String col[] = {"Col 1", "Col 2", "Col 3"};
+
+        model = new DefaultTableModel(data, col);
+        JTable table = new JTable(model);
+
+        frame.getContentPane().add(new JScrollPane(table));
+    }
+}
+</code></pre>

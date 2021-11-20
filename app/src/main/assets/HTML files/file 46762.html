@@ -1,0 +1,23 @@
+<p>There are a few things going on here that don't make sense to me. I don't understand why you are doing a <code>.Defer(...)</code> and why you are doing a <code>.Publish().RefCount()</code>.</p>
+
+<p>Also, you are grouping your results and then flattening them. Why not just leave them as they are?</p>
+
+<p>Finally, it appears you're using <code>.Materialize()</code> to somehow handle the case when <code>GetPriceStream</code> doesn't produce an actual value.</p>
+
+<p>So, given all of that, this seems to be the most likely query you need:</p>
+
+<pre><code>var query =
+    from order in GetOrderStream("FNZCTEST")
+    from price in GetPriceStream(order.Exchange, order.Security)
+        .DefaultIfEmpty(new PriceDto())
+    select new
+    {
+        Order = order,
+        Price = price,
+    };
+
+IDisposable disposable =
+    query.Subscribe(x =&gt; Console.WriteLine("{0} : {1}", x.Order, x.Price));
+</code></pre>
+
+<p>Now, it's also possible that you implementation of <code>Observable.Create</code> is also causing you grief. So, if you could it would be great if you could add the implementations at the end of your question.</p>

@@ -1,0 +1,42 @@
+<p>The return value of <code>memcmp()</code> does a nice unsigned little endian compare.</p>
+
+<p>return memcmp(&amp;packet[IndexLo], &amp;Reference, IndexHi - IndexLo + 1);</p>
+
+<hr>
+
+<p>A portable method would simple compare 1 byte at a time.  </p>
+
+<hr>
+
+<p>Quick method but has a number of assumptions:<br>
+. Packet data and platform same endian and Little.<br>
+. <code>Boundary_width &lt;= sizeof inttype</code>.<br>
+. unsigned arithmetic.<br>
+. Optimized for <code>Packet_CompareMask()</code>.<br>
+. Accessing a width integer on any byte boundary OK.<br>
+. OK to access memory just past end of <code>packet</code>.</p>
+
+<pre><code>typedef uint64_t inttype;
+
+int Packet_CompareMask(const char *packet, size_t IndexLo, unint64_t Mask, inttype Reference) {
+   // This fails on machine with alignment restricts on wide integers.
+   inttype x = *((inttype *) &amp;packet[IndexLo]);
+   x &amp;= Mask;
+   if (x &lt; Reference) return -1;
+   return x &gt; 0;
+}
+
+int Packet_CompareRange(const void *packet, size_t IndexLo, size_t IndexHi, inttype Reference) {
+  inttype Mask = 0;
+  ssize_t Diff = IndexHi - IndexLo;
+  if ((Diff &lt;= 0) || (Diff &gt; (sizeof(Mask) - 1))) {
+    ; // handle error
+  }
+  // This only works on little endian machines.  A variant would work with Big endian.
+  while (--Diff &gt;= 0) {
+    Mask &lt;&lt;= 8;
+    Mask |= 0xFF;
+    }
+  return Packet_CompareRange(packet, IndexLo, Mask, Reference);
+}
+</code></pre>

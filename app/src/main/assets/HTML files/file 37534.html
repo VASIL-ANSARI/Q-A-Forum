@@ -1,0 +1,43 @@
+<p>You just have to do <code>[Dog objectsWhere:@"ANY owners = %@", person]</code>, where <code>person</code> is the owner you want to query for.</p>
+
+<p>A complete example:</p>
+
+<pre><code>@protocol Person;
+
+@interface Dog : RLMObject
+@property NSString *name;
+@property NSInteger age;
+
+@property RLMArray&lt;Person&gt; *owners;
+@end
+
+@implementation Dog
+@end
+
+RLM_ARRAY_TYPE(Dog)
+
+@interface Person : RLMObject
+@property NSString *name;
+@property RLMArray&lt;Dog&gt; *dogs;
+@end
+
+@implementation Person
+@end
+
+RLM_ARRAY_TYPE(Person)
+
+void test() {
+    RLMRealm *realm = RLMRealm.defaultRealm;
+
+    [realm beginWriteTransaction];
+    Person *person = [Person createInRealm:realm withObject:@{@"name": @"Tim"}];
+
+    Dog *dog = [Dog createInRealm:realm withObject:@{@"name": @"Rover", @"age": @5, @"owners": @[person]}];
+    [Dog createInRealm:realm withObject:@{@"name": @"Rex", @"age": @10, @"owners": @[]}];
+    [realm commitWriteTransaction];
+
+    RLMArray *dogs = [Dog objectsWhere:@"ANY owners = %@", person];
+    assert(dogs.count == 1);
+    assert([dog isEqual:dogs[0]]);
+}
+</code></pre>

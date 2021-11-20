@@ -1,0 +1,29 @@
+<p>The issue is that you are calling the <code>run</code> method of your thread directly. This does not spawn a new thread, it just calls the run method in-line. <code>retrieveThread.start()</code> would give you the behaviour you are looking for.</p>
+
+<p>However, there is a better way of doing it (at least more 'eclipse friendly'), and that is to use an Eclipse <code>Job</code> instead of a raw <code>Thread</code>.</p>
+
+<pre><code>    Job retrieveJob = new Job("Retrieving Data") 
+    {           
+        @Override
+        protected IStatus run(IProgressMonitor monitor) {
+            // do your REST call
+            ModelProvider.INSTANCE.addItems(items);
+            // if something goes wrong - don't return ok, obviously 
+            return Status.OK_STATUS;                
+        }
+    };
+    retrieveJob.addJobChangeListener(new JobChangeAdapter() {
+
+        @Override
+        public void done(IJobChangeEvent event) {
+            if(event.getResult().isOK())
+            {
+                resultLabel.setText(ModelProvider.INSTANCE.getItems().size() + " items");
+                viewer.refresh();
+            }
+        }           
+    });
+    // this will run in a background thread 
+    // and nicely integrate with the UI
+    retrieveJob.schedule(); 
+</code></pre>

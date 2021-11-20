@@ -1,0 +1,41 @@
+<pre><code>+[SVC setDismissDelegate:]: unrecognized selector sent to class 0xbca68
+</code></pre>
+
+<p>See the <strong>+</strong></p>
+
+<p>The plus sign idicates that you are calling a class method. You must have tried setting a class variable by a setter. But a property represents instance variables only. Therefore the setters and getters that are automatically generated are intance methods only. (starting with a minus <strong>-</strong> in error messages like this).  </p>
+
+<p>And that is what you do: </p>
+
+<pre><code>        _SubclassVC = (SVC *) vc.superclass;
+        _SubclassVC.dismissDelegate = self;
+</code></pre>
+
+<p>For whatever reason (probably by mistake or misunderstanding) you take the vc instance and get its <code>superclass</code>. <code>vc.superclass</code> returns a class object, not an object (meaning not an instance, in Obj-C class objects are objects too). 
+Then you typecast it to <code>(SVC *)</code> just to stop the compiler from throwing errors (or warnings - not sure). </p>
+
+<p>Well, I guess that you wondered yourself why you have to typecast it at all. That's the reason :) </p>
+
+<p>Next, you assign <code>self</code> to a property <code>dismissDelegate</code>. The compiler does that because you typecasted it to SVC* which does have a property <code>dismissDelegate</code>. The compiler will actually call the setter <code>setDismissDelegate</code> as usual in contructs like this. </p>
+
+<p>BUT at runtime the message (or selector) setDismissDelegate: is not sent to an <code>SVC*</code> but to a <code>class</code> object. And the class <code>SVC</code> does not have a method (or selector) <code>+setDismissDelegate:</code> and therefore cannot resolve the message. And that is exactly what the error message is telling you. </p>
+
+<p>All right, now we get to your questions. 
+1. Well, it is not the way I would do it, but that is certainly one way of achiving it. 
+2. If you want to stick with that unusual approach then do this minor change and you will get rid of the error: </p>
+
+<pre><code>for (SVC *vc in navController.viewControllers) {
+    vc.dismissDelegate = self; 
+}
+</code></pre>
+
+<p>There is no point in fetching the superclass object. If you cannot access the property of a superclass then you did something wrong with the inheritance chain. 
+If you want to be on the save side: </p>
+
+<pre><code>for (UIViewController *vc in navController.viewControllers) {
+  if (vc isKindOfClass:[SVC class]){  //BTW, this is good usage of the class object
+    SVC *svc = (SVC*) vc;
+    svc.dismissDelegate = self; 
+  }
+}
+</code></pre>

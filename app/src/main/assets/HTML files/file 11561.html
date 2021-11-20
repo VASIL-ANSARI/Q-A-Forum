@@ -1,0 +1,32 @@
+<p>The issue is likely that the notification is sent (and therefore received) on a different thread than the main thread.  Only on the main thread will you be able to update UI elements (like a label).</p>
+
+<p>See my answer to <a href="http://stackoverflow.com/questions/8032652/is-it-ok-to-use-of-a-notification-to-communication-back-to-the-main-thread-of-an/8033344#8033344">this question</a> for some insight into threads and NSNotifications.</p>
+
+<p>Use something like:</p>
+
+<pre><code>NSLog(@"Code executing in Thread %@",[NSThread currentThread] );
+</code></pre>
+
+<p>to compare your main thread versus where your recieveNotifcation: method is being executed.</p>
+
+<p>If it is the case that you are sending the notification out on a thread that is not the main thread, a solution may be to broadcast your nsnotifications out on the main thread like so:</p>
+
+<pre><code>//Call this to post a notification and are on a background thread      
+- (void) postmyNotification{
+  [self performSelectorOnMainThread:@selector(helperMethod:) withObject:Nil waitUntilDone:NO];
+}
+
+//Do not call this directly if you are running on a background thread.
+- (void) helperMethod{
+  [[NSNotificationCenter defaultCenter] postNotificationName:@"SOMENAME" object:self];
+}
+</code></pre>
+
+<p>If you only care about the label being updated on the main thread, you can perform that operation on the main thread using something similar to:</p>
+
+<pre><code>dispatch_sync(dispatch_get_main_queue(), ^(void){
+                            [label setText:@"Success!"];
+                        });
+</code></pre>
+
+<p>Hope that was helpful!</p>

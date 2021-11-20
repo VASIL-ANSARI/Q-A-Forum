@@ -1,0 +1,91 @@
+<p>So, usually with an iPhone table, you should just use one of the built in styles: <a href="http://developer.apple.com/iphone/library/documentation/UIKit/Reference/UITableView_Class/Reference/Reference.html#//apple_ref/occ/instp/UITableView/separatorStyle">http://developer.apple.com/iphone/library/documentation/UIKit/Reference/UITableView_Class/Reference/Reference.html#//apple_ref/occ/instp/UITableView/separatorStyle</a></p>
+
+<p>As an iPhone developer who has been down this road, I suggest you avoid images wherever possible, and use the API to build your app.</p>
+
+<p>If you insist on your reckless course, or if you have a client demanding this or something, then what you can do is subclass UITableViewCell.</p>
+
+<p>In your UITableViewCell subclass, you can add whatever UI elements you want to the contentView of the cell, including a separator image at the bottom of the cell.</p>
+
+<p>So, here is an implementation of the delegate function that returns a table cell using a custom UITableViewCell:</p>
+
+<pre><code>- (UITableViewCell *)tableView:(UITableView *)tableView 
+         cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+
+  static NSString *CellIdentifier = @"Cell";
+
+  // notice I use a SavedTableCell here instead of a UITavbleViewCell
+  SavedTableCell *cell = (SavedTableCell *)[tableView dequeueReusableCellWithIdentifier:CellIdentifier];
+
+  if (cell == nil) {
+    cell = [[[SavedTableCell alloc] initWithReuseIdentifier:CellIdentifier hasIcon:YES] autorelease];
+  }
+
+  // custom function to set the fields in the cell
+  [cell setItem:[self.items objectAtIndex:indexPath.row]];  
+  return cell;
+}
+</code></pre>
+
+<p>And then here's my simplified implementation of SavedTableCell.h:</p>
+
+<pre><code>#import &lt;UIKit/UIKit.h&gt;
+#import "Item.h"
+
+@interface SavedTableCell : UITableViewCell {
+
+  // my cell has one label and one image, but yours would have an image placed at the bottom of the cell's frame
+  UILabel *primaryLabel;
+  UIImageView *icon;
+}
+
+// i just made up the class Item... in my code they are actually Waypoints.
+- (void) setItem:(Item*)item;
+
+
+@property(nonatomic,retain) UILabel *primaryLabel;
+@property(nonatomic,retain) UIImageView *icon;
+
+
+@end
+</code></pre>
+
+<p>And here is a simplified SavedTableCell.m:</p>
+
+<pre><code>#import "SavedTableCell.h"
+
+@implementation SavedTableCell
+
+@synthesize primaryLabel, icon;
+
+
+- (id)initWithReuseIdentifier:(NSString *)reuseIdentifier {
+  if (self = [super initWithStyle:UITableViewStylePlain reuseIdentifier:reuseIdentifier]) {
+    icon = [[UIImageView alloc] initWithFrame:CGRectMake(5,5,40,40)];
+    [self.contentView addSubview:icon];
+    primaryLabel = [[UILabel alloc]init];
+primaryLabel.font = TITLE_FONT;     
+    [self.contentView addSubview:primaryLabel]; 
+  } 
+  return self;
+}
+
+
+- (void) setItem:(Item*)item {
+  self.primaryLabel.text = [item name];
+  [self.icon setImage:[item imageName]];
+}
+
+- (void)layoutSubviews {
+  [super layoutSubviews];
+  primaryLabel.frame = LABEL_FRAME;
+  icon.frame = ICON_FRAME;  
+}
+
+- (void)dealloc {
+  [icon release];
+  [primaryLabel release];
+}
+
+
+@end
+</code></pre>

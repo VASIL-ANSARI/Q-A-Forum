@@ -1,0 +1,115 @@
+<p>I would build a letter object maintaining the letter and timings. This way you can provide a simple update functionality on the object and the object will itself make sure it produces the correct current letter.</p>
+
+<h3>For example:</h3>
+
+<pre><code>function Letter(table, letter, duration) {
+  this.table = table;                          // lookup-table
+  this.letter = letter;                        // target letter
+  this.current = 0;                            // index in table
+  this.delay = duration / tbl.indexOf(letter); // ms
+  this.time = Date.now();                      // current (start) time
+  this.done = false;                           // status
+}
+</code></pre>
+
+<p>Then a common prototyped <code>update()</code> method:</p>
+
+<pre><code>Letter.prototype.update = function() {
+  if (this.done) return;                       // if done, do no more
+  var time = Date.now();                       // get current time
+  if (time - this.time &gt;= this.delay) {        // exceeded delay?
+    this.time = time;                          // store current time
+    if (this.letter === this.table[this.current] || 
+        this.current === this.table.length) {  // target reached? unknown letter
+      this.done = true;                        // we're done
+    }
+    else {
+      this.current++;                          // next in table
+    }
+  }
+};
+</code></pre>
+
+<p>Then we can produce the objects from the string:</p>
+
+<pre><code>var letters = [];
+word.toUpperCase().split("").forEach(function(l) {
+  letters.push(new Letter(tbl, l, 2500));  // 2.5s duration
+});
+</code></pre>
+
+<p>Then animate it:</p>
+
+<pre><code>(function loop() {
+   var txt = "", isDone = true;
+   letters.forEach(function(l) {
+     l.update();
+     if (!l.done) isDone = false;
+     txt += l.table[l.current];
+   });
+
+   // output txt
+   if (!isDone) requestAnimationFrame(loop);
+   else { /* done */ }
+})();
+</code></pre>
+
+<h1>Demo</h1>
+
+<p><div class="snippet" data-lang="js" data-hide="false" data-console="true">
+<div class="snippet-code">
+<pre class="snippet-code-js lang-js prettyprint-override"><code>function Letter(table, letter, duration) {
+  this.table = table;
+  this.letter = letter;
+  this.current = 0;
+  this.delay = duration / tbl.indexOf(letter);   // ms
+  this.time = Date.now();
+  this.done = false;
+}
+Letter.prototype.update = function() {
+  if (this.done) return;
+  var time = Date.now();
+  if (time - this.time &gt;= this.delay) {
+    this.time = time;
+    if (this.letter === this.table[this.current] || 
+        this.current === this.table.length) {
+      this.done = true;
+    }
+    else {
+      this.current++;
+    }
+  }
+};
+
+var word = "hello there";
+var tbl = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+var letters = [];
+word.toUpperCase().split("").forEach(function(l) {
+  letters.push(new Letter(tbl, l, 2500))
+});
+
+(function loop() {
+  var txt = "", isDone = true;
+  letters.forEach(function(l) {
+    l.update();
+    if (!l.done) isDone = false;
+    txt += l.table[l.current];
+  });
+
+  // output txt
+  d.innerHTML = txt;
+  
+  if (!isDone) requestAnimationFrame(loop);
+  else { /* done */ }
+})();</code></pre>
+<pre class="snippet-code-css lang-css prettyprint-override"><code>#d {font:bold 32px monospace}</code></pre>
+<pre class="snippet-code-html lang-html prettyprint-override"><code>&lt;div id=d&gt;&lt;/div&gt;</code></pre>
+</div>
+</div>
+</p>
+
+<h3>Misc</h3>
+
+<p>If the delay is below 16.7ms it may not increment fast enough. It can be solved by dividing current relative time on duration. Multiply this normalized value with index of the target letter in the table to get a current, just round the result to an integer value.</p>
+
+<p>You can provide different tables to obtain randomness/variation.</p>

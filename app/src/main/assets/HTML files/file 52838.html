@@ -1,0 +1,22 @@
+<p>I don't have your complete database structure, so I can't test the following query but it may contain some optimization.  I will leave it to you to test, but will explain why I have changed, what I have changed.</p>
+
+<pre><code>select Distinct Customers.id, Subscriptions.publicationName 
+from Subscriptions 
+join Customers on Subscriptions.id_Customer = Customer.id
+join Publications
+ON Subscriptions.id_Publication = Publications.id
+Where Subscriptions.isExpired = 1
+And Not Exists
+(select * from Subscriptions s2
+join Customers on s2.id_Customer = Customer.id
+join Publications
+ON s2.id_Publication = Publications.id
+where s2.id_Customer = s2.id_customer and 
+(s2.isPending = 1 or s2.isActive = 1))
+</code></pre>
+
+<p>If you have no resulting data in Customer or Publications DB, then the Subscription information isn't useful, so I eliminated the LEFT join in favor of simply join.  Combine the two Exists subqueries.  These are pretty intensive if I recall so the fewer the better.  Last thing which I did not list above but may be worth looking into is, can you run a subquery with specific data fields returned and use it in an Exists clause?  The use of Select * will return all data fields which slows down processing.  I'm not sure if you can limit your result unfortunately, because I don't have an equivalent DB available to me that I can test on (the google probably knows).</p>
+
+<p>I suspect there are further optimizations that could be made on this query.  Eliminating the Exists clause in favor of an 'IN' clause may help, but I can't think of a way right now, seeing how you've got to match two unique fields (customer id and the relevant subscription).  Let me know if this helps at all.</p>
+
+<p>With a table of 50k rows, you should be able to run a query like this in seconds.</p>

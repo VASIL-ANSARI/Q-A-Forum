@@ -1,0 +1,30 @@
+<p>After twisting my head for about 24 hours, I was able to derive the right query from a similar post (however lot less complicated query) here at Stack Overflow:</p>
+
+<pre><code>select @index := @index + 1 as `Index`, `Date`
+from
+(
+  select date_format(calendar.dy, '%Y-%m-%d') as `Date`
+  from
+  (
+    select date_add(date('2015-10-01'), interval (a2.digit * 100) + (a1.digit * 10) + a0.digit day) as dy
+    from digits a2
+    cross join digits a1
+    cross join digits a0
+    where date_add('2015-10-01', interval (a2.digit * 100) + (a1.digit * 10) + a0.digit day) &lt;= date('2015-12-31')
+    order by date_add('2015-10-01', interval (a2.digit * 100) + (a1.digit * 10) + a0.digit day)
+  ) calendar
+  inner join
+  (
+    SELECT `ID`, `from`, `to` FROM `tbl_cards`
+    UNION
+    SELECT `ID`, `from`, `to` FROM `tbl_shoppingcart`
+  ) t
+  on calendar.dy between t.`from` and t.`to`
+  group by calendar.dy
+  having count(calendar.dy) = 3
+) dts
+cross join ( select @index := -1 ) params
+;
+</code></pre>
+
+<p>Obviously I didn't know enough about derived tables and subqueries, otherwise this would have been an easy customization. Seems like I've learned something new today as well :)</p>

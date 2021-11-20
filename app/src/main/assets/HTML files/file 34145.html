@@ -1,0 +1,21 @@
+<p>As Patryk already suggested this is a good example for <a href="http://msdn.microsoft.com/en-us/library/hh228603%28v=vs.110%29.aspx" rel="nofollow">TPL Dataflow</a> - we do something similar (just with several steps in the pipeline including batching and transforming) here:</p>
+
+<p>Create your Dataflow block to process the tasks and a collection to hold all of them:</p>
+
+<pre><code>var actionBlock = new ActionBlock&lt;WorkItem&gt;(item =&gt; ProcessWorkItem(item), 
+   new ExecutionDataflowBlockOptions() { MaxDegreeOfParallelism = threadCount });
+var allItems = new ConcurrentDictionary&lt;int, WorkItem&gt;(); // or whatever fits
+</code></pre>
+
+<p>Then in the the <code>Add</code> method:</p>
+
+<pre><code>public void Add(WorkItem workItem)
+{
+    allItems.Add(workItem.Id, workItem);
+    actionBlock.Post(workItem);
+}
+</code></pre>
+
+<p>And at the end of <code>ProcessWorkItem</code> do a <code>allItems.Remove(workItem.Id)</code>.</p>
+
+<p>P.S.: The dataflow blocks are pretty fast also - we do several hundred <code>Post</code> calls per second here...</p>

@@ -1,0 +1,30 @@
+<p><code>ERROR_NOTIFY_ENUM_DIR</code> is defined in winerror.h:</p>
+
+<pre><code>//
+// MessageId: ERROR_NOTIFY_ENUM_DIR
+//
+// MessageText:
+//
+// A notify change request is being completed and the information is not being returned in the caller's buffer. The caller now needs to enumerate the files to find the changes.
+//
+#define ERROR_NOTIFY_ENUM_DIR            1022L
+</code></pre>
+
+<p>However, 1022 is 0x3FE.  0x10C is 268 instead, which is not an error code that <code>ReadDirectoryChangesW()</code> is supposed to return.  So if <code>ReadDirectoryChangesW()</code> is directly returning <code>STATUS_NOTIFY_ENUM_DIR</code> instead of translating it into <code>ERROR_NOTIFY_ENUM_DIR</code>, then that very well could be a bug inside of <code>ReadDirectoryChangesW()</code> itself, unless it is a typo in winerror.h instead.</p>
+
+<p><code>STATUS_NOTIFY_ENUM_DIR</code> is used by some lower-level systems, like <a href="http://msdn.microsoft.com/en-us/library/ee441586.aspx" rel="nofollow"><code>NT_TRANSACT_NOTIFY_CHANGE</code></a> and <a href="http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/File/NtNotifyChangeDirectoryFile.html" rel="nofollow"><code>NtNotifyChangeDirectoryFile()</code></a>, to indicate that the notification data is larger than the output buffer can hold.  That is what <code>ERROR_NOTIFY_ENUM_DIR</code> means in <code>ReadDirectoryChangesW()</code>, as stated in its own documentation.</p>
+
+<p>Some return values of other functions, like the <code>WaitFor...()</code> family of functions, and OverlappedIO/IOCP functions, map directly to <code>STATUS_...</code> codes internally, but are not documented as such because that is a private implementation detail.  For example, if you look in winbase.h, there are a couple of dozen common return codes, like <code>WAIT_OBJECT_0</code>, <code>WAIT_IO_COMPLETION</code>, <code>STILL_ACTIVE</code>, and various <code>EXCEPTION_...</code>, that map directly to <code>STATUS_...</code> values.</p>
+
+<p>That does not appear to be the case in this situation, though.  <a href="http://support.microsoft.com/kb/113996" rel="nofollow">According to MSDN</a>, <code>STATUS_NOTIFY_ENUM_DIR</code>is indeed supposed to map to <code>ERROR_NOTIFY_ENUM_DIR</code>, so this would appear to be a bug:</p>
+
+<blockquote>
+  <p>When a kernel-mode driver is called because of an input/output (I/O) request from the Win32 subsystem, the status code returned by the kernel- mode driver will be translated to the status code's corresponding Win32 error code. The following table shows the mapping from the Windows NT status codes to Win32 error codes.</p>
+
+<pre><code>WINDOWS NT STATUS CODE                  WIN32 ERROR CODE
+------------------------------------------------------------------
+...
+STATUS_NOTIFY_ENUM_DIR                  ERROR_NOTIFY_ENUM_DIR
+...
+</code></pre>
+</blockquote>

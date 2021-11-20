@@ -1,0 +1,38 @@
+<p>In the event that you are wrapping your mailer action in a Future (or Play Java equivalent), then it may be a variable scoping issue that you're hitting:</p>
+
+<p>This works:</p>
+
+<pre><code>val mail = use[MailerPlugin].email
+val async: Future[Unit] = Future{
+  mail.setSubject(subject)
+  mail.setRecipient(recipient)
+  mail.setFrom(from)
+  mail.send(body)
+}
+async.onFailure{case(e)=&gt;
+  Logger.error(s"mailer failed for $recipient due to: ${e.getMessage}")
+}
+</code></pre>
+
+<p>This does <em>not</em> work:</p>
+
+<pre><code>val mail = use[MailerPlugin].email
+mail.setSubject(subject)
+mail.setRecipient(recipient)
+mail.setFrom(from)
+val async: Future[Unit] = Future{mail.send(body)}
+async.onFailure{case(e)=&gt;
+  Logger.error(s"mailer failed for $recipient due to: ${e.getMessage}")
+}
+</code></pre>
+
+<p>I assumed that the enclosing scope would be available within the Future closure; in this case definitely not since underlying Apache Commons mailer bails with "From address required". Sure enough, setting smtp.mock=true reveals that fromAddress is null when mail.setFrom and friends are populated outside of Future{...} scope.</p>
+
+<p>Interestingly, even if I break out async val into a local method and pass in constructed mailer and body text:</p>
+
+<pre><code>private def async(mail: MailerAPI, body: String): Future[Unit] = Future{
+  mail.send(body)
+}
+</code></pre>
+
+<p>the mail properties set outside of the Future still wind up null despite passing a constructed mailer directly -- surprising, no?</p>

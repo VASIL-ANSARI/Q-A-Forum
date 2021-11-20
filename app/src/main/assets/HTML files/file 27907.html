@@ -1,0 +1,173 @@
+<p>Ok, so I'll post here how I'm setup, using LibGDX and GPGS, and I have no issues with getting the popup to show when logging in after having logged out. </p>
+
+<p>First my declaration for my Android project:</p>
+
+<pre><code>public class MainActivity extends AndroidApplication implements RequestHandler, GameHelperListener,
+    GoogleInterface, RealTimeMessageReceivedListener, RoomStatusUpdateListener, RoomUpdateListener, 
+    OnInvitationReceivedListener, RealTimeReliableMessageSentListener, OnImageLoadedListener, OnStateLoadedListener, ConnectionCallbacks{ 
+private GameHelper mHelper;
+private GameHelperInterface mGHInterface = null;
+private ConfirmInterface mConfirmInterface = null;
+private Handler libGDXHandler;
+</code></pre>
+
+<p>The GoogleInterface is used to pass from the LibGDX thread to the Android thread, and the GameHelperInterface and ConfirmInterface are for passing things from the android to the libGDX side of the house  (I use the confirmInteface for logging in stuff, and the other for messaging, etc...)  The Handler is to ensure anything coming from the LibGDX side is posted on the Android thread correctly  (just as anything in the libGDX side coming from Android is posted using the Gdx.app.postRunnable())</p>
+
+<p>Now I declare in onCreate()</p>
+
+<pre><code>.. setup the gameView etc..
+mHelper.setup(this, GameHelper.CLIENT_GAMES | GameHelper.CLIENT_APPSTATE | GameHelper.CLIENT_PLUS, null);
+mHelper.getPlusClient().registerConnectionCallbacks(this);
+</code></pre>
+
+<p>the onStart and onStop :</p>
+
+<pre><code>@Override
+public void onStart(){
+    super.onStart();
+    mHelper.onStart(this);
+}
+
+@Override
+public void onStop(){
+    super.onStop();
+    mHelper.onStop();
+}
+</code></pre>
+
+<p>the Login and Logout methods inside the Android code</p>
+
+<pre><code>@Override
+    public void Login() {
+        libGDXHandler.post(new Runnable() {
+
+            @Override
+            public void run() {
+                dLog("beginUserInitatedSignIn()");
+                //mHelper.signOut();
+                mHelper.beginUserInitiatedSignIn();
+
+            }
+        });
+
+    }
+
+    @Override
+    public void LogOut() {
+        iServerBadAttempts = -1;
+        mHelper.signOut();
+
+    }
+</code></pre>
+
+<p>The iServerBadAttempts is used so that when I startup my Screen process in libGDX, I can ask the Android side to give me that variable... if it is -1, then I know that no login has been attempted previously, and can setup my Google login button appropriately, otherwise I check the status of the connection and a couple of other things to set the buttons I use appropriately. </p>
+
+<p>And just in case, here's how I tell my libGDX code that mHelper is successful in logging in:</p>
+
+<pre><code>@Override
+public void onSignInSucceeded() {
+    dLog("signed in");
+    mConfirmInterface.googleSucceeded();
+     if (mHelper.getInvitationId() != null) {
+            acceptInviteToRoom(mHelper.getInvitationId());
+            mConfirmInterface.acceptedInvitation();
+
+        }
+
+
+} 
+</code></pre>
+
+<p>and here is logcat of sign in and out</p>
+
+<blockquote>
+  <p>09-24 09:14:31.495: I/SplashScreen(6021): Doing Google Login
+  09-24 09:14:31.495: D/LDGame MainActivity(6021): beginUserInitatedSignIn()
+  09-24 09:14:31.495: D/Helper(6021): Starting USER-INITIATED sign-in flow.
+  09-24 09:14:31.495: D/Helper(6021): isGooglePlayServicesAvailable returned 0
+  09-24 09:14:31.495: D/Helper(6021): beginUserInitiatedSignIn: starting new sign-in flow.
+  09-24 09:14:31.495: D/Helper(6021): Starting connections.
+  09-24 09:14:31.495: D/Helper(6021): State change DISCONNECTED -> CONNECTING
+  09-24 09:14:31.495: D/Helper(6021): connectNextClient: requested clients: 7, connected clients: 0
+  09-24 09:14:31.495: D/Helper(6021): Pending clients: 7
+  09-24 09:14:31.495: D/Helper(6021): Connecting GamesClient.
+  09-24 09:14:31.535: D/Helper(6021): onConnectionFailed
+  09-24 09:14:31.535: D/Helper(6021): Connection failure:
+  09-24 09:14:31.535: D/Helper(6021):    - code: SIGN_IN_REQUIRED(4)
+  09-24 09:14:31.535: D/Helper(6021):    - resolvable: true
+  09-24 09:14:31.535: D/Helper(6021):    - details: ConnectionResult{statusCode=SIGN_IN_REQUIRED, resolution=PendingIntent{41d914d0: android.os.BinderProxy@41ef40c8}}
+  09-24 09:14:31.535: D/Helper(6021): onConnectionFailed: since user initiated sign-in, resolving problem.
+  09-24 09:14:31.535: D/Helper(6021): resolveConnectionResult: trying to resolve result: ConnectionResult{statusCode=SIGN_IN_REQUIRED, resolution=PendingIntent{41d914d0: android.os.BinderProxy@41ef40c8}}
+  09-24 09:14:31.535: D/Helper(6021): Result has resolution. Starting it.
+  09-24 09:14:31.615: I/ScreenLog(6021): SCREEN PAUSE: SplashScreen
+  09-24 09:14:31.615: D/SensorManager(6021): unregisterListener::  Listener= com.badlogic.gdx.backends.android.AndroidInput$SensorListener@41dc06e0
+  09-24 09:14:31.615: I/AndroidGraphics(6021): paused
+  09-24 09:14:31.615: D/Sensors(6021): Remain listener = Sending .. normal delay 200ms
+  09-24 09:14:31.615: I/Sensors(6021): sendDelay --- 200000000
+  09-24 09:14:31.615: D/SensorManager(6021): JNI - sendDelay
+  09-24 09:14:31.615: I/SensorManager(6021): Set normal delay = true
+  09-24 09:14:31.615: D/SensorManager(6021): unregisterListener::  Listener= com.badlogic.gdx.backends.android.AndroidInput$SensorListener@41db99a0
+  09-24 09:14:31.615: D/Sensors(6021): Remain listener = Sending .. normal delay 200ms
+  09-24 09:14:31.615: I/Sensors(6021): sendDelay --- 200000000
+  09-24 09:14:31.620: D/SensorManager(6021): JNI - sendDelay
+  09-24 09:14:31.620: I/SensorManager(6021): Set normal delay = true
+  09-24 09:14:31.620: I/AndroidInput(6021): sensor listener tear down
+  09-24 09:14:32.220: W/IInputConnectionWrapper(6021): showStatusIcon on inactive InputConnection
+  09-24 09:14:37.010: D/Helper(6021): onActivityResult: req=RC_RESOLVE, resp=RESULT_OK
+  09-24 09:14:37.010: D/Helper(6021): onAR: Resolution was RESULT_OK, so connecting current client again.
+  09-24 09:14:37.065: D/LDGame MainActivity(6021): on Activity Result
+  09-24 09:14:37.065: D/SensorManager(6021): registerListener :: handle = 0  name= LSM330DLC 3-axis Accelerometer delay= 20000 Listener= com.badlogic.gdx.backends.android.AndroidInput$SensorListener@41ef6c38
+  09-24 09:14:37.070: D/SensorManager(6021): registerListener :: handle = 1  name= AK8975C 3-axis Magnetic field sensor delay= 20000 Listener= com.badlogic.gdx.backends.android.AndroidInput$SensorListener@41ef6f00
+  09-24 09:14:37.070: I/AndroidInput(6021): sensor listener setup
+  09-24 09:14:37.100: I/ScreenLog(6021): SCREEN RESIZE: SplashScreen
+  09-24 09:14:37.100: I/ScreenLog(6021): SCREEN RESUME: SplashScreen
+  09-24 09:14:37.160: D/dalvikvm(6021): GC_CONCURRENT freed 674K, 13% free 13233K/15047K, paused 7ms+3ms, total 61ms
+  09-24 09:14:37.160: D/dalvikvm(6021): WAIT_FOR_CONCURRENT_GC blocked 22ms
+  09-24 09:14:37.180: D/dalvikvm(6021): GC_FOR_ALLOC freed 10K, 13% free 13222K/15047K, paused 18ms, total 18ms
+  09-24 09:14:37.180: I/dalvikvm-heap(6021): Grow heap (frag case) to 13.932MB for 313374-byte allocation
+  09-24 09:14:37.200: D/dalvikvm(6021): GC_FOR_ALLOC freed &lt;1K, 12% free 13528K/15367K, paused 19ms, total 19ms
+  09-24 09:14:37.235: D/SensorManager(6021): onAccuracyChanged :: accuracy = 3
+  09-24 09:14:37.240: D/Helper(6021): onConnected: connected! client=1
+  09-24 09:14:37.240: D/Helper(6021): Connected clients updated to: 1
+  09-24 09:14:37.240: D/Helper(6021): connectNextClient: requested clients: 7, connected clients: 1
+  09-24 09:14:37.240: D/Helper(6021): Pending clients: 6
+  09-24 09:14:37.240: D/Helper(6021): Connecting PlusClient.
+  09-24 09:14:37.395: D/dalvikvm(6021): GC_FOR_ALLOC freed 511K, 14% free 13236K/15367K, paused 20ms, total 20ms
+  09-24 09:14:37.570: D/dalvikvm(6021): GC_CONCURRENT freed 320K, 14% free 13319K/15367K, paused 1ms+1ms, total 34ms
+  09-24 09:14:37.755: D/dalvikvm(6021): GC_CONCURRENT freed 482K, 14% free 13295K/15367K, paused 12ms+2ms, total 33ms
+  09-24 09:14:37.840: I/AndroidGraphics(6021): resumed
+  09-24 09:14:38.055: D/Helper(6021): onConnected: connected! client=2
+  09-24 09:14:38.055: D/Helper(6021): Connected clients updated to: 3
+  09-24 09:14:38.055: D/Helper(6021): connectNextClient: requested clients: 7, connected clients: 3
+  09-24 09:14:38.055: D/Helper(6021): Pending clients: 4
+  09-24 09:14:38.055: D/Helper(6021): Connecting AppStateClient.
+  09-24 09:14:38.070: D/LDGame MainActivity(6021): inside on connected
+  09-24 09:14:38.070: D/LDGame MainActivity(6021): figures
+  09-24 09:14:38.090: D/Helper(6021): onConnected: connected! client=4
+  09-24 09:14:38.090: D/Helper(6021): Connected clients updated to: 7
+  09-24 09:14:38.090: D/Helper(6021): connectNextClient: requested clients: 7, connected clients: 7
+  09-24 09:14:38.090: D/Helper(6021): Pending clients: 0
+  09-24 09:14:38.090: D/Helper(6021): All clients now connected. Sign-in successful!
+  09-24 09:14:38.090: D/Helper(6021): All requested clients connected. Sign-in succeeded!
+  09-24 09:14:38.090: D/Helper(6021): State change CONNECTING -> CONNECTED
+  09-24 09:14:38.090: D/Helper(6021): Notifying LISTENER of sign-in SUCCESS
+  09-24 09:14:38.090: D/LDGame MainActivity(6021): signed in</p>
+</blockquote>
+
+<p>for sign in, key note is you should see the "D/Helper(6021): onConnectionFailed: since user initiated sign-in, resolving problem." as that will mean signout worked previously</p>
+
+<p>and sign out logcat</p>
+
+<blockquote>
+  <p>09-24 09:14:52.145: D/Helper(6021): Clearing default account on PlusClient.
+  09-24 09:14:52.165: D/Helper(6021): Signing out from GamesClient.
+  09-24 09:14:52.190: D/Helper(6021): Proceeding with disconnection.
+  09-24 09:14:52.190: D/Helper(6021): killConnections: killing connections.
+  09-24 09:14:52.190: D/Helper(6021): Disconnecting GamesClient.
+  09-24 09:14:52.195: D/Helper(6021): Disconnecting PlusClient.
+  09-24 09:14:52.195: D/Helper(6021): Disconnecting AppStateClient.
+  09-24 09:14:52.195: D/Helper(6021): killConnections: all clients disconnected.
+  09-24 09:14:52.195: D/Helper(6021): State change CONNECTED -> DISCONNECTED</p>
+</blockquote>
+
+<p>hope that helps!</p>

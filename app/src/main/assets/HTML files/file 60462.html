@@ -1,0 +1,39 @@
+<p>Your initial problem is because the implicit assignment operator has signature</p>
+
+<pre><code>Bar&amp; operator=(const Bar&amp; rhs);
+</code></pre>
+
+<p>... and that isn't callable for a <code>volatile</code> object.  The warnings are because your updated function returns a volatile reference, but that reference is never used.  GCC thinks that this might be a problem.  The simplest way to fix this is to change the return type to void!</p>
+
+<p>There is another problem: Your function will call itself in an infinite recursion.  I suggest the following:</p>
+
+<pre><code>struct Bar {
+    int a;
+    Bar&amp; operator=(const Bar&amp;rhs) = default;
+    void operator=(const volatile Bar&amp; rhs) volatile // Note void return.
+    {
+         // Caution: This const_cast removes the volatile from
+         // the reference.  This may lose the point of the original
+         // volatile qualification.
+         //
+         // If this is a problem, use "a = rhs.a;" instead - but this
+         // obviously doesn't generalize so well.
+         const_cast&lt;Bar&amp;&gt;(*this) = const_cast&lt;const Bar&amp;&gt;(rhs);
+    }
+};
+
+volatile Bar vbar;
+Bar bar;
+
+int main(){
+    vbar = bar;  // All four combinations work.
+    bar = vbar;
+    vbar = vbar;
+    bar = bar;
+    return 0;
+}
+</code></pre>
+
+<p>This means you won't be able to chain assignment operators when using volatile structs.  I assert this is not a huge loss.</p>
+
+<p>Final aside: Why are you using <code>volatile</code> - it's not very useful for multi-threaded code (it is useful for memory mapped IO).</p>

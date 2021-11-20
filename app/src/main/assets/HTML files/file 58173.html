@@ -1,0 +1,15 @@
+<p>You have several problems I'll get to in a moment, but generally your program is disk-bound (it can't go faster than your hard drive) so even a properly threaded program isn't any faster. It can be hard to measure disk performance because of the file system cache: You run this once with threads and you go at hard drive speed, you run it again without threads and the files are in the system so go fast. It makes it hard to figure out how the code will perform later when the data no longer in the system cache.</p>
+
+<p>So now for the problems.</p>
+
+<p><code>if file not in processedFiles:</code> isn't thread safe. Both threads could look at an empty list and decide to copy the same file. At a minimum you need a lock. Or you could do the <code>glob</code> once and pass the files to a queue that are read by the thread.</p>
+
+<p>Reading the file line-by-line then joining with <code>\n</code> is a crazy slow way to write a file. Use <code>shutil.copyfileobj</code> instead - its built to copy files efficiently.</p>
+
+<p><code>f = open('myfile','a')</code> now you have multiple file descriptors to a single file and each will advance their file pointers independently.... so one overwrites the other.</p>
+
+<p><code>f.write("%s \n" %lines)</code> is also not thread safe. You could end up with bits of the files interleaving each other in the output file.</p>
+
+<p><code>stop = timeit.default_timer()</code> - you didn't wait for the threads to complete their work so you didn't really measure anything useful. Code code severely under-reports execution time.</p>
+
+<p>You are much better off with a simple single-threaded script.</p>

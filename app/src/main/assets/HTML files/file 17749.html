@@ -1,0 +1,45 @@
+<p>The <code>TagBuilder.MergeAttributes</code> method doesn't work how you expect it to. This is the exact code of this method:</p>
+
+<pre><code>    public void MergeAttributes&lt;TKey, TValue&gt;(IDictionary&lt;TKey, TValue&gt; attributes, bool replaceExisting)
+    {
+        if (attributes != null)
+        {
+            foreach (var entry in attributes)
+            {
+                string key = Convert.ToString(entry.Key, CultureInfo.InvariantCulture);
+                string value = Convert.ToString(entry.Value, CultureInfo.InvariantCulture);
+                MergeAttribute(key, value, replaceExisting);
+            }
+        }
+    }
+
+    public void MergeAttribute(string key, string value, bool replaceExisting)
+    {
+        if (String.IsNullOrEmpty(key))
+        {
+            throw new ArgumentException(CommonResources.Argument_Cannot_Be_Null_Or_Empty, "key");
+        }
+
+        if (replaceExisting || !Attributes.ContainsKey(key))
+        {
+            Attributes[key] = value;
+        }
+    }
+</code></pre>
+
+<p>As you can see it only adds new attributes to the collection (if <code>replaceExisting</code> is set to true it also replaces the ones already in the collection). It doesn't perform and attributes values merging logic. If you want to merge values you need to do it by yourself:</p>
+
+<pre><code>public static MvcHtmlString List(this HtmlHelperhelper, object htmlAttributes)
+{
+    var attributes = HtmlHelper.AnonymousObjectToHtmlAttributes(htmlAttributes);        
+    if (attributes.ContainsKey("class"))
+        attributes["class"] = "myclass " + attributes["class"];
+    else
+        attributes.Add("class", "myClass");
+
+    var tag = new TagBuilder("div");
+    tag.MergeAttributes(attributes, false);
+
+    return new MvcHtmlString(tag.ToString(TagRenderMode.Normal));
+}
+</code></pre>

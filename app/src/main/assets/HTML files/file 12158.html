@@ -1,0 +1,167 @@
+<p>I'd suggest you have your BasicGLSurfaceView already added to your framelayout in XML, and use <code>findViewById(R.id.basicGLSurfaceView1)</code> to get a hold of it, rather than trying to create it programatically:</p>
+
+<pre><code>&lt;FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:ads="http://schemas.android.com/apk/lib/com.google.ads"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"&gt;
+
+    &lt;com.example.android.lunarlander.BasicGLSurfaceView 
+        android:id="@+id/glSurfaceView1" 
+        android:layout_width="match_parent" 
+        android:layout_height="match_parent"&gt;
+    &lt;/com.example.android.lunarlander.BasicGLSurfaceView&gt;
+
+    &lt;com.example.android.lunarlander.LunarView
+      android:id="@+id/lunar"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"/&gt;
+
+    &lt;LinearLayout
+       android:id="@+id/dets"
+       android:layout_width="wrap_content"
+       android:layout_height="wrap_content"
+       android:layout_alignParentLeft="true"
+       android:layout_alignParentTop="true"
+       android:layout_marginLeft="0dp"
+       android:layout_marginTop="50dp"
+       android:orientation="vertical" &gt;
+
+         &lt;com.google.ads.AdView
+             android:id="@+id/adView"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             ads:adSize="BANNER"
+             ads:adUnitId="a14ecf8f2d9ef49"
+             ads:loadAdOnCreate="true" &gt;
+         &lt;/com.google.ads.AdView&gt;
+
+    &lt;/LinearLayout&gt;
+
+
+
+     &lt;RelativeLayout   
+         android:id="@+id/relLayout"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent" &gt;
+
+         &lt;TextView
+             android:id="@+id/text"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:layout_centerInParent="true"
+             android:gravity="center_horizontal"
+             android:text="@string/lunar_layout_text_text"
+             android:textColor="#88ffffff"
+             android:textSize="24sp"
+             android:visibility="visible" /&gt;
+
+      &lt;/RelativeLayout&gt;
+
+&lt;/FrameLayout&gt;
+</code></pre>
+
+<p>You need to tell the GLSurfaceView to start rendering. <a href="http://developer.android.com/reference/android/opengl/GLSurfaceView.html" rel="nofollow">You have to call (or even override)</a> <code>GLSurfaceView.start()</code> in your GLSurfaceView. <s>Alternatively, setRenderer is public, so if you call <code>mGLSV.setRenderer(myRenderer);</code> in your Activity where myRenderer is an instance of <code>MyRenderer implements GLSurfaceView.Renderer</code> then it should automatically start the rendering without you having to touch <code>start()</code></s></p>
+
+<p>EDIT: Actually, <code>start()</code> is called when the view is laid out (i.e. when you <code>setContentView()</code> or add it to whatever layout you set as content view), not when setRenderer is called</p>
+
+<p>It sounds back-to-front but implementing Renderer is for if you just want to render something in the standard android/opengl-es way, whilst extending GLSurfaceView is if you actually want to get under the hood and edit the way android renders. In fact, I would recommend not extending GLSurfaceView at all but doing as much as possible in your GLSurfaceView.Renderer. I have programmed my entire 3D game without extending GLSurfaceView. My code looks like this:</p>
+
+<pre><code>public class stackoverflowTest extends Activity {
+
+MyGLSurfaceView glSurface;
+MyRenderer myRenderer;
+
+/** Called when the activity is first created. */
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+
+    setContentView(R.layout.main);
+
+    myRenderer = new MyRenderer();
+
+    //Get hold of our GLSurfaceView
+    glSurface = (MyGLSurfaceView) findViewById(R.id.graphics_glsurfaceview1);
+    // optional
+    glSurface.setEGLConfigChooser(true);
+
+    glSurface.setRenderer(myRenderer);
+    //Set the renderer. setRenderer will call start() and start the GL thread, which then calls onSurfaceCreated, onDraw etc in the Renderer
+
+
+
+}
+
+    @Override
+public void onPause(){
+    super.onPause();
+     glSurface.onPause();
+}
+
+@Override
+public void onResume() {
+       super.onResume();
+       glSurface.onResume();
+    }
+}
+
+}
+</code></pre>
+
+<p>Renderer:</p>
+
+<pre><code>public class MyRenderer implements Renderer {
+
+@Override
+public void onDrawFrame(GL10 gl) {
+    // openGL drawing code goes here
+
+
+}
+
+@Override
+public void onSurfaceChanged(GL10 gl, int width, int height) {
+
+    // etc
+
+
+}
+
+@Override
+public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+    // etc
+
+
+}
+
+}
+</code></pre>
+
+<p>GLSurfaceView:</p>
+
+<pre><code>public class MyGLSurfaceView extends GLSurfaceView {
+
+public MyGLSurfaceView(Context context) {
+    super(context);
+
+}
+
+public MyGLSurfaceView(Context context, AttributeSet attribs) {
+    super(context, attribs);
+
+}
+
+@Override
+public void onPause(){
+    super.onPause();
+}
+
+@Override
+public void onResume(){
+    super.onResume();
+}
+
+}
+</code></pre>
+
+<p>If you can stand upgrading to android 2.1 (opengl-es 1.1) you can use point-sprites rather than rendering textured quads or whatever</p>

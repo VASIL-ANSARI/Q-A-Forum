@@ -1,0 +1,29 @@
+<p>There are quite a number of issues with your code.</p>
+
+<p>Your URL parser is quite cumbersome. Instead of the line </p>
+
+<pre><code>filename = message.split()[1].partition("/")[2].replace("/", "")
+</code></pre>
+
+<p>I would use</p>
+
+<pre><code>import re
+parsed_url = re.match(r'GET\s+http://(([^/]+)(.*))\sHTTP/1.*$', message)
+local_path = parsed_url.group(3)
+host_name = parsed_url.group(2)
+filename = parsed_url.group(1)
+</code></pre>
+
+<p>If you catch an exception there, you should probably throw an error because it is a request your proxy doesn't understand (e.g. a POST).</p>
+
+<p>When you assemble your request to the destination server, you then use</p>
+
+<pre><code>fileobj.write("GET {object} HTTP/1.0\n".format(object=local_path))
+fileobj.write("Host: {host}\n\n".format(host=host_name))
+</code></pre>
+
+<p>You should also include some of the header lines from the original request because they can make a major difference to the returned content.</p>
+
+<p>Furthermore, you currently cache the entire response with all header lines, so you should not add your own when serving from cache.</p>
+
+<p>What you have doesn't work, anyway, because there is no guarantee that you will get a 200 and <code>text/html</code> content. You should check the response code and only cache if you did indeed get a 200.</p>

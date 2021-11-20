@@ -1,0 +1,29 @@
+<p>In general the idea is correct I think - if you need to refresh the list of active processes every time. So updating the list using timer is ok. I don't know Win32 API very well, but I think it would be a security issue if anybody could subscribe to process_run and process_retminate wineows events, so it is unlikely to be possible.</p>
+
+<p>But do you really need to update it all the time? Maybe it woule be enough to read process list only when combobox expands? When user will expand it next time, you will reinit items again. I think this approach will cause less problems.</p>
+
+<p>As fo your implementation, I think it is not the most effifient and elegant:</p>
+
+<ol>
+<li>Storing the whole Process object in the combobox item is not good as for me. Better create your class, that will store only those properties you need (Process ID, Process Name)</li>
+<li><p>using current.Count() in a loop is extreemely inefficient - it is extention method that always iterates on IEnumerable on call. So your </p>
+
+<p>for (byte Ãndex = 0; Ãndex &lt; current.Count(); Ãndex++)</p>
+
+<p>results in O(N*N) complexity. Fortunately process count will be not too big to affect your application very much, but you should know this fact and do not get used to using this method in a loop. use current.Length instead as it is an array.</p></li>
+<li><p>Your collection synchronization is too complex and strange. 
+Why not to make a method that receives collection to change and collection to init from and makes first collection to be equal to second using add-remove operations? Of you will have both collections sorted by some property (Process name for example), this can be done very simple and efficient - using <a href="http://www.dotnetperls.com/binarysearch" rel="nofollow">binary search</a>.
+In WPF you can use ObservableCollection as dataSource to use this approach most effectively. In WinForms you probably can also use collections with change notification, but I haven't used them.</p></li>
+</ol>
+
+<p>You can do it even more simple:</p>
+
+<pre><code>//Somewhere in Form_Load
+combobox.DisplayMember = "Name";//name of the property in your MyProcessInfo class
+combobox.ValueMember = "Id";//name of the property in your MyProcessInfo class
+
+//In your timer.Tick handler
+combobox.DataSource = Wow_getCurrentlyRunning().Select(p=&gt;new MyProcessInfo(p.Id, p.Name)).ToList();
+</code></pre>
+
+<p>But this approach will always reinit all items if combobox and some blinking is possible. </p>

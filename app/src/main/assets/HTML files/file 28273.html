@@ -1,0 +1,44 @@
+<p>As we've established in the comments, you can workaround this performance bash by pinning the process to a specific processor on the AMD Opteron machines. </p>
+
+<p>Kindled by this not-really-on-topic question I decided to have a look at possible scenarios where single core pinning would make such a difference (from 11 to 7 seconds seems a bit extreme).</p>
+
+<p>The most plausible answer is not that revolutionary:</p>
+
+<p>The AMD Opteron series employ <a href="http://en.wikipedia.org/wiki/HyperTransport" rel="nofollow">HyperTransport</a> in a so-called NUMA architecture, instead of a traditional FSB as you would find on Intel's SMP CPU's (Xeon 4850 included)</p>
+
+<p>My guess is that this symptom stems from the fact that individual nodes in a NUMA architecture has individual cache, as opposed to the Intel CPU, in which the processor cache is shared. </p>
+
+<p>In other words, when consecutive computations shift between nodes on the Opteron, the cache is flushed, whereas balancing between processors in an SMP architecture like the Xeon 4850 has no such impact since the cache is shared.</p>
+
+<p>Setting affinity in .NET is pretty easy, just pick a processor (let's just take the first one for simplicity):</p>
+
+<pre><code>static void Main(string[] args)
+{
+    Console.WriteLine(Environment.ProcessorCount);
+    Console.Read();
+
+    //An AffinityMask of 0x0001 will make sure the process is always pinned to processer 0
+    Process thisProcess = Process.GetCurrentProcess();
+    thisProcess.ProcessorAffinity = (IntPtr)0x0001; 
+
+    const int ITERATIONS = 10000;
+    const int FIBONACCI = 100000;
+
+    var watch = new Stopwatch();
+    watch.Start();
+
+
+    DoFibonnacci(ITERATIONS, FIBONACCI);
+
+    watch.Stop();
+
+    Console.WriteLine("Total fibonacci time: {0}ms", watch.ElapsedMilliseconds);
+    Console.ReadLine();
+}
+</code></pre>
+
+<p>Although I'm pretty sure this is not very smart in a NUMA environment. </p>
+
+<p>Windows 2008 R2 has <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa363804%28v=vs.85%29.aspx" rel="nofollow">some cool native NUMA functionality</a>, and I found a promissing codeplex project with a .NET wrapper for this as well: <a href="http://multiproc.codeplex.com/" rel="nofollow">http://multiproc.codeplex.com/</a></p>
+
+<p>I'm in no way near qualified to teach you how to utilize this technology, but this should point you in the right direction.</p>

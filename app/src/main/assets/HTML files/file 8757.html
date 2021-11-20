@@ -1,0 +1,21 @@
+<p>You should immediately be setting the <code>enabled</code> or <code>hidden</code> property of the button to disable interaction.</p>
+
+<p><strong>HOWEVER</strong> that change will not take effect until the <em>next</em> turn of the runloop, when everything gets re-drawn.  As your code stands, your code is hiding the button, doing stuff, and then unhiding the button, <em>all before the button gets a chance to redraw</em>.</p>
+
+<p>What you should do is set the <code>hidden</code> property and then start the computation (preferably on a background thread).  Once and only once the computation completes, you should signal the main thread to un-hide the button again.</p>
+
+<p>If you are OK with having this only work on iOS 4.0+, you can easily accomplish this with Grand Central Dispatch:</p>
+
+<pre><code>- (IBAction)doStuff:(id)sender {
+  [button setEnabled:NO];
+  dispatch_async(dispatch_get_global_queue(0,0), ^{
+
+    // do all your computation/synchronous requesting here
+    // this will happen on a background thread
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [button setEnabled:YES];
+    });
+  });
+}
+</code></pre>

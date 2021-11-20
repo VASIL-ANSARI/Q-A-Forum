@@ -1,0 +1,42 @@
+<p>If I understood the question correctly it's all about cascading through simple <code>1:N</code> relations. In that case Hibernate can do the job rather well:</p>
+
+<pre><code>@Entity
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @OneToMany(cascade = CascadeType.ALL, 
+        mappedBy = "post", orphanRemoval = true)
+    private List&lt;Comment&gt; comments = new ArrayList&lt;&gt;();
+}
+
+@Entity
+public class Comment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @ManyToOne
+    private Post post;
+}
+</code></pre>
+
+<p>Code:</p>
+
+<pre><code>Post post = newPost();
+doInTransaction(session -&gt; {
+    session.delete(post);
+});
+</code></pre>
+
+<p>Generates:</p>
+
+<pre><code>delete from Comment where id = 1
+delete from Comment where id = 2
+delete from Post where id = 1
+</code></pre>
+
+<p>But if you have some other (synthetic) collections, Hibernate has no chance to know which ones, so you have to handle them yourself.</p>
+
+<p>As for Hibernate and custom queries, Hibernate provides HQL which is more compact then traditional SQL, but still is less transparent then annotations.</p>

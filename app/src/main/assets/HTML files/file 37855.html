@@ -1,0 +1,39 @@
+<p>First of all, if you got your certificate from NetworkFX, then you likely received the SHA256 certificate by default, which is TLS 1.2.  If this is the case, you need to make sure that the openssl instance being used by PHP is at least version 1.0.1 or higher.  Versions prior to that do not support TLS 1.2 and will not be able to parse the certificates.  To check the openssl version used by PHP, you can run <code>&lt;?php phpinfo() ?&gt;</code> and then look for the string "SSL Version".  If you're below 1.0.1, then you definitely need to get the SHA1 certificate from NetworkFX or upgrade your openssl instance. The good news is that--for now--only TLS 1.0 is required for 2.0a certification, so you aren't required to upgrade.</p>
+
+<p>Second, if you got your certificates from NetworkFX, then they likely come in the DER format.  PHP-cURL uses PEM by default, but you can technically change the format to DER using</p>
+
+<pre><code>curl_setopt($curl, CURLOPT_SSLCERTTYPE, 'DER');
+curl_setopt($curl, CURLOPT_SSLKEYTYPE, 'DER');
+</code></pre>
+
+<p>The first option for CURLOPT_SSLCERTTYPE (the public key), using the DER worked fine. However, for the private key, using the DER format, I got the message "unable to set private key file".  So, I had to convert the private key to the PEM format using openssl (the below will convert an RSA cert from DER to PEM.  If you have an ECC cert, you should be able to find the command pretty easily online):</p>
+
+<pre><code>openssl rsa -inform der -in certificate.der -out certificate.pem
+</code></pre>
+
+<p>Once that is taken care of, you should be able to post to the VTN as follows using cURL in PHP:</p>
+
+<pre><code>// e.g. 'https://localhost:8080/OpenADR2/Simple/EiEvent'
+$curl       = curl_init($vtnBaseURL.'/OpenADR2/Simple'.$path);
+curl_setopt($curl, CURLOPT_POSTFIELDS, $xml); //-d
+curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+    'Host: my.host.com',
+    'Content-Type: application/xml; charset=utf-8',
+    "Content-Length: ".strlen($xml)
+) ); //-H
+curl_setopt($curl, CURLOPT_VERBOSE, false); //-v
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+
+//SECURITY
+if( strpos($vtnBaseURL,'https') !== false ) {
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false); //should be true in production
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0);     //should be 2 in production
+    curl_setopt($curl, CURLOPT_SSL_CIPHER_LIST, 'TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_RSA_WITH_AES_128_CBC_SHA256:TLS_RSA_WITH_AES_128_CBC_SHA');
+    curl_setopt($curl, CURLOPT_SSLCERT, 'path/to/cert.pem');
+    curl_setopt($curl, CURLOPT_SSLKEY, 'path/to/privkey.pem');
+}
+
+$response   = curl_exec($curl);
+$error      = curl_error($curl);
+curl_close($curl);
+</code></pre>

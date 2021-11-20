@@ -1,0 +1,60 @@
+<p>Ok, I think I've figured out actually get a speed boost from multiprocessing. Since your actual source lists aren't very long, it's reasonable to pass them in their entirety to the worker processes. So, if each worker process has copies of the same source lists, then ideally we'd want all of them iterate over different pieces of the lists in parallel, and just sum up that unique slice. Because we know the size of the input lists, we can accurately determine how long <code>itertools.product(D1, D2, ...)</code> will be, which means we can also accurately determine how big each chunk should be to evenly distribute the work. So, we can provide each worker with a specific range of the <code>itertools.product</code> iterator that they should iterate over and sum:</p>
+
+<pre><code>import math
+import itertools
+import multiprocessing
+import functools
+
+def smart_calc(valD1, valD2, valD3, valD4, valD5, valD6, valD7, slices):
+    # Build an iterator over the entire data set
+    prod = itertools.product(([x[1],x[2]] for x in valD1), 
+                             ([x[1],x[2]] for x in valD2), 
+                             ([x[1],x[2]] for x in valD3), 
+                             ([x[1],x[2]] for x in valD4), 
+                             ([x[1],x[2]] for x in valD5), 
+                             ([x[1],x[2]] for x in valD6), 
+                             ([x[1],x[2]] for x in valD7))
+
+    # But only iterate over our unique slice
+    for subD1, subD2, subD3, subD4, subD5, subD6, subD7 in itertools.islice(prod, slices[0], slices[1]):
+        sol1=float(subD1[0]+subD2[0]+subD3[0]+subD4[0]+subD5[0]+subD6[0]+subD7[0])
+        sol2=float(subD1[1]+subD2[1]+subD3[1]+subD4[1]+subD5[1]+subD6[1]+subD7[1])
+    return None
+
+def smart_process():
+    CHUNKS = multiprocessing.cpu_count()  # Number of pieces to break the list into.
+    total_len = len(D1) ** 7  # The total length of itertools.product()
+    # Figure out how big each chunk should be. Got this from 
+    # multiprocessing.map()
+    chunksize, extra = divmod(total_len, CHUNKS)
+    if extra:
+        chunksize += 1
+
+    # Build a list that has the low index and high index for each
+    # slice of the list. Each process will iterate over a unique
+    # slice
+    low = 0 
+    high = chunksize
+    chunk_list = []
+    for _ in range(CHUNKS):
+        chunk_list.append((low, high))
+        low += chunksize
+        high += chunksize
+
+    pool = multiprocessing.Pool(processes=CHUNKS)
+    # Use partial so we can pass all the lists to each worker
+    # while using map (which only allows one arg to be passed)
+    func = functools.partial(smart_calc, D1, D2, D3, D4, D5, D6, D7) 
+    result = pool.map(func, chunk_list)
+    pool.close()
+    pool.join()
+    return result
+</code></pre>
+
+<p>Results:</p>
+
+<pre><code>sequential: 13.9547419548
+mp: 4.0270690918
+</code></pre>
+
+<p>Success! Now, you do have to actually combine the results after you have them, which will add additional overhead to your real program. It might end up making this approach slower than sequential again, but it really depends on what you actually want to do with the data.</p>

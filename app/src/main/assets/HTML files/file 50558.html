@@ -1,0 +1,79 @@
+<p>Select all in one column (instead of four). The function <a href="http://www.postgresql.org/docs/9.4/static/functions-string.html#FUNCTIONS-STRING-FORMAT" rel="nofollow">format()</a> will help you to write it down more clearly. Use </p>
+
+<pre><code>regexp_replace (str, '(\d\d\d\d-\d\d-\d\d)T', '\1 ', 'g')
+</code></pre>
+
+<p>to correct the date format and</p>
+
+<pre><code>replace (str, e' \n ', '')
+</code></pre>
+
+<p>to skip newline chars.</p>
+
+<p>Use <a href="http://www.postgresql.org/docs/9.4/static/sql-copy.html" rel="nofollow">COPY command</a> to simplify the issue:</p>
+
+<pre><code>COPY (
+    with f_1 as(
+       SELECT id, json_agg(file1.*) AS tag
+       FROM forum.file1
+       GROUP BY id
+    ), f_2 as (
+       SELECT id, json_agg(file2.*) AS tag
+       FROM forum.file2
+       GROUP BY id
+    ), f_3 as (
+       SELECT id, json_agg(file3.*) AS tag
+       FROM forum.file3
+       GROUP BY id
+    )
+    SELECT
+        replace(
+            regexp_replace(
+                format('{"id":%s,"file1":%s,"file2":%s,"file3":%s}', 
+                    a.id, a.tag, b.tag, c.tag),
+                '(\d\d\d\d-\d\d-\d\d)T', '\1 ', 'g'),
+            e' \n ', '')
+    FROM f_1 AS a, f_2 AS b, f_3 AS c
+    WHERE b.id = a.id AND c.id = a.id
+) TO '/full/path/to/your/file';
+</code></pre>
+
+<hr>
+
+<p>To prepend each line of data with a command line you can use a trick with a function returning two rows.
+Some part of formatting can be moved to the function on the occasion.</p>
+
+<pre><code>create or replace function format_data_line(command text, data_str text)
+returns setof text language plpgsql as $$
+begin
+    return next command;
+    return next             
+        replace(
+            regexp_replace(data_str,
+                '(\d\d\d\d-\d\d-\d\d)T', '\1 ', 'g'),
+            e' \n ', '');
+end $$;
+
+COPY (
+    with f_1 as(
+       SELECT id, json_agg(file1.*) AS tag
+       FROM forum.file1
+       GROUP BY id
+    ), f_2 as (
+       SELECT id, json_agg(file2.*) AS tag
+       FROM forum.file2
+       GROUP BY id
+    ), f_3 as (
+       SELECT id, json_agg(file3.*) AS tag
+       FROM forum.file3
+       GROUP BY id
+    )
+    SELECT 
+        format_data_line(
+            'my command', 
+            format('{"id":%s,"file1":%s,"file2":%s,"file3":%s}', 
+                a.id, a.tag, b.tag, c.tag))
+    FROM f_1 AS a, f_2 AS b, f_3 AS c
+    WHERE b.id = a.id AND c.id = a.id
+) TO '/full/path/to/your/file';
+</code></pre>

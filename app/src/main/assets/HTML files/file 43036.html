@@ -1,0 +1,55 @@
+<p>I think, I've found a solution. 
+If I see it right, your data model looks like this:</p>
+
+<pre><code>Discussion
+----------
+...
+
+Comment
+----------
+discussion_id:int
+parent_id:int
+lft:int
+rgt:int
+</code></pre>
+
+<p>Then AR model classes will be:</p>
+
+<pre><code>class Discussion &lt; ActiveRecord::Base
+  has_many :comments
+end
+
+class Comment &lt; ActiveRecord::Base
+  belongs_to :discussion
+end
+</code></pre>
+
+<p>To eager load discussion (id == 1) with all its tree of comments and answers use:</p>
+
+<pre><code>d = Discussion.includes(:comments).find(1)
+</code></pre>
+
+<p>This gives a collection of all comments for given discussion in memory (<code>d.comments</code>).</p>
+
+<p>Now we can manipulate this collection to get answers for any particular comment without additional DB queries. Just add this to <code>Discussion</code> class:</p>
+
+<pre><code>def comment_roots
+  self.comments.select {|c| c.parent_id.nil? }
+end
+</code></pre>
+
+<p>and this to <code>Comment</code> class:</p>
+
+<pre><code>  def answers
+    self.discussion.comments.select {|c| c.parent_id = self.id }
+  end
+
+  def answers_tree
+    self.discussion.comments.select {|c| self.lft &lt; c.lft &amp;&amp; c.rgt &lt;   self.rgt }
+  end
+</code></pre>
+
+<p>Example:</p>
+
+<pre><code>d.comment_roots.first.answers
+</code></pre>

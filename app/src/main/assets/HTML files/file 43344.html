@@ -1,0 +1,77 @@
+<p>You can <a href="http://www.postgresql.org/docs/current/interactive/sql-createaggregate.html" rel="nofollow">create your own aggregate function</a>, which you can use as window function.  </p>
+
+<h2>Specialized aggregate function</h2>
+
+<p>It's easier than one might think:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION f_sum_cap50 (numeric, numeric)
+  RETURNS numeric LANGUAGE sql AS
+'SELECT CASE WHEN $1 &gt; 50 THEN 0 ELSE $1 END + $2';
+
+CREATE AGGREGATE sum_cap50 (numeric)
+( sfunc     = f_sum_cap50
+ ,stype     = numeric
+ ,initcond  = 0
+);
+</code></pre>
+
+<p>Then:</p>
+
+<pre><code>SELECT *, sum_cap50(val) OVER (PARTITION BY fk
+                               ORDER BY created) &gt; 50 AS threshold_met 
+FROM   test
+WHERE  fk = 5;
+</code></pre>
+
+<p>Result exactly as requested.</p>
+
+<p><a href="http://sqlfiddle.com/#!15/4449e/2" rel="nofollow"><strong>SQL Fiddle.</strong></a></p>
+
+<h2>More generic aggregate function</h2>
+
+<p>If you want that to work for <strong>other thresholds</strong> and / or <strong>other data types</strong> and also <strong>allow NULL values</strong>, you can make this more generic:</p>
+
+<pre><code>CREATE OR REPLACE FUNCTION f_sum_cap (anyelement, anyelement, anyelement)
+  RETURNS anyelement  LANGUAGE sql STRICT AS
+$$SELECT CASE WHEN $1 &gt; $3 THEN '0' ELSE $1 END + $2;$$;
+
+CREATE AGGREGATE sum_cap (anyelement, anyelement)
+( sfunc     = f_sum_cap
+ ,stype     = anyelement
+ ,initcond  = '0'
+);
+</code></pre>
+
+<p>Then, to call with a limit of, say, 110 with any numeric type:</p>
+
+<pre><code>SELECT *
+     , sum_cap(val, '110') OVER (PARTITION BY fk
+                                 ORDER BY created) AS capped_at_110
+     , sum_cap(val, '110') OVER (PARTITION BY fk
+                                 ORDER BY created) &gt; 110 AS threshold_met 
+FROM   test
+WHERE  fk = 5;
+</code></pre>
+
+<p><a href="http://sqlfiddle.com/#!15/33c52/1" rel="nofollow"><strong>SQL Fiddle.</strong></a></p>
+
+<h3>Explain</h3>
+
+<ul>
+<li><p>In your case we don't have to defend against <strong>NULL</strong> values since <code>val</code> is defined <code>NOT NULL</code>. If NULL can be involved, define <code>f_sum_cap()</code> as <strong><code>STRICT</code></strong> and it works because (<a href="http://www.postgresql.org/docs/current/interactive/sql-createaggregate.html" rel="nofollow">per documentation</a>):</p>
+
+<blockquote>
+  <p>If the state transition function is declared "strict", then it cannot
+  be called with null inputs. With such a transition function, aggregate
+  execution behaves as follows. Rows with any null input values are
+  ignored (the function is not called and the previous state value is
+  retained) [...]</p>
+</blockquote></li>
+<li><p>Both function and aggregate take one more argument. For the <a href="http://www.postgresql.org/docs/current/interactive/extend-type-system.html#EXTEND-TYPES-POLYMORPHIC" rel="nofollow">polymorphic</a> variant it can be a hard coded data type or the same polymorphic type as the leading arguments.</p></li>
+<li><p>About polymorphic functions:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/9832973/initial-array-in-function-to-aggregate-multi-dimensional-array/9845460#9845460">Initial array in function to aggregate multi-dimensional array</a></li>
+</ul></li>
+<li><p>Note how I use <strong>untyped string literals</strong>, not numeric literals, which would default to <code>integer</code>.</p></li>
+</ul>

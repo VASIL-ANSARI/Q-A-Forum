@@ -1,0 +1,191 @@
+<p>You will want to follow MVVM, and have no code in your code-behind (programmatically affect the mark-up structure) files.  The concept is easy when you grasp it, so learn it before you start writing your code.  </p>
+
+<p>In short, you are going to want to have a view model (something that implements <code>INotifyPropertyChanged</code> (INPC)) which holds your collection of items (which are going to be models, or view models in pure-MVVM).  In "hybrid"-MVVM you could just have your models implement INPC.  </p>
+
+<p>Then, through the use of commands, you'd implement the logic to remove items from the list that its in.  You can pass references, raise notification, using event bubbling, etc. (it's your preference) to have the item actually removed.  In my case, I just passed a "manager" to the hybrid-model and held a reference to that.  When the command is called (button is clicked), the model calls for the reference to remove itself from the list.</p>
+
+<p>After you do that you define a <code>DataTemplate</code> to define what an "item" should look like one the View.  You use a <code>ItemsControl</code> to show a collection of items, and bind to its <code>ItemsSource</code> so the collection of items are shown.  Set your <code>ItemsControl.ItemTemplate</code> to the <code>DataTemplate</code> you created, and anything added to the collection bound to <code>ItemsSource</code> of the type defined in <code>DataTemplate.DataType</code> will render as you specify in the <code>DataTemplate</code>.  </p>
+
+<p>At the end of the day, you should learn about MVVM design, <code>DataContext</code>, INPC, Commands, Control types and their "main" properties, e.g. everything that inherits from <code>ItemsControl</code> has an <code>ItemsSource</code> property.</p>
+
+<p>Here is a working example, where changing the original string, will reverse it and put it in the read-only right side text box:</p>
+
+<p><a href="http://i.stack.imgur.com/bVIuA.png"><img src="http://i.stack.imgur.com/bVIuA.png" alt="Text changed, items removed, etc."></a></p>
+
+<h2>MainWindow.xaml.cs (code-behind)</h2>
+
+<pre><code>public partial class MainWindow : Window
+{
+    StructureVm _struct = new StructureVm("Test");
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        DataContext = _struct;
+    }
+}
+</code></pre>
+
+<h2>MainWindow.xaml (View)</h2>
+
+<pre><code>&lt;Window x:Class="DataTemplateWithCommands.MainWindow"
+        xmlns:local="clr-namespace:DataTemplateWithCommands"
+        Title="MainWindow" Height="350" Width="525" Background="Orange"&gt;
+    &lt;Window.Resources&gt;
+        &lt;DataTemplate DataType="{x:Type local:Model}"
+                      x:Key="VmItem"&gt;
+            &lt;StackPanel Orientation="Horizontal"&gt;
+                &lt;TextBox Text="{Binding Original, UpdateSourceTrigger=PropertyChanged}" /&gt;
+                &lt;TextBox Text="{Binding Encoded}"
+                         IsReadOnly="True" /&gt;
+                &lt;Button Content="X"
+                        Command="{Binding RemoveMeCommand}" /&gt;
+            &lt;/StackPanel&gt;
+        &lt;/DataTemplate&gt;
+    &lt;/Window.Resources&gt;
+    &lt;Grid&gt;
+        &lt;ItemsControl ItemsSource="{Binding Items}"
+                      ItemTemplate="{StaticResource VmItem}"&gt;
+        &lt;/ItemsControl&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+
+<h2>Interface (helpful for Dependency Injection)</h2>
+
+<pre><code>public interface IStructureManager
+{
+    bool RemoveItem(Model itemToRemove);
+}
+</code></pre>
+
+<h2>ViewModel</h2>
+
+<pre><code>public class StructureVm : IStructureManager
+{
+    private readonly ObservableCollection&lt;Model&gt; _items;
+    private readonly string _title;
+
+    public StructureVm(string title)
+    {
+        _title = title;
+        _items = new ObservableCollection&lt;Model&gt;
+            {
+                new Model(this, "12"),
+                new Model(this, "23"),
+                new Model(this, "34"),
+                new Model(this, "45"),
+                new Model(this, "56"),
+                new Model(this, "67"),
+                new Model(this, "78"),
+                new Model(this, "89"),
+            };
+    }}
+
+    public ObservableCollection&lt;Model&gt; Items
+    {
+        get
+        {
+            return _items;
+        }
+    }
+
+    public string Title
+    {
+        get
+        {
+            return _title;
+        }
+    }
+
+    public bool RemoveItem(Model itemToRemove)
+    {
+        return _items.Remove(itemToRemove);
+    }
+}
+</code></pre>
+
+<h2>Model (not pure-MVVM, pure MVVM models don't implement INPC, and don't have Command in them)</h2>
+
+<pre><code>public class Model : INotifyPropertyChanged
+{
+    private readonly RelayCommand _removeMe;
+    private string _original;
+    private string _encoded;
+    private readonly IStructureManager _manager;
+    public string Original
+    {
+        get
+        {
+            return _original;
+        }
+        set
+        {
+            _original = value;
+            Encoded = ReverseString(_original);
+            NotifyPropertyChanged();
+        }
+    }
+
+    public string Encoded
+    {
+        get
+        {
+            return _encoded;
+        }
+        set
+        {
+            _encoded = value;
+            NotifyPropertyChanged();
+        }
+    }
+
+    public ICommand RemoveMeCommand
+    {
+        get
+        {
+            return _removeMe;
+        }
+    }
+
+    public Model(IStructureManager manager, string original)
+    {
+        Original = original;
+        _manager = manager;
+        _removeMe = new RelayCommand(param =&gt; RemoveMe(), param =&gt; CanRemoveMe);
+    }
+
+    private void RemoveMe()
+    {
+        _manager.RemoveItem(this);
+    }
+
+    private bool CanRemoveMe
+    {
+        get
+        {
+            //Logic to enable/disable button
+            return true;
+        }
+    }
+
+    private string ReverseString(string s)
+    {
+        char[] arr = s.ToCharArray();
+        Array.Reverse(arr);
+        return new string(arr);
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    private void NotifyPropertyChanged([CallerMemberName]string propertyName = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+</code></pre>
+
+<h2><a href="http://msdn.microsoft.com/en-us/magazine/dd419663.aspx#id0090030">RelayCommand implementation</a></h2>
+
+<p>From here on out all you have to do is change the attributes of your controls to whatever you're happy with and call it good.  The example might be ugly, but I'm leaving it as an exercise for you to figure out other properties/attributes of WPF controls.</p>

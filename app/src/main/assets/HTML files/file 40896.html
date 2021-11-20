@@ -1,0 +1,22 @@
+<p>Yes, you can only call <code>delete</code> on memory which was allocated via <code>new</code>. Notice that it's the <em>address</em> of the memory (the <em>value</em> of the pointer) which matters, and not the variable storing the pointer. So, your first code:</p>
+
+<pre><code>int* x = new int; //(A)
+cout &lt;&lt; x&lt;&lt;"\n";
+int* p;
+cout &lt;&lt; p &lt;&lt;"\n";
+p = x;  //(B)
+delete p;  //(C)
+cout &lt;&lt; p &lt;&lt;"\n"; //(D)
+</code></pre>
+
+<p>Line (A) allocates memory dynamically at some address (<code>0x100104250</code> in your example output) and stores this address in variable <code>x</code>. The memory is allocated via <code>new</code>, which means that <code>delete</code> must eventually be called on address <code>0x100104250</code>.</p>
+
+<p>Line (B) assigns the address <code>0x100104250</code> (value of pointer <code>x</code>) into the pointer <code>p</code>. Line (C) then calls <code>delete p</code>, which means "deallocate the memory pointed to by <code>p</code>." This means it calls <code>delete</code> on address <code>0x100104250</code>, and all is well. The memory at address <code>0x100104250</code> <em>was</em> allocated via <code>new</code>, and so is not correctly allocated via <code>delete</code>. The fact that you used a different variable for storing the value plays no role.</p>
+
+<p>Line (D) just prints out the value of the pointer. <code>delete</code> acts on the memory to which a pointer points, not on the pointer itself. The value of the pointer stays the same - it still points to the same memory, that memory is just no longer allocated.</p>
+
+<hr>
+
+<p>The second example is different - you're calling <code>delete p</code> when <code>p</code> was not initialised to anything. It points to a random piece of memory, so calling <code>delete</code> on it is of course illegal (technically, it has "Undefined Behaviour", and will most likely crash).</p>
+
+<p>It seems that in your particular example, you're running a debug build and your compiler is "helpfully" initialising local variables to 0 if you don't initialise them yourself. So it actually causes your second example to not crash, since calling <code>delete</code> on a null pointer is valid (and does nothing). But the program actually has a bug, since local variables are normally not initialised implicitly.</p>

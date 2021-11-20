@@ -1,0 +1,32 @@
+<p>You set reuse <em>before</em> binding not after you get an exception.</p>
+
+<pre><code>ServerSocket ss = new ServerSocket(); // don't bind just yet
+ss.setReuseAddress(true);
+ss.bind(new InetSocketAddress(12345)); // can bind with reuse= true
+</code></pre>
+
+<p>This runs without error on Windows 7 and RHEL 5.x</p>
+
+<pre><code>for (int i = 0; i &lt; 1000; i++) {
+    Thread t = new Thread(new Runnable() {
+        @Override
+        public void run() {
+            try {
+                final ServerSocket ss = new ServerSocket();
+                ss.setReuseAddress(true);
+                ss.bind(new InetSocketAddress(12345));
+                Socket s = ss.accept();
+                System.out.println((char) s.getInputStream().read());
+                ss.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    });
+    t.start();
+    Thread.sleep(50);
+    Socket s = new Socket("localhost", 12345);
+    s.getOutputStream().write('c');
+    t.join();
+}
+</code></pre>

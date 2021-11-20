@@ -1,0 +1,41 @@
+<p>It's best to create a module for this kind of behavior:</p>
+
+<pre><code>module CustomAuth
+  def self.included(controller)
+    controller.send :helper_method, :current_account, :logged_in?
+  end
+
+  def current_account
+    # note the Rails.cache.fetch. First time, it will
+    # make a query, but it caches the result and not
+    # run the query a second time.
+    @current_account ||= Rails.cache.fetch(session[:account_id], Account.where(...))
+  end
+
+  def logged_in?
+    !current_account.nil?
+  end
+end
+</code></pre>
+
+<p>Then, make sure that Rails loads up this file (I put mine in <code>./lib/custom_auth.rb</code>), so add that to the <code>config.autoload_paths</code> in <code>./config/application.rb</code>:</p>
+
+<pre><code># ./config/application.rb
+...
+config.autoload_path += %W(#{config.root}/lib)
+...
+</code></pre>
+
+<p>Import the <code>CustomAuth</code> module into your <code>application_controller.rb</code>:</p>
+
+<pre><code>class ApplicationController &lt; ActionController::Base
+  include CustomAuth
+  protect_from_forgery
+
+  ...
+end
+</code></pre>
+
+<p>Finally, Crucial: <strong>Restart your server</strong></p>
+
+<p>NOTE: You can add additional methods to the <code>custom_auth.rb</code>. If you restart the server, they will be available. These methods are also available in the view, so you can call <code>current_account.name</code> right inside a view.</p>

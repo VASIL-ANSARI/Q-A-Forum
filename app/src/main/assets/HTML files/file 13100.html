@@ -1,0 +1,23 @@
+<p>When you return from <code>handle</code> the socket is closed.  Use a while loop and return from <code>handle</code> only when <code>self.data == ''</code>. <code>recv</code> returns zero bytes when the client closes the connection.  Also don't <code>strip()</code> the result until after testing the return value or you could get a false close.  Finally, use <code>ThreadingTCPServer</code> or the server can only handle one connection at a time.</p>
+
+<p>Example:</p>
+
+<pre><code>import SocketServer
+
+class MyTCPHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        while True:
+            self.data = self.request.recv(1024)
+            if self.data == '':
+                break
+            self.data = self.data.strip()
+            print "{} wrote: {}\n".format(self.client_address[0], self.data)
+            self.request.send(self.data.upper())
+
+if __name__ == "__main__":
+    HOST, PORT = "localhost", 9999
+    server = SocketServer.ThreadingTCPServer((HOST, PORT), MyTCPHandler)
+    server.serve_forever()
+</code></pre>
+
+<p>Also note the <code>send()</code> is not guaranteed to send all bytes of message, so use <code>sendall()</code> or check the return value.  <code>recv()</code> can also be tricky.  TCP/IP is a streaming protocol and has no concept of message boundaries, so it is up to you to implement a protocol to check that you have received a complete message.  It is possible to send 10000 bytes and receive less than that, requiring multiple receives to get the whole message.  It is also possible to make two sends and receive both in one receive, or even all of one send and part of another.  For your example simply buffering all receives until there is a <code>\n</code> in the message would do for a simple protocol.</p>

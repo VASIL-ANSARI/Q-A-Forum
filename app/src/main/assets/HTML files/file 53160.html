@@ -1,0 +1,33 @@
+<p>You can execute web2py templates using the <code>gluon.template.render</code> function, but if the template was designed to be executed within a web2py application, it may include references to some web2py environment objects (e.g., HTML helper objects, the <code>T</code> translation object, the <code>request</code> and <code>response</code> objects, etc.), which would not be available when calling the <code>render</code> function outside of a web2py HTTP request.</p>
+
+<p>If proper execution of the template requires a web2py environment, you can build one using the <code>gluon.shell.env</code> function:</p>
+
+<pre><code>    import os
+    import gluon.shell
+
+    context_dict = {...} # The context to be passed to the template.
+
+    app = 'myapp'
+    app_path = os.path.join(os.path.dirname(os.path.abspath(gluon.shell.__file__)),
+                            '..', '..', 'applications', app)
+    w2p_env = gluon.shell.env(app, dir=app_path, import_models=True)
+    context_dict.update(**w2p_env) # Update context with web2py environment objects.
+    response = w2p_env['response']
+    html = response.render(os.path.join(app_path, 'views', 'mycontroller', 'myview.html'),
+                           context=context_dict)
+</code></pre>
+
+<p><code>gluon.shell.env</code> returns a dictionary containing all the web2py execution environment objects. If <code>import_models=True</code>, as in the code above, it will also execute the application's models (and therefore, any objects defined in the models will also be included in the returned dictionary).</p>
+
+<p>By updating <code>context_dict</code> with the full web2py execution environment, we ensure that any web2py objects referenced in the template (and any templates it extends or includes) will be available.</p>
+
+<p>The <code>w2p_env</code> environment also includes a <code>response</code> object, so we can use the <code>response.render</code> method to render the template. Alternatively, as noted above, we could have used the <code>gluon.template.render</code> function.</p>
+
+<p>An alternative approach is to simply run your Python script in the environment of your web2py application:</p>
+
+<pre><code>python web2py.py -S myapp -M -R '/path/to/myscript.py'
+</code></pre>
+
+<p>With this approach, myscript.py can make reference to any web2py environment objects that would be available from within the application code (no need to import anything or explicitly build a web2py environment).</p>
+
+<p>Also, note that you can exclude the <code>-M</code> if you don't need the application's models to be run.</p>

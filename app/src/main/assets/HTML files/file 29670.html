@@ -1,0 +1,26 @@
+<p>Use <a href="http://man7.org/linux/man-pages/man2/wait.2.html" rel="nofollow"><code>waitpid</code></a> instead, and be sure to handle <em>both</em> normal exit and killed-by-signal:</p>
+
+<pre><code>pid_t pid = fork();
+
+if (pid == 0)
+{
+    exit(0);
+}
+else if (pid &gt; 0)
+{
+    int status;
+    int n = waitpid(pid, &amp;status, 0);
+
+    if (n != pid)                 { /* error */ }
+    else if (WIFSIGNALED(status)) { /* get WTERMSIG(status)    */ }
+    else if (WIFEXITED(status))   { /* get WEXITSTATUS(status) */ }
+}
+else if (pid &lt; 0)
+{
+    /* error */
+}
+</code></pre>
+
+<p>As you can see from the documentation, <code>wait</code> will wait for <em>any</em> child, not just the current one. And of course its entirely possible that the child exits normally before receiving the signal.</p>
+
+<p>You can stop the child from exiting normally by calling <a href="http://man7.org/linux/man-pages/man2/pause.2.html" rel="nofollow"><code>pause</code></a>, but the signal will only kill the child if it <em>doesn't</em> get handled. If the signal handler returns, <code>pause</code> returns, too.</p>

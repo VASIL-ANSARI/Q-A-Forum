@@ -1,0 +1,65 @@
+<blockquote>
+  <p>The encrypt function within railo CFML is limited to DESede without
+  any further options (i.e. defaults are used for cipher mode and
+  padding).</p>
+</blockquote>
+
+<p>Yes, I believe it uses java's defaults ie <code>DESede/ECB/PKCS5Padding</code> which are compatible with <code>TripleDES/ECB/PKCS7padding</code> in .NET. So it should work right out of the box as long as you are using a 24 byte key.  </p>
+
+<p>Without knowing more, I am guessing it might be a problem with your key size. .NET supports both 16 and 24 byte keys, but java only supports 24 byte keys. So if your key is only 16 bytes, you need to pad it with the first eight (8) bytes to make it acceptable to Java/Railo.</p>
+
+<p><strong>CF/Railo Code</strong></p>
+
+<pre><code>&lt;cfscript&gt;
+    input  = "DESede (3DES) Encryption in RAILO CFML";
+    key    = "ru8femXhTm9jwdGdhb/4Sw==";
+
+    // pad the key with the first eight bytes. then convert back to base64
+    keyBytes  = binaryDecode(key, "base64");
+    keyBytes  = arrayMerge(keyBytes, arraySlice(keyBytes, 1, 8));
+    newKey = binaryEncode(javacast("byte[]", keyBytes), "base64");
+
+    encrypted = encrypt(input, newKey, "desede", "base64");
+    WriteDump("encrypted (CF): "&amp; encrypted);
+&lt;/cfscript&gt;
+</code></pre>
+
+<p><strong>C# Code</strong></p>
+
+<pre><code>byte[] input = Encoding.UTF8.GetBytes("DESede (3DES) Encryption in RAILO CFML");
+byte[] key = Convert.FromBase64String("ru8femXhTm9jwdGdhb/4Sw==");
+
+TripleDESCryptoServiceProvider algorithm = new TripleDESCryptoServiceProvider();
+algorithm.Mode = CipherMode.ECB;
+algorithm.BlockSize = 64;
+algorithm.KeySize = 128; // 16 byte key
+algorithm.Key = key;
+ICryptoTransform cipher = algorithm.CreateEncryptor();
+byte[] encrypted = cipher.TransformFinalBlock(input, 0, input.Length);
+Console.WriteLine("encrypted (.NET): {0}", Convert.ToBase64String(encrypted));
+</code></pre>
+
+<p><strong>Results:</strong></p>
+
+<pre><code>encrypted (CF):   fMPlk0ZqHDwp2zzZs/Cng7Y6r8Acr55UPJYWJTruEesxkBApsEFo6w==
+encrypted (.NET): fMPlk0ZqHDwp2zzZs/Cng7Y6r8Acr55UPJYWJTruEesxkBApsEFo6w==
+</code></pre>
+
+<hr>
+
+<p><strong>Update:</strong>  Weird. When I MD5 hash the key in .NET I get your first result rather than the "expected result"</p>
+
+<pre><code>    String rawInput = "&lt;xml&gt;&lt;PanNumber&gt;6280390027626871&lt;/PanNumber&gt;&lt;Req_Currency_Code&gt;826&lt;/Req_Currency_Code&gt;&lt;Card_Pin&gt;1234&lt;/Card_Pin&gt;&lt;Till_Amount&gt;&lt;/Till_Amount&gt;&lt;Auth_Code&gt;&lt;/Auth_Code&gt;&lt;/xml&gt;";
+    String rawKey = "06098140901984F95E139F29B479D952CB6545C177D21456";
+    byte[] input = Encoding.UTF8.GetBytes(rawInput);
+    byte[] key = MD5.Create().ComputeHash(Encoding.UTF8.GetBytes(rawKey));
+    // ... rest of code 
+</code></pre>
+
+<p><strong>Result:</strong>    </p>
+
+<pre><code>encrypted (.NET): 26sfwv2DHDj7EHYd5Qao8veDtPbKIcv8rDVhbLPDEaWHO27EUGRF6KrdbXe7NB
+UVADYMdGuagfO4Tev584dUcgKGJ2h6kWPZxooNUGMgL2xB7e00YOkLosA8wFD569sZUd1MGKuF9yCjY1
+zCsAE4SgohkcuK9YZ7BizQma99/W9yOsIjAfHtAqGiep4tMTQ+eFASYtPybccsgi8H4brIB/HAu0kaDS
+Aw          
+</code></pre>

@@ -1,0 +1,66 @@
+<p>If the web hosting is using <strong>cPanel</strong> then you can use the cPanel API to call the <strong>getFreeSpace()</strong> and <strong>getSpaceUsed()</strong> function. </p>
+
+<pre><code>function getFreeSpace()
+{
+    $freeSpace = $this-&gt;parseIndex('Disk space available', 'float');
+    return ($freeSpace == 0) ? 'Unlimited' : floatval($freeSpace);
+}
+</code></pre>
+
+<p>Just my 2 penny</p>
+
+<p>cPanel API: <a href="http://www.phpkode.com/source/s/cpanel-api/cpanel-api/cPanel.php" rel="nofollow">http://www.phpkode.com/source/s/cpanel-api/cpanel-api/cPanel.php</a></p>
+
+<p><strong>Update:</strong></p>
+
+<p>I came across the web and found this php script (extracted from a cms plugin). So this is the script that I have tested on my web hosting:</p>
+
+<p><img src="http://i.stack.imgur.com/N5YNc.jpg" alt="Disk space script"></p>
+
+<pre><code>&lt;?php
+
+
+
+// SETTINGS - START
+
+// PUT YOUR CPANEL HOSTING USERNAME HERE:
+    $username = "username";
+
+// PUT YOUR CPANEL HOSTING USERNAME HERE:
+    $password = "password";
+
+// MODIFY THIS PATH TO REFLECT YOUR DOMAIN, REPLACING "DOMAIN-NAME" AND "YOUR-CPANEL-USERNAME":
+    $query ="http://cpanel.yoursite.com:2082/xml-api/cpanel?user=USERNAME&amp;cpanel_xmlapi_module=StatsBar&amp;cpanel_xmlapi_func=stat&amp;display=diskusage";
+
+// SETTINGS - END
+
+
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER,0);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST,0);
+    curl_setopt($curl, CURLOPT_HEADER,0);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER,1);
+    curl_setopt($curl, CURLOPT_USERPWD, $username.":".$password);
+    curl_setopt($curl, CURLOPT_URL, $query);
+    $result = curl_exec($curl);
+    curl_close($curl); 
+
+    $xml = simpleXML_load_string($result);
+
+    $df = $xml-&gt;data[0]-&gt;_count; // used MB
+    $ds = $xml-&gt;data[0]-&gt;_max; // max MB
+    $du = $ds - $df; // free MB
+    if ($ds &gt; 0) $perc = number_format(100 * $du / $ds, 2); else $perc = 0;
+    $color = '#e87d7d';
+    if ($perc &gt; 50) $color = '#e8cf7d';
+    if ($perc &gt; 70) $color = '#ace97c';
+    echo '&lt;li style="font-weight:bold;padding:5px 15px;border-radius:4px;-moz-border-radius:4px;-webkit-border-radius:4px;background-color:#182227;margin-left:13px;color:#afc5cf;"&gt;'
+        .'Free disk space'
+        .'&lt;div style="border:1px solid #ccc;width:100%;margin:2px 5px 2px 0;padding:1px"&gt;'
+        .'&lt;div style="width:'.$perc.'%;background-color:'.$color.';height:6px"&gt;&lt;/div&gt;&lt;/div&gt;'
+        .$du.' of '.$ds.' MB free'.'&lt;/li&gt;';
+
+?&gt;
+</code></pre>
+
+<p>Source script: <a href="http://get-simple.info/extend/plugin/free-disk-space-cpanel/317/" rel="nofollow">http://get-simple.info/extend/plugin/free-disk-space-cpanel/317/</a></p>

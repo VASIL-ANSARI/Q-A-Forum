@@ -1,0 +1,60 @@
+<p>If you record enough data in your job table every time a job executes, including exact timing your answer will be to just do a select in the table and group your jobs per minute. I'm not familiar with MySQL but I can show you an easy select in SQL Server that could do the job:</p>
+
+<pre><code>SELECT DATEPART(MINUTE,YourDate), Count(YourJob) 
+FROM #X
+GROUP BY  DATEPART(MINUTE,YourDate), YourJob
+</code></pre>
+
+<p>DATEPART is a function in SQL Server that gets a specific part of your date (in this case the minute). You may find a similar function in MySQL? then you just group your rows by minute using this function and then by the count of jobs. This will show you the count of jobs done per minute.</p>
+
+<p>Update: Try this in MySQL:</p>
+
+<pre><code>SELECT MINUTE(YourDate), Count(YourJob) 
+FROM #X
+GROUP BY  MINUTE(YourDate), YourJob
+</code></pre>
+
+<p>Update 2: Hope this works better for you...</p>
+
+<pre><code>SELECT StreamWS, DATEFORMAT(JobStarted,'%d %m %y %H') as Date, MINUTE(JobStarted) StartedMinute, 
+Count(StreamWS) Total
+FROM #YourTable
+WHERE  STR_TO_DATE(JobStarted, '%d/%m/%Y') BETWEEN '01-Jan-2013' AND '01-Jun-2015'
+GROUP BY  StreamWS, DATEFORMAT(JobStarted,'%d %m %y'), MINUTE(JobStarted)
+</code></pre>
+
+<p>In this query you are grouping first by servers so you'll be able to see the result for each server, then by the actual date it happened (you can change the parameters here so that you can show as granular as you need, e.g. every hour, or every day, or just every month), and then per minute to divide the counts for every minute. in the Where clause you can add the date range you need.</p>
+
+<p>More info about date operations in MySQL here:
+<a href="http://dev.mysql.com/doc/refman/5.0/en/date-and-time-functions.html#function_date-format" rel="nofollow">http://dev.mysql.com/doc/refman/5.0/en/date-and-time-functions.html#function_date-format</a></p>
+
+<p>Update 3:</p>
+
+<p>Another option I was considering to solve this was Recursive CTEs but after some research I found MySQL doesn't support them (<a href="http://dba.stackexchange.com/questions/46061/mysql-equivalent-of-with-in-oracle">http://dba.stackexchange.com/questions/46061/mysql-equivalent-of-with-in-oracle</a>), I'll show you how it may look like (I didn't test it though), so you may do something alike in a different way...</p>
+
+<pre><code>WITH X (StreamWS, MyCount, [Minutes]) AS
+(
+SELECT StreamWS, 1 as MyCount, DATEDIFF(MINUTE,JobStarted,JobCompleted) FROM #TransactionLog T
+UNION ALL 
+SELECT X.StreamWS, X.MyCount+1, X.Minutes-1 FROM X 
+WHERE X.Minutes&gt;0 and X.MyCount&lt;X.Minutes
+
+--JOIN #TransactionLog T ON X.StreamWS = T.StreamWS
+--AND DATEDIFF(MINUTE,T.JobStarted,T.JobCompleted)&lt;X.MyCount&lt;
+)
+SELECT * FROM X
+</code></pre>
+
+<p>The idea is to duplicate the entries (jobs) for each minute where it was running, so for example for Server 1 in your sample table you had it running 22 minutes (from 21:31 to 21:53): you can have a new temporal table where Server1 is created as a row for each minute (i.e. 22 times):</p>
+
+<pre><code>StreamWS MyCount     Time
+-------- ----------- -----------
+Server1  1           4/12/2014 21:31
+Server1  2           4/12/2014 21:32
+Server1  3           4/12/2014 21:33
+Server1  4           4/12/2014 21:34
+
+...
+</code></pre>
+
+<p>If you do this with all the servers then you can query this new temporal table for a specific range. This should give you a more accurate result of the Jobs that where running at that date range each minute.</p>

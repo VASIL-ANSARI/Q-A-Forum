@@ -1,0 +1,50 @@
+<p>I figured out how to do this using Jackson 1.4.  I'm not using jersey-json since it is based on an older version of Jackson and I needed version 1.4 to use JsonViews.</p>
+
+<p>Here is the annotated pojo:</p>
+
+<pre><code>public class CalendarFeed {
+    public enum FeedType { GCAL, EVENT };
+    @JsonIgnore
+    private Member owner;
+    private String name;
+    private String value;
+    @JsonIgnore
+    private FeedType type;
+}
+</code></pre>
+
+<p>Here is the jersey resource:</p>
+
+<pre><code>@Path("/calendar")
+public class CalendarResource {
+
+ @Inject("memberService")
+ private MemberService memberService;
+
+ @Inject
+ private ObjectMapper mapper;
+
+ @GET
+ @Produces(MediaType.APPLICATION_JSON)
+ public String getCalendars() {
+  Member member = memberService.getCurrentMember();
+  try {
+   return mapper.writeValueAsString(member.getCalendarFeeds());
+  } catch (JsonGenerationException e) {
+  } catch (JsonMappingException e) {
+  } catch (IOException e) {
+  }
+  return "{}";
+ }
+}
+</code></pre>
+
+<p>Here is my spring bean:</p>
+
+<pre><code>&lt;!-- Jackson JSON ObjectMapper --&gt;
+&lt;bean id="objectMapper" class="org.codehaus.jackson.map.ObjectMapper"/&gt;
+</code></pre>
+
+<p>The output is exactly what I need.  And using JsonViews, I can customize what fields get output for different situations.</p>
+
+<p>Hopefully this will help someone else!</p>

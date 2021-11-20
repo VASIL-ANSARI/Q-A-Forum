@@ -1,0 +1,81 @@
+<p>Your logic is wrong</p>
+
+<p>You iterate a row of the <code>rs</code> and store it in the request attributes <code>data1</code> and <code>data2</code>.
+Then you get the next row and you <strong>overwrite</strong> the same attributes over and over again.</p>
+
+<p>And therefore you are left with the last value of the <code>rs</code>.</p>
+
+<p>I think it would be better to store your results in a <code>Collection</code>, and then store your <code>Collection</code> in your <code>request</code> object </p>
+
+<p><strong>UPDATE1</strong></p>
+
+<p>Consider this sample code</p>
+
+<pre><code>public class MyObject{
+  private String data1;
+  private String data2;
+    public void setData1(String data1) {
+        this.data1 = data1;
+    }
+
+    public String getData1() {
+        return data1;
+    }
+
+    public void setData2(String data2) {
+        this.data2 = data2;
+    }
+
+    public String getData2() {
+        return data2;
+    }
+}
+</code></pre>
+
+<p>This is your Object.</p>
+
+<p>Then Do the changes in your code above like this:</p>
+
+<pre><code>List &lt;MyObject&gt; list = new List&lt;MyObject&gt;();
+if (res.next()){
+    MyObject obj = new MyObject();
+    do{
+          obj.setData1(res.getString(1));
+          obj.setData2(res.getString(2));
+          list.add(obj);
+    }while(res.next());
+
+request.setAttribute("results", list);
+}
+</code></pre>
+
+<p>This will add the <code>List</code> in a request attribute named <code>results</code></p>
+
+<p>Then you can retrieve the list using</p>
+
+<pre><code>List &lt;MyObject&gt; results = (List&lt;MyObject&gt;) request.getAttribute("results");
+</code></pre>
+
+<p><strong>UPDATE2</strong></p>
+
+<p>PS: It is a good practice to remove the <code>do/while</code> loop because it is error prone and replace it with a <code>while</code> like this</p>
+
+<pre><code>    while(res.next()){
+          obj.setData1("data1", res.getString(1));
+          obj.setData2("data2", res.getString(2));
+          list.add(obj);
+    }
+</code></pre>
+
+<p><strong>UPDATE3</strong></p>
+
+<p>Print it to jsp like this</p>
+
+<pre><code>&lt;%@page import="java.util.*"%&gt;
+&lt;%
+  List &lt;MyObject&gt; results = (List&lt;MyObject&gt;) request.getAttribute("results");
+  for(MyObject obj : results){
+    out.write(obj.getData1() + " "+ obj.getData2() + "&lt;br/&gt;";
+  }
+%&gt;
+</code></pre>

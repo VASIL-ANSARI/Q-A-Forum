@@ -1,0 +1,92 @@
+<p>Ok I think I got it working now after making some changes.  First I made some changes to the JQuery script by looking to see if the current Textbox is null or not and whether the gridview count is the same as it was before the page request.  This is because for some reason if I'm on the fifth row of a page and the next page only has four rows, then it would be looking to put the focus on the fifth row of the page and I would get an exception.</p>
+
+<p>Then for the code behind, I simply put the focus on the first row in the Page_Load event and PageIndexChanged event (which I added).</p>
+
+<p>HTML:</p>
+
+<pre><code>&lt;asp:ScriptManager ID="ScriptManagerDetails" runat="server" ScriptMode="Release"&gt;&lt;/asp:ScriptManager&gt;
+    &lt;script type="text/javascript"&gt;
+        var rowscountbefore;
+        var g_CurrentTextBox;                
+        Sys.Application.add_load(applicationLoadHandler);
+        function applicationLoadHandler() {
+            Sys.WebForms.PageRequestManager.getInstance().add_endRequest(endRequestHandler);
+        }
+
+        function beginRequestHandler() {
+        rowscountbefore = $("#&lt;%=gvDetailList.ClientID%&gt; tr").length;
+         }
+
+        function endRequestHandler() {
+         if (g_CurrentTextBox != null &amp;&amp; rowscountbefore == $("#&lt;%=gvDetailList.ClientID%&gt; tr").length) {
+            $get(g_CurrentTextBox).focus();
+            $get(g_CurrentTextBox).select();
+           }
+        }
+
+        function onTextFocus() {
+            g_CurrentTextBox = event.srcElement.id;
+        }                
+    &lt;/script&gt;
+    &lt;asp:UpdatePanel ID="UpdatePanelDetails" runat="server"&gt;
+        &lt;ContentTemplate&gt;
+        &lt;div class="row" id="ItemResults"&gt;
+        &lt;asp:GridView ID="gvDetailList" runat="server" CssClass="table table-striped table-bordered table-hover" OnPageIndexChanged="gvDetailList_PageIndexChanged"
+          AutoGenerateColumns="false"  AllowPaging="true" OnPageIndexChanging="gvDetailList_PageIndexChanging" OnRowDataBound="gvDetailList_RowDataBound" Pagesize="25" &gt;
+            &lt;Columns&gt;
+                &lt;asp:BoundField DataField="ItemNumber" HeaderText ="Item Number" SortExpression="ItemNumber" /&gt;
+                &lt;asp:TemplateField HeaderText="Qty" SortExpression="QUANTITY"&gt;
+                    &lt;ItemTemplate&gt;
+                        &lt;asp:Label ID="lblGVQuantity" runat="server" Text='&lt;%#Eval("QUANTITY") %&gt;'&gt;&lt;/asp:Label&gt;
+                        &lt;asp:Panel ID="pnlQuantity" runat="server"&gt;
+                            &lt;asp:TextBox ID="txtQuantity" runat="server" class="form-control input-sm" 
+                                  AutoPostBack="true"  Text='&lt;%#Eval("QUANTITY") %&gt;' OnTextChanged="txtQuantity_TextChanged"&gt;&lt;/asp:TextBox&gt;
+                            &lt;asp:CompareValidator ID="cvQuantity" runat="server" ControlToValidate="txtQuantity" Type="Integer" ForeColor="Red"
+                             Operator="DataTypeCheck" ErrorMessage="Quantity is not numeric" Text="* Quantity is not numeric" Display="Dynamic" ValidationGroup="valAdd" /&gt;
+                        &lt;/asp:Panel&gt;
+                    &lt;/ItemTemplate&gt;
+                &lt;/asp:TemplateField&gt;
+            &lt;/Columns&gt;
+            &lt;PagerStyle CssClass="pagination-ys" /&gt;
+        &lt;/asp:GridView&gt;
+        &lt;asp:SqlDataSource ID="SqlDetailList" runat="server" 
+        ConnectionString="&lt;%$ ConnectionStrings:MyConnectionStr%&gt;"                     
+         &gt;
+    &lt;/asp:SqlDataSource&gt;
+    &lt;/div&gt;
+    &lt;/ContentTemplate&gt;
+ &lt;/asp:UpdatePanel&gt;
+</code></pre>
+
+<p>Code Behind:</p>
+
+<pre><code>protected void Page_Load(object sender, EventArgs e)
+{        
+    if (!IsPostBack)
+    {
+        BindDetails();
+        TextBox txtQuantity = (TextBox)gvDetailList.Rows[0].Cells[4].FindControl("txtQuantity");
+        txtQuantity.Focus();
+    }
+}
+
+private void BindDetails()
+{        
+    string strSQL = "SELECT  * FROM TABLE";
+    SqlDetailList.SelectCommand = strSQL;
+    gvDetailList.DataSource = SqlDetailList;
+    gvDetailList.DataBind();
+}
+
+protected void gvDetailList_PageIndexChanging(object sender, GridViewPageEventArgs e)
+{        
+    gvDetailList.PageIndex = e.NewPageIndex;
+    BindDetails();
+}
+
+protected void gvDetailList_PageIndexChanged(object sender, EventArgs e)
+{
+    TextBox txtQuantity = (TextBox)gvDetailList.Rows[0].Cells[4].FindControl("txtQuantity");
+    txtQuantity.Focus();
+}
+</code></pre>

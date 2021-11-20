@@ -1,0 +1,36 @@
+<p>you can just do this</p>
+
+<pre><code>dt.Columns.Remove("xyz");
+</code></pre>
+
+<p><strong>Update</strong></p>
+
+<p>It seems Fill does not support CLOB data. Above solution will not work.You need to do change in SQL itself. My suggestion is to move everything in stored procedure and use meta data to extract column which you want (or exclude column which you do not want.) Here is sample code. Please note I have not tested it so you may find some minor issue but the code gives you gist of what you can do to solve your problem </p>
+
+<p><strong>C# Code</strong></p>
+
+<pre><code> OleDbConnection oc= new OleDbConnection("[pass your connection string]");
+ OleDbCommand ocom = new OleDbCommand();
+   ocom.CommandText = "Abc"; // Abc is stored procedure  
+   ocom.Connection  = oc;
+   ocom.CommandType = CommandType.StoreProcedure;
+   ocom.Parameters.AddWithValue("@tableName","PQR") // pass your table name
+   ocom.Parameters.AddWithValue("@databaseName","IJK"); // pass your database name
+ OleDbDataAdapter oda = new OleDbDataAdapter(ocom);
+            DataTable dt = new DataTable();
+            oda.Fill(dt);
+            dataGridViewAttendanceDatabase.DataSource = dt;
+</code></pre>
+
+<p><strong>SQL Script</strong></p>
+
+<pre><code>Create Porocedure Abc (@tableName varchar(255),@databaseName varchar(255))
+Begin 
+
+SET @sql = CONCAT('SELECT ', (SELECT REPLACE(GROUP_CONCAT(COLUMN_NAME), 'Fingerprint_Template,', '') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tableName AND TABLE_SCHEMA = @databaseName), CONCAT(' FROM ',@tableName));
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+
+End
+</code></pre>
